@@ -346,7 +346,9 @@ class PreconPostProcessing:
         nodes = sweeper.coll.nodes
 
         if plot_Q:
-            ax.plot(np.append(0, nodes), [sum(Q[i, :]) for i in range(QI.shape[0])], color='black', label='Q', linewidth=6)
+            ax.plot(
+                np.append(0, nodes), [sum(Q[i, :]) for i in range(QI.shape[0])], color='black', label='Q', linewidth=6
+            )
 
         ax.plot(np.append(0, nodes), [sum(QI[i, :]) for i in range(QI.shape[0])], color=self.color, label=self.label)
 
@@ -566,7 +568,7 @@ def compare_signatures(precons, **kwargs):
     """
     fig, ax = plt.subplots()
     for precon in precons:
-        precon.plot_signature(ax=ax, plot_Q=precon==precons[0])
+        precon.plot_signature(ax=ax, plot_Q=precon == precons[0])
     fig.tight_layout()
     plt.savefig(f'data/plots/weights.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
 

@@ -1,7 +1,7 @@
 # Preconditioners
 The major goal of this project is to derive preconditioners using optimization and adaptivity.
 
-We made some considerations of how to evaluate the contraction factors of preconditioners using Fouriour transform [here](data/notes/Fourier.md).
+We made some considerations of how to evaluate the contraction factors of preconditioners using Fourier transform [here](data/notes/Fourier.md).
 
 We discussed details of the optimization [here](data/notes/optimization.md).
 
