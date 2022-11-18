@@ -237,6 +237,6 @@ if __name__ == '__main__':
     store_serial_precon(problem, num_nodes, IE=True, **kwargs)
     store_serial_precon(problem, num_nodes, MIN=True, **kwargs)
     store_serial_precon(problem, num_nodes, MIN3=True, **kwargs)
-    # optimize_with_first_row(params, num_nodes, **kwargs)
+    optimize_with_first_row(params, num_nodes, **kwargs)
     optimize_without_sum(params, num_nodes, **kwargs)
-    # optimize_with_sum(params, num_nodes, **kwargs)
+    optimize_with_sum(params, num_nodes, **kwargs)

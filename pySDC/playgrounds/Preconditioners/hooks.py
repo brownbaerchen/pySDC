@@ -52,6 +52,16 @@ class log_error_at_iterations(hooks):
             level=L.level_index,
             iter=step.status.iter,
             sweep=L.status.sweep,
+            type='u_nodes',
+            value=L.u.copy(),
+        )
+
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
             type='u',
             value=L.uend,
         )

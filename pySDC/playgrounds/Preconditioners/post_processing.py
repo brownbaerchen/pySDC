@@ -427,6 +427,200 @@ class PreconPostProcessing:
             )
         return parameter, parameter_range, iterations
 
+    def get_special_cases(self, **kwargs):
+        """
+        Return iteration count for certian specific problems
+        """
+        # dt = {
+        #    'advection': {-1: 5e-2, 2: 2e-1},
+        #    'heat': {-1: 5e-3, 2: 9e-2},
+        # }
+        dt = {
+            'advection': {-1: 2e-1, 2: 2e-1},
+            'heat': {-1: 9e-2, 2: 9e-2},
+        }
+
+        res = {}
+
+        for p in ['advection', 'heat']:
+            res[p] = {}
+
+            for f in [-1, 2]:
+                res[p][f] = {}
+
+                params, _, _ = get_params_for_stiffness_plot(p, **{**self.data['kwargs'], **kwargs})
+
+                params['problem_params']['freq'] = f
+                # params['level_params']['dt'] = dt[p][f]
+                params['Tend'] = params['level_params']['dt']
+
+                stats, controller = self.run_problem(logger_level=30, custom_params=params, **kwargs)
+
+                res[p][f]['k'] = get_sorted(stats, type='k', recomputed=None)
+                res[p][f]['r'] = get_sorted(stats, type='residual_post_step', recomputed=False)
+        return res
+
+    def euler_comp(self, l=-0.9 + 0j, **kwargs):
+        # TODO: dox
+        if 'ax' not in kwargs.keys():
+            fig, ax = plt.subplots()
+        else:
+            ax = kwargs['ax']
+
+        params = get_params('Dahlquist', **{**self.data['kwargs'], **kwargs})
+        params['problem_params']['lambdas'] = np.array([l])
+        params['force_sweeper_params'] = {'initial_guess': 'spread'}
+        params['step_params'] = {'maxiter': 2}
+        params['convergence_controllers'] = {}
+
+        from pySDC.playgrounds.Preconditioners.hooks import log_error_at_iterations
+
+        stats, controller = self.run_problem(logger_level=15, custom_params=params, hook_class=log_error_at_iterations)
+
+        sweeper = controller.MS[0].levels[0].sweep
+        QI = sweeper.QI
+        Q = sweeper.coll.Qmat
+        nodes = np.append(0, sweeper.coll.nodes)
+        num_nodes = sweeper.coll.num_nodes
+
+        [ax.axvline(n, color='black') for n in nodes]
+
+        # plot exact solution
+        t = np.linspace(0, 1, 10)
+        ax.plot(t, np.exp(l * t).real, label='$u^*$', marker='^', color='black')
+        ax.plot(t, np.exp(l * t).imag, ls='--', marker='*', color='black')
+
+        u = get_sorted(stats, type='u_nodes', sortby='iter')
+        for k, v in u:
+            print(k, v)
+            ax.plot(nodes, np.array(v).real, label=fr'$u^{k}$', color=colors[k - 1], marker='^')
+            ax.plot(nodes, np.array(v).imag, color=colors[k - 1], marker='*', ls='--')
+
+        ax.legend(frameon=False)
+        ax.set_ylabel(r'$\Re (u)$, $\Im (u)$')
+        ax.set_xlabel('$t$')
+        if 'ax' not in kwargs.keys():
+            plt.savefig(
+                f'data/plots/test_special/{self.label}-l={l}.{kwargs.get("format", "pdf")}',
+                bbox_inches='tight',
+                dpi=200,
+            )
+
+        # iterations = kwargs.get('iterations', [1, 2])
+
+        # solutions = {0: np.ones_like(nodes)}
+        # ax.scatter(nodes, solutions[0], label=r'$u_0$')
+
+        # for i in iterations:
+        #    f = l * solutions[i - 1]
+
+        # for j in range(num_nodes):
+
+        diags = [QI[i + 1, i + 1] for i in range(num_nodes)]
+
+
+def compare_special_cases(precons, **kwargs):
+    """
+    Compare advection and diffusion with smooth and slightly less smooth initial conditions respectively.
+
+    They are plotted in a polar plot with the radial coordinate representing the iteration or step number, depending in
+    whether adaptivity is used or not. The size of the marker gives information about the maximal residual at the end
+    of the steps. The larger the marker, the smaller the residual relative to the same problem solved with different
+    preconditioners.
+
+    Args:
+        precons (list): List of preconditioners as PreconPostProcessing objects
+
+    Returns:
+        None
+    """
+    # make figure
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='polar')
+
+    res = [p.get_special_cases(**kwargs) for p in precons]
+
+    problems = list(res[0].keys())
+    freqs = list(res[0][problems[0]].keys())
+
+    n_options = len(problems) * len(freqs)
+    angles = 2 * np.pi / n_options * (np.arange(n_options) + 1 / 2)
+    angles = np.pi / 4 * np.array([1, 3, 7, 5])
+    idx = [0, 1, 3, 2]
+
+    # figure out the minimum residual across the preconditioners for plotting reasons
+    r_min = [
+        np.reshape(
+            [
+                [min([max([me[1] for me in res[i][p][f]['r']]) for i in range(len(precons))]) for f in freqs]
+                for p in problems
+            ],
+            (n_options),
+        )
+    ]
+
+    # plot stuff
+    for i in range(len(precons)):
+        k = np.reshape([[sum([me[1] for me in res[i][p][f]['k']]) for f in freqs] for p in problems], (n_options))
+        r = np.reshape([[max([me[1] for me in res[i][p][f]['r']]) for f in freqs] for p in problems], (n_options))
+        n_steps = np.reshape([[len([me[1] for me in res[i][p][f]['k']]) for f in freqs] for p in problems], (n_options))
+
+        to_plot = k if not kwargs.get('adaptivity', False) else n_steps
+        ax.scatter(angles, to_plot, label=precons[i].label, marker='*', s=r_min / r * 200, color=precons[i].color)
+        ax.plot(
+            np.append(angles[idx], angles[0]),
+            np.append(to_plot[idx], to_plot[0]),
+            color=precons[i].color,
+            ls=precons[i].ls,
+        )
+
+    # decorate
+    ax.set_thetagrids([])
+    r_max = ax.get_ylim()[1]
+    ax.plot([0, np.pi], [r_max, r_max], color='black', zorder=-1000)
+    ax.plot([np.pi / 2, np.pi * 3 / 2], [r_max, r_max], color='black', zorder=-1000)
+    ax.set_ylim(0, r_max)
+    r_pos = r_max * 1.05
+    ax.annotate(
+        'advection',
+        xy=(np.pi / 2, r_max),
+        xytext=(np.pi / 2, r_pos),
+        verticalalignment='center',
+        horizontalalignment='center',
+    )
+    ax.annotate(
+        'heat',
+        xy=(np.pi * 3 / 2, r_max),
+        xytext=(np.pi * 3 / 2, r_pos),
+        verticalalignment='center',
+        horizontalalignment='center',
+    )
+
+    ax.annotate(
+        'sin',
+        xy=(np.pi, r_max),
+        xytext=(np.pi, r_pos),
+        verticalalignment='center',
+        horizontalalignment='center',
+        rotation=90,
+    )
+    ax.annotate(
+        'Gaussian',
+        xy=(0, r_max),
+        xytext=(0, r_pos),
+        verticalalignment='center',
+        horizontalalignment='center',
+        rotation=90,
+    )
+
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    plt.savefig(
+        f'data/plots/special_cases{"-adaptivity" if kwargs.get("adaptivity", False) else ""}.png',
+        dpi=200,
+        bbox_inches='tight',
+    )
+
 
 def compare_stiffness(precons, problem, parameter=None, parameter_range=None, **kwargs):
     """
@@ -663,6 +857,7 @@ postNORM = PreconPostProcessing(
 
 precons = [postDiagFirstRow, postLU, postDiag, postIE]
 more_precons = precons + [postMIN, postNORM, postMIN3]
+interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
 
 custom_problem_params = {
     'sigma': 6e-2,
@@ -673,8 +868,10 @@ custom_problem_params = {
 pkwargs = {'Tend': 1e-2}
 
 
-compare_stiffness_paper(more_precons, format='png')
-compare_signatures([postIE, postLU, postDiag, postDiagFirstRow, postMIN, postMIN3], format='png')
+# [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
+compare_special_cases(interesting_precons, adaptivity=False)
+compare_stiffness_paper(interesting_precons, format='png')
+compare_signatures(interesting_precons + [postIE], format='png')
 # compare_contraction(precons, plot_eigenvals= True, problem='advection', problem_parameter=-1, vmin=-9)
 # compare_contraction(precons, plot_eigenvals=True, problem_parameter=1, vmin=-10, problem='heat')
 # compare_Fourier(precons, problem='heat')

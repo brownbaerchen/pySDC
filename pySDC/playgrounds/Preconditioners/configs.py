@@ -220,11 +220,18 @@ def get_params_for_stiffness_plot(problem, **kwargs):
     assert problem in params_all.keys(), f"Don\'t have parameters for stiffness plot for problem \"{problem}\""
     special_params = params_all[problem]
 
-    if not kwargs.get('adaptivity', True):
+    if not kwargs.get('adaptivity', False):
         params['convergence_controllers'] = {}
         params['step_params'] = {'maxiter': 100}
         params['level_params'] = {
             'restol': 1e-8,
+            'dt': 0.1,
+        }
+    else:
+        params['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-7}}
+        params['step_params'] = {'maxiter': 5}
+        params['level_params'] = {
+            'restol': -1,
             'dt': 0.1,
         }
 
