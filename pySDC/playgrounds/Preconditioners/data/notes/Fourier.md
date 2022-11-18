@@ -72,10 +72,12 @@ with problem parameter $\lambda \in \mathbb{C}$.
 Notice this is an ordinary differential equation, so there is no space index.
 For $\lambda$ on the negative real axis, the exact solution will decay exponentially, for $\lambda$ on the imaginary axis, the exact solution will oscillate and for $\lambda$ on the positive real axis, the exact solution will grow exponentially.
 
-This is coherent with where we found the eigenvalues of the FD stencils of advection and heat equations to be; the magnitudes of the modes will oscillate for the advection problem, where the magnitude of the solution stays the same, but it moves around in space and the magnitudes of the modes will decay for the heat equation, where the solution stays put, but decays.
+This is consistent with where we found the eigenvalues of the FD stencils of advection and heat equations to be; the magnitudes of the modes will oscillate for the advection problem, where the magnitude of the solution stays the same, but it moves around in space and the magnitudes of the modes will decay for the heat equation, where the solution stays put, but decays.
 
 Our strategy for analysing the convergence properties of SDC with a given preconditioner and FD discretization will be to first plot the performance of SDC for a range of Dahlquist problems with $\lambda$ in a patch of the complex plane.
 Then we will see where the eigenvalues of our FD scheme lie in the complex plane, and finally we need to check which of these modes are represented in the initial conditions of the problem that we want to solve, or more precisely, in the error.
+Looking at the error is justified because it satisfies the same equation as the solution, because finite difference schemes are linear.
+Of course, this is only valid for the error with respect to the exact solution to the discretized problem, not the continuous one.
 
 Let's start with plotting the contraction factor after four iterations.
 Since we know the exact solution to the Dahlquist problem, we can just compare the initial and final errors to determine how the error shrinks.

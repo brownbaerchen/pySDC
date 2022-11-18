@@ -98,6 +98,18 @@ They represent the best behaviour we have seen so far.
 </em>
 </p>
 
+We can also make another comparison for more specialized cases.
+The four problems we look at are advection and diffusion, with more and less smooth initial conditions.
+Smooth initial conditions means a sin wave with the wavelength equal to the spatial domain and the less smooth initial conditions are a Gaussian distribution.
+The problem parameter has been set to $\nu=1$ and $c=1$ and the smooth cases can also be found in the plots visualizing the reaction to stiffness above.
+<p>
+<img src="./optimization_plots/special_cases.png" alt="Number of iterations for heat and advection problems" style="width:40%;"/>
+<em>The radial coordinate represents the number of iterations, whereas the size of the marker is larger when the residual at the end of the step is smaller compared to other preconditioners.
+</em>
+</p>
+As expected, the problems with more smooth initial conditions require fewer iterations to solve.
+We can see that the performance of the preconditioners is quite problem dependent, with only the LU and MIN3 preconditioners performing well for each problem.
+
 To visualize the values in the preconditioners, we plot the cumulative sum of the weights.
 Keep in mind that the preconditioner is a quadrature rule that is used to solve the error equation.
 We have solutions at the times of the quadrature nodes and we wish to integrate the error until then, so that we can refine the solutions appropriately.
