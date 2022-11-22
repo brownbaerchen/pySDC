@@ -160,7 +160,7 @@ def get_serial_preconditioner(params, **kwargs):
     Returns:
         dict: Updated params
     """
-    allowed = ['LU', 'IE', 'MIN', 'MIN3']
+    allowed = ['LU', 'IE', 'MIN', 'MIN3', 'IEpar']
     for precon in allowed:
         if kwargs.get(precon, False):
             params['sweeper'] = params['serial_sweeper']
@@ -314,7 +314,7 @@ def store_precon(params, x, initial_guess, **kwargs):
     data = {}
 
     # write the configuration in the data array
-    configs = ['use_first_row', 'normalized', 'LU', 'IE', 'MIN', 'random_IG', 'MIN3']
+    configs = ['use_first_row', 'normalized', 'LU', 'IE', 'MIN', 'random_IG', 'MIN3', 'use_complex', 'SOR']
     for c in configs:
         data[c] = kwargs.get(c, False)
 
@@ -350,7 +350,12 @@ def store_serial_precon(problem, nodes, **kwargs):
         None
     """
     params = get_params(problem, **kwargs)
-    store_precon(params=params, x=np.zeros((nodes)), initial_guess=np.zeros((nodes)), **kwargs)
+    store_precon(
+        params=params,
+        x=np.zeros((nodes)) if not kwargs.get('use_complex', False) else np.zeros((nodes * 2)),
+        initial_guess=np.zeros((nodes)),
+        **kwargs,
+    )
 
 
 def load_precon(problem, nodes, **kwargs):
@@ -384,7 +389,7 @@ def get_collocation_nodes(params, num_nodes):
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
-def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=False, **kwargs):
+def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=False, use_complex=False, **kwargs):
     """
     Prepare the sweeper with diagonal elements before running the problem
 
@@ -399,22 +404,25 @@ def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=
         dict: Sweeper parameters
     """
     # process options
+    elements = x.copy() if not use_complex else x[0::2] + x[1::2] * 1j
+
     if use_first_row:
         if normalized:
             raise NotImplementedError
 
-        diags = np.array(x[0 : len(x) // 2])
-        first_row = np.array(x[len(x) // 2 : :])
+        diags = np.array(elements[0 : len(elements) // 2])
+        first_row = np.array(x[len(elements) // 2 : :])
         num_nodes = len(x) // 2
+
     else:
         if normalized:
-            diags = np.array(np.append(x, -sum(x) + 1))
+            diags = np.array(np.append(elements, -sum(elements) + 1))
             first_row = np.zeros_like(diags)
-            num_nodes = len(x) + 1
+            num_nodes = len(elements) + 1
         else:
-            diags = np.array(x)
+            diags = np.array(elements)
             first_row = np.zeros_like(diags)
-            num_nodes = len(x)
+            num_nodes = len(elements)
 
     if random_IG:
         initial_guess = 'random'

@@ -148,8 +148,15 @@ def optimize(params, initial_guess, num_nodes, objective_function, tol=1e-16, **
         None
     """
     get_defaults(initial_guess, params)
-    opt = minimize(objective_function, initial_guess, args=(params, kwargs), tol=tol, method='nelder-mead')
-    store_precon(params, opt.x, initial_guess, **kwargs)
+    if kwargs.get('use_complex'):
+        ics = np.zeros(len(initial_guess) * 2)
+        ics[::2] = initial_guess
+        initial_guess = ics
+    if kwargs.get('SOR'):
+        store_precon(params, initial_guess, initial_guess, **kwargs)
+    else:
+        opt = minimize(objective_function, initial_guess, args=(params, kwargs), tol=tol, method='nelder-mead')
+        store_precon(params, opt.x, initial_guess, **kwargs)
 
 
 def objective_function_k_and_e(x, *args):
@@ -207,14 +214,13 @@ def optimize_with_sum(params, num_nodes, **kwargs):
     optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
 
 
-def optimize_without_sum(params, num_nodes, **kwargs):
-    initial_guess = np.array(get_collocation_nodes(params, num_nodes)) * 0.5
-    # initial_guess = np.ones(num_nodes) * 0.5
+def optimize_diagonal(params, num_nodes, **kwargs):
+    initial_guess = np.array(get_collocation_nodes(params, num_nodes)) * 0.7
     optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
 
 
 def optimize_with_first_row(params, num_nodes, **kwargs):
-    i0 = np.array(get_collocation_nodes(params, num_nodes)) / 2.0
+    i0 = np.array(get_collocation_nodes(params, num_nodes)) / 2 * 1.3
     initial_guess = np.append(i0, i0)
     # initial_guess = np.append(np.ones(num_nodes) * 0.9, - (0.9 - i0 * 2 + np.finfo(float).eps))
     kwargs['use_first_row'] = True
@@ -228,6 +234,8 @@ if __name__ == '__main__':
     kwargs = {
         'adaptivity': True,
         'random_IG': True,
+        # 'use_complex': True,
+        #'SOR': True,
     }
 
     params = get_params(problem, **kwargs)
@@ -235,8 +243,10 @@ if __name__ == '__main__':
 
     store_serial_precon(problem, num_nodes, LU=True, **kwargs)
     store_serial_precon(problem, num_nodes, IE=True, **kwargs)
+    store_serial_precon(problem, num_nodes, IEpar=True, **kwargs)
     store_serial_precon(problem, num_nodes, MIN=True, **kwargs)
     store_serial_precon(problem, num_nodes, MIN3=True, **kwargs)
+
+    optimize_diagonal(params, num_nodes, **kwargs)
     optimize_with_first_row(params, num_nodes, **kwargs)
-    optimize_without_sum(params, num_nodes, **kwargs)
-    optimize_with_sum(params, num_nodes, **kwargs)
+    # optimize_with_sum(params, num_nodes, **kwargs)

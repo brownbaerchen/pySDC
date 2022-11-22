@@ -67,7 +67,8 @@ We find that employing heat and advection model problems leads to very similar p
 
 <p>
 <img src="./optimization_plots/stiffness-advection.png" alt="Iterations vs. stiffness for a preconditiner obtained with advection" style="width:100%;"/>
-<em>The problem parameters range from non-stiff on the left to stiff on the right.
+<em>Performance of preconditioners obtained with the advection equation.
+The problem parameters range from non-stiff on the left to stiff on the right.
 Solid lines represent preconditioners obtained with optimization, whereas dashed lines are serial preconditioners and dot-dashed lines show diagonal preconditioners from Robert's paper.
 Evidently, the normalized diagonal preconditioner is more effecicient than its non-normalized counterpart, for no apparent reason.
 Diagonal and semi-diagonal preconditioners require almost identical iteration counts.

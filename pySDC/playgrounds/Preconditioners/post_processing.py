@@ -14,6 +14,7 @@ from pySDC.playgrounds.Preconditioners.configs import (
     colors,
     get_params,
     get_params_for_stiffness_plot,
+    get_collocation_nodes,
 )
 from pySDC.playgrounds.Preconditioners.hooks import log_error_at_iterations
 
@@ -435,10 +436,10 @@ class PreconPostProcessing:
         #    'advection': {-1: 5e-2, 2: 2e-1},
         #    'heat': {-1: 5e-3, 2: 9e-2},
         # }
-        dt = {
-            'advection': {-1: 2e-1, 2: 2e-1},
-            'heat': {-1: 9e-2, 2: 9e-2},
-        }
+        # dt = {
+        #     'advection': {-1: 2e-1, 2: 2e-1},
+        #     'heat': {-1: 9e-2, 2: 9e-2},
+        # }
 
         res = {}
 
@@ -478,10 +479,10 @@ class PreconPostProcessing:
         stats, controller = self.run_problem(logger_level=15, custom_params=params, hook_class=log_error_at_iterations)
 
         sweeper = controller.MS[0].levels[0].sweep
-        QI = sweeper.QI
-        Q = sweeper.coll.Qmat
+        # QI = sweeper.QI
+        # Q = sweeper.coll.Qmat
         nodes = np.append(0, sweeper.coll.nodes)
-        num_nodes = sweeper.coll.num_nodes
+        # num_nodes = sweeper.coll.num_nodes
 
         [ax.axvline(n, color='black') for n in nodes]
 
@@ -516,7 +517,46 @@ class PreconPostProcessing:
 
         # for j in range(num_nodes):
 
-        diags = [QI[i + 1, i + 1] for i in range(num_nodes)]
+        # diags = [QI[i + 1, i + 1] for i in range(num_nodes)]
+
+
+def SOR(facs, problem, **kwargs):
+    # TODO: dox
+
+    custom_params, parameter_paper, parameter_range_paper = get_params_for_stiffness_plot(problem, **kwargs)
+
+    implicit_euler = get_collocation_nodes({}, kwargs.get('num_nodes', 3))
+    parameter_range = kwargs.get('parameter_range', parameter_range_paper)
+    iter_counts = np.zeros((len(facs), len(parameter_range)))
+
+    for i in range(len(facs)):
+        diags = (
+            facs[i] * implicit_euler
+            if not kwargs.get('use_first_row', False)
+            else facs[i] / 2 * np.append(implicit_euler, implicit_euler)
+        )
+        for j in range(len(parameter_range)):
+            custom_params['problem_params'][parameter_paper] = parameter_range[j]
+            stats, controller = single_run(diags, custom_params, **kwargs)
+            iter_counts[i][j] = sum([me[1] for me in get_sorted(stats, type='k')])
+
+    fig, ax = plt.subplots()
+
+    xlabels = {
+        'advection': r'$c$',
+        'heat': r'$\nu$',
+        'vdp': r'$\mu$',
+    }
+    ax.set_xlabel(f"log {xlabels.get(problem, 'parameter')}")
+    ax.set_ylabel(r"SOR factor")
+    ax.set_title(problem)
+
+    X, Y = np.meshgrid(np.log10(parameter_range), facs)
+    im = ax.pcolormesh(X, Y, iter_counts)
+    ax.axhline(1, color='black')
+    cbar = fig.colorbar(im)
+    cbar.set_label('iterations')
+    plt.savefig(f'data/plots/SOR-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
 
 
 def compare_special_cases(precons, **kwargs):
@@ -796,10 +836,12 @@ def generate_metadata_table(precons, path='./data/notes/metadata.md'):
 kwargs = {
     'adaptivity': True,
     'random_IG': True,
+    #'use_complex': True,
+    #'SOR': True,
 }
 
 problem = 'Dahlquist'
-problem_serial = 'advection'
+problem_serial = 'Dahlquist'
 
 postLU = PreconPostProcessing(
     problem_serial,
@@ -845,18 +887,28 @@ postMIN = PreconPostProcessing(
     source='[Robert](https://doi.org/10.1007/s00791-018-0298-x)',
     **kwargs,
 )
-postNORM = PreconPostProcessing(
-    problem,
+postIEpar = PreconPostProcessing(
+    problem_serial,
     3,
+    IEpar=True,
+    label='IEpar',
+    color=colors[7],
+    ls='-.',
+    source='[Robert](https://doi.org/10.1007/s00791-018-0298-x)',
     **kwargs,
-    normalized=True,
-    label='normalized',
-    color=colors[5],
-    ls='-',
 )
+# postNORM = PreconPostProcessing(
+#    problem,
+#    3,
+#    **kwargs,
+#    normalized=True,
+#    label='normalized',
+#    color=colors[5],
+#    ls='-',
+# )
 
 precons = [postDiagFirstRow, postLU, postDiag, postIE]
-more_precons = precons + [postMIN, postNORM, postMIN3]
+more_precons = precons + [postMIN, postMIN3]
 interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
 
 custom_problem_params = {
@@ -870,8 +922,10 @@ pkwargs = {'Tend': 1e-2}
 
 # [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
 compare_special_cases(interesting_precons, adaptivity=False)
+# SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
 compare_stiffness_paper(interesting_precons, format='png')
 compare_signatures(interesting_precons + [postIE], format='png')
+
 # compare_contraction(precons, plot_eigenvals= True, problem='advection', problem_parameter=-1, vmin=-9)
 # compare_contraction(precons, plot_eigenvals=True, problem_parameter=1, vmin=-10, problem='heat')
 # compare_Fourier(precons, problem='heat')
