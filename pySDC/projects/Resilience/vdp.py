@@ -86,7 +86,7 @@ class log_data(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_em',
-            value=L.status.error_embedded_estimate,
+            value=L.status.get('error_embedded_estimate'),
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -188,18 +188,14 @@ def run_vdp(
 
         comm = kwargs.get('comm', MPI.COMM_WORLD)
         controller = controller_MPI(controller_params=controller_params, description=description, comm=comm)
-
-        # get initial values on finest level
         P = controller.S.levels[0].prob
-        uinit = P.u_exact(t0)
     else:
         controller = controller_nonMPI(
             num_procs=num_procs, controller_params=controller_params, description=description
         )
-
-        # get initial values on finest level
         P = controller.MS[0].levels[0].prob
-        uinit = P.u_exact(t0)
+
+    uinit = P.u_exact(t0)
 
     # insert faults
     if fault_stuff is not None:

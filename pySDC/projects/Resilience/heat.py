@@ -29,6 +29,8 @@ def run_heat(
     fault_stuff=None,
     custom_controller_params=None,
     custom_problem_params=None,
+    use_MPI=False,
+    **kwargs
 ):
 
     # initialize level parameters
@@ -89,7 +91,18 @@ def run_heat(
     t0 = 0.0
 
     # instantiate controller
-    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params, description=description)
+    if use_MPI:
+        from mpi4py import MPI
+        from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
+
+        comm = kwargs.get('comm', MPI.COMM_WORLD)
+        controller = controller_MPI(controller_params=controller_params, description=description, comm=comm)
+        P = controller.S.levels[0].prob
+    else:
+        controller = controller_nonMPI(
+            num_procs=num_procs, controller_params=controller_params, description=description
+        )
+        P = controller.MS[0].levels[0].prob
 
     # insert faults
     if fault_stuff is not None:
@@ -101,7 +114,6 @@ def run_heat(
         )
 
     # get initial values on finest level
-    P = controller.MS[0].levels[0].prob
     uinit = P.u_exact(t0)
 
     # call main function to get things done...
