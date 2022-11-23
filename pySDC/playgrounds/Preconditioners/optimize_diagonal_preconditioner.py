@@ -171,7 +171,7 @@ def optimize(params, initial_guess, num_nodes, objective_function, tol=1e-16, **
     if type(initial_guess) == str:
         initial_guess = get_opt_ICs(initial_guess, num_nodes, params)
 
-    get_defaults(initial_guess, params, 'MIN3')
+    get_defaults(initial_guess, params, 'MIN')
 
     if kwargs.get('use_complex'):
         ics = np.zeros(len(initial_guess) * 2)
