@@ -98,7 +98,25 @@ im = np.linspace(-1, 100, 102)
 lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).reshape(
     (len(re) * len(im))
 )
-# lambdas = np.append(re, im * 1j)
+lambdas = np.append(re, im * 1j)
+from pySDC.projects.Resilience.FDeigenvalues import get_finite_difference_eigenvalues
+eigenvalsHeat = 1. * 0.1 * get_finite_difference_eigenvalues(
+    2,
+    order=2,
+    type='center',
+    dx=1. / 63,
+    L=1.,
+)
+eigenvalsAdvection = 1. * 0.1 * get_finite_difference_eigenvalues(
+    1,
+    order=2,
+    type='center',
+    dx=1. / 64,
+    L=1.,
+)
+re = eigenvalsHeat
+im = eigenvalsAdvection
+lambdas = np.append(re, im)
 
 
 params_Dahlquist = {
@@ -178,6 +196,7 @@ def get_params_for_stiffness_plot(problem, **kwargs):
 
     Returns:
         dict: Parameters for running a problem
+        str: The parameter to adapt in the problem
         numpy.ndarray: List of values for the problem parameter
     """
     params = get_params(problem, **kwargs)
@@ -389,7 +408,7 @@ def get_collocation_nodes(params, num_nodes):
 colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
-def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=False, use_complex=False, **kwargs):
+def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=False, use_complex=False, force_sweeper=None, **kwargs):
     """
     Prepare the sweeper with diagonal elements before running the problem
 
@@ -443,4 +462,4 @@ def prepare_sweeper(x, params, use_first_row=False, normalized=False, random_IG=
     else:
         sweeper_params = {}
 
-    return sweeper_params, params['sweeper']
+    return sweeper_params, params['sweeper'] if force_sweeper is None else force_sweeper

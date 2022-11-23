@@ -49,7 +49,7 @@ def single_run(x, params, *args, **kwargs):
         **params.get('force_sweeper_params', {}),
         **kwargs.get('force_sweeper_params', {}),
     }
-    custom_description['sweeper_class'] = kwargs.get('force_sweeper', sweeper)
+    custom_description['sweeper_class'] = sweeper
 
     allowed_keys = ['step_params', 'level_params']
     for key in allowed_keys:
@@ -66,7 +66,28 @@ def single_run(x, params, *args, **kwargs):
     return stats, controller
 
 
-def get_defaults(x, params):
+def get_opt_ICs(QI, num_nodes, params):
+    """
+    Get initial conditions for optimization from preexisting preconditioners
+
+    Args:
+        QI (str): The preconditioner you want to use as initial conditions
+        num_nodes (int): Number of nodes for the preconditioner
+        params (dict): Params that are passed to `single_run`
+
+    Returns:
+        numpy.ndarray: List of the quadrature weights that go on the diagonal
+    """
+    params = {
+        'QI': QI,
+        'num_nodes': num_nodes,
+        'quad_type': params['quad_type'],
+    }
+    sweeper = generic_implicit(params)
+    return np.array([sweeper.QI[i, i] for i in range(1, num_nodes + 1)])
+
+
+def get_defaults(x, params, QI='LU'):
     """
     Run the problem with LU to see how many iterations that requires
 
@@ -78,12 +99,12 @@ def get_defaults(x, params):
         None
     """
     stats, controller = single_run(
-        x, params, force_sweeper=generic_implicit, force_sweeper_params={'QI': 'LU', 'num_nodes': 3}
+        x, params, force_sweeper=generic_implicit, force_sweeper_params={'QI': QI, 'num_nodes': 3}, **kwargs
     )
     params['k'] = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
 
     if print_status:
-        print(f'Needed {params["k"]} iterations for {params["name"]} problem with LU')
+        print(f'Needed {params["k"]} iterations for {params["name"]} problem with {QI}')
 
 
 def objective_function_k_only(x, *args):
@@ -105,7 +126,7 @@ def objective_function_k_only(x, *args):
     stats, controller = single_run(x, params, *args, **kwargs)
 
     # check how many iterations we needed
-    k = sum([me[1] for me in get_sorted(stats, type='k')])
+    k = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
 
     # get error
     e = get_error(stats, controller)
@@ -140,14 +161,18 @@ def optimize(params, initial_guess, num_nodes, objective_function, tol=1e-16, **
 
     Args:
         params (dict): Parameters for running the problem
-        initial_guess (numpy.ndarray): Initial guess to start the minimization problem
+        initial_guess (numpy.ndarray) or (str): Initial guess to start the minimization problem
         num_nodes (int): Number of collocation nodes
         objective_function (function): Objective function for the minimizaiton alogrithm
 
     Returns:
         None
     """
-    get_defaults(initial_guess, params)
+    if type(initial_guess) == str:
+        initial_guess = get_opt_ICs(initial_guess, num_nodes, params)
+
+    get_defaults(initial_guess, params, 'MIN3')
+
     if kwargs.get('use_complex'):
         ics = np.zeros(len(initial_guess) * 2)
         ics[::2] = initial_guess
@@ -184,7 +209,7 @@ def objective_function_k_and_e(x, *args):
     u_end = get_sorted(stats, type='u')[-1]
     exact = controller.MS[0].levels[0].prob.u_exact(t=u_end[0])
     e = abs(exact - u_end[1])
-    e_em = max([me[1] for me in get_sorted(stats, type='e_em', recomputed=False)])
+    e_em = max([me[1] for me in get_sorted(stats, type='e_em', recomputed=None)])
     raise NotImplementedError('Please fix the next couple of lines')
 
     # return the score
@@ -216,6 +241,7 @@ def optimize_with_sum(params, num_nodes, **kwargs):
 
 def optimize_diagonal(params, num_nodes, **kwargs):
     initial_guess = np.array(get_collocation_nodes(params, num_nodes)) * 0.7
+    initial_guess = 'MIN'
     optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
 
 
@@ -239,6 +265,8 @@ if __name__ == '__main__':
     }
 
     params = get_params(problem, **kwargs)
+    # from pySDC.playgrounds.Preconditioners.configs import get_params_for_stiffness_plot
+    # params, _, _  = get_params_for_stiffness_plot('heat', **kwargs)
     num_nodes = 3
 
     store_serial_precon(problem, num_nodes, LU=True, **kwargs)

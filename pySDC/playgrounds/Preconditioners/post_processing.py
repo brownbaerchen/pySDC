@@ -432,15 +432,6 @@ class PreconPostProcessing:
         """
         Return iteration count for certian specific problems
         """
-        # dt = {
-        #    'advection': {-1: 5e-2, 2: 2e-1},
-        #    'heat': {-1: 5e-3, 2: 9e-2},
-        # }
-        # dt = {
-        #     'advection': {-1: 2e-1, 2: 2e-1},
-        #     'heat': {-1: 9e-2, 2: 9e-2},
-        # }
-
         res = {}
 
         for p in ['advection', 'heat']:
@@ -452,7 +443,6 @@ class PreconPostProcessing:
                 params, _, _ = get_params_for_stiffness_plot(p, **{**self.data['kwargs'], **kwargs})
 
                 params['problem_params']['freq'] = f
-                # params['level_params']['dt'] = dt[p][f]
                 params['Tend'] = params['level_params']['dt']
 
                 stats, controller = self.run_problem(logger_level=30, custom_params=params, **kwargs)
@@ -840,8 +830,8 @@ kwargs = {
     #'SOR': True,
 }
 
-problem = 'Dahlquist'
-problem_serial = 'Dahlquist'
+problem = 'dahlquist'
+problem_serial = problem
 
 postLU = PreconPostProcessing(
     problem_serial,
