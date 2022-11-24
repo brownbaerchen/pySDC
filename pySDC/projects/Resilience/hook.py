@@ -1,6 +1,30 @@
 from pySDC.core.Hooks import hooks
 
 
+class log_timings(hooks):
+    """
+    Hook class for loggin relevant information for timings. Keep in mind that timings themselves are recorded in the
+    parent class.
+    """
+
+    def post_step(self, step, level_number):
+        """
+        Record the step size
+        """
+        super(log_timings, self).post_step(step, level_number)
+        L = step.levels[level_number]
+
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='dt',
+            value=L.dt,
+        )
+
+
 class log_error_estimates(hooks):
     """
     Record data required for analysis of problems in the resilience project
