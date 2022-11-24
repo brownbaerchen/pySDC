@@ -178,7 +178,12 @@ def plot_timing(problem, cluster='.', **kwargs):
 
 
 def parse_command_line_arguments():
-    # TODO: docs
+    """
+    Parse the command line arguments to create a keyword argument dictionary for running the problems
+
+    Returns:
+        dict: kwargs
+    """
     import os
 
     kwargs = {}
