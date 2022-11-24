@@ -57,11 +57,17 @@ def record_timing(problem, sizes, **kwargs):
         if MPI.COMM_WORLD.rank >= s:
             continue
 
+        if comm.rank == 0:
+            print(f'Running with {s} ranks', flush=True)
+
         stats = run(problem, comm, **kwargs)
 
         # record the timing for the entire run
         for k in record_keys:
             res[k][comm.size] = ops.get(k, np.mean)([me[1] for me in get_sorted(stats, type=keys.get(k, k), comm=comm)])
+
+        if comm.rank == 0:
+            print(f'\tneeded {res["timing_run"][s]:.2e}s with {s} ranks', flush=True)
 
     if MPI.COMM_WORLD.rank == 0:
         name = get_name(problem, **kwargs)
@@ -188,6 +194,10 @@ if __name__ == "__main__":
     cluster = 'juwels'
 
     kwargs = parse_command_line_arguments()
+    if MPI.COMM_WORLD.rank == 0:
+        print('Parsed following arguments from command line:')
+        for k in kwargs.keys():
+            print(f'\t{k}: {kwargs[k]}')
 
     record_timing(problem, sizes, **kwargs)
     # plot_timing(problem, cluster, **kwargs)
