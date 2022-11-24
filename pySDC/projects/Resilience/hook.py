@@ -23,6 +23,15 @@ class log_timings(hooks):
             type='dt',
             value=L.dt,
         )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='e_embedded',
+            value=L.status.__dict__.get('error_embedded_estimate'),
+        )
 
 
 class log_error_estimates(hooks):

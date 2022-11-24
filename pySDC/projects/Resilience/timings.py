@@ -5,6 +5,7 @@ import pickle
 
 from pySDC.helpers.stats_helper import get_sorted
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
 from pySDC.projects.Resilience.hook import log_timings
 from pySDC.projects.Resilience.advection import run_advection
@@ -19,7 +20,7 @@ problem_names = {
 }
 
 
-def record_timing(problem, sizes, adaptivity):
+def record_timing(problem, sizes, **kwargs):
     # TODO: docs
     res = {}
     res['problem'] = problem
@@ -55,47 +56,86 @@ def record_timing(problem, sizes, adaptivity):
         if MPI.COMM_WORLD.rank >= s:
             continue
 
-        custom_description = {}
-        custom_controller_params = {'logger_level': 30}
-
-        if adaptivity:
-            custom_description = {'convergence_controllers': {}}
-            custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
-
-        # run the problem
-        stats, controller, Tend = problem(
-            custom_description=custom_description,
-            num_procs=comm.size,
-            use_MPI=True,
-            custom_controller_params=custom_controller_params,
-            Tend=5.0,
-            comm=comm,
-            hook_class=log_timings,
-        )
+        stats = run(problem, comm, **kwargs)
 
         # record the timing for the entire run
         for k in record_keys:
             res[k][comm.size] = ops.get(k, np.mean)([me[1] for me in get_sorted(stats, type=keys.get(k, k), comm=comm)])
 
     if MPI.COMM_WORLD.rank == 0:
-        name = get_name(problem, adaptivity)
+        name = get_name(problem, **kwargs)
         with open(f"data/{name}.pickle", 'wb') as file:
             pickle.dump(res, file)
-        plot_timing(problem, adaptivity)
+        plot_timing(problem, **kwargs)
     return res
 
 
-def get_name(problem, adaptivity):
+def run(problem, comm=None, adaptivity=False, Tend=5.0, smooth=None):
     # TODO: docs
-    return f'{problem_names[problem]}-timings{"-with-adaptivity" if adaptivity else ""}'
+    custom_controller_params = {'logger_level': 30}
+    custom_description = {'convergence_controllers': {}}
+
+    if adaptivity:
+        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
+    else:
+        custom_description['convergence_controllers'][EstimateEmbeddedError.get_implementation('MPI')] = {}
+
+    if smooth == True:
+        custom_description['problem_params'] = {
+            'freq': 2,
+        }
+    elif smooth == False:
+        custom_description['problem_params'] = {
+            'freq': -1,
+            'sigma': 0.6,
+        }
+
+    # run the problem
+    stats, controller, Tend = problem(
+        custom_description=custom_description,
+        num_procs=comm.size,
+        use_MPI=True,
+        custom_controller_params=custom_controller_params,
+        Tend=Tend,
+        comm=comm,
+        hook_class=log_timings,
+    )
+    return stats
 
 
-def plot_timing(problem, adaptivity, cluster='.'):
+def plot(problem, **kwargs):
+    stats = run(problem, MPI.COMM_WORLD, Tend=0.5, **kwargs)
+    e_embedded = [me[1] for me in get_sorted(stats, type='e_embedded', recomputed=False, comm=MPI.COMM_WORLD)]
+    t = [me[0] for me in get_sorted(stats, type='e_embedded', recomputed=False, comm=MPI.COMM_WORLD)]
+    if MPI.COMM_WORLD.rank == 0:
+        plt.plot(t, e_embedded)
+        # plt.yscale('log')
+        plt.show()
+    # print(MPI.COMM_WORLD.rank, np.min(e_embedded), np.max(e_embedded), np.std(e_embedded), np.mean(e_embedded))
+
+
+def get_name(problem, **kwargs):
+    """
+    Get a unique identifier for a certain configuration for storing and loading.
+
+    Args:
+        problem (function): A function that runs a pySDC problem
+
+    Returns:
+        str: The identifier
+    """
+    name = f'{problem_names[problem]}-timings'
+    for k in kwargs.keys():
+        name = f'{name}{f"-with-{k}" if kwargs[k] else f"-no-{k}"}'
+    return name
+
+
+def plot_timing(problem, cluster='.', **kwargs):
     # TODO: docs
     if MPI.COMM_WORLD.rank != 0:
         return None
 
-    name = get_name(problem, adaptivity)
+    name = get_name(problem, **kwargs)
     with open(f"data/{cluster}/{name}.pickle", 'rb') as file:
         res = pickle.load(file)
 
@@ -122,7 +162,7 @@ def plot_timing(problem, adaptivity, cluster='.'):
     print(min(timing), max(timing))
     print(np.argmin(timing), np.argmax(timing))
 
-    ax.set_title(f'{problem_names[problem]}{" with adaptivity" if adaptivity else ""}')
+    ax.set_title(name.replace('-', ' '))
 
     fig.tight_layout()
 
@@ -133,8 +173,13 @@ def plot_timing(problem, adaptivity, cluster='.'):
 if __name__ == "__main__":
     problem = run_advection
     sizes = np.arange(MPI.COMM_WORLD.size) + 1
-    adaptivity = True
     cluster = 'juwels'
 
-    # record_timing(problem, sizes, adaptivity)
-    plot_timing(problem, adaptivity, cluster)
+    kwargs = {
+        'adaptivity': True,
+        'smooth': False,
+    }
+
+    record_timing(problem, sizes, **kwargs)
+    # plot_timing(problem, cluster, **kwargs)
+    # plot(problem, **kwargs)
