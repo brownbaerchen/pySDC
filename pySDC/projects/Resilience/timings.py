@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import sys
 
 from pySDC.helpers.stats_helper import get_sorted
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
@@ -170,15 +171,23 @@ def plot_timing(problem, cluster='.', **kwargs):
     plt.show()
 
 
+def parse_command_line_arguments():
+    # TODO: docs
+    import os
+
+    kwargs = {}
+    for i in range(1, len(sys.argv), 2):
+        # kwargs[sys.argv[i]] = None if sys.argv[i + 1] == 'None' else bool(sys.argv[i+1])
+        exec(f'kwargs[sys.argv[i]] = {sys.argv[i + 1]}')
+    return kwargs
+
+
 if __name__ == "__main__":
     problem = run_advection
     sizes = np.arange(MPI.COMM_WORLD.size) + 1
     cluster = 'juwels'
 
-    kwargs = {
-        'adaptivity': True,
-        'smooth': False,
-    }
+    kwargs = parse_command_line_arguments()
 
     record_timing(problem, sizes, **kwargs)
     # plot_timing(problem, cluster, **kwargs)
