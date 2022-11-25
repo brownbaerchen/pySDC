@@ -30,7 +30,16 @@ class log_timings(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_embedded',
-            value=L.status.__dict__.get('error_embedded_estimate'),
+            value=L.status.get('error_embedded_estimate'),
+        )
+        self.increment_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='restart',
+            value=step.status.get('restart'),
         )
 
 
@@ -83,7 +92,7 @@ class log_error_estimates(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_embedded',
-            value=L.status.__dict__.get('error_embedded_estimate', None),
+            value=L.status.get('error_embedded_estimate'),
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -92,5 +101,5 @@ class log_error_estimates(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_extrapolated',
-            value=L.status.__dict__.get('error_extrapolation_estimate', None),
+            value=L.status.get('error_extrapolation_estimate'),
         )

@@ -36,15 +36,20 @@ def record_timing(problem, sizes, **kwargs):
         'niter',
         'total_iterations',
         'nsteps',
+        'restart',
     ]
 
     ops = {
         'total_iterations': sum,
         'nsteps': len,
+        'restart': sum,
     }
     keys = {
         'total_iterations': 'niter',
         'nsteps': 'niter',
+    }
+    recomputed = {
+        'dt': False,
     }
 
     for k in record_keys:
@@ -64,10 +69,15 @@ def record_timing(problem, sizes, **kwargs):
 
         # record the timing for the entire run
         for k in record_keys:
-            res[k][comm.size] = ops.get(k, np.mean)([me[1] for me in get_sorted(stats, type=keys.get(k, k), comm=comm)])
+            res[k][comm.size] = ops.get(k, np.mean)(
+                [me[1] for me in get_sorted(stats, type=keys.get(k, k), comm=comm, recomputed=recomputed.get(k, None))]
+            )
 
         if comm.rank == 0:
-            print(f'\tneeded {res["timing_run"][s]:.2e}s with {s} ranks', flush=True)
+            print(
+                f'\tneeded {res["timing_run"][s]:.2e}s and {res["total_iterations"][s]} iterations with {s} ranks',
+                flush=True,
+            )
 
     if MPI.COMM_WORLD.rank == 0:
         name = get_name(problem, **kwargs)
@@ -75,7 +85,7 @@ def record_timing(problem, sizes, **kwargs):
         with open(path, 'wb') as file:
             pickle.dump(res, file)
             print(f'stored \"{path}\"', flush=True)
-        plot_timing(problem, **kwargs)
+        plot_timing(problem, **{**kwargs, 'cluster': '.'})
     return res
 
 
@@ -156,6 +166,10 @@ def plot_timing(problem, cluster='.', **kwargs):
     for k in plotting_keys:
         ax.plot(sizes, [res[k][s] for s in sizes], label=k)
 
+    dt_ax = ax.twinx()
+    dt_ax.loglog(sizes, [res['dt'][s] for s in sizes], label=k, color='magenta')
+    print(res['restart'])
+
     k_dict = res.get('niter', {'niter': 5})
     k = np.mean([k_dict[me] for me in k_dict.keys()])
     n = np.array(sizes)
@@ -212,6 +226,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    # record_timing(**kwargs)
-    plot_timing(**kwargs)
+    record_timing(**kwargs)
+    # plot_timing(**kwargs)
     # plot(**kwargs)
