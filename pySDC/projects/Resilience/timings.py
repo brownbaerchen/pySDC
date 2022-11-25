@@ -79,7 +79,7 @@ def record_timing(problem, sizes, **kwargs):
     return res
 
 
-def run(problem, comm=None, adaptivity=False, Tend=5.0, smooth=None, **kwargs):
+def run(problem, comm=None, adaptivity=False, Tend=1.0, smooth=None, **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
@@ -123,7 +123,7 @@ def plot(problem, **kwargs):
     # print(MPI.COMM_WORLD.rank, np.min(e_embedded), np.max(e_embedded), np.std(e_embedded), np.mean(e_embedded))
 
 
-def get_name(problem, **kwargs):
+def get_name(problem, sizes=None, cluster=None, **kwargs):
     """
     Get a unique identifier for a certain configuration for storing and loading.
 
@@ -199,7 +199,7 @@ def parse_command_line_arguments():
 if __name__ == "__main__":
     problem = run_advection
     sizes = np.arange(MPI.COMM_WORLD.size) + 1
-    cluster = '.'  #'juwels'
+    cluster = 'juwels'
 
     kwargs = {
         'problem': problem,
@@ -212,6 +212,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    record_timing(**kwargs)
+    # record_timing(**kwargs)
     plot_timing(**kwargs)
-    plot(**kwargs)
+    # plot(**kwargs)
