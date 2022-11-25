@@ -71,13 +71,15 @@ def record_timing(problem, sizes, **kwargs):
 
     if MPI.COMM_WORLD.rank == 0:
         name = get_name(problem, **kwargs)
-        with open(f"data/{name}.pickle", 'wb') as file:
+        path = f"data/{name}.pickle"
+        with open(path, 'wb') as file:
             pickle.dump(res, file)
+            print(f'stored \"{path}\"', flush=True)
         plot_timing(problem, **kwargs)
     return res
 
 
-def run(problem, comm=None, adaptivity=False, Tend=5.0, smooth=None):
+def run(problem, comm=None, adaptivity=False, Tend=5.0, smooth=None, **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
@@ -187,6 +189,7 @@ def parse_command_line_arguments():
     import os
 
     kwargs = {}
+
     for i in range(1, len(sys.argv), 2):
         # kwargs[sys.argv[i]] = None if sys.argv[i + 1] == 'None' else bool(sys.argv[i+1])
         exec(f'kwargs[sys.argv[i]] = {sys.argv[i + 1]}')
@@ -196,14 +199,19 @@ def parse_command_line_arguments():
 if __name__ == "__main__":
     problem = run_advection
     sizes = np.arange(MPI.COMM_WORLD.size) + 1
-    cluster = 'juwels'
+    cluster = '.'  #'juwels'
 
-    kwargs = parse_command_line_arguments()
+    kwargs = {
+        'problem': problem,
+        'sizes': sizes,
+        'cluster': cluster,
+        **parse_command_line_arguments(),
+    }
     if MPI.COMM_WORLD.rank == 0:
         print('Parsed following arguments from command line:')
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    record_timing(problem, sizes, **kwargs)
-    # plot_timing(problem, cluster, **kwargs)
-    # plot(problem, **kwargs)
+    record_timing(**kwargs)
+    plot_timing(**kwargs)
+    plot(**kwargs)
