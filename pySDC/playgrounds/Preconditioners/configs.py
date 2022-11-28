@@ -307,7 +307,9 @@ def get_name(problem, nodes, **kwargs):
     '''
     name = f'{problem}'
     for c in kwargs.keys():
-        if kwargs[c]:
+        if c == 'initial_conditions':
+            name = f'{name}-ic={kwargs[c]}'
+        elif kwargs[c]:
             name = f'{name}-{c}'
     name += f'-{nodes}nodes'
     return name
@@ -474,3 +476,41 @@ def prepare_sweeper(
         sweeper_params = {}
 
     return sweeper_params, params['sweeper'] if force_sweeper is None else force_sweeper
+
+
+def get_optimization_initial_conditions(params, num_nodes, initial_conditions='IEpar', SOR_factor=1.0, **kwargs):
+    """
+    Get initial conditions for optimization
+
+    Args:
+        params (dict): Params that are passed to `single_run`
+        num_nodes (int): Number of nodes for the preconditioner
+        initial_conditions (str): A preexisting preconditioner that can be used for initial conditions
+        SOR_factor (float): A rescaling number for the preconditioner
+
+    Returns:
+        numpy.ndarray: The initial conditions for optimization
+    """
+    diags = np.zeros(num_nodes)
+    first_row = np.zeros(num_nodes)
+
+    if initial_conditions in ['MIN', 'MIN3', 'IEpar']:
+        params = {
+            'QI': initial_conditions,
+            'num_nodes': num_nodes,
+            'quad_type': params['quad_type'],
+        }
+        sweeper = generic_implicit(params)
+        diags = np.array([sweeper.QI[i, i] for i in range(1, num_nodes + 1)])
+
+        if kwargs.get('use_first_row', False):
+            diags /= 2.0
+            first_row = diags * 1.0
+    else:
+        raise NotImplementedError(f'No initial conditions called "{initial_conditions}" available')
+
+    # assemble result
+    if kwargs.get('use_first_row', False):
+        return np.append(SOR_factor * diags, SOR_factor * first_row)
+    else:
+        return SOR_factor * diags

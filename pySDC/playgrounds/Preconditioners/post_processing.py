@@ -351,7 +351,13 @@ class PreconPostProcessing:
                 np.append(0, nodes), [sum(Q[i, :]) for i in range(QI.shape[0])], color='black', label='Q', linewidth=6
             )
 
-        ax.plot(np.append(0, nodes), [sum(QI[i, :]) for i in range(QI.shape[0])], color=self.color, label=self.label)
+        ax.plot(
+            np.append(0, nodes),
+            [sum(QI[i, :]) for i in range(QI.shape[0])],
+            color=self.color,
+            label=self.label,
+            ls=self.ls,
+        )
 
         for i in range(1, QI.shape[0]):
             cumsum = np.cumsum(QI[i, : i + 1])
@@ -826,6 +832,7 @@ def generate_metadata_table(precons, path='./data/notes/metadata.md'):
 kwargs = {
     'adaptivity': True,
     'random_IG': True,
+    'initial_conditions': 'IEpar',
     #'use_complex': True,
     #'SOR': True,
 }
@@ -842,7 +849,7 @@ postLU = PreconPostProcessing(
     ls='--',
     source='[Martin Weiser](https://doi.org/10.1007/s10543-014-0540-y)',
     parallelizable=False,
-    **kwargs,
+    # **kwargs,
 )
 postIE = PreconPostProcessing(
     problem_serial,
@@ -853,11 +860,11 @@ postIE = PreconPostProcessing(
     ls='--',
     source='[Dutt et al.](https://doi.org/10.1023/A:1022338906936)',
     parallelizable=False,
-    **kwargs,
+    # **kwargs,
 )
 postDiag = PreconPostProcessing(problem, 3, label='Diagonal', color=colors[2], **kwargs)
 postMIN3 = PreconPostProcessing(
-    problem, 3, MIN3=True, label='MIN3', color=colors[6], ls='-.', source='Anonymous', **kwargs
+    problem, 3, MIN3=True, label='MIN3', color=colors[6], ls='-.', source='Anonymous'  # , **kwargs
 )
 postDiagFirstRow = PreconPostProcessing(
     problem,
@@ -875,7 +882,7 @@ postMIN = PreconPostProcessing(
     color=colors[4],
     ls='-.',
     source='[Robert](https://doi.org/10.1007/s00791-018-0298-x)',
-    **kwargs,
+    # **kwargs,
 )
 postIEpar = PreconPostProcessing(
     problem_serial,
@@ -885,7 +892,7 @@ postIEpar = PreconPostProcessing(
     color=colors[7],
     ls='-.',
     source='[Robert](https://doi.org/10.1007/s00791-018-0298-x)',
-    **kwargs,
+    # **kwargs,
 )
 # postNORM = PreconPostProcessing(
 #    problem,

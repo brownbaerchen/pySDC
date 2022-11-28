@@ -12,6 +12,7 @@ from pySDC.playgrounds.Preconditioners.configs import (
     store_serial_precon,
     get_collocation_nodes,
     prepare_sweeper,
+    get_optimization_initial_conditions,
 )
 
 print_status = False
@@ -64,27 +65,6 @@ def single_run(x, params, *args, **kwargs):
         **kwargs.get('pkwargs', {}),
     )
     return stats, controller
-
-
-def get_opt_ICs(QI, num_nodes, params):
-    """
-    Get initial conditions for optimization from preexisting preconditioners
-
-    Args:
-        QI (str): The preconditioner you want to use as initial conditions
-        num_nodes (int): Number of nodes for the preconditioner
-        params (dict): Params that are passed to `single_run`
-
-    Returns:
-        numpy.ndarray: List of the quadrature weights that go on the diagonal
-    """
-    params = {
-        'QI': QI,
-        'num_nodes': num_nodes,
-        'quad_type': params['quad_type'],
-    }
-    sweeper = generic_implicit(params)
-    return np.array([sweeper.QI[i, i] for i in range(1, num_nodes + 1)])
 
 
 def get_defaults(x, params, QI='LU'):
@@ -155,23 +135,25 @@ def get_error(stats, controller):
     return abs(u_end[1] - exact)
 
 
-def optimize(params, initial_guess, num_nodes, objective_function, tol=1e-16, **kwargs):
+def optimize(params, num_nodes, objective_function, tol=1e-16, **kwargs):
     """
     Run a single optimization run and store the result
 
     Args:
         params (dict): Parameters for running the problem
-        initial_guess (numpy.ndarray) or (str): Initial guess to start the minimization problem
+        initial_conditions (numpy.ndarray) or (str): Initial guess to start the minimization problem
         num_nodes (int): Number of collocation nodes
         objective_function (function): Objective function for the minimizaiton alogrithm
 
     Returns:
         None
     """
-    if type(initial_guess) == str:
-        initial_guess = get_opt_ICs(initial_guess, num_nodes, params)
+    if not 'initial_conditions' in kwargs.keys():
+        raise ValueError('Need "initial_conditions" in keyword arguments to start optimization')
+    if type(kwargs['initial_conditions']) == str:
+        initial_guess = get_optimization_initial_conditions(params, num_nodes, **kwargs)
 
-    get_defaults(initial_guess, params, 'MIN')
+    get_defaults(initial_guess, params, QI=kwargs['initial_conditions'])
 
     if kwargs.get('use_complex'):
         ics = np.zeros(len(initial_guess) * 2)
@@ -233,48 +215,38 @@ def plot_errors(stats, u_end, exact):
     plt.cla()
 
 
-def optimize_with_sum(params, num_nodes, **kwargs):
-    initial_guess = (np.arange(num_nodes - 1) + 1) / (num_nodes + 2)
-    kwargs['normalized'] = True
-    optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
+def run_optimization(problem, num_nodes, args, kwargs):
 
-
-def optimize_diagonal(params, num_nodes, **kwargs):
-    initial_guess = np.array(get_collocation_nodes(params, num_nodes)) * 0.7
-    initial_guess = 'MIN'
-    optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
-
-
-def optimize_with_first_row(params, num_nodes, **kwargs):
-    i0 = np.array(get_collocation_nodes(params, num_nodes)) / 2 * 1.3
-    initial_guess = np.append(i0, i0)
-    # initial_guess = np.append(np.ones(num_nodes) * 0.9, - (0.9 - i0 * 2 + np.finfo(float).eps))
-    kwargs['use_first_row'] = True
-    optimize(params, initial_guess, num_nodes, objective_function_k_only, **kwargs)
+    params = get_params(problem, **kwargs)
+    for k in args.keys():
+        for v in args[k]:
+            kwargs[k] = v
+            for k2 in args.keys():
+                if k == k2:
+                    break
+                for v2 in args[k2]:
+                    kwargs[k2] = v2
+                    print(kwargs)
+                    optimize(params=params, num_nodes=num_nodes, objective_function=objective_function_k_only, **kwargs)
 
 
 if __name__ == '__main__':
     print_status = True
+
     problem = 'Dahlquist'
+    num_nodes = 3
+
+    args = {'initial_conditions': ['MIN', 'MIN3', 'IEpar'], 'use_first_row': [False, True]}
 
     kwargs = {
         'adaptivity': True,
         'random_IG': True,
+        'initial_conditions': 'MIN',
         # 'use_complex': True,
         #'SOR': True,
     }
 
-    params = get_params(problem, **kwargs)
-    # from pySDC.playgrounds.Preconditioners.configs import get_params_for_stiffness_plot
-    # params, _, _  = get_params_for_stiffness_plot('heat', **kwargs)
-    num_nodes = 3
+    for precon in ['LU', 'IE', 'IEpar', 'MIN', 'MIN3']:
+        store_serial_precon(problem, num_nodes, **{precon: True})
 
-    store_serial_precon(problem, num_nodes, LU=True, **kwargs)
-    store_serial_precon(problem, num_nodes, IE=True, **kwargs)
-    store_serial_precon(problem, num_nodes, IEpar=True, **kwargs)
-    store_serial_precon(problem, num_nodes, MIN=True, **kwargs)
-    store_serial_precon(problem, num_nodes, MIN3=True, **kwargs)
-
-    optimize_diagonal(params, num_nodes, **kwargs)
-    optimize_with_first_row(params, num_nodes, **kwargs)
-    # optimize_with_sum(params, num_nodes, **kwargs)
+    run_optimization(problem, num_nodes, args, kwargs)
