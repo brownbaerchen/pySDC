@@ -124,3 +124,12 @@ class log_cost(hooks):
             type='restarts',
             value=int(step.status.restart),
         )
+        self.increment_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='dt',
+            value=L.dt,
+        )

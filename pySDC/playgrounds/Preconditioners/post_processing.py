@@ -7,7 +7,8 @@ from pySDC.projects.Resilience.advection import run_advection
 from pySDC.projects.Resilience.heat import run_heat
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.FDeigenvalues import get_finite_difference_eigenvalues
-from pySDC.helpers.stats_helper import get_sorted
+from pySDC.projects.Resilience.accuracy_check import plot_orders
+from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.playgrounds.Preconditioners.optimize_diagonal_preconditioner import single_run
 from pySDC.playgrounds.Preconditioners.configs import (
     load_precon,
@@ -15,6 +16,8 @@ from pySDC.playgrounds.Preconditioners.configs import (
     get_params,
     get_params_for_stiffness_plot,
     get_collocation_nodes,
+    Adaptivity,
+    problems,
 )
 from pySDC.playgrounds.Preconditioners.hooks import log_error_at_iterations
 
@@ -114,7 +117,13 @@ class PreconPostProcessing:
         }
 
         desc = {'sweeper_params': sweeper_params, 'sweeper_class': self.data['sweeper'], 'level_params': level_params}
-        stats, _, _ = run_dahlquist(custom_description=desc, custom_problem_params=problem_params, Tend=dt, **kwargs)
+
+        if 'maxiter' in kwargs.keys():
+            desc['step_params'] = {'maxiter': kwargs['maxiter']}
+
+        stats, _, _ = run_dahlquist(
+            custom_description=desc, custom_problem_params=problem_params, **{'Tend': dt, **kwargs}
+        )
         self.dahlquist_stats = stats
         return stats
 
@@ -138,6 +147,127 @@ class PreconPostProcessing:
             self.run_dahlquist(**kwargs)
 
         return plot_func(self.dahlquist_stats, **kwargs)
+
+    def get_dahlquist_order(self, iter, **kwargs):
+        # TODO: docs
+        # Warning: this don't work I don't think :(
+        res = 401
+        self.change_dahlquist_range(re=(-res * 100 + 1, 0), im=(-(res - 1) / 2 * 100, (res - 1) / 2 * 100), res=res)
+        dt_range = kwargs.get('dt_range', np.logspace(-5, 0, 6, base=2))
+        Tend = max(dt_range)
+
+        # run the Dahlquist problem for different step sizes but over the same interval
+        dahlquist_range = [self.run_dahlquist(dt=dt, Tend=Tend, maxiter=iter) for dt in dt_range]
+
+        # get the exact solution
+        lambdas = np.array(get_sorted(dahlquist_range[0], type='lambdas')[0][1])
+        exact_solutions = np.exp(lambdas * Tend)
+
+        # get the error
+        u = [get_sorted(filter_stats(stats, iter=iter, type='u')) for stats in dahlquist_range]
+        error_range = [np.abs(me[-1][1] - exact_solutions) for me in u]
+
+        # compute the order
+        order = [
+            np.log(error_range[i - 1] / error_range[i]) / np.log(dt_range[i - 1] / dt_range[i])
+            for i in range(1, len(dt_range))
+        ]
+        # print([error_range[i - 1] / error_range[i] for i in range(1, len(dt_range))])
+        # order = np.array([np.log(error_range[i] / error_range[i - 1]) / np.log(dt_range[i] / dt_range[i - 1]) for i in range(1, len(dt_range))])
+        # print(order)
+        # print(error_range)
+        # print(dt_range)
+        plottable = np.mean(order, axis=0).reshape((res, res))
+
+        # plot some stuff
+        if not 'ax' in kwargs.keys():
+            fig, ax = plt.subplots()
+
+        x_range = np.unique(lambdas.real)
+        y_range = np.unique(lambdas.imag)
+        X, Y = np.meshgrid(x_range, y_range)
+
+        # print([(error_range[i - 1] / error_range[i]) for i in range(1, len(dt_range))])
+        # print(max(order[0]), min(order[0]), np.mean(order[0]))
+        im = ax.pcolormesh(X, Y, np.where(plottable > 0, (plottable), 0))
+        # im = ax.pcolormesh(X, Y, np.log(error_range[0].reshape(101, 101)))#np.where(plottable > 0, (plottable), 0))
+
+        expected_order = iter + 1
+        ax.contour(X, Y, plottable, levels=[expected_order - 0.2], colors=['black'])
+        ax.contour(X, Y, np.log(error_range[0].reshape(res, res)), levels=[-12], colors='white')
+        fig.colorbar(im)
+        plt.show()
+
+    def plot_order(self, problem, ax, **kwargs):
+        """
+        Plot the order in time for a given problem.
+
+        Args:
+            problem (str): Name of the problem
+            ax: Somewhere to plot
+
+        Returns:
+            None
+        """
+        if problem == 'heat':
+            ks = [1, 2, 3]
+            dt_list = kwargs.get('dt_list', np.logspace(-8, -6, 8, base=2)[::-1])
+        elif problem == 'advection':
+            ks = [1, 2, 3, 4, 5]
+            dt_list = kwargs.get('dt_list', np.logspace(-7, -4, 4, base=2)[::-1])
+        elif problem == 'vdp':
+            ks = [1, 2, 3, 4, 5]
+            dt_list = kwargs.get('dt_list', np.logspace(-6, -2, 18, base=2)[::-1])
+        Tend_fixed = max(dt_list)
+        custom_description = {
+            'sweeper_params': self.data['sweeper_params'],
+            'sweeper_class': self.data['sweeper'],
+        }
+        custom_description['sweeper_params']['initial_guess'] = kwargs.get('initial_guess', 'random')
+        custom_controller_params = {'logger_level': 15}
+        plot_orders(
+            ax, ks, True, Tend_fixed, custom_description, problems[problem]['prob'], dt_list, custom_controller_params
+        )
+
+    def compare_order(self, problem, **kwargs):
+        """
+        Compare the order in time with different initial guesses.
+
+        We find that precondtioners that lack an interpretation as a time-stepping scheme or equivalently quadrature
+        rule fail to provide the desired first order approximation to the error when the initial guess is sufficiently
+        removed from the solution at the end of the step.
+
+        Args:
+            problem (str): Name of the problem
+
+        Returns:
+            None
+        """
+        fig, axs = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(11, 5))
+        igs = ['spread', 'zero']
+        [self.plot_order(problem, axs[i], initial_guess=igs[i]) for i in range(2)]
+        [axs[i].set_title(igs[i]) for i in range(2)]
+        axs[1].set_xlabel(None)
+        axs[1].set_ylabel(None)
+        fig.tight_layout()
+        plt.savefig(
+            f'data/plots/order-{self.label}-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200
+        )
+        plt.show()
+
+    def plot_restarts(self, problem, **kwargs):
+        # TODO: docs
+        custom_params = get_params(problem, **{**self.data['kwargs'], **kwargs})
+        custom_params['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-7}}
+        # custom_params, parameter_paper, parameter_range_paper = get_params_for_stiffness_plot(
+        #    problem, **{**self.data['kwargs'], **kwargs}
+        # )
+        stats, controller = self.run_problem(logger_level=15, custom_params=custom_params, **kwargs)
+
+        dt = [me[1] for me in get_sorted(stats, type='dt', recomputed=False)]
+        k = [me[1] for me in get_sorted(stats, type='k')]
+        restarts = [me[1] for me in get_sorted(stats, type='restarts')]
+        print(dt, k, restarts)
 
     def get_initial_conditions(self, problem, error=False, **kwargs):
         """
@@ -414,7 +544,7 @@ class PreconPostProcessing:
 
             custom_params['problem_params'] = {**kwargs.get('custom_problem_params', {}), **custom_problem_params}
 
-            stats, controller = self.run_problem(logger_level=30, custom_params=custom_params, **kwargs)
+            stats, controller = self.run_problem(logger_level=15, custom_params=custom_params, **kwargs)
 
             iterations[i] = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
 
@@ -803,6 +933,19 @@ def compare_signatures(precons, **kwargs):
     plt.savefig(f'data/plots/weights.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
 
 
+def compare_order(precons, problem):
+    assert len(precons) <= 2, "please choose only 2 preconditioners!"
+
+    fig, axs = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(11, 5))
+    [precons[i].plot_order(problem, axs[i]) for i in range(2)]
+    [axs[i].set_title(precons[i].label) for i in range(2)]
+    axs[1].set_xlabel(None)
+    axs[1].set_ylabel(None)
+    fig.tight_layout()
+    plt.savefig(f'data/plots/order-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
+    plt.show()
+
+
 def generate_metadata_table(precons, path='./data/notes/metadata.md'):
     """
     Generate a table containing some metadata about the preconditioners and store it in a Markdown file.
@@ -832,61 +975,51 @@ def generate_metadata_table(precons, path='./data/notes/metadata.md'):
 kwargs = {
     'adaptivity': True,
     'random_IG': True,
-    'initial_conditions': 'IEpar',
+    'initial_conditions': 'MIN',
+    # 'SOR': True,
     #'use_complex': True,
-    #'SOR': True,
 }
 
 problem = 'dahlquist'
 problem_serial = problem
+num_nodes = 3
 
 postLU = PreconPostProcessing(
     problem_serial,
-    3,
+    num_nodes,
     LU=True,
     label='LU',
     color=colors[0],
     ls='--',
     source='[Martin Weiser](https://doi.org/10.1007/s10543-014-0540-y)',
     parallelizable=False,
-    # **kwargs,
 )
 postIE = PreconPostProcessing(
     problem_serial,
-    3,
+    num_nodes,
     IE=True,
     label='Implicit Euler',
     color=colors[1],
     ls='--',
     source='[Dutt et al.](https://doi.org/10.1023/A:1022338906936)',
     parallelizable=False,
-    # **kwargs,
 )
-postDiag = PreconPostProcessing(problem, 3, label='Diagonal', color=colors[2], **kwargs)
+postDiag = PreconPostProcessing(problem, num_nodes, label='Diagonal', color=colors[2], **kwargs)
 postMIN3 = PreconPostProcessing(
-    problem, 3, MIN3=True, label='MIN3', color=colors[6], ls='-.', source='Anonymous'  # , **kwargs
-)
-postDiagFirstRow = PreconPostProcessing(
-    problem,
-    3,
-    **kwargs,
-    use_first_row=True,
-    color=colors[3],
-    label='Semi-Diagonal',
+    problem, num_nodes, MIN3=True, label='MIN3', color=colors[6], ls='-.', source='Anonymous'  # , **kwargs
 )
 postMIN = PreconPostProcessing(
     problem_serial,
-    3,
+    num_nodes,
     MIN=True,
     label='MIN',
     color=colors[4],
     ls='-.',
     source='[Robert](https://doi.org/10.1007/s00791-018-0298-x)',
-    # **kwargs,
 )
 postIEpar = PreconPostProcessing(
     problem_serial,
-    3,
+    num_nodes,
     IEpar=True,
     label='IEpar',
     color=colors[7],
@@ -896,17 +1029,28 @@ postIEpar = PreconPostProcessing(
 )
 # postNORM = PreconPostProcessing(
 #    problem,
-#    3,
+#    num_nodes,
 #    **kwargs,
 #    normalized=True,
 #    label='normalized',
 #    color=colors[5],
 #    ls='-',
 # )
+# postDiagFirstRow = PreconPostProcessing(
+#    problem,
+#    num_nodes,
+#    **kwargs,
+#    use_first_row=True,
+#    color=colors[3],
+#    label='Semi-Diagonal',
+# )
+# precons = [postDiagFirstRow, postLU, postDiag, postIE]
+# more_precons = precons + [postMIN, postMIN3]
+# interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
 
-precons = [postDiagFirstRow, postLU, postDiag, postIE]
+precons = [postLU, postDiag, postIE]
 more_precons = precons + [postMIN, postMIN3]
-interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
+interesting_precons = [postDiag, postLU, postMIN, postMIN3]
 
 custom_problem_params = {
     'sigma': 6e-2,
@@ -917,12 +1061,16 @@ custom_problem_params = {
 pkwargs = {'Tend': 1e-2}
 
 
-# [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
-compare_special_cases(interesting_precons, adaptivity=False)
-# SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
-compare_stiffness_paper(interesting_precons, format='png')
-compare_signatures(interesting_precons + [postIE], format='png')
+# # [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
+# compare_special_cases(interesting_precons, adaptivity=False)
+# # SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
+# compare_stiffness_paper(interesting_precons, format='png')
+# compare_signatures(interesting_precons + [postIE], format='png')
 
+# postLU.get_dahlquist_order(2)
+# postDiag.plot_restarts('advection')
+# compare_order([postIE, postLU], 'advection')
+postLU.compare_order('vdp', format='png')
 # compare_contraction(precons, plot_eigenvals= True, problem='advection', problem_parameter=-1, vmin=-9)
 # compare_contraction(precons, plot_eigenvals=True, problem_parameter=1, vmin=-10, problem='heat')
 # compare_Fourier(precons, problem='heat')

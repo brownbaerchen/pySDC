@@ -106,7 +106,7 @@ def run_dahlquist(
 
     if custom_description is not None:
         for k in custom_description.keys():
-            if k == 'sweeper_class':
+            if k in ['sweeper_class', 'max_restarts']:
                 description[k] = custom_description[k]
                 continue
             description[k] = {**description.get(k, {}), **custom_description.get(k, {})}

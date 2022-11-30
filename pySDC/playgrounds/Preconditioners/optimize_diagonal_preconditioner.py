@@ -51,6 +51,7 @@ def single_run(x, params, *args, **kwargs):
         **kwargs.get('force_sweeper_params', {}),
     }
     custom_description['sweeper_class'] = sweeper
+    custom_description['max_restarts'] = 20
 
     allowed_keys = ['step_params', 'level_params']
     for key in allowed_keys:
@@ -79,7 +80,11 @@ def get_defaults(x, params, QI='LU'):
         None
     """
     stats, controller = single_run(
-        x, params, force_sweeper=generic_implicit, force_sweeper_params={'QI': QI, 'num_nodes': 3}, **kwargs
+        x,
+        params,
+        force_sweeper=generic_implicit,
+        force_sweeper_params={'QI': QI, 'num_nodes': params['sweeper_params'].get('num_nodes', 3)},
+        **kwargs,
     )
     params['k'] = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
 
@@ -151,7 +156,15 @@ def optimize(params, num_nodes, objective_function, tol=1e-16, **kwargs):
     if not 'initial_conditions' in kwargs.keys():
         raise ValueError('Need "initial_conditions" in keyword arguments to start optimization')
     if type(kwargs['initial_conditions']) == str:
-        initial_guess = get_optimization_initial_conditions(params, num_nodes, **kwargs)
+        if kwargs.get('SOR', False):
+            ics = {
+                'MIN3': 1.0,
+                'IEpar': 0.7,
+                'MIN': 1.25,
+            }
+            initial_guess = np.array([ics.get(kwargs['initial_conditions'], 1.0)])
+        else:
+            initial_guess = get_optimization_initial_conditions(params, num_nodes, **kwargs)
 
     get_defaults(initial_guess, params, QI=kwargs['initial_conditions'])
 
@@ -159,11 +172,9 @@ def optimize(params, num_nodes, objective_function, tol=1e-16, **kwargs):
         ics = np.zeros(len(initial_guess) * 2)
         ics[::2] = initial_guess
         initial_guess = ics
-    if kwargs.get('SOR'):
-        store_precon(params, initial_guess, initial_guess, **kwargs)
-    else:
-        opt = minimize(objective_function, initial_guess, args=(params, kwargs), tol=tol, method='nelder-mead')
-        store_precon(params, opt.x, initial_guess, **kwargs)
+
+    opt = minimize(objective_function, initial_guess, args=(params, kwargs), tol=tol, method='nelder-mead')
+    store_precon(params, opt.x, initial_guess, **kwargs)
 
 
 def objective_function_k_and_e(x, *args):
@@ -218,6 +229,8 @@ def plot_errors(stats, u_end, exact):
 def run_optimization(problem, num_nodes, args, kwargs):
 
     params = get_params(problem, **kwargs)
+    params['sweeper_params']['num_nodes'] = num_nodes
+
     for k in args.keys():
         for v in args[k]:
             kwargs[k] = v
@@ -236,14 +249,18 @@ if __name__ == '__main__':
     problem = 'Dahlquist'
     num_nodes = 3
 
-    args = {'initial_conditions': ['MIN', 'MIN3', 'IEpar'], 'use_first_row': [False, True]}
+    args = {
+        'initial_conditions': ['MIN', 'MIN3', 'IEpar'],
+        'use_first_row': [False, True],
+        #'SOR': [True, False],
+    }
 
     kwargs = {
         'adaptivity': True,
         'random_IG': True,
         'initial_conditions': 'MIN',
         # 'use_complex': True,
-        #'SOR': True,
+        # 'SOR': True,
     }
 
     for precon in ['LU', 'IE', 'IEpar', 'MIN', 'MIN3']:

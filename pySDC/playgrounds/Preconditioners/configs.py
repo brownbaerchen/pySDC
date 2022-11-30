@@ -420,7 +420,15 @@ colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
 
 
 def prepare_sweeper(
-    x, params, use_first_row=False, normalized=False, random_IG=False, use_complex=False, force_sweeper=None, **kwargs
+    x,
+    params,
+    use_first_row=False,
+    normalized=False,
+    random_IG=False,
+    use_complex=False,
+    force_sweeper=None,
+    SOR=False,
+    **kwargs,
 ):
     """
     Prepare the sweeper with diagonal elements before running the problem
@@ -431,12 +439,18 @@ def prepare_sweeper(
         use_first_row (bool): Use the first row of the preconditioner or not
         normalize (bool): Normalize the quadrature weights or not
         random_IG (bool): Use random initial guess in the sweeper
+        SOR (bool): Use successive over-relaxation and vary a single parameter rather than all entries
 
     Returns
         dict: Sweeper parameters
     """
     # process options
-    elements = x.copy() if not use_complex else x[0::2] + x[1::2] * 1j
+    if SOR:
+        elements = get_optimization_initial_conditions(
+            params, params['sweeper_params']['num_nodes'], SOR_factor=x, **kwargs
+        )
+    else:
+        elements = x.copy() if not use_complex else x[0::2] + x[1::2] * 1j
 
     if use_first_row:
         if normalized:

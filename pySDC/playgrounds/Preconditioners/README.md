@@ -8,6 +8,8 @@ We discussed details of the optimization [here](data/notes/optimization.md).
 In an attempt to understand what the MIN preconditioner is doing, I looked a little bit into successive over-relaxation for SDC [here](data/notes/SOR.md).
 In my personal opinion, this topic is worthy of further exploration, but it is not really connected to the optimization and adaptivity part and so I don't know if I will find the time.
 
+We discuss the impacts of different preconditioners a little bit [here](data/notes/adaptivity.md).
+
 ## Things we learned so far
  - Preconditioners are better at handling stiff problems when we initialized the intermediate solutions during optimization randomly.
  - Chosing a suitable region of Dahlquist problems is better than choosing a problem directly, although what this suitable region is is tbd.
