@@ -108,7 +108,7 @@ class log_cost(hooks):
         )
         self.increment_stats(
             process=step.status.slot,
-            time=L.time + L.dt,
+            time=L.time,
             level=L.level_index,
             iter=0,
             sweep=L.status.sweep,
@@ -117,7 +117,7 @@ class log_cost(hooks):
         )
         self.increment_stats(
             process=step.status.slot,
-            time=L.time + L.dt,
+            time=L.time,
             level=L.level_index,
             iter=0,
             sweep=L.status.sweep,
@@ -126,7 +126,7 @@ class log_cost(hooks):
         )
         self.increment_stats(
             process=step.status.slot,
-            time=L.time + L.dt,
+            time=L.time,
             level=L.level_index,
             iter=0,
             sweep=L.status.sweep,

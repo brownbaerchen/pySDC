@@ -124,6 +124,42 @@ def objective_function_k_only(x, *args):
     return score
 
 
+def objective_function_k_and_restarts(x, *args):
+    '''
+    This function takes as input the diagonal preconditioner entries and runs a problem and then returns the number of
+    iterations.
+
+    The args should contain the params for a problem in position 0
+
+    Args:
+        x (numpy.ndarray): The entries of the preconditioner
+
+    Returns:
+        int: Number of iterations
+    '''
+    params = args[0]
+    kwargs = args[1]
+
+    stats, controller = single_run(x, params, *args, **kwargs)
+
+    # check how many iterations we needed
+    k = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
+    restarts = get_sorted(stats, type='restarts', recomputed=None)
+    times = np.unique([me[0] for me in restarts])
+    restart = [sum([me[1] for me in restarts if me[0]==t]) for t in times]
+    print(restart)
+
+    # get error
+    e = get_error(stats, controller)
+
+    # return the score
+    score = k
+    if print_status:
+        print(f's={score:7.0f} | e={e:.2e} | k: {k - params["k"]:5} | sum(x)={sum(x):.2f}', x)
+
+    return score
+
+
 def get_error(stats, controller):
     """
     Get the error at the end of a pySDC run
@@ -162,19 +198,19 @@ def optimize(params, num_nodes, objective_function, tol=1e-16, **kwargs):
                 'IEpar': 0.7,
                 'MIN': 1.25,
             }
-            initial_guess = np.array([ics.get(kwargs['initial_conditions'], 1.0)])
+            opt_IC = np.array([ics.get(kwargs['initial_conditions'], 1.0)])
         else:
-            initial_guess = get_optimization_initial_conditions(params, num_nodes, **kwargs)
+            opt_IC = get_optimization_initial_conditions(params, num_nodes, **kwargs)
 
-    get_defaults(initial_guess, params, QI=kwargs['initial_conditions'])
+    get_defaults(opt_IC, params, QI=kwargs['initial_conditions'])
 
     if kwargs.get('use_complex'):
-        ics = np.zeros(len(initial_guess) * 2)
-        ics[::2] = initial_guess
-        initial_guess = ics
+        ics = np.zeros(len(opt_IC) * 2)
+        ics[::2] = opt_IC
+        opt_IC = ics
 
-    opt = minimize(objective_function, initial_guess, args=(params, kwargs), tol=tol, method='nelder-mead')
-    store_precon(params, opt.x, initial_guess, **kwargs)
+    opt = minimize(objective_function, opt_IC, args=(params, kwargs), tol=tol, method='nelder-mead')
+    store_precon(params, opt.x, opt_IC, **kwargs)
 
 
 def objective_function_k_and_e(x, *args):
@@ -240,7 +276,7 @@ def run_optimization(problem, num_nodes, args, kwargs):
                 for v2 in args[k2]:
                     kwargs[k2] = v2
                     print(kwargs)
-                    optimize(params=params, num_nodes=num_nodes, objective_function=objective_function_k_only, **kwargs)
+                    optimize(params=params, num_nodes=num_nodes, objective_function=objective_function_k_and_restarts, **kwargs)
 
 
 if __name__ == '__main__':
@@ -257,10 +293,10 @@ if __name__ == '__main__':
 
     kwargs = {
         'adaptivity': True,
-        'random_IG': True,
-        'initial_conditions': 'MIN',
+        'initial_guess': 'spread',
+        #'initial_conditions': 'IEpar',
         # 'use_complex': True,
-        # 'SOR': True,
+        'SOR': True,
     }
 
     for precon in ['LU', 'IE', 'IEpar', 'MIN', 'MIN3']:

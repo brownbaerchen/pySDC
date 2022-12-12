@@ -171,7 +171,7 @@ def plot_contraction(stats, fig=None, ax=None, iter=None, plot_increase=False, c
     kwargs['cmap'] = kwargs.get('cmap', 'seismic' if plot_increase else 'jet')
 
     # decide which iterations to look at
-    iter = [0, 1] if iter is None else iter
+    iter = np.array([0, 1] if iter is None else iter)
     assert len(iter) > 1, 'Need to compute the contraction factor across multiple iterations!'
 
     # get solution for the specified iterations
@@ -184,7 +184,8 @@ def plot_contraction(stats, fig=None, ax=None, iter=None, plot_increase=False, c
     e[e == 0] = np.finfo(float).eps
 
     # get contraction rates for each iteration
-    rho = e[1:, :] / e[:-1, :]
+    # rho = (e[1:, :] / e[:-1, :])
+    rho = [(e[i + 1, :] / e[i, :]) ** (1./iter[i + 1] - iter[i]) for i in range(len(iter) - 1)]
     rho_avg = np.mean(rho, axis=0)
     rho_log = np.log(np.reshape(rho_avg, (len(imag), len(real))))
 

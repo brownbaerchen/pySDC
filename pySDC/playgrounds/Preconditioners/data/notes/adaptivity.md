@@ -27,3 +27,9 @@ On the other hand, trusty friends like implicit Euler, both zero-to-node (diagon
 While fixating on quadrature rules as preconditioners in the past seemed like unreasonable fixation on relics from SDCs original introduction, this provides us with at least a minor point in their favor.
 In practice, though, we will always chose sensible predictions and are likely to obtain good speedup from LU and like preconditioners.
 Hence, we chose to ignore the fact that we might lose an order to poor initial guesses.
+Note however, that a step size update rule that overestimates the accuracy of the scheme will compute too large step sizes, which will result in many restarts and should be avoided if convenient.
+
+In particular, please note that adaptivity is not designed to work with random initial guess.
+Initializing randomly means we get a different error each time if we solve the step size multiple times with the same scheme.
+Since that prohibits any sort of predictability regarding the scaling of the error with the step size, we must rely on the many restarts to get us to a suitable step size by accident.
+Instead, if we want to do something more challenging than spreading, we can choose to initialize with zero.

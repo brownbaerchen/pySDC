@@ -51,7 +51,7 @@ class PreconPostProcessing:
         self.normalized = self.data['normalized']
         self.semi_diagonal = self.data['use_first_row']
         self.nodes = nodes
-        self.random_ig = self.data['random_IG'] and self.source == 'optimization'
+        self.initial_guess = self.data['initial_guess'] and self.source == 'optimization'
 
         # prepare empty variables
         self.dahlquist_stats = None
@@ -224,7 +224,7 @@ class PreconPostProcessing:
             'sweeper_class': self.data['sweeper'],
         }
         custom_description['sweeper_params']['initial_guess'] = kwargs.get('initial_guess', 'random')
-        custom_controller_params = {'logger_level': 15}
+        custom_controller_params = {'logger_level': 30}
         plot_orders(
             ax, ks, True, Tend_fixed, custom_description, problems[problem]['prob'], dt_list, custom_controller_params
         )
@@ -259,15 +259,45 @@ class PreconPostProcessing:
         # TODO: docs
         custom_params = get_params(problem, **{**self.data['kwargs'], **kwargs})
         custom_params['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-7}}
+        custom_params['force_sweeper_params'] = {'initial_guess': 'spread'}
+        replace_params = {'Tend': 8 if problem == 'vdp' else 1.}
         # custom_params, parameter_paper, parameter_range_paper = get_params_for_stiffness_plot(
         #    problem, **{**self.data['kwargs'], **kwargs}
         # )
-        stats, controller = self.run_problem(logger_level=15, custom_params=custom_params, **kwargs)
+        stats, controller = self.run_problem(logger_level=30, custom_params=custom_params, replace_params=replace_params, **kwargs)
 
-        dt = [me[1] for me in get_sorted(stats, type='dt', recomputed=False)]
-        k = [me[1] for me in get_sorted(stats, type='k')]
-        restarts = [me[1] for me in get_sorted(stats, type='restarts')]
-        print(dt, k, restarts)
+        dt = get_sorted(stats, type='dt', recomputed=False)
+         
+        restarts_ = get_sorted(stats, type='restarts', recomputed=None)
+        times = np.unique([me[0] for me in restarts_])
+        restarts = np.array([sum([me[1] for me in restarts_ if me[0]==t]) for t in times])
+
+        k_ = get_sorted(stats, type='k')
+        k_times = np.unique([me[0] for me in k_])
+        k = np.array([sum([me[1] for me in k_ if me[0]==t]) for t in k_times])
+
+        if not 'ax' in kwargs.keys() and 'dt_ax' in kwargs.keys():
+            fig, ax = plt.subplots()
+            dt_ax = ax.twinx()
+        else:
+            ax = kwargs['ax']
+            dt_ax = kwargs['dt_ax']
+
+        #ax.scatter(times[restarts > 0], restarts[restarts > 0], color=self.color)
+
+        #dt_ax.plot([me[0] for me in dt], [me[1] for me in dt], color=self.color, label=self.label, ls='--')
+        ax.plot([me[0] for me in k_], np.cumsum([me[1] for me in k_]), color=self.color, label=self.label)
+        dt_ax.plot([me[0] for me in restarts_], np.cumsum([me[1] for me in restarts_]), color=self.color, ls='--')
+        dt_ax.plot(times, np.cumsum(restarts), color=self.color, ls='-.')
+
+        ax.set_ylabel('k')
+        ax.set_xlabel('time')
+        dt_ax.set_ylabel('restarts')
+        ax.legend(frameon=False)
+
+        #plt.savefig(f'data/plots/restarts-{self.label}-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
+
+        #print(dt, k, restarts)
 
     def get_initial_conditions(self, problem, error=False, **kwargs):
         """
@@ -379,14 +409,17 @@ class PreconPostProcessing:
         params = get_params(problem)
         problem_params = params['problem_params']
 
-        # get the eigenvalues of the Toeplitz matrix
-        eigenvals = problem_parameter * get_finite_difference_eigenvalues(
-            params['derivative'],
-            order=problem_params['order'],
-            type=problem_params['type'],
-            dx=params['L'] / problem_params['nvars'],
-            L=params['L'],
-        )
+        if problem == 'Dahlquist':
+            eigenvals = problem_params['lambdas']
+        else:
+            # get the eigenvalues of the Toeplitz matrix
+            eigenvals = problem_parameter * get_finite_difference_eigenvalues(
+                params['derivative'],
+                order=problem_params['order'],
+                type=problem_params['type'],
+                dx=params['L'] / problem_params['nvars'],
+                L=params['L'],
+            )
 
         if active_only:
             # get initial error
@@ -411,12 +444,17 @@ class PreconPostProcessing:
 
         # plot the contraction factor
         if ax is None:
-            fig, ax = plt.subplots(1, 1)
+            fig, ax = plt.subplots(1, 1, figsize=(5, 4.5))
         im = self.plot_dahlquist(plot_contraction, ax=ax, fig=fig, vmin=vmin, **kwargs)
 
         # plot the eigenvalues
         ax.scatter(eigenvals[active_modes].real, eigenvals[active_modes].imag, color='black', marker='*')
 
+        ax.set_xlabel(r'$\Re (\lambda)$')
+        ax.set_ylabel(r'$\Im (\lambda)$')
+
+        if 'format' in kwargs:
+            plt.savefig(f'data/plots/eigenvalues.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
         return im
 
     def plot_everything(self, **kwargs):
@@ -544,7 +582,7 @@ class PreconPostProcessing:
 
             custom_params['problem_params'] = {**kwargs.get('custom_problem_params', {}), **custom_problem_params}
 
-            stats, controller = self.run_problem(logger_level=15, custom_params=custom_params, **kwargs)
+            stats, controller = self.run_problem(logger_level=30, custom_params=custom_params, **kwargs)
 
             iterations[i] = sum([me[1] for me in get_sorted(stats, type='k', recomputed=None)])
 
@@ -945,6 +983,12 @@ def compare_order(precons, problem):
     plt.savefig(f'data/plots/order-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
     plt.show()
 
+def compare_restarts(precons, problem, **kwargs):
+    fig, ax = plt.subplots()
+    dt_ax = ax.twinx()
+    [p.plot_restarts(ax=ax, dt_ax=dt_ax, problem=problem, **kwargs) for p in precons]
+    plt.savefig(f'data/plots/restarts-{problem}.{kwargs.get("format", "pdf")}', bbox_inches='tight', dpi=200)
+
 
 def generate_metadata_table(precons, path='./data/notes/metadata.md'):
     """
@@ -974,9 +1018,9 @@ def generate_metadata_table(precons, path='./data/notes/metadata.md'):
 
 kwargs = {
     'adaptivity': True,
-    'random_IG': True,
+    'initial_guess': 'spread',
+    'SOR': True,
     'initial_conditions': 'MIN',
-    # 'SOR': True,
     #'use_complex': True,
 }
 
@@ -1036,17 +1080,17 @@ postIEpar = PreconPostProcessing(
 #    color=colors[5],
 #    ls='-',
 # )
-# postDiagFirstRow = PreconPostProcessing(
-#    problem,
-#    num_nodes,
-#    **kwargs,
-#    use_first_row=True,
-#    color=colors[3],
-#    label='Semi-Diagonal',
-# )
-# precons = [postDiagFirstRow, postLU, postDiag, postIE]
-# more_precons = precons + [postMIN, postMIN3]
-# interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
+#postDiagFirstRow = PreconPostProcessing(
+#   problem,
+#   num_nodes,
+#   **kwargs,
+#   use_first_row=True,
+#   color=colors[3],
+#   label='Semi-Diagonal',
+#)
+#precons = [postDiagFirstRow, postLU, postDiag, postIE]
+#more_precons = precons + [postMIN, postMIN3]
+#interesting_precons = [postDiagFirstRow, postDiag, postLU, postMIN, postMIN3]
 
 precons = [postLU, postDiag, postIE]
 more_precons = precons + [postMIN, postMIN3]
@@ -1061,16 +1105,20 @@ custom_problem_params = {
 pkwargs = {'Tend': 1e-2}
 
 
-# # [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
-# compare_special_cases(interesting_precons, adaptivity=False)
-# # SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
-# compare_stiffness_paper(interesting_precons, format='png')
-# compare_signatures(interesting_precons + [postIE], format='png')
+# [p.euler_comp(l=-0+1j*np.pi/2) for p in more_precons]
+#compare_special_cases(interesting_precons, adaptivity=False)
+# SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
+compare_stiffness_paper(interesting_precons, format='png')
+#compare_signatures(interesting_precons + [postIE], format='png')
+#compare_restarts(interesting_precons + [postIE], 'vdp')
+#compare_restarts([postIE], 'advection')
+
+#postIE.plot_eigenvalues('Dahlquist', active_only=False, iter=[0, 1], format='png')
 
 # postLU.get_dahlquist_order(2)
-# postDiag.plot_restarts('advection')
+#postDiag.plot_restarts('advection')
 # compare_order([postIE, postLU], 'advection')
-postLU.compare_order('vdp', format='png')
+#postLU.compare_order('vdp', format='png')
 # compare_contraction(precons, plot_eigenvals= True, problem='advection', problem_parameter=-1, vmin=-9)
 # compare_contraction(precons, plot_eigenvals=True, problem_parameter=1, vmin=-10, problem='heat')
 # compare_Fourier(precons, problem='heat')

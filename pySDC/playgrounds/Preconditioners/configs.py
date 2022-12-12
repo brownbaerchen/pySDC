@@ -95,10 +95,10 @@ params_heat = {
 
 re = np.linspace(-300, 1, 302)
 im = np.linspace(-1, 100, 102)
-lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).reshape(
-    (len(re) * len(im))
-)
-lambdas = np.append(re, im * 1j)
+# lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).reshape(
+#     (len(re) * len(im))
+# )
+# lambdas = np.append(re, im * 1j)
 from pySDC.projects.Resilience.FDeigenvalues import get_finite_difference_eigenvalues
 
 eigenvalsHeat = (
@@ -309,6 +309,8 @@ def get_name(problem, nodes, **kwargs):
     for c in kwargs.keys():
         if c == 'initial_conditions':
             name = f'{name}-ic={kwargs[c]}'
+        elif c == 'initial_guess':
+            name = f'{name}-ig={kwargs[c]}'
         elif kwargs[c]:
             name = f'{name}-{c}'
     name += f'-{nodes}nodes'
@@ -329,14 +331,14 @@ def get_path(problem, nodes, **kwargs):
     return f'data/precons/{get_name(problem, nodes, **kwargs)}.pickle'
 
 
-def store_precon(params, x, initial_guess, **kwargs):
+def store_precon(params, x, ics, **kwargs):
     """
     Store the preconditioner of a specific optimization run.
 
     Args:
         problem (str): The name of the problem that has been run to obtain the preconditioner
         x (numpy.ndarray): The entries of the preconditioner
-        initial_guess (numpy.ndarray): Initial guess to start the minimization problem
+        initial_conditions (numpy.ndarray): Initial guess to start the minimization problem
 
     Returns:
         None
@@ -344,7 +346,7 @@ def store_precon(params, x, initial_guess, **kwargs):
     data = {}
 
     # write the configuration in the data array
-    configs = ['use_first_row', 'normalized', 'LU', 'IE', 'MIN', 'random_IG', 'MIN3', 'use_complex', 'SOR']
+    configs = ['use_first_row', 'normalized', 'LU', 'IE', 'MIN', 'initial_guess', 'MIN3', 'use_complex', 'SOR']
     for c in configs:
         data[c] = kwargs.get(c, False)
 
@@ -356,7 +358,7 @@ def store_precon(params, x, initial_guess, **kwargs):
     data['x'] = x.copy()
     data['params'] = params
     data['kwargs'] = kwargs
-    data['initial_guess'] = initial_guess
+    data['ics'] = ics
     data['sweeper_params'] = sweeper_params
     data['sweeper'] = sweeper
 
@@ -383,7 +385,7 @@ def store_serial_precon(problem, nodes, **kwargs):
     store_precon(
         params=params,
         x=np.zeros((nodes)) if not kwargs.get('use_complex', False) else np.zeros((nodes * 2)),
-        initial_guess=np.zeros((nodes)),
+        ics=np.zeros((nodes)),
         **kwargs,
     )
 
@@ -424,7 +426,7 @@ def prepare_sweeper(
     params,
     use_first_row=False,
     normalized=False,
-    random_IG=False,
+    initial_guess='spread',
     use_complex=False,
     force_sweeper=None,
     SOR=False,
@@ -438,7 +440,7 @@ def prepare_sweeper(
         params (dict): Parameters for setting up the run
         use_first_row (bool): Use the first row of the preconditioner or not
         normalize (bool): Normalize the quadrature weights or not
-        random_IG (bool): Use random initial guess in the sweeper
+        initial_guess (str): Initial guess for the sweeper
         SOR (bool): Use successive over-relaxation and vary a single parameter rather than all entries
 
     Returns
@@ -469,11 +471,6 @@ def prepare_sweeper(
             diags = np.array(elements)
             first_row = np.zeros_like(diags)
             num_nodes = len(elements)
-
-    if random_IG:
-        initial_guess = 'random'
-    else:
-        initial_guess = 'spread'
 
     # setup the sweeper
     if None not in x:
