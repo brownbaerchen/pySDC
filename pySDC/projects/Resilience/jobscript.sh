@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --ntasks=80
-#SBATCH --time=00:30:00
+#SBATCH --time=02:20:00
 #SBATCH --output=data/text_output/out%A_%a.txt
 #SBATCH --error=data/text_output/err%A_%a.txt
 #SBATCH -A cstma
