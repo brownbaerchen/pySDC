@@ -96,9 +96,9 @@ def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
 
     if problem == run_advection:
         if not smooth:
-            Tend = 3e-1
+            Tend = 3e-1 * 4
         else:
-            Tend = 1e1
+            Tend = 1e1 * 2
     elif problem == run_heat:
         if not smooth:
             Tend = 3e0
