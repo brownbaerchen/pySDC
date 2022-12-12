@@ -185,13 +185,14 @@ def plot_timing(problem, cluster='.', **kwargs):
     print(parallel_efficiency)
     print(speedup)
     ax.plot(sizes, speedup, label='speedup')
-    ax.plot(sizes, parallel_efficiency, label='speedup')
+    ax.plot(sizes, parallel_efficiency, label='parallel efficiency')
     ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
 
     ax.plot([None], [None], color='magenta', label=r'$\Delta t$')
     ax.legend(frameon=False)
     ax.set_xlabel('MPI size')
-    ax.set_ylabel('Wall clock time')
+    # ax.set_ylabel('Wall clock time')
+    # ax.set_ylabel('Parallel efficiency')
     dt_ax.set_ylabel(r'$\Delta t$')
 
     ax.set_title(name.replace('-', ' '))
