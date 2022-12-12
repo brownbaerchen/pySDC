@@ -89,10 +89,21 @@ def record_timing(problem, sizes, **kwargs):
     return res
 
 
-def run(problem, comm=None, adaptivity=False, Tend=2.0, smooth=None, **kwargs):
+def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
+
+    if problem == run_advection:
+        if not smooth:
+            Tend = 3e-1
+        else:
+            Tend = 1e1
+    elif problem == run_heat:
+        if not smooth:
+            Tend = 3e0
+        else:
+            Tend = 5e2
 
     if adaptivity:
         custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
@@ -237,5 +248,5 @@ if __name__ == "__main__":
             print(f'\t{k}: {kwargs[k]}')
 
     record_timing(**kwargs)
-    plot_timing(**kwargs)
+    # plot_timing(**kwargs)
     # plot(**kwargs)
