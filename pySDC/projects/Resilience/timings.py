@@ -89,7 +89,7 @@ def record_timing(problem, sizes, **kwargs):
     return res
 
 
-def run(problem, comm=None, adaptivity=False, Tend=1.0, smooth=None, **kwargs):
+def run(problem, comm=None, adaptivity=False, Tend=2.0, smooth=None, **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
