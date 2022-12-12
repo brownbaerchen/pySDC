@@ -163,27 +163,36 @@ def plot_timing(problem, cluster='.', **kwargs):
     plotting_keys = ['timing_run']
     sizes = np.unique(list(res['timing_run'].keys()))
 
-    for k in plotting_keys:
-        ax.plot(sizes, [res[k][s] for s in sizes], label=k)
+    #for k in plotting_keys:
+    #    ax.plot(sizes, [res[k][s] for s in sizes], label=k)
 
     dt_ax = ax.twinx()
-    dt_ax.loglog(sizes, [res['dt'][s] for s in sizes], label=k, color='magenta')
-    print(res['restart'])
+    dt_ax.plot(sizes, [res['dt'][s] for s in sizes], color='magenta')
+    print(res['nsteps'])
 
     k_dict = res.get('niter', {'niter': 5})
     k = np.mean([k_dict[me] for me in k_dict.keys()])
     n = np.array(sizes)
-    ax.loglog(sizes, res['timing_run'][1] / n, color='black', linestyle='--', label='ideal speedup')
+    # ax.loglog(sizes, res['timing_run'][1] / n, color='black', linestyle='--', label='ideal speedup')
     # ax.loglog(sizes, res['timing_run'][1] * (n - 1 + k) / n / k, color='black', linestyle='-.', label='maximal speedup')
     # ax.loglog(sizes, [res['timing_run'][1] * res['total_iterations'][s] / res['total_iterations'][1] / s for s in sizes] , color='grey', linestyle='-.', label='maximal speedup')
 
+    timing = [res['timing_run'][s] for s in sizes]
+    speedup = timing[0] / timing
+    parallel_efficiency = speedup / sizes
+    ax.axvline(sizes[np.argmax(speedup)], color='grey', ls='-.', label=f'max. speedup: {np.max(speedup):.2f}')
+    ax.axvline(sizes[np.argmax(parallel_efficiency)], color='grey', ls='--', label=f'max. parallel efficiency: {np.max(parallel_efficiency):.2f}')
+    print(parallel_efficiency)
+    print(speedup)
+    ax.plot(sizes, speedup, label='speedup')
+    ax.plot(sizes, parallel_efficiency, label='speedup')
+    ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
+
+    ax.plot([None], [None], color='magenta', label=r'$\Delta t$')
     ax.legend(frameon=False)
     ax.set_xlabel('MPI size')
     ax.set_ylabel('Wall clock time')
-
-    timing = [res['timing_run'][s] for s in sizes]
-    print(min(timing), max(timing))
-    print(np.argmin(timing), np.argmax(timing))
+    dt_ax.set_ylabel(r'$\Delta t$')
 
     ax.set_title(name.replace('-', ' '))
 
@@ -226,6 +235,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    record_timing(**kwargs)
-    # plot_timing(**kwargs)
+    # record_timing(**kwargs)
+    plot_timing(**kwargs)
     # plot(**kwargs)
