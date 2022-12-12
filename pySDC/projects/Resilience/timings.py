@@ -236,6 +236,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    # record_timing(**kwargs)
+    record_timing(**kwargs)
     plot_timing(**kwargs)
     # plot(**kwargs)
