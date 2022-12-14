@@ -12,7 +12,7 @@ from pySDC.projects.Resilience.hook import log_error_estimates
 def plot_embedded(stats, ax):
     u = get_sorted(stats, type='u', recomputed=False)
     uold = get_sorted(stats, type='uold', recomputed=False)
-    t = [get_sorted(stats, type='u', recomputed=False)[i][0] for i in range(len(u))]
+    t = [u[i][0] for i in range(len(u))]
     e_em = np.array(get_sorted(stats, type='e_embedded', recomputed=False))[:, 1]
     e_em_semi_glob = [abs(u[i][1] - uold[i][1]) for i in range(len(u))]
     ax.plot(t, e_em_semi_glob, label=r'$\|u^{\left(k-1\right)}-u^{\left(k\right)}\|$')
@@ -32,7 +32,7 @@ class log_data(hooks):
 
     def post_iteration(self, step, level_number):
         super(log_data, self).post_iteration(step, level_number)
-        if step.status.iter == step.params.maxiter - 1:
+        if step.status.iter == step.params.maxiter:
             L = step.levels[level_number]
             L.sweep.compute_end_point()
             self.add_to_stats(
