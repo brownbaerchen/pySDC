@@ -104,6 +104,8 @@ def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
             Tend = 3e0
         else:
             Tend = 5e2
+    elif problem == run_vdp:
+        Tend = 2.
 
     if adaptivity:
         custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
@@ -247,6 +249,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    # record_timing(**kwargs)
-    plot_timing(**kwargs)
+    record_timing(**kwargs)
+    # plot_timing(**kwargs)
     # plot(**kwargs)
