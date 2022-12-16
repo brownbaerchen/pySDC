@@ -1019,8 +1019,8 @@ def generate_metadata_table(precons, path='./data/notes/metadata.md'):
 kwargs = {
     'adaptivity': True,
     'initial_guess': 'spread',
-    'SOR': True,
-    'initial_conditions': 'MIN',
+    'SOR': False,
+    'initial_conditions': 'MC',
     #'use_complex': True,
 }
 
@@ -1109,7 +1109,7 @@ pkwargs = {'Tend': 1e-2}
 #compare_special_cases(interesting_precons, adaptivity=False)
 # SOR(np.linspace(0, 2, 40), 'advection', parameter_range=np.logspace(-1, 5, 40), use_first_row=True, format='png')
 compare_stiffness_paper(interesting_precons, format='png')
-#compare_signatures(interesting_precons + [postIE], format='png')
+compare_signatures(interesting_precons + [postIE], format='png')
 #compare_restarts(interesting_precons + [postIE], 'vdp')
 #compare_restarts([postIE], 'advection')
 
