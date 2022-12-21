@@ -147,9 +147,14 @@ class Adaptivity(AdaptivityBase):
 
         super(Adaptivity, self).dependencies(controller, description)
 
+        params = {}
+        if 'estimate_semi_glob_error' in self.params.__dict__.keys():
+            params['estimate_semi_glob_error'] = self.params.estimate_semi_glob_error
+
         controller.add_convergence_controller(
             EstimateEmbeddedError.get_implementation("nonMPI" if type(controller) == controller_nonMPI else "MPI"),
             description=description,
+            params=params,
         )
 
         return None

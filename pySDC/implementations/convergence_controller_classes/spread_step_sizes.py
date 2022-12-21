@@ -75,6 +75,8 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwiseBase):
             for i in range(len(MS[p].levels)):
                 MS[p].levels[i].params.dt = new_steps[i]
 
+        if len(MS) > 1:
+            self.log(f'The finest levels on all steps receive dt={new_steps[0]:.4e}', MS[restart_at])
         return None
 
 
@@ -127,4 +129,5 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwiseBase):
         for i in range(len(S.levels)):
             S.levels[i].params.dt = new_steps[i]
 
+        self.log(f'The finest levels on all steps receive dt={new_steps[0]:.4e} from step {restart_at}', S)
         return None
