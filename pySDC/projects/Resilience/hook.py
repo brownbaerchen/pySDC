@@ -103,3 +103,21 @@ class log_error_estimates(hooks):
             type='e_extrapolated',
             value=L.status.get('error_extrapolation_estimate'),
         )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='restart',
+            value=int(step.status.get('restart')),
+        )
+        self.increment_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='sweeps',
+            value=step.status.iter,
+        )
