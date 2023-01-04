@@ -26,6 +26,7 @@ class SpreadStepSizesBlockwiseBase(ConvergenceController):
         """
         defaults = {
             "control_order": +100,
+            "use_first_step_only": description.get('spread_step_size_from_first_step', False),
         }
 
         return {**defaults, **params}
@@ -52,11 +53,14 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwiseBase):
             None
         """
         # figure out where the block is restarted
-        restarts = [MS[p].status.restart for p in active_slots]
-        if True in restarts:
-            restart_at = np.where(restarts)[0][0]
+        if self.params.use_first_step_only:
+            restart_at = 0
         else:
-            restart_at = len(restarts) - 1
+            restarts = [MS[p].status.restart for p in active_slots]
+            if True in restarts:
+                restart_at = np.where(restarts)[0][0]
+            else:
+                restart_at = len(restarts) - 1
 
         # Compute the maximum allowed step size based on Tend.
         dt_max = (Tend - time[0]) / len(active_slots)
@@ -75,6 +79,8 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwiseBase):
             for i in range(len(MS[p].levels)):
                 MS[p].levels[i].params.dt = new_steps[i]
 
+        if len(MS) > 1:
+            self.log(f'The finest levels on all steps receive dt={new_steps[0]:.4e}', MS[restart_at])
         return None
 
 
@@ -127,4 +133,5 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwiseBase):
         for i in range(len(S.levels)):
             S.levels[i].params.dt = new_steps[i]
 
+        self.log(f'The finest levels on all steps receive dt={new_steps[0]:.4e} from step {restart_at}', S)
         return None

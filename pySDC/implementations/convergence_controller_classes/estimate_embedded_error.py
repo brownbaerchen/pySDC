@@ -57,7 +57,7 @@ class EstimateEmbeddedError(ConvergenceController):
             dict: Updated parameters
         """
         sweeper_type = 'RK' if RungeKutta in description['sweeper_class'].__bases__ else 'SDC'
-        return {"control_order": -80, "sweeper_type": sweeper_type, **params}
+        return {"control_order": -80, "sweeper_type": sweeper_type, "estimate_semi_glob_error": False, **params}
 
     def dependencies(self, controller, description, **kwargs):
         """
@@ -157,7 +157,8 @@ level"
                 temp = self.estimate_embedded_error_serial(L)
                 L.status.error_embedded_estimate = max([abs(temp - self.buffers.e_em_last), np.finfo(float).eps])
 
-            self.buffers.e_em_last = temp * 1.0
+            if not self.params.estimate_semi_glob_error:
+                self.buffers.e_em_last = temp * 1.0
 
         return None
 
@@ -181,7 +182,7 @@ class EstimateEmbeddedErrorMPI(EstimateEmbeddedError):
             for L in S.levels:
 
                 # get accumulated local errors from previous steps
-                if not S.status.first:
+                if not S.status.first and not self.params.estimate_semi_glob_error:
                     if not S.status.prev_done:
                         self.buffers.e_em_last = self.recv(comm, S.status.slot - 1)
                 else:
@@ -194,7 +195,7 @@ class EstimateEmbeddedErrorMPI(EstimateEmbeddedError):
                 L.status.error_embedded_estimate = max([abs(temp - self.buffers.e_em_last), np.finfo(float).eps])
 
                 # send the accumulated local errors forward
-                if not S.status.last:
+                if not S.status.last and not self.params.estimate_semi_glob_error:
                     self.send(comm, dest=S.status.slot + 1, data=temp, blocking=True)
 
         return None

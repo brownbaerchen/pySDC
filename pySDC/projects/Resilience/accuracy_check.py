@@ -132,6 +132,8 @@ def multiple_runs(
     custom_controller_params=None,
     var='dt',
     avoid_restarts=False,
+    num_procs=None,
+    estimate_semi_glob_error=False,
 ):
     """
     A simple test program to compute the order of accuracy.
@@ -148,6 +150,8 @@ def multiple_runs(
         custom_controller_params (dict): Custom parameters to pass to the problem
         var (str): The variable to check the order against
         avoid_restarts (bool): Mode of running adaptivity if applicable
+        num_procs (int): Number of processes, can override `serial`
+        estimate_semi_glob_error (bool): Estimate semi-global error or try to estimate local error in MSSDC
 
     Returns:
         dict: The errors for different values of var
@@ -161,14 +165,14 @@ def multiple_runs(
     else:
         dt_list = 0.01 * 10.0 ** -(np.arange(20) / 10.0)
 
-    num_procs = 1 if serial else 5
+    num_procs = num_procs if num_procs is not None else 1 if serial else 5
 
     # perform rest of the tests
     for i in range(0, len(dt_list)):
         desc = {
             'step_params': {'maxiter': k},
             'convergence_controllers': {
-                EstimateEmbeddedErrorNonMPI: {},
+                EstimateEmbeddedErrorNonMPI: {'estimate_semi_glob_error': estimate_semi_glob_error},
                 EstimateExtrapolationErrorNonMPI: {'no_storage': not serial},
             },
         }
@@ -233,7 +237,7 @@ def plot_order(res, ax, k):
     ax.legend(frameon=False, loc='lower right')
 
 
-def plot(res, ax, k, var='dt'):
+def plot(res, ax, k, var='dt', color=None):
     """
     Plot the order of various errors using the results from `multiple_runs`.
 
@@ -242,13 +246,14 @@ def plot(res, ax, k, var='dt'):
         ax: Somewhere to plot
         k (int): Number of SDC sweeps
         var (str): The variable to compute the order against
+        color (str): Color for plotting
 
     Returns:
         None
     """
     keys = ['e_embedded', 'e_extrapolated', 'e']
     ls = ['-', ':', '-.']
-    color = plt.rcParams['axes.prop_cycle'].by_key()['color'][k - 2]
+    color = color if color is not None else plt.rcParams['axes.prop_cycle'].by_key()['color'][k - 2]
 
     for i in range(len(keys)):
         if all([me == 0.0 for me in res[keys[i]]]):
@@ -367,6 +372,9 @@ def plot_all_errors(
     custom_controller_params=None,
     var='dt',
     avoid_restarts=False,
+    num_procs=None,
+    color=None,
+    estimate_semi_glob_error=False,
 ):
     """
     Make tests for plotting the error and plot a bunch of error estimates
@@ -382,6 +390,8 @@ def plot_all_errors(
         custom_controller_params (dict): Custom parameters to pass to the problem
         var (str): The variable to compute the order against
         avoid_restarts (bool): Mode of running adaptivity if applicable
+        num_procs (int): Number of processes, can override `serial`
+        color (str): Color for plotting
 
     Returns:
         None
@@ -398,15 +408,55 @@ def plot_all_errors(
             custom_controller_params=custom_controller_params,
             var=var,
             avoid_restarts=avoid_restarts,
+            num_procs=num_procs,
+            estimate_semi_glob_error=estimate_semi_glob_error,
         )
 
         # visualize results
-        plot(res, ax, k, var=var)
+        plot(res, ax, k, var=var, color=color)
 
     ax.plot([None, None], color='black', label=r'$\epsilon_\mathrm{embedded}$', ls='-')
     ax.plot([None, None], color='black', label=r'$\epsilon_\mathrm{extrapolated}$', ls=':')
     ax.plot([None, None], color='black', label=r'$e$', ls='-.')
     ax.legend(frameon=False, loc='lower right')
+
+
+def check_order_with_adaptivity_MSSDC():
+    """
+    Test the order when running adaptivity and multiple steps.
+    Since we replace the step size with the tolerance, we check the order against this.
+
+    Irrespective of the number of sweeps we do, the embedded error estimate should scale linearly with the tolerance,
+    since it is supposed to match it as closely as possible.
+
+    The error estimate for the error of the last sweep, however will depend on the number of sweeps we do. The order
+    we expect is 1 + 1/k.
+    """
+    setup_mpl()
+    ks = [4]
+    num_procs_list = [1, 2, 3, 4]
+    from pySDC.projects.Resilience.vdp import run_vdp
+
+    fig, ax = plt.subplots(1, 1, figsize=(3.5, 3))
+    for num_procs in num_procs_list:
+        color = plt.rcParams['axes.prop_cycle'].by_key()['color'][num_procs - 1]
+        plot_all_errors(
+            ax,
+            ks,
+            serial=None,
+            Tend_fixed=5e-1,
+            var='e_tol',
+            dt_list=[1e-5, 1e-6, 1e-7],
+            avoid_restarts=False,
+            num_procs=num_procs,
+            color=color,
+            prob=run_vdp,
+            estimate_semi_glob_error=False,
+        )
+    ax.get_legend().remove()
+    fig.savefig('data/error_estimate_order_adaptivity_MSSDC.png', dpi=300, bbox_inches='tight')
+    plt.close(fig)
+    print('done')
 
 
 def check_order_with_adaptivity():
@@ -452,6 +502,7 @@ def check_order_against_step_size():
 
 def main():
     """Run various tests"""
+    # check_order_with_adaptivity_MSSDC()
     check_order_with_adaptivity()
     check_order_against_step_size()
 

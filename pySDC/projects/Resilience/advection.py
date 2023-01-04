@@ -2,7 +2,6 @@
 
 from pySDC.implementations.problem_classes.AdvectionEquation_ND_FD import advectionNd
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
-from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
 from pySDC.helpers.stats_helper import get_sorted
 import numpy as np
@@ -101,8 +100,26 @@ def run_advection(
     custom_controller_params=None,
     custom_problem_params=None,
     use_MPI=False,
-    **kwargs
+    **kwargs,
 ):
+    """
+    Run an advection problem with default parameters.
+
+    Args:
+        custom_description (dict): Overwrite presets
+        num_procs (int): Number of steps for MSSDC
+        Tend (float): Time to integrate to
+        hook_class (pySDC.Hook): A hook to store data
+        fault_stuff (dict): A dictionary with information on how to add faults
+        custom_controller_params (dict): Overwrite presets
+        custom_problem_params (dict): Overwrite presets
+        use_MPI (bool): Whether or not to use MPI
+
+    Returns:
+        dict: The stats object
+        controller: The controller
+        Tend: The time that was supposed to be integrated to
+    """
 
     # initialize level parameters
     level_params = dict()
@@ -143,10 +160,10 @@ def run_advection(
 
     if custom_description is not None:
         for k in custom_description.keys():
-            if k == 'sweeper_class':
+            if type(custom_description[k]) == dict:
+                description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
+            else:
                 description[k] = custom_description[k]
-                continue
-            description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
 
     # set time parameters
     t0 = 0.0
@@ -158,12 +175,20 @@ def run_advection(
 
         comm = kwargs.get('comm', MPI.COMM_WORLD)
         controller = controller_MPI(controller_params=controller_params, description=description, comm=comm)
+
+        # get initial values on finest level
         P = controller.S.levels[0].prob
+        uinit = P.u_exact(t0)
     else:
+        from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+
         controller = controller_nonMPI(
             num_procs=num_procs, controller_params=controller_params, description=description
         )
+
+        # get initial values on finest level
         P = controller.MS[0].levels[0].prob
+        uinit = P.u_exact(t0)
 
     # insert faults
     if fault_stuff is not None:
