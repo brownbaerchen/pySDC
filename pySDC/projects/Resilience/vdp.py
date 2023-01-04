@@ -155,10 +155,10 @@ def run_vdp(
 
     if custom_description is not None:
         for k in custom_description.keys():
-            if k == 'sweeper_class':
+            if type(custom_description[k]) == dict:
+                description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
+            else:
                 description[k] = custom_description[k]
-                continue
-            description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
 
     # set time parameters
     t0 = 0.0
@@ -320,7 +320,7 @@ def check_adaptivity_with_avoid_restarts(comm=None, size=1):
     size = comm.size if comm is not None else size
 
     for avoid_restarts in [True, False]:
-        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 2e-7 if avoid_restarts else 1e-7, 'estimate_semi_glob_error': avoid_restarts}
+        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
         stats, controller, Tend = run_vdp(
             custom_description=custom_description,
             num_procs=size,
@@ -344,7 +344,6 @@ def check_adaptivity_with_avoid_restarts(comm=None, size=1):
             [me[1] for me in get_sorted(stats, type='sweeps', recomputed=None, comm=comm)]
         )
         results['restarts'][avoid_restarts] = sum([me[1] for me in get_sorted(stats, type='restart', comm=comm)])
-        print(size, results['e'][avoid_restarts], results['sweeps'][avoid_restarts], avoid_restarts)
 
     fig.tight_layout()
     fig.savefig(f'data/vdp-{size}procs{"-use_MPI" if comm is not None else ""}-avoid_restarts.png')
@@ -451,4 +450,4 @@ if __name__ == "__main__":
     check_step_size_limiter(size, comm)
 
     if size == 1:
-        check_adaptivity_with_avoid_restarts(comm=None, size=1)
+        check_adaptivity_with_avoid_restarts(comm=None, size=4)

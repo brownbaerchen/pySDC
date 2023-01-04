@@ -26,6 +26,7 @@ class SpreadStepSizesBlockwiseBase(ConvergenceController):
         """
         defaults = {
             "control_order": +100,
+            "use_first_step_only": description.get('spread_step_size_from_first_step', False),
         }
 
         return {**defaults, **params}
@@ -52,11 +53,14 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwiseBase):
             None
         """
         # figure out where the block is restarted
-        restarts = [MS[p].status.restart for p in active_slots]
-        if True in restarts:
-            restart_at = np.where(restarts)[0][0]
+        if self.params.use_first_step_only:
+            restart_at = 0
         else:
-            restart_at = len(restarts) - 1
+            restarts = [MS[p].status.restart for p in active_slots]
+            if True in restarts:
+                restart_at = np.where(restarts)[0][0]
+            else:
+                restart_at = len(restarts) - 1
 
         # Compute the maximum allowed step size based on Tend.
         dt_max = (Tend - time[0]) / len(active_slots)
