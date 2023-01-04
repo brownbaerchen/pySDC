@@ -108,7 +108,7 @@ def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', **kwargs
         Tend = 2.0
 
     if adaptivity:
-        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
+        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7, 'estimate_semi_glob_error': True}
     else:
         custom_description['convergence_controllers'][EstimateEmbeddedError.get_implementation('MPI')] = {}
 
