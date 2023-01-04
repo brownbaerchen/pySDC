@@ -89,7 +89,7 @@ def record_timing(problem, sizes, **kwargs):
     return res
 
 
-def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
+def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
@@ -105,7 +105,7 @@ def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
         else:
             Tend = 5e2
     elif problem == run_vdp:
-        Tend = 2.
+        Tend = 2.0
 
     if adaptivity:
         custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7}
@@ -121,6 +121,7 @@ def run(problem, comm=None, adaptivity=False, smooth=None, **kwargs):
             'freq': -1,
             'sigma': 0.6,
         }
+    custom_description['sweeper_params'] = {'QI': precon}
 
     # run the problem
     stats, controller, Tend = problem(
@@ -146,7 +147,7 @@ def plot(problem, **kwargs):
     # print(MPI.COMM_WORLD.rank, np.min(e_embedded), np.max(e_embedded), np.std(e_embedded), np.mean(e_embedded))
 
 
-def get_name(problem, sizes=None, cluster=None, **kwargs):
+def get_name(problem, sizes=None, cluster=None, precon=None, **kwargs):
     """
     Get a unique identifier for a certain configuration for storing and loading.
 
@@ -156,7 +157,7 @@ def get_name(problem, sizes=None, cluster=None, **kwargs):
     Returns:
         str: The identifier
     """
-    name = f'{problem_names[problem]}-timings'
+    name = f'{problem_names[problem]}-timings-{precon}'
     for k in kwargs.keys():
         name = f'{name}{f"-with-{k}" if kwargs[k] else f"-no-{k}"}'
     return name
@@ -176,7 +177,7 @@ def plot_timing(problem, cluster='.', **kwargs):
     plotting_keys = ['timing_run']
     sizes = np.unique(list(res['timing_run'].keys()))
 
-    #for k in plotting_keys:
+    # for k in plotting_keys:
     #    ax.plot(sizes, [res[k][s] for s in sizes], label=k)
 
     dt_ax = ax.twinx()
@@ -194,7 +195,12 @@ def plot_timing(problem, cluster='.', **kwargs):
     speedup = timing[0] / timing
     parallel_efficiency = speedup / sizes
     ax.axvline(sizes[np.argmax(speedup)], color='grey', ls='-.', label=f'max. speedup: {np.max(speedup):.2f}')
-    ax.axvline(sizes[np.argmax(parallel_efficiency)], color='grey', ls='--', label=f'max. parallel efficiency: {np.max(parallel_efficiency):.2f}')
+    ax.axvline(
+        sizes[np.argmax(parallel_efficiency)],
+        color='grey',
+        ls='--',
+        label=f'max. parallel efficiency: {np.max(parallel_efficiency):.2f}',
+    )
     print(parallel_efficiency)
     print(speedup)
     ax.plot(sizes, speedup, label='speedup')
@@ -229,7 +235,10 @@ def parse_command_line_arguments():
 
     for i in range(1, len(sys.argv), 2):
         # kwargs[sys.argv[i]] = None if sys.argv[i + 1] == 'None' else bool(sys.argv[i+1])
-        exec(f'kwargs[sys.argv[i]] = {sys.argv[i + 1]}')
+        if sys.argv[i] in ['precon', 'cluster']:
+            kwargs[sys.argv[i]] = sys.argv[i + 1]
+        else:
+            exec(f'kwargs[sys.argv[i]] = {sys.argv[i + 1]}')
     return kwargs
 
 
@@ -242,6 +251,7 @@ if __name__ == "__main__":
         'problem': problem,
         'sizes': sizes,
         'cluster': cluster,
+        'precon': 'IE',
         **parse_command_line_arguments(),
     }
     if MPI.COMM_WORLD.rank == 0:
