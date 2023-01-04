@@ -89,7 +89,7 @@ def record_timing(problem, sizes, **kwargs):
     return res
 
 
-def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', **kwargs):
+def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', estimate_semi_glob_error=False, **kwargs):
     # TODO: docs
     custom_controller_params = {'logger_level': 30}
     custom_description = {'convergence_controllers': {}}
@@ -108,7 +108,10 @@ def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', **kwargs
         Tend = 2.0
 
     if adaptivity:
-        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7, 'estimate_semi_glob_error': True}
+        custom_description['convergence_controllers'][Adaptivity] = {
+            'e_tol': 1e-7,
+            'estimate_semi_glob_error': estimate_semi_glob_error,
+        }
     else:
         custom_description['convergence_controllers'][EstimateEmbeddedError.get_implementation('MPI')] = {}
 
@@ -205,7 +208,7 @@ def plot_timing(problem, cluster='.', **kwargs):
     print(speedup)
     ax.plot(sizes, speedup, label='speedup')
     ax.plot(sizes, parallel_efficiency, label='parallel efficiency')
-    ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
+    # ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
 
     ax.plot([None], [None], color='magenta', label=r'$\Delta t$')
     ax.legend(frameon=False)
