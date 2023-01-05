@@ -108,10 +108,7 @@ def run(problem, comm=None, adaptivity=False, smooth=None, precon='IE', estimate
         Tend = 2.0
 
     if adaptivity:
-        custom_description['convergence_controllers'][Adaptivity] = {
-            'e_tol': 1e-7,
-            'estimate_semi_glob_error': estimate_semi_glob_error,
-        }
+        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-7, 'estimate_semi_glob_error': estimate_semi_glob_error}
     else:
         custom_description['convergence_controllers'][EstimateEmbeddedError.get_implementation('MPI')] = {}
 
@@ -204,11 +201,10 @@ def plot_timing(problem, cluster='.', **kwargs):
         ls='--',
         label=f'max. parallel efficiency: {np.max(parallel_efficiency):.2f}',
     )
-    print(parallel_efficiency)
-    print(speedup)
+    print([res['restart'][s] for s in sizes])
     ax.plot(sizes, speedup, label='speedup')
     ax.plot(sizes, parallel_efficiency, label='parallel efficiency')
-    # ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
+    #ax.loglog(sizes, n, color='black', linestyle='--', label='ideal speedup')
 
     ax.plot([None], [None], color='magenta', label=r'$\Delta t$')
     ax.legend(frameon=False)
@@ -262,6 +258,6 @@ if __name__ == "__main__":
         for k in kwargs.keys():
             print(f'\t{k}: {kwargs[k]}')
 
-    record_timing(**kwargs)
-    # plot_timing(**kwargs)
+    # record_timing(**kwargs)
+    plot_timing(**kwargs)
     # plot(**kwargs)
