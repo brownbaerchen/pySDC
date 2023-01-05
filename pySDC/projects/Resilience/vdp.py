@@ -9,6 +9,7 @@ from pySDC.implementations.controller_classes.controller_nonMPI import controlle
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 from pySDC.core.Errors import ProblemError
 from pySDC.projects.Resilience.hook import log_error_estimates
+from pySDC.projects.Resilience.predictor_corrector import PredictorCorrector
 
 
 def plot_step_sizes(stats, ax):
@@ -53,7 +54,7 @@ def plot_step_sizes(stats, ax):
     ax.set_xlabel('time')
 
 
-def plot_avoid_restarts(stats, ax, avoid_restarts):
+def plot_iterations_over_time(stats, ax, color, label, ls):
     """
     Make a plot that shows how many iterations where required to solve to a point in time in the simulation.
     Also restarts are shown as vertical lines.
@@ -61,7 +62,9 @@ def plot_avoid_restarts(stats, ax, avoid_restarts):
     Args:
         stats (pySDC.stats): The stats object of the run
         ax: Somewhere to plot
-        avoid_restarts (bool): Whether the `avoid_restarts` option was set in order to choose a color
+        color (str): Color for plotting
+        label (str): Label for plotting
+        ls (str): Linestyle for plotting
 
     Returns:
         None
@@ -69,11 +72,7 @@ def plot_avoid_restarts(stats, ax, avoid_restarts):
     sweeps = get_sorted(stats, type='sweeps', recomputed=None)
     restarts = get_sorted(stats, type='restart', recomputed=None)
 
-    color = 'blue' if avoid_restarts else 'red'
-    ls = ':' if not avoid_restarts else '-.'
-    label = 'with' if avoid_restarts else 'without'
-
-    ax.plot([me[0] for me in sweeps], np.cumsum([me[1] for me in sweeps]), color=color, label=f'{label} avoid_restarts')
+    ax.plot([me[0] for me in sweeps], np.cumsum([me[1] for me in sweeps]), color=color, label=label)
     [ax.axvline(me[0], color=color, ls=ls) for me in restarts if me[1]]
 
     ax.set_xlabel(r'$t$')
@@ -329,7 +328,12 @@ def check_adaptivity_with_avoid_restarts(comm=None, size=1):
             Tend=10.0e0,
             comm=comm,
         )
-        plot_avoid_restarts(stats, ax, avoid_restarts)
+
+        color = 'blue' if avoid_restarts else 'red'
+        ls = ':' if not avoid_restarts else '-.'
+        label = 'with' if avoid_restarts else 'without'
+
+        plot_iterations_over_time(stats, ax, avoid_restarts, color=color, ls=ls, label=label)
 
         # check error
         u = get_sorted(stats, type='u', recomputed=False)[-1]
@@ -434,6 +438,83 @@ def check_step_size_limiter(size=4, comm=None):
             print(f'Passed step size limiter test with {size} ranks in MPI implementation')
 
 
+def select_preconditioner_function(iter, **kwargs):
+    """
+    Do a prediction sweep with implicit Euler and then perform correction sweeps with LU
+
+    Args:
+        iteration (int): SDC iteration
+
+    Returns:
+        str: Preconditioner to use in this iteration
+    """
+    if iter == 1:
+        return 'IE'
+    else:
+        return 'LU'
+
+
+def check_predictor_corrector():
+    # TODO docs
+    custom_description = {'convergence_controllers': {}, 'level_params': {'dt': 1.0e-2}}
+    # custom_description['convergence_controllers'][Adaptivity] = {'e_tol': 1e-6}
+    custom_controller_params = {'logger_level': 15}
+    results = {'e': {}, 'sweeps': {}, 'restarts': {}}
+    fig, ax = plt.subplots()
+
+    colors = {
+        'PC': 'blue',
+        'LU': 'orange',
+        'IE': 'magenta',
+    }
+
+    for preconditioner_mode in ['PC', 'LU', 'IE']:
+        if preconditioner_mode == 'LU':
+            custom_description['sweeper_params'] = {'QI': 'LU'}
+            custom_description['convergence_controllers'].pop(PredictorCorrector, None)
+        elif preconditioner_mode == 'IE':
+            custom_description['sweeper_params'] = {'QI': 'IE'}
+            custom_description['convergence_controllers'].pop(PredictorCorrector, None)
+        elif preconditioner_mode == 'PC':
+            custom_description['convergence_controllers'][PredictorCorrector] = {
+                'select_preconditioner_function': select_preconditioner_function
+            }
+        else:
+            raise f"Mode {preconditioner_mode} not implemented!"
+
+        stats, controller, Tend = run_vdp(
+            custom_description=custom_description,
+            num_procs=4,
+            use_MPI=False,
+            custom_controller_params=custom_controller_params,
+            Tend=5.0e0,
+            comm=comm,
+        )
+
+        # plot the step sizes
+        plot_iterations_over_time(
+            stats, ax, label=preconditioner_mode, color=colors.get(preconditioner_mode, None), ls='-'
+        )
+
+        # check error
+        u = get_sorted(stats, type='u', recomputed=False)[-1]
+        u_exact = controller.MS[0].levels[0].prob.u_exact(t=u[0])
+        results['e'][preconditioner_mode] = abs(u[1] - u_exact)
+
+        # check iteration counts
+        results['sweeps'][preconditioner_mode] = sum(
+            [me[1] for me in get_sorted(stats, type='sweeps', recomputed=None)]
+        )
+        results['restarts'][preconditioner_mode] = sum([me[1] for me in get_sorted(stats, type='restart')])
+
+    fig.tight_layout()
+    fig.savefig(f'data/vdp-{4}procs-predictor_corrector.png')
+
+    assert np.allclose([results['e'][me] for me in results['e'].keys()], results['e']['LU'], rtol=5.0), (
+        'Errors don\'t match, got ' f'{results["e"]}'
+    )
+
+
 if __name__ == "__main__":
     try:
         from mpi4py import MPI
@@ -446,8 +527,9 @@ if __name__ == "__main__":
         comm = None
         size = 1
 
-    mpi_vs_nonMPI(MPI_ready, comm)
-    check_step_size_limiter(size, comm)
+    check_predictor_corrector()
+    # mpi_vs_nonMPI(MPI_ready, comm)
+    # check_step_size_limiter(size, comm)
 
-    if size == 1:
-        check_adaptivity_with_avoid_restarts(comm=None, size=1)
+    # if size == 1:
+    #    check_adaptivity_with_avoid_restarts(comm=None, size=1)
