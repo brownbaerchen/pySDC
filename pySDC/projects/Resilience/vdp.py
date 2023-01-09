@@ -53,6 +53,33 @@ def plot_step_sizes(stats, ax):
     ax.set_xlabel('time')
 
 
+def plot_phase_space(stats, ax, color, marker, label, rescale=1.0):
+    """
+    Plot the solution over time in phase space
+
+    Args:
+        stats (pySDC.stats): The stats object of the run
+        ax (Matplotlib.pyplot.axes): Somewhere to plot
+        color, marker, label (str): Plotting attributes
+
+    Returns:
+        None
+    """
+    u = np.array([me[1][0] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
+    p = np.array([me[1][1] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
+
+    if rescale:
+        fac = max(abs(np.append(u, p)))
+    else:
+        fac = 1.0
+
+    ax.plot(u / fac, p / fac, color=color, marker=marker, label=label)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_ylabel(r'$u_t$')
+    ax.set_xlabel(r'$u$')
+
+
 def plot_avoid_restarts(stats, ax, avoid_restarts):
     """
     Make a plot that shows how many iterations where required to solve to a point in time in the simulation.
@@ -434,6 +461,44 @@ def check_step_size_limiter(size=4, comm=None):
             print(f'Passed step size limiter test with {size} ranks in MPI implementation')
 
 
+def plot_phase_space_things():
+    from pySDC.helpers.plot_helper import setup_mpl
+    import matplotlib as mpl
+
+    setup_mpl(font_size=12, reset=True)
+    mpl.rcParams.update({'lines.markersize': 8})
+    mu_range = [0, 5, 10]
+    Tend_range = [6.3, 12, 19]
+    markers = ['.', 'v', '1']
+    nsteps = [100, 300, 1000]
+    colors = ['blue', 'orange', 'magenta']
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax.axhline(0, color='black')
+    ax.axvline(0, color='black')
+
+    for i in range(len(mu_range)):
+        problem_params = {'mu': mu_range[i]}
+        custom_description = {'level_params': {'dt': Tend_range[i] / nsteps[i]}}
+        stats, controller, Tend = run_vdp(
+            custom_description=custom_description, custom_problem_params=problem_params, Tend=Tend_range[i]
+        )
+        plot_phase_space(
+            stats,
+            ax,
+            color=colors[i],
+            label=rf'$\mu={{{mu_range[i]}}}, N={nsteps[i]}$',
+            marker=markers[i],
+            rescale=True,
+        )
+    lim = max(np.append(ax.get_ylim(), ax.get_xlim()))
+    ax.set_ylim([-lim, lim])
+    ax.set_xlim([-lim, lim])
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    plt.savefig('data/vdp_phase_space.pdf')
+    plt.show()
+
+
 if __name__ == "__main__":
     try:
         from mpi4py import MPI
@@ -446,8 +511,9 @@ if __name__ == "__main__":
         comm = None
         size = 1
 
-    mpi_vs_nonMPI(MPI_ready, comm)
-    check_step_size_limiter(size, comm)
+    plot_phase_space_things()
+    # mpi_vs_nonMPI(MPI_ready, comm)
+    # check_step_size_limiter(size, comm)
 
-    if size == 1:
-        check_adaptivity_with_avoid_restarts(comm=None, size=1)
+    # if size == 1:
+    #    check_adaptivity_with_avoid_restarts(comm=None, size=1)

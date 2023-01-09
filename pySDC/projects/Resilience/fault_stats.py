@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 from mpi4py import MPI
 import sys
+import matplotlib as mpl
 
 import pySDC.helpers.plot_helper as plot_helper
 from pySDC.helpers.stats_helper import get_sorted
@@ -17,7 +18,8 @@ from pySDC.projects.Resilience.advection import run_advection
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.piline import run_piline
 
-plot_helper.setup_mpl(reset=True)
+plot_helper.setup_mpl(reset=True, font_size=12)
+mpl.rcParams.update({'lines.markersize': 8})
 cmap = TABLEAU_COLORS
 
 
@@ -1069,6 +1071,7 @@ class FaultStats:
         name=None,
         store=True,
         ax=None,
+        fig=None,
     ):
         '''
         Plot thingA vs thingB for multiple strategies
@@ -1084,6 +1087,7 @@ class FaultStats:
             name (str): Optional name for the plot
             store (bool): Store the plot at a predefined path or not (for jupyter notebooks)
             ax (Matplotlib.axes): Somewhere to plot
+            fig (Matplotlib.figure): Figure of the ax
 
         Returns
             None
@@ -1094,7 +1098,7 @@ class FaultStats:
         # make sure we have something to plot in
         if ax is None:
             fig, ax = plt.subplots(1, 1)
-        else:
+        elif fig is None:
             store = False
 
         # execute the plots for all strategies
@@ -1605,9 +1609,35 @@ def main():
     stats_analyser.plot_things_per_things(
         'recovered', 'iteration', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
     )
+
+    # make plots with with the recovery rate
+    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True, sharey=True)
     stats_analyser.plot_things_per_things(
-        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
+        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}, ax=axs[0]
     )
+    not_crashed = None
+    for i in range(len(stats_analyser.strategies)):
+        not_crashed = stats_analyser.get_mask(
+            strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf, old_mask=not_crashed
+        )
+    fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
+    stats_analyser.plot_things_per_things(
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        mask=fixable,
+        args={'ylabel': '', 'xlabel': ''},
+        ax=axs[1],
+        fig=fig,
+    )
+    axs[1].get_legend().remove()
+    axs[0].set_title('All faults')
+    axs[1].set_title('Only recoverable faults')
+    fig.tight_layout()
+    fig.savefig('data/recovery_rate_compared.pdf', bbox_inches='tight', transparent=True)
+    print('noice')
+
     stats_analyser.plot_things_per_things(
         'total_iteration',
         'bit',
