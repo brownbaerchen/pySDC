@@ -75,6 +75,11 @@ def plot_phase_space_things():
                 marker=markers[i],
                 rescale=True,
             )
+
+            # check resolution
+            u = np.array([me[1] for me in get_sorted(stats, type='u')])
+            increment = np.linalg.norm(u[1:] - u[:-1], axis=1)
+            print(mu_range[i], increment.max(), increment.mean(), increment.std())
         lim = max(np.append(ax.get_ylim(), ax.get_xlim()))
         ax.set_ylim([-lim, lim])
         ax.set_xlim([-lim, lim])
