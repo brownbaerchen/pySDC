@@ -1101,7 +1101,7 @@ class FaultStats:
             store = False
 
         # execute the plots for all strategies
-        for s in self.strategies:
+        for s in strategies:
             self.plot_thingA_per_thingB(s, thingA=thingA, thingB=thingB, recovered=recovered, ax=ax, mask=mask, op=op)
 
         # set the parameters

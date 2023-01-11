@@ -149,20 +149,26 @@ def plot_recovery_rate():
     )
     not_crashed = None
     for i in range(len(stats_analyser.strategies)):
-        not_crashed = stats_analyser.get_mask(
-            strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf, old_mask=not_crashed
+        not_crashed = stats_analyser.get_mask(strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf)
+        if type(stats_analyser.strategies[i]) in [BaseStrategy]:
+            fixable = not_crashed
+        else:
+            fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
+
+        if type(stats_analyser.strategies[i]) == AdaptivityStrategy:
+            fixable = stats_analyser.get_mask(key='iteration', op='lt', val=3, old_mask=fixable)
+
+        stats_analyser.plot_things_per_things(
+            'recovered',
+            'bit',
+            False,
+            op=stats_analyser.rec_rate,
+            mask=fixable,
+            args={'ylabel': '', 'xlabel': ''},
+            ax=axs[1],
+            fig=fig,
+            strategies=[stats_analyser.strategies[i]],
         )
-    fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
-    stats_analyser.plot_things_per_things(
-        'recovered',
-        'bit',
-        False,
-        op=stats_analyser.rec_rate,
-        mask=fixable,
-        args={'ylabel': '', 'xlabel': ''},
-        ax=axs[1],
-        fig=fig,
-    )
     axs[1].get_legend().remove()
     axs[0].set_title('All faults')
     axs[1].set_title('Only recoverable faults')
