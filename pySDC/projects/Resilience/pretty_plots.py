@@ -8,6 +8,8 @@ import matplotlib as mpl
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
+cm = 1 / 2.54
+
 
 def savefig(fig, name):
     """
@@ -56,14 +58,14 @@ def plot_phase_space_things():
         ax.set_ylabel(r'$u_t$')
         ax.set_xlabel(r'$u$')
 
-    setup_mpl(font_size=12, reset=True)
+    setup_mpl(font_size=8, reset=True)
     mpl.rcParams.update({'lines.markersize': 8})
     mu_range = [0, 5, 10]
-    Tend_range = [6.5, 12, 19]
+    Tend_range = [6.4, 12, 19]
     markers = ['.', 'v', '1']
-    nsteps = [28, 300, 1000]
+    nsteps = [30, 300, 1000]
     colors = ['blue', 'orange', 'magenta']
-    fig, axs = plt.subplots(1, 2, figsize=(7, 3.7), sharex=True, sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 8.8 * cm), sharex=True, sharey=True)
     convergence_controllers = {}
     titles = [r'Fixed $\Delta t$', 'Adaptivity']
     for j in range(2):
@@ -73,7 +75,7 @@ def plot_phase_space_things():
         ax.set_title(titles[j])
 
         if j > 0:
-            convergence_controllers[Adaptivity] = {'e_tol': 5e-5}
+            convergence_controllers[Adaptivity] = {'e_tol': 3e-5}
             print('Activating adaptivity')
 
         for i in range(len(mu_range)):
@@ -105,7 +107,7 @@ def plot_phase_space_things():
         lim = max(np.append(ax.get_ylim(), ax.get_xlim()))
         ax.set_ylim([-lim, lim])
         ax.set_xlim([-lim, lim])
-        ax.legend(frameon=False, loc='lower right')
+        ax.legend(frameon=True, loc='lower right')
 
         if j > 0:
             ax.set_xlabel('')
@@ -126,7 +128,7 @@ def plot_recovery_rate():
         HotRodStrategy,
     )
 
-    setup_mpl(reset=True, font_size=12)
+    setup_mpl(reset=True, font_size=8)
     mpl.rcParams.update({'lines.markersize': 8})
 
     stats_analyser = FaultStats(
@@ -141,7 +143,7 @@ def plot_recovery_rate():
     stats_analyser.run_stats_generation(runs=5000, step=50)
     mask = None
 
-    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True, sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=True)
     stats_analyser.plot_things_per_things(
         'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}, ax=axs[0]
     )
@@ -168,7 +170,68 @@ def plot_recovery_rate():
     savefig(fig, 'recovery_rate_compared')
 
 
+def plot_fault():
+    from pySDC.projects.Resilience.fault_stats import (
+        FaultStats,
+        BaseStrategy,
+        log_local_error,
+    )
+
+    stats_analyser = FaultStats(
+        prob=run_vdp,
+        strategies=[BaseStrategy()],
+        faults=[False, True],
+        reload=True,
+        recovery_thresh=1.1,
+        num_procs=1,
+        mode='combination',
+    )
+
+    run = 779  # 120, 11, 780
+    faults = True
+
+    fig, ax = plt.subplots(figsize=(8 * cm, 5 * cm))
+    colors = ['blue', 'red']
+    ls = ['--', '-']
+    markers = ['*', '.']
+    do_faults = [False, True]
+    labels = ['^*', '']
+    for i in range(2):
+        stats, controller, Tend = stats_analyser.single_run(
+            strategy=BaseStrategy(), run=run, faults=do_faults[i], hook_class=log_local_error
+        )
+        u = get_sorted(stats, type='u')
+        faults = get_sorted(stats, type='bitflip')
+        ax.plot(
+            [me[0] for me in u],
+            [me[1][0] for me in u],
+            ls=ls[i],
+            color=colors[0],
+            label=rf'$u{{{labels[i]}}}$',
+            marker=markers[0],
+            markevery=10,
+        )
+        ax.plot(
+            [me[0] for me in u],
+            [me[1][1] for me in u],
+            ls=ls[i],
+            color=colors[1],
+            label=rf'$u{{{labels[i]}}}_t$',
+            marker=markers[1],
+            markevery=10,
+        )
+        for idx in range(len(faults)):
+            ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
+            print(
+                f'Fault at t={faults[idx][0]:.2e}, iter={faults[idx][1][1]}, node={faults[idx][1][2]}, space={faults[idx][1][3]}, bit={faults[idx][1][4]}'
+            )
+
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$t$')
+    savefig(fig, 'fault')
+
+
 if __name__ == "__main__":
+    plot_fault()
     plot_recovery_rate()
     plot_phase_space_things()
-    plt.show()
