@@ -18,8 +18,7 @@ from pySDC.projects.Resilience.advection import run_advection
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.piline import run_piline
 
-plot_helper.setup_mpl(reset=True, font_size=12)
-mpl.rcParams.update({'lines.markersize': 8})
+plot_helper.setup_mpl(reset=True)
 cmap = TABLEAU_COLORS
 
 
@@ -1610,33 +1609,9 @@ def main():
         'recovered', 'iteration', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
     )
 
-    # make plots with with the recovery rate
-    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True, sharey=True)
     stats_analyser.plot_things_per_things(
-        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}, ax=axs[0]
+        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
     )
-    not_crashed = None
-    for i in range(len(stats_analyser.strategies)):
-        not_crashed = stats_analyser.get_mask(
-            strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf, old_mask=not_crashed
-        )
-    fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
-    stats_analyser.plot_things_per_things(
-        'recovered',
-        'bit',
-        False,
-        op=stats_analyser.rec_rate,
-        mask=fixable,
-        args={'ylabel': '', 'xlabel': ''},
-        ax=axs[1],
-        fig=fig,
-    )
-    axs[1].get_legend().remove()
-    axs[0].set_title('All faults')
-    axs[1].set_title('Only recoverable faults')
-    fig.tight_layout()
-    fig.savefig('data/recovery_rate_compared.pdf', bbox_inches='tight', transparent=True)
-    print('noice')
 
     stats_analyser.plot_things_per_things(
         'total_iteration',

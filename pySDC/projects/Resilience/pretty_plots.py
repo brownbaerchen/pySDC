@@ -2,41 +2,59 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pySDC.helpers.stats_helper import get_sorted
+from pySDC.helpers.plot_helper import setup_mpl
+import matplotlib as mpl
 
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
 
-def plot_phase_space(stats, ax, color, marker, label, rescale=1.0):
+def savefig(fig, name):
     """
-    Plot the solution over time in phase space
+    Save a figure to some predefined location.
 
     Args:
-        stats (pySDC.stats): The stats object of the run
-        ax (Matplotlib.pyplot.axes): Somewhere to plot
-        color, marker, label (str): Plotting attributes
+        fig (Matplotlib.Figure): The figure of the plot
+        name (str): The name of the plot
 
     Returns:
         None
     """
-    u = np.array([me[1][0] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
-    p = np.array([me[1][1] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
-
-    if rescale:
-        fac = max(abs(np.append(u, p)))
-    else:
-        fac = 1.0
-
-    ax.plot(u / fac, p / fac, color=color, marker=marker, label=label)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_ylabel(r'$u_t$')
-    ax.set_xlabel(r'$u$')
+    path = f'data/paper/{name}.pdf'
+    fig.savefig(path, bbox_inches='tight', transparent=True)
+    print(f'saved "{path}"')
 
 
 def plot_phase_space_things():
-    from pySDC.helpers.plot_helper import setup_mpl
-    import matplotlib as mpl
+    """
+    Make a phase space plots comparing van der Pol with and without adaptivity
+    """
+
+    def plot_phase_space(stats, ax, color, marker, label, rescale=1.0):
+        """
+        Plot the solution over time in phase space
+
+        Args:
+            stats (pySDC.stats): The stats object of the run
+            ax (Matplotlib.pyplot.axes): Somewhere to plot
+            color, marker, label (str): Plotting attributes
+
+        Returns:
+            None
+        """
+        u = np.array([me[1][0] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
+        p = np.array([me[1][1] for me in get_sorted(stats, type='u', recomputed=False, sortby='time')])
+
+        if rescale:
+            fac = max(abs(np.append(u, p)))
+        else:
+            fac = 1.0
+
+        ax.plot(u / fac, p / fac, color=color, marker=marker, label=label)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_ylabel(r'$u_t$')
+        ax.set_xlabel(r'$u$')
 
     setup_mpl(font_size=12, reset=True)
     mpl.rcParams.update({'lines.markersize': 8})
@@ -93,9 +111,64 @@ def plot_phase_space_things():
             ax.set_xlabel('')
             ax.set_ylabel('')
     fig.tight_layout()
-    plt.savefig('data/vdp_phase_space.pdf', bbox_inches='tight')
-    plt.show()
+    savefig(fig, 'vdp_phase_space')
+
+
+def plot_recovery_rate():
+    """
+    Make plots showing the recovery rate for all strategies under consideration.
+    """
+    from pySDC.projects.Resilience.fault_stats import (
+        FaultStats,
+        BaseStrategy,
+        AdaptivityStrategy,
+        IterateStrategy,
+        HotRodStrategy,
+    )
+
+    setup_mpl(reset=True, font_size=12)
+    mpl.rcParams.update({'lines.markersize': 8})
+
+    stats_analyser = FaultStats(
+        prob=run_vdp,
+        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        faults=[False, True],
+        reload=True,
+        recovery_thresh=1.1,
+        num_procs=1,
+        mode='combination',
+    )
+    stats_analyser.run_stats_generation(runs=5000, step=50)
+    mask = None
+
+    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True, sharey=True)
+    stats_analyser.plot_things_per_things(
+        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}, ax=axs[0]
+    )
+    not_crashed = None
+    for i in range(len(stats_analyser.strategies)):
+        not_crashed = stats_analyser.get_mask(
+            strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf, old_mask=not_crashed
+        )
+    fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
+    stats_analyser.plot_things_per_things(
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        mask=fixable,
+        args={'ylabel': '', 'xlabel': ''},
+        ax=axs[1],
+        fig=fig,
+    )
+    axs[1].get_legend().remove()
+    axs[0].set_title('All faults')
+    axs[1].set_title('Only recoverable faults')
+    fig.tight_layout()
+    savefig(fig, 'recovery_rate_compared')
 
 
 if __name__ == "__main__":
+    plot_recovery_rate()
     plot_phase_space_things()
+    plt.show()
