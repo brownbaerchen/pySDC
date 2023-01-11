@@ -56,6 +56,7 @@ def plot_phase_space_things():
 
         if j > 0:
             convergence_controllers[Adaptivity] = {'e_tol': 5e-5}
+            print('Activating adaptivity')
 
         for i in range(len(mu_range)):
             problem_params = {'mu': mu_range[i]}
@@ -79,7 +80,10 @@ def plot_phase_space_things():
             # check resolution
             u = np.array([me[1] for me in get_sorted(stats, type='u')])
             increment = np.linalg.norm(u[1:] - u[:-1], axis=1)
-            print(mu_range[i], increment.max(), increment.mean(), increment.std())
+
+            print(
+                f'Mu={mu_range[i]:2d}, phase space dist: max={increment.max():.2e}, mean={increment.mean():.2e}, min={increment.min():.2e}, std={increment.mean():.2e}'
+            )
         lim = max(np.append(ax.get_ylim(), ax.get_xlim()))
         ax.set_ylim([-lim, lim])
         ax.set_xlim([-lim, lim])
