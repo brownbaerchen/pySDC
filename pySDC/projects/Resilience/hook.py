@@ -50,7 +50,7 @@ class log_error_estimates(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_embedded',
-            value=L.status.__dict__.get('error_embedded_estimate', None),
+            value=L.status.get('error_embedded_estimate'),
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -59,7 +59,7 @@ class log_error_estimates(hooks):
             iter=0,
             sweep=L.status.sweep,
             type='e_extrapolated',
-            value=L.status.__dict__.get('error_extrapolation_estimate', None),
+            value=L.status.get('error_extrapolation_estimate'),
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -78,4 +78,48 @@ class log_error_estimates(hooks):
             sweep=L.status.sweep,
             type='sweeps',
             value=step.status.iter,
+        )
+
+
+class log_global_error(log_error_estimates):
+    '''
+    This class stores the "true" global error (may be approximated with scipy reference solution)
+    '''
+
+    def post_step(self, step, level_number):
+
+        super(log_global_error, self).post_step(step, level_number)
+
+        # some abbreviations
+        L = step.levels[level_number]
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='e_glob',
+            value=abs(L.prob.u_exact(t=L.time + L.dt) - L.u[-1]),
+        )
+
+
+class log_local_error(log_error_estimates):
+    '''
+    This class stores the "true" local error (may be approximated with scipy reference solution)
+    '''
+
+    def post_step(self, step, level_number):
+
+        super(log_local_error, self).post_step(step, level_number)
+
+        # some abbreviations
+        L = step.levels[level_number]
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='e_loc',
+            value=abs(L.prob.u_exact(t=L.time + L.dt, u_init=L.u[0], t_init=L.time) - L.u[-1]),
         )

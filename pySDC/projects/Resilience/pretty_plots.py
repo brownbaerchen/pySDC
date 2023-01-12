@@ -22,6 +22,7 @@ def savefig(fig, name):
     Returns:
         None
     """
+    fig.tight_layout()
     path = f'data/paper/{name}.pdf'
     fig.savefig(path, bbox_inches='tight', transparent=True)
     print(f'saved "{path}"')
@@ -116,6 +117,63 @@ def plot_phase_space_things():
     savefig(fig, 'vdp_phase_space')
 
 
+def plot_adaptivity_stuff():
+    # TODO: docs
+    from pySDC.projects.Resilience.hook import log_global_error, log_local_error
+
+    setup_mpl(font_size=8, reset=True)
+    mpl.rcParams.update({'lines.markersize': 8})
+    markers = ['.', 'v', '1']
+    nsteps = [30, 300, 1000]
+    fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 8.8 * cm), sharex=True, sharey=False)
+    convergence_controllers = {}
+    ax = axs[0]
+    labels = [r'Fixed $\Delta t$', 'Adaptivity']
+
+    def plot_error(stats, ax, iter_ax, **kwargs):
+        """
+        Plot global error and cumulative sum of iterations
+
+        Args:
+            stats (dict): Stats from pySDC run
+            ax (Matplotlib.pyplot.axes): Somewhere to plot the error
+            iter_ax (Matplotlib.pyplot.axes): Somewhere to plot the iterations
+
+        Returns:
+            None
+        """
+        e = get_sorted(stats, type='e_loc', recomputed=False)
+        ax.plot([me[0] for me in e], [me[1] for me in e], ls='-', **kwargs)
+        k = get_sorted(stats, type='sweeps')
+        iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), ls='-')
+        ax.set_yscale('log')
+        ax.set_ylabel(r'$e_\mathrm{loc}$')
+        iter_ax.set_ylabel(r'$k$')
+        ax.set_xlabel(r'$t$')
+
+    for i in range(2):
+        if i > 0:
+            convergence_controllers[Adaptivity] = {'e_tol': 1e-6}
+            print('Activating adaptivity')
+        problem_params = {'mu': 5.0}
+        custom_description = {
+            'level_params': {'dt': 2e-2},
+            'convergence_controllers': convergence_controllers,
+        }
+        stats, controller, Tend = run_vdp(
+            custom_description=custom_description,
+            custom_problem_params=problem_params,
+            Tend=10.0,
+            hook_class=log_local_error,
+        )
+        plot_error(stats, axs[0], axs[1], label=labels[i])
+
+    ax.legend(frameon=True, loc='lower right')
+
+    fig.tight_layout()
+    savefig(fig, 'adaptivity')
+
+
 def plot_recovery_rate():
     """
     Make plots showing the recovery rate for all strategies under consideration.
@@ -150,10 +208,7 @@ def plot_recovery_rate():
     not_crashed = None
     for i in range(len(stats_analyser.strategies)):
         not_crashed = stats_analyser.get_mask(strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf)
-        if type(stats_analyser.strategies[i]) in [BaseStrategy]:
-            fixable = not_crashed
-        else:
-            fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
+        fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
 
         if type(stats_analyser.strategies[i]) == AdaptivityStrategy:
             fixable = stats_analyser.get_mask(key='iteration', op='lt', val=3, old_mask=fixable)
@@ -193,18 +248,20 @@ def plot_fault():
         mode='combination',
     )
 
-    run = 779  # 120, 11, 780
-    faults = True
+    # run = 779  # 120, 11, 780
 
-    fig, ax = plt.subplots(figsize=(8 * cm, 5 * cm))
+    fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=True)
     colors = ['blue', 'red']
-    ls = ['--', '-']
+    ls = ['--', '--', '-', '-']
     markers = ['*', '.']
-    do_faults = [False, True]
-    labels = ['^*', '']
-    for i in range(2):
+    do_faults = [False, False, True, True]
+    labels = ['*', '*', '', '']
+    # runs = [779, 120, 779, 120]
+    runs = [779, 810, 779, 923]
+    for i in range(len(do_faults)):
+        ax = axs[i % 2]
         stats, controller, Tend = stats_analyser.single_run(
-            strategy=BaseStrategy(), run=run, faults=do_faults[i], hook_class=log_local_error
+            strategy=BaseStrategy(), run=runs[i], faults=do_faults[i], hook_class=log_local_error
         )
         u = get_sorted(stats, type='u')
         faults = get_sorted(stats, type='bitflip')
@@ -215,29 +272,31 @@ def plot_fault():
             color=colors[0],
             label=rf'$u{{{labels[i]}}}$',
             marker=markers[0],
-            markevery=10,
+            markevery=15,
         )
         ax.plot(
             [me[0] for me in u],
             [me[1][1] for me in u],
             ls=ls[i],
             color=colors[1],
-            label=rf'$u{{{labels[i]}}}_t$',
+            label=rf'$u^{{{labels[i]}}}_t$',
             marker=markers[1],
-            markevery=10,
+            markevery=15,
         )
         for idx in range(len(faults)):
             ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
             print(
                 f'Fault at t={faults[idx][0]:.2e}, iter={faults[idx][1][1]}, node={faults[idx][1][2]}, space={faults[idx][1][3]}, bit={faults[idx][1][4]}'
             )
+            ax.set_title(f'Fault in bit {faults[idx][1][4]}')
 
-    ax.legend(frameon=False)
-    ax.set_xlabel(r'$t$')
+    axs[0].legend(frameon=False)
+    axs[0].set_xlabel(r'$t$')
     savefig(fig, 'fault')
 
 
 if __name__ == "__main__":
-    plot_fault()
-    plot_recovery_rate()
-    plot_phase_space_things()
+    plot_adaptivity_stuff()
+    # plot_fault()
+    # plot_recovery_rate()
+    # plot_phase_space_things()
