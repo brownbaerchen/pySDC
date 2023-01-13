@@ -28,6 +28,80 @@ def savefig(fig, name):
     print(f'saved "{path}"')
 
 
+def get_vdp_fault_stats():
+    """
+    Retrieve fault statistics for van der Pol equation.
+    """
+    from pySDC.projects.Resilience.fault_stats import (
+        FaultStats,
+        BaseStrategy,
+        AdaptivityStrategy,
+        IterateStrategy,
+        HotRodStrategy,
+    )
+
+    stats_analyser = FaultStats(
+        prob=run_vdp,
+        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        faults=[False, True],
+        reload=True,
+        recovery_thresh=1.1,
+        num_procs=1,
+        mode='combination',
+    )
+    stats_analyser.run_stats_generation(runs=5000, step=50)
+    return stats_analyser
+
+
+def plot_efficiency():
+    # TODO: docs
+
+    setup_mpl(reset=True, font_size=8)
+    mpl.rcParams.update({'lines.markersize': 8})
+
+    stats_analyser = get_vdp_fault_stats()
+
+    mask = stats_analyser.get_mask()
+
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(8 * cm, 8 * cm))
+
+    res = {}
+    for strategy in stats_analyser.strategies:
+        dat = stats_analyser.load(strategy=strategy, faults=True)
+        dat_no_faults = stats_analyser.load(strategy=strategy, faults=False)
+
+        fail_rate = 1.0 - stats_analyser.rec_rate(dat, dat_no_faults, 'recovered', mask)
+        iterations_no_faults = np.mean(dat_no_faults['total_iteration'])
+
+        detected = stats_analyser.get_mask(strategy=strategy, key='total_iteration', op='gt', val=iterations_no_faults)
+        rec_mask = stats_analyser.get_mask(strategy=strategy, key='recovered', op='eq', val=True, old_mask=detected)
+        if rec_mask.any():
+            extra_iterations = np.mean(dat['total_iteration'][rec_mask]) - iterations_no_faults
+        else:
+            extra_iterations = 0
+
+        res[strategy.name] = [fail_rate, extra_iterations, iterations_no_faults]
+
+    # normalize
+    # for strategy in stats_analyser.strategies:
+    norms = [max([res[k][i] for k in res.keys()]) for i in range(len(res['base']))]
+    res_norm = res.copy()
+    for k in res_norm.keys():
+        for i in range(3):
+            res_norm[k][i] /= norms[i]
+
+    theta = np.array([30, 150, 270, 30]) * 2 * np.pi / 360
+    for s in stats_analyser.strategies:
+        ax.plot(theta, res_norm[s.name] + [res_norm[s.name][0]], label=s.name, color=s.color, marker=s.marker)
+
+    labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
+    ax.set_xticks(theta[:-1], [f'{labels[i]}\nmax={norms[i]:.2f}' for i in range(len(labels))])
+    ax.set_rlabel_position(90)
+
+    ax.legend(frameon=True, loc='lower right')
+    savefig(fig, 'efficiency')
+
+
 def plot_phase_space_things():
     """
     Make a phase space plots comparing van der Pol with and without adaptivity
@@ -113,7 +187,6 @@ def plot_phase_space_things():
         if j > 0:
             ax.set_xlabel('')
             ax.set_ylabel('')
-    fig.tight_layout()
     savefig(fig, 'vdp_phase_space')
 
 
@@ -170,7 +243,6 @@ def plot_adaptivity_stuff():
 
     ax.legend(frameon=True, loc='lower right')
 
-    fig.tight_layout()
     savefig(fig, 'adaptivity')
 
 
@@ -178,27 +250,12 @@ def plot_recovery_rate():
     """
     Make plots showing the recovery rate for all strategies under consideration.
     """
-    from pySDC.projects.Resilience.fault_stats import (
-        FaultStats,
-        BaseStrategy,
-        AdaptivityStrategy,
-        IterateStrategy,
-        HotRodStrategy,
-    )
+    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy
 
     setup_mpl(reset=True, font_size=8)
     mpl.rcParams.update({'lines.markersize': 8})
 
-    stats_analyser = FaultStats(
-        prob=run_vdp,
-        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        faults=[False, True],
-        reload=True,
-        recovery_thresh=1.1,
-        num_procs=1,
-        mode='combination',
-    )
-    stats_analyser.run_stats_generation(runs=5000, step=50)
+    stats_analyser = get_vdp_fault_stats()
     mask = None
 
     fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=True)
@@ -227,7 +284,6 @@ def plot_recovery_rate():
     axs[1].get_legend().remove()
     axs[0].set_title('All faults')
     axs[1].set_title('Only recoverable faults')
-    fig.tight_layout()
     savefig(fig, 'recovery_rate_compared')
 
 
@@ -296,7 +352,8 @@ def plot_fault():
 
 
 if __name__ == "__main__":
-    plot_adaptivity_stuff()
+    plot_efficiency()
+    # plot_adaptivity_stuff()
     # plot_fault()
     # plot_recovery_rate()
     # plot_phase_space_things()
