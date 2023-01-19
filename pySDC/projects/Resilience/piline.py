@@ -204,7 +204,6 @@ def plot_solution(data, ax):
     Returns:
         None
     """
-    setup_mpl_from_accuracy_check()
     ax.plot(data['t'], data['v1'], label='v1', ls='-')
     ax.plot(data['t'], data['v2'], label='v2', ls='--')
     ax.plot(data['t'], data['p3'], label='p3', ls='-.')
@@ -345,6 +344,7 @@ def main():
     """
     Make a variety of tests to see if Hot Rod and Adaptivity work in serial as well as MSSDC.
     """
+    setup_mpl_from_accuracy_check()
     generate_reference = False
 
     for use_adaptivity in [True, False]:

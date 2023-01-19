@@ -28,7 +28,7 @@ def savefig(fig, name):
     print(f'saved "{path}"')
 
 
-def get_vdp_fault_stats():
+def get_vdp_fault_stats(mode='paper'):
     """
     Retrieve fault statistics for van der Pol equation.
     """
@@ -40,9 +40,14 @@ def get_vdp_fault_stats():
         HotRodStrategy,
     )
 
+    if mode == 'paper':
+        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()]
+    elif mode == 'talk_CSE23':
+        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
+
     stats_analyser = FaultStats(
         prob=run_vdp,
-        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        strategies=strategies,
         faults=[False, True],
         reload=True,
         recovery_thresh=1.1,
@@ -100,6 +105,28 @@ def plot_efficiency():
 
     ax.legend(frameon=True, loc='lower right')
     savefig(fig, 'efficiency')
+
+
+def plot_vdp_solution():
+    """
+    Plot the solution of van der Pol problem over time to illustrate the varying time scales.
+    """
+    setup_mpl(font_size=8, reset=True)
+    mpl.rcParams.update({'lines.markersize': 8})
+    fig, ax = plt.subplots(figsize=(9 * cm, 8 * cm))
+
+    custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}}
+    problem_params = {}
+
+    stats, _, _ = run_vdp(
+        custom_description=custom_description, custom_problem_params=problem_params, Tend=28.6
+    )
+
+    u = get_sorted(stats, type='u')
+    ax.plot([me[0] for me in u], [me[1][0] for me in u], color='black')
+    ax.set_ylabel(r'$u$')
+    ax.set_xlabel(r'$t$')
+    savefig(fig, 'vdp_sol')
 
 
 def plot_phase_space_things():
@@ -192,16 +219,71 @@ def plot_phase_space_things():
 
 def plot_adaptivity_stuff():
     # TODO: docs
-    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, BaseStrategy
+    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, BaseStrategy, IterateEmbeddedStrategy
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.implementations.hooks.log_errors import LogLocalError, LogGlobalError
 
     stats_analyser = get_vdp_fault_stats()
 
-    stats_adaptivity = stats_analyser.single_run(strategy=AdaptivityStrategy())
-    stats_regular = stats_analyser.single_run(strategy=BaseStrategy())
+    setup_mpl(font_size=8, reset=True)
+    mpl.rcParams.update({'lines.markersize': 6})
+    #fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=False)
+    fig, axs = plt.subplots(3, 1, figsize=(10 * cm, 11 * cm), sharex=True, sharey=False)
+
+    def plot_error(stats, ax, iter_ax, strategy, **kwargs):
+        """
+        Plot global error and cumulative sum of iterations
+
+        Args:
+            stats (dict): Stats from pySDC run
+            ax (Matplotlib.pyplot.axes): Somewhere to plot the error
+            iter_ax (Matplotlib.pyplot.axes): Somewhere to plot the iterations
+            strategy (pySDC.projects.Resilience.fault_stats.Strategy): The resilience strategy
+
+        Returns:
+            None
+        """
+        e = get_sorted(stats, type='error_embedded_estimate', recomputed=False)
+        ax.plot([me[0] for me in e], [me[1] for me in e], markevery=15, **strategy.style, **kwargs)
+        k = get_sorted(stats, type='k')
+        iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), **strategy.style, markevery=15, **kwargs)
+        ax.set_yscale('log')
+        ax.set_ylabel(r'$e_\mathrm{loc}$')
+        iter_ax.set_ylabel(r'iterations')
+
+    force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}}
+    for strategy in [AdaptivityStrategy, BaseStrategy, IterateEmbeddedStrategy]:
+        stats, _, _ = stats_analyser.single_run(strategy=strategy(), force_params=force_params)
+        plot_error(stats, axs[1], axs[2], strategy())
+
+        if strategy == AdaptivityStrategy:
+            u = get_sorted(stats, type='u')
+            axs[0].plot([me[0] for me in u], [me[1][0] for me in u], color='black', label=r'$u$')
+            axs[0].plot([me[0] for me in u], [me[1][1] for me in u], color='black', ls='--', label=r'$u_t$')
+            axs[0].legend(frameon=False)
+
+
+    axs[1].set_ylim(bottom=1e-9)
+    axs[2].set_xlabel(r'$t$')
+    axs[0].set_ylabel('solution')
+    axs[2].legend(frameon=False)
+    savefig(fig, 'adaptivity')
+
+
+def plot_adaptivity_stuff_2():
+    # TODO: docs
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.projects.Resilience.convergence_by_embedded_error_estimate import CheckConvergenceEmbeddedErrorEstimate
+    from pySDC.implementations.hooks.log_errors import LogLocalError, LogGlobalError
+    from pySDC.projects.Resilience.hook import LogData
 
     setup_mpl(font_size=8, reset=True)
     mpl.rcParams.update({'lines.markersize': 8})
+    markers = ['.', 'v', '1']
     fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=False)
+    convergence_controllers = {}
+    ax = axs[0]
+    labels = [r'Fixed $\Delta t$', 'Adaptivity', 'Iterate']
 
     def plot_error(stats, ax, iter_ax, **kwargs):
         """
@@ -217,73 +299,76 @@ def plot_adaptivity_stuff():
         """
         e = get_sorted(stats, type='error_embedded_estimate', recomputed=False)
         ax.plot([me[0] for me in e], [me[1] for me in e], ls='-', **kwargs)
-        k = get_sorted(stats, type='sweeps')
+        k = get_sorted(stats, type='k')
         iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), ls='-')
         ax.set_yscale('log')
         ax.set_ylabel(r'$e_\mathrm{loc}$')
         iter_ax.set_ylabel(r'$k$')
         ax.set_xlabel(r'$t$')
 
-    plot_error(stats_regular, axs[0], axs[1])
-    plot_error(stats_adaptivity, axs[0], axs[1])
+    convergence_controllers[EstimateEmbeddedErrorNonMPI] = {}
+    for i in range(3):
+        if i == 1:
+            convergence_controllers[Adaptivity] = {'e_tol': 2e-6}
+            print('Adaptivity')
+        if i == 2:
+            convergence_controllers.pop(Adaptivity)
+            convergence_controllers[CheckConvergenceEmbeddedErrorEstimate] = {'e_tol': 2e-6}
+            print('Iterate')
+                     
+        problem_params = {'mu': 5.0}
+        custom_description = {
+            'level_params': {'dt': 1e-2},
+            'convergence_controllers': convergence_controllers,
+        }
+        stats, controller, Tend = run_vdp(
+            custom_description=custom_description,
+            custom_problem_params=problem_params,
+            Tend=10.0,
+            hook_class=[LogLocalError, LogData],
+        )
+        plot_error(stats, axs[0], axs[1], label=labels[i])
+
+    ax.legend(frameon=True, loc='lower right')
+    ax.set_ylim(bottom=1e-9)
+
+    savefig(fig, 'adaptivity2')
 
 
-# def plot_adaptivity_stuff():
-#    # TODO: docs
-#    from pySDC.projects.Resilience.hook import log_global_error, log_local_error
-#    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
-#
-#    setup_mpl(font_size=8, reset=True)
-#    mpl.rcParams.update({'lines.markersize': 8})
-#    markers = ['.', 'v', '1']
-#    fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=False)
-#    convergence_controllers = {}
-#    ax = axs[0]
-#    labels = [r'Fixed $\Delta t$', 'Adaptivity']
-#
-#    def plot_error(stats, ax, iter_ax, **kwargs):
-#        """
-#        Plot global error and cumulative sum of iterations
-#
-#        Args:
-#            stats (dict): Stats from pySDC run
-#            ax (Matplotlib.pyplot.axes): Somewhere to plot the error
-#            iter_ax (Matplotlib.pyplot.axes): Somewhere to plot the iterations
-#
-#        Returns:
-#            None
-#        """
-#        e = get_sorted(stats, type='e_embedded', recomputed=False)
-#        ax.plot([me[0] for me in e], [me[1] for me in e], ls='-', **kwargs)
-#        k = get_sorted(stats, type='sweeps')
-#        iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), ls='-')
-#        ax.set_yscale('log')
-#        ax.set_ylabel(r'$e_\mathrm{loc}$')
-#        iter_ax.set_ylabel(r'$k$')
-#        ax.set_xlabel(r'$t$')
-#
-#    convergence_controllers[EstimateEmbeddedErrorNonMPI] = {}
-#    for i in range(2):
-#        if i > 0:
-#            convergence_controllers[Adaptivity] = {'e_tol': 2e-6}
-#            print('Activating adaptivity')
-#        problem_params = {'mu': 5.0}
-#        custom_description = {
-#            'level_params': {'dt': 1e-2},
-#            'convergence_controllers': convergence_controllers,
-#        }
-#        stats, controller, Tend = run_vdp(
-#            custom_description=custom_description,
-#            custom_problem_params=problem_params,
-#            Tend=10.0,
-#            hook_class=log_local_error,
-#        )
-#        plot_error(stats, axs[0], axs[1], label=labels[i])
-#
-#    ax.legend(frameon=True, loc='lower right')
-#    ax.set_ylim(bottom=1e-9)
-#
-#    savefig(fig, 'adaptivity')
+def plot_recovery_rate_talk_CSE23():
+    """
+    Make plots showing the recovery rate for all strategies under consideration.
+    Plot made for talk at SIAM CSE23
+    """
+    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy
+
+    setup_mpl(reset=True, font_size=8)
+    mpl.rcParams.update({'lines.markersize': 8})
+
+    stats_analyser = get_vdp_fault_stats(mode='talk_CSE23')
+    mask = None
+
+    fig, ax = plt.subplots(1, 1, figsize=(9 * cm, 7 * cm))
+    not_crashed = None
+    for i in range(len(stats_analyser.strategies)):
+        not_crashed = stats_analyser.get_mask(strategy=stats_analyser.strategies[i], key='error', op='uneq', val=np.inf)
+        fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
+
+        if type(stats_analyser.strategies[i]) == AdaptivityStrategy:
+            fixable = stats_analyser.get_mask(key='iteration', op='lt', val=3, old_mask=fixable)
+
+        stats_analyser.plot_things_per_things(
+            'recovered',
+            'bit',
+            False,
+            op=stats_analyser.rec_rate,
+            mask=fixable,
+            args={'ylabel': 'recovery rate'},
+            ax=ax,
+            fig=fig,
+            strategies=[stats_analyser.strategies[i]],
+        )
+    savefig(fig, 'recovery_rate_CSE23')
 
 
 def plot_recovery_rate():
@@ -392,8 +477,9 @@ def plot_fault():
 
 
 if __name__ == "__main__":
-    # plot_efficiency()
+    #plot_vdp_solution()
+    plot_efficiency()
     plot_adaptivity_stuff()
     # plot_fault()
-    # plot_recovery_rate()
+    plot_recovery_rate_talk_CSE23()
     # plot_phase_space_things()

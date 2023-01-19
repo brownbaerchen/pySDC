@@ -86,6 +86,24 @@ class Strategy:
 
         return {}
 
+    @property
+    def style(self):
+        """
+        Get the plotting parameters for the strategy.
+        Supply them to a plotting function using `**`
+
+        Returns:
+            (dict): The plotting parameters as a dictionary
+        """
+        return {'marker': self.marker, 'label': self.label, 'color': self.color, 'ls': self.linestyle,}
+
+    @ property
+    def label(self):
+        """
+        Get a label for plotting
+        """
+        return self.name
+
 
 class BaseStrategy(Strategy):
     '''
@@ -144,6 +162,59 @@ class AdaptivityStrategy(Strategy):
         custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': e_tol, 'dt_min': dt_min}}}
 
         return {**custom_description, **self.custom_description}
+
+
+class IterateEmbeddedStrategy(Strategy):
+    '''
+    Iterate until reaching residual tolerance
+    '''
+
+    def __init__(self):
+        '''
+        Initialization routine
+        '''
+        super().__init__()
+        self.color = list(cmap.values())[2]
+        self.marker = 'v'
+        self.name = 'iterate_embedded'
+        self.bar_plot_x_label = 'iterate'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        if problem == run_piline:
+            e_tol = 1e-7
+            dt_min = 1e-2
+        elif problem == run_vdp:
+            e_tol = 2e-5
+            dt_min = 1e-3
+        else:
+            raise NotImplementedError(
+                'I don\'t have a tolerance for iterating for your problem. Please add one to the\
+ strategy'
+            )
+
+        from pySDC.projects.Resilience.convergence_by_embedded_error_estimate import CheckConvergenceEmbeddedErrorEstimate
+
+        custom_description = {
+            'step_params': {'maxiter': 99},
+            'level_params': {'restol': -1},
+            'convergence_controllers': {CheckConvergenceEmbeddedErrorEstimate: {'e_tol': e_tol,}},
+        }
+
+        return {**custom_description, **self.custom_description}
+
+    @property
+    def label(self):
+        return 'iterate'
 
 
 class AdaptiveHotRodStrategy(Strategy):
@@ -569,7 +640,7 @@ class FaultStats:
         [self.scrutinize_visual(self.strategies[i], run, faults, ax, k_ax, ls[i]) for i in range(len(self.strategies))]
 
         # make a legend
-        [k_ax.plot([None], [None], label=strategy.name, color=strategy.color) for strategy in self.strategies]
+        [k_ax.plot([None], [None], label=strategy.label, color=strategy.color) for strategy in self.strategies]
         k_ax.legend(frameon=True)
 
         if store:
@@ -932,7 +1003,7 @@ class FaultStats:
             ax.plot(
                 admissable_thingB,
                 me_recovered,
-                label=f'{strategy.name} (only recovered)',
+                label=f'{strategy.label} (only recovered)',
                 color=strategy.color,
                 marker=strategy.marker,
                 ls='--',
@@ -940,7 +1011,7 @@ class FaultStats:
             )
 
         ax.plot(
-            admissable_thingB, me, label=f'{strategy.name}', color=strategy.color, marker=strategy.marker, linewidth=2
+            admissable_thingB, me, label=f'{strategy.label}', color=strategy.color, marker=strategy.marker, linewidth=2
         )
 
         ax.legend(frameon=False)
@@ -1033,7 +1104,7 @@ class FaultStats:
                 rec_mask = with_faults['error'] < thresh_range[thresh_idx] * fault_free['error'].mean()
                 rec_rates[strategy_idx][thresh_idx] = len(with_faults['error'][rec_mask]) / len(with_faults['error'])
 
-            ax.plot(thresh_range, rec_rates[strategy_idx], color=strategy.color, label=strategy.name)
+            ax.plot(thresh_range, rec_rates[strategy_idx], color=strategy.color, label=strategy.label)
         ax.legend(frameon=False)
         ax.set_ylabel('recovery rate')
         ax.set_xlabel('threshold as ratio to fault-free error')
