@@ -46,7 +46,6 @@ def get_vdp_fault_stats(mode='paper'):
     elif mode == 'talk_CSE23':
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
 
-    strategies = [HotRodStrategy()]
     stats_analyser = FaultStats(
         prob=run_Lorenz,
         strategies=strategies,
@@ -57,7 +56,7 @@ def get_vdp_fault_stats(mode='paper'):
         mode='combination',
     )
     stats_analyser.run_stats_generation(runs=5000, step=50)
-    stats_analyser.get_recovered()
+    #stats_analyser.get_recovered()
     print(len(stats_analyser.load()['iteration']))
     return stats_analyser
 
@@ -483,7 +482,7 @@ def plot_fault():
 
 
 if __name__ == "__main__":
-    plot_fault()
+    # plot_fault()
     plot_recovery_rate()
     #plot_vdp_solution()
     plot_efficiency()
