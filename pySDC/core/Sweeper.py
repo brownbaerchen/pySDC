@@ -338,7 +338,8 @@ class sweeper(object):
         L = self.level
 
         # check if there are new values (e.g. from a sweep)
-        # assert L.status.updated
+        if not L.status.updated:
+            return L.status.residual
 
         # compute the residual for each node
 
