@@ -6,6 +6,7 @@ from pySDC.helpers.plot_helper import setup_mpl
 import matplotlib as mpl
 
 from pySDC.projects.Resilience.vdp import run_vdp
+from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
 cm = 1 / 2.54
@@ -45,8 +46,9 @@ def get_vdp_fault_stats(mode='paper'):
     elif mode == 'talk_CSE23':
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
 
+    strategies = [HotRodStrategy()]
     stats_analyser = FaultStats(
-        prob=run_vdp,
+        prob=run_Lorenz,
         strategies=strategies,
         faults=[False, True],
         reload=True,
@@ -55,6 +57,8 @@ def get_vdp_fault_stats(mode='paper'):
         mode='combination',
     )
     stats_analyser.run_stats_generation(runs=5000, step=50)
+    stats_analyser.get_recovered()
+    print(len(stats_analyser.load()['iteration']))
     return stats_analyser
 
 
@@ -381,6 +385,7 @@ def plot_recovery_rate():
     mpl.rcParams.update({'lines.markersize': 8})
 
     stats_analyser = get_vdp_fault_stats()
+    #stats_analyser.scrutinize(AdaptivityStrategy(), 2)
     mask = None
 
     fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=True)
@@ -393,7 +398,14 @@ def plot_recovery_rate():
         fixable = stats_analyser.get_mask(key='node', op='gt', val=0, old_mask=not_crashed)
 
         if type(stats_analyser.strategies[i]) == AdaptivityStrategy:
-            fixable = stats_analyser.get_mask(key='iteration', op='lt', val=3, old_mask=fixable)
+            dat = stats_analyser.load()
+            max_iter = max(dat['iteration'])
+            fixable = stats_analyser.get_mask(key='iteration', op='lt', val=max_iter, old_mask=fixable)
+
+            not_fixed = stats_analyser.get_mask(key='recovered', op='eq', val=False, old_mask=fixable)
+            print(dat['recovered'][not_fixed])
+            print(stats_analyser.strategies[i].name)
+            #stats_analyser.print_faults(not_fixed)
 
         stats_analyser.plot_things_per_things(
             'recovered',
@@ -416,8 +428,9 @@ def plot_fault():
     from pySDC.projects.Resilience.fault_stats import (
         FaultStats,
         BaseStrategy,
-        log_local_error,
+        LogLocalError,
     )
+    from pySDC.projects.Resilience.hook import LogData
 
     stats_analyser = FaultStats(
         prob=run_vdp,
@@ -432,38 +445,31 @@ def plot_fault():
     # run = 779  # 120, 11, 780
 
     fig, axs = plt.subplots(1, 2, figsize=(16 * cm, 7 * cm), sharex=True, sharey=True)
-    colors = ['blue', 'red']
+    colors = ['blue', 'red', 'magenta']
     ls = ['--', '--', '-', '-']
-    markers = ['*', '.']
+    markers = ['*', '.', 'y']
     do_faults = [False, False, True, True]
-    labels = ['*', '*', '', '']
-    # runs = [779, 120, 779, 120]
+    superscripts = ['*', '*', '', '']
+    subscripts = ['', 't', '']
     runs = [779, 810, 779, 923]
+    # runs = [20, 300, 12, 300]
     for i in range(len(do_faults)):
         ax = axs[i % 2]
         stats, controller, Tend = stats_analyser.single_run(
-            strategy=BaseStrategy(), run=runs[i], faults=do_faults[i], hook_class=log_local_error
+            strategy=BaseStrategy(), run=runs[i], faults=do_faults[i], hook_class=[LogData, LogLocalError], 
         )
         u = get_sorted(stats, type='u')
         faults = get_sorted(stats, type='bitflip')
-        ax.plot(
-            [me[0] for me in u],
-            [me[1][0] for me in u],
-            ls=ls[i],
-            color=colors[0],
-            label=rf'$u{{{labels[i]}}}$',
-            marker=markers[0],
-            markevery=15,
-        )
-        ax.plot(
-            [me[0] for me in u],
-            [me[1][1] for me in u],
-            ls=ls[i],
-            color=colors[1],
-            label=rf'$u^{{{labels[i]}}}_t$',
-            marker=markers[1],
-            markevery=15,
-        )
+        for j in range(len(u[0][1])):
+            ax.plot(
+                [me[0] for me in u],
+                [me[1][j] for me in u],
+                ls=ls[i],
+                color=colors[j],
+                label=rf'$u^{{{superscripts[i]}}}_{{{subscripts[j]}}}$',
+                marker=markers[0],
+                markevery=15,
+            )
         for idx in range(len(faults)):
             ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
             print(
@@ -477,9 +483,10 @@ def plot_fault():
 
 
 if __name__ == "__main__":
+    plot_fault()
+    plot_recovery_rate()
     #plot_vdp_solution()
     plot_efficiency()
     plot_adaptivity_stuff()
-    # plot_fault()
     plot_recovery_rate_talk_CSE23()
     # plot_phase_space_things()

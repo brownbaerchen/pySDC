@@ -200,6 +200,9 @@ class IterateEmbeddedStrategy(Strategy):
         elif problem == run_vdp:
             e_tol = 2e-5
             dt_min = 1e-3
+        elif problem == run_Lorenz:
+            e_tol = 2e-5
+            dt_min = 1e-3
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for iterating for your problem. Please add one to the\
