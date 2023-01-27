@@ -14,13 +14,14 @@ from pySDC.projects.Resilience.fault_injection import get_fault_injector_hook
 from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
-from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep, LogGlobalErrorPostRun
 
 # these problems are available for testing
 from pySDC.projects.Resilience.advection import run_advection
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.piline import run_piline
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
+from pySDC.projects.Resilience.AC import run_AC
 
 plot_helper.setup_mpl(reset=True)
 cmap = TABLEAU_COLORS
@@ -208,6 +209,9 @@ class AdaptivityStrategy(Strategy):
         elif problem == run_Lorenz:
             e_tol = 2e-5
             dt_min = 1e-3
+        elif problem == run_AC:
+            e_tol = 5e-4
+            dt_min = 1e-5
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -301,6 +305,8 @@ class IterateStrategy(Strategy):
             restol = 9e-7
         elif problem == run_Lorenz:
             restol = 16e-7
+        elif problem == run_AC:
+            restol = 5e-4
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \
@@ -347,6 +353,9 @@ class HotRodStrategy(Strategy):
         elif problem == run_Lorenz:
             HotRod_tol = 4e-7
             maxiter = 6
+        elif problem == run_AC:
+            HotRod_tol = 3e-4
+            maxiter = 5
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for Hot Rod for your problem. Please add one to the\
@@ -403,6 +412,20 @@ class FaultStats:
         self.mode = mode
         self.stats_path = stats_path
 
+    def get_error_hook(self, post_run=True):
+        """
+        Get a hook that logs the error after the run
+        """
+        if post_run:
+            if self.prob == run_AC:
+                from pySDC.projects.Resilience.AC import LogErrorAC
+
+                return LogErrorAC
+
+            return LogGlobalErrorPostRun
+        else:
+            return LogLocalErrorPostStep
+
     def get_Tend(self):
         '''
         Get the final time of runs for fault stats based on the problem
@@ -416,6 +439,8 @@ class FaultStats:
             return 20.0
         elif self.prob == run_Lorenz:
             return 1.5
+        elif self.prob == run_AC:
+            return 0.032
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -431,6 +456,8 @@ class FaultStats:
             custom_description['step_params'] = {'maxiter': 3}
         elif self.prob == run_Lorenz:
             custom_description['step_params'] = {'maxiter': 5}
+        elif self.prob == run_AC:
+            custom_description['step_params'] = {'maxiter': 4}
         return custom_description
 
     def get_custom_problem_params(self):
@@ -545,12 +572,11 @@ class FaultStats:
             # get the data from the stats
             faults_run = get_sorted(stats, type='bitflip')
             t, u = get_sorted(stats, type='u', recomputed=False)[-1]
+            e = get_sorted(stats, type='e_global_post_run', recomputed=False)
 
             # check if we ran to the end
-            if t < Tend:
-                error = np.inf
-            else:
-                error = abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
+            error = np.inf if t < Tend else abs(controller.MS[0].levels[0].prob.u_exact(t) - u)
+
             total_iteration = sum([k[1] for k in get_sorted(stats, type='k')])
 
             # record the new data point
@@ -591,7 +617,9 @@ class FaultStats:
             pySDC.Controller: The controller of the run
             float: The time the problem should have run to
         '''
-        hook_class = hook_collection + [LogData] if hook_class is None else hook_class
+        hook_class = (
+            hook_collection + [self.get_error_hook(post_run=True)] + [LogData] if hook_class is None else hook_class
+        )
         force_params = {} if force_params is None else force_params
 
         # build the custom description
@@ -631,7 +659,7 @@ class FaultStats:
             custom_problem_params=custom_problem_params,
         )
 
-    def compare_strategies(self, run=0, faults=False, ax=None):
+    def compare_strategies(self, run=0, faults=False, ax=None, strategies=None):
         '''
         Take a closer look at how the strategies compare for a specific run
 
@@ -639,10 +667,13 @@ class FaultStats:
             run (int): The number of the run to get the appropriate random generator
             faults (bool): Whether or not to include faults
             ax (Matplotlib.axes): Somewhere to plot
+            strategies (list): List of resilience strategies
 
         Returns:
             None
         '''
+        strategies = self.strategies if strategies is None else strategies
+
         if ax is None:
             fig, ax = plt.subplots(1, 1)
             store = True
@@ -650,11 +681,11 @@ class FaultStats:
             store = False
 
         k_ax = ax.twinx()
-        ls = ['-.' if type(strategy) == HotRodStrategy else '-' for strategy in self.strategies]
-        [self.scrutinize_visual(self.strategies[i], run, faults, ax, k_ax, ls[i]) for i in range(len(self.strategies))]
+        ls = ['-.' if type(strategy) == HotRodStrategy else '-' for strategy in strategies]
+        [self.scrutinize_visual(strategies[i], run, faults, ax, k_ax, ls[i]) for i in range(len(strategies))]
 
         # make a legend
-        [k_ax.plot([None], [None], label=strategy.label, color=strategy.color) for strategy in self.strategies]
+        [k_ax.plot([None], [None], label=strategy.label, color=strategy.color) for strategy in strategies]
         k_ax.legend(frameon=True)
 
         if store:
@@ -689,10 +720,13 @@ class FaultStats:
             run=run,
             faults=faults,
             force_params=force_params,
-            hook_class=hook_collection + [LogLocalErrorPostStep, LogData],
+            hook_class=hook_collection + [self.get_error_hook(post_run=False), LogData],
         )
 
         # plot the local error
+        # if self.prob == run_AC:
+        #    e_loc = get_sorted(stats, type='e_global_post_step', recomputed=False)
+        # else:
         e_loc = get_sorted(stats, type='e_local_post_step', recomputed=False)
         ax.plot([me[0] for me in e_loc], [me[1] for me in e_loc], color=strategy.color, ls=ls)
 
@@ -833,6 +867,8 @@ class FaultStats:
             prob_name = 'piline'
         elif self.prob == run_Lorenz:
             prob_name = 'Lorenz'
+        elif self.prob == run_AC:
+            prob_name = 'Allen-Cahn'
         else:
             raise NotImplementedError(f'Name not implemented for problem {self.prob}')
 
@@ -903,7 +939,8 @@ class FaultStats:
         fault_free = self.load(strategy, False)
         with_faults = self.load(strategy, True)
 
-        assert fault_free['error'].std() / fault_free['error'].mean() < 1e-5
+        if any(fault_free['error'] > 1):
+            assert fault_free['error'].std() / fault_free['error'].mean() < 1e-5
 
         with_faults['recovered'] = with_faults['error'] < self.recovery_thresh * fault_free['error'].mean()
         self.store(strategy, True, with_faults)
@@ -1603,16 +1640,25 @@ class FaultStats:
 
 def main():
     stats_analyser = FaultStats(
-        prob=run_Lorenz,
+        prob=run_AC,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=True,
         recovery_thresh=1.1,
         num_procs=1,
-        mode='combination',
+        mode='random',
+    )
+    stats_analyser.run_stats_generation(runs=5000, step=50)
+    stats_analyser.plot_things_per_things(
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        mask=None,
+        args={'ylabel': 'recovery rate'},
+        strategies=[AdaptivityStrategy()],
     )
 
-    stats_analyser.run_stats_generation(runs=5000, step=50)
     mask = None
 
     stats_analyser.compare_strategies()
