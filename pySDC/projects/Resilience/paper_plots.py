@@ -398,7 +398,10 @@ def plot_vdp_solution():  # pragma no cover
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
     my_setup_mpl()
-    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
+    if JOURNAL == 'JSC_beamer':
+        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
+    else:
+        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.85, 0.4))
 
     custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}}
     problem_params = {}
@@ -437,12 +440,13 @@ def make_plots_for_paper():  # pragma no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    plot_adaptivity_stuff()
-    plot_efficiency_polar(run_vdp)
-    compare_recovery_rate_problems()
+    plot_vdp_solution()
+    #plot_recovery_rate(get_stats(run_vdp))
+    #plot_fault_vdp(0)
+    #plot_fault_vdp(13)
+    #plot_adaptivity_stuff()
+    #plot_efficiency_polar(run_vdp)
+    #compare_recovery_rate_problems()
 
 
 def make_plots_for_notes():  # pragma no cover
@@ -457,6 +461,6 @@ def make_plots_for_notes():  # pragma no cover
 
 
 if __name__ == "__main__":
-    make_plots_for_notes()
-    make_plots_for_SIAM_CSE23()
+    # make_plots_for_notes()
+    # make_plots_for_SIAM_CSE23()
     make_plots_for_paper()
