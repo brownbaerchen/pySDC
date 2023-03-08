@@ -154,6 +154,10 @@ class BaseStrategy(Strategy):
         self.name = 'base'
         self.bar_plot_x_label = 'base'
 
+    @property
+    def label(self):
+        return r'fixed'
+
 
 class AdaptivityStrategy(Strategy):
     '''

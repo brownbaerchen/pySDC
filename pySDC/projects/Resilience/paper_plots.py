@@ -273,6 +273,8 @@ def plot_adaptivity_stuff():  # pragma no cover
         None
     """
     from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+    from pySDC.projects.Resilience.hook import LogData
 
     stats_analyser = get_stats(run_vdp, 'data/stats')
 
@@ -293,17 +295,19 @@ def plot_adaptivity_stuff():  # pragma no cover
         Returns:
             None
         """
-        e = get_sorted(stats, type='error_embedded_estimate', recomputed=False)
+        e = get_sorted(stats, type='e_local_post_step', recomputed=False)
         ax.plot([me[0] for me in e], [me[1] for me in e], markevery=15, **strategy.style, **kwargs)
         k = get_sorted(stats, type='k')
         iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), **strategy.style, markevery=15, **kwargs)
         ax.set_yscale('log')
         ax.set_ylabel('local error')
-        iter_ax.set_ylabel(r'iterations')
+        iter_ax.set_ylabel(r'SDC iterations')
 
     force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}}
     for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy]:
-        stats, _, _ = stats_analyser.single_run(strategy=strategy(), force_params=force_params)
+        stats, _, _ = stats_analyser.single_run(
+            strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData]
+        )
         plot_error(stats, axs[1], axs[2], strategy())
 
         if strategy == AdaptivityStrategy:
@@ -312,7 +316,6 @@ def plot_adaptivity_stuff():  # pragma no cover
             axs[0].plot([me[0] for me in u], [me[1][1] for me in u], color='black', ls='--', label=r'$u_t$')
             axs[0].legend(frameon=False)
 
-    axs[1].set_ylim(bottom=1e-9)
     axs[2].set_xlabel(r'$t$')
     axs[0].set_ylabel('solution')
     axs[2].legend(frameon=JOURNAL == 'JSC_beamer')
@@ -347,10 +350,10 @@ def plot_fault_vdp(bit=0):  # pragma no cover
     )
 
     my_setup_mpl()
-    fig, ax = plt.subplots(1, 1, figsize=(TEXTWIDTH * 3.0 / 4.0, 5 * cm))
+    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.8, 0.5))
     colors = ['blue', 'red', 'magenta']
     ls = ['--', '-']
-    markers = ['*', '.', 'y']
+    markers = ['*', '^']
     do_faults = [False, True]
     superscripts = ['*', '']
     subscripts = ['', 't', '']
@@ -373,7 +376,7 @@ def plot_fault_vdp(bit=0):  # pragma no cover
                 ls=ls[i],
                 color=colors[j],
                 label=rf'$u^{{{superscripts[i]}}}_{{{subscripts[j]}}}$',
-                marker=markers[0],
+                marker=markers[j],
                 markevery=15,
             )
         for idx in range(len(faults)):
@@ -383,7 +386,7 @@ def plot_fault_vdp(bit=0):  # pragma no cover
             )
             ax.set_title(f'Fault in bit {faults[idx][1][4]}')
 
-    ax.legend(frameon=False)
+    ax.legend(frameon=True, loc='lower left')
     ax.set_xlabel(r'$t$')
     savefig(fig, f'fault_bit_{bit}')
 
@@ -401,7 +404,7 @@ def plot_vdp_solution():  # pragma no cover
     if JOURNAL == 'JSC_beamer':
         fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
     else:
-        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.85, 0.4))
+        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.33))
 
     custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}}
     problem_params = {}
@@ -441,12 +444,12 @@ def make_plots_for_paper():  # pragma no cover
     BASE_PATH = 'data/paper'
 
     plot_vdp_solution()
-    # plot_recovery_rate(get_stats(run_vdp))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
-    # plot_efficiency_polar(run_vdp)
-    # compare_recovery_rate_problems()
+    plot_recovery_rate(get_stats(run_vdp))
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    plot_adaptivity_stuff()
+    plot_efficiency_polar(run_vdp)
+    compare_recovery_rate_problems()
 
 
 def make_plots_for_notes():  # pragma no cover
