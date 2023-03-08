@@ -3,8 +3,6 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.colors import TABLEAU_COLORS
 from mpi4py import MPI
-import sys
-import matplotlib as mpl
 
 import pySDC.helpers.plot_helper as plot_helper
 from pySDC.helpers.stats_helper import get_sorted
@@ -675,7 +673,21 @@ class FaultStats:
                 HotRodStrategy: 0.03682153860683977,
                 BaseStrategy: 0.03682153860683977,
             }
-            return abs(max(u) - ref[type(strategy)])
+            temperature_error = abs(max(u) - ref[type(strategy)])
+
+            # find out when the temperature threshold was crossed
+            crossing_ref = 320.0
+            stats = controller.return_stats()
+            temp = get_sorted(stats, type='u', recomputed=False)
+            time = np.array([me[0] for me in temp])
+            T = np.array([np.mean(me[1]) for me in temp])
+            T_thresh = controller.MS[0].levels[0].prob.params.u_thresh
+            time_crossing = min(time[T > T_thresh])
+            dt = np.array([me[1] for me in get_sorted(stats, type='dt', recomputed=False)])
+            dt_crossing = dt[T > T_thresh][0]
+            crossing_error = 0.0 if abs(crossing_ref - time_crossing) < min([1.5 * dt_crossing, 20]) else 10.0
+
+            return temperature_error + crossing_error
         else:
             return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
 
@@ -792,7 +804,7 @@ class FaultStats:
         else:
             store = False
 
-        force_params = dict()
+        force_params = {}
 
         stats, controller, Tend = self.single_run(
             strategy=strategy,
@@ -843,7 +855,7 @@ class FaultStats:
         Returns:
             None
         '''
-        force_params = dict()
+        force_params = {}
         force_params['controller_params'] = {'logger_level': 15}
 
         stats, controller, Tend = self.single_run(strategy=strategy, run=run, faults=faults, force_params=force_params)
@@ -1450,7 +1462,7 @@ class FaultStats:
                 vals = self.load(strategy, False)[key]
                 val = sum(vals) / len(vals)
 
-        if None in [key, val] and not op in ['isfinite']:
+        if None in [key, val] and op not in ['isfinite']:
             mask = dat['bit'] == dat['bit']
         else:
             if op == 'uneq':
