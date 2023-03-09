@@ -454,12 +454,11 @@ def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no 
     def load_data(reload):
         if reload:
             try:
-                with open('data/work-error.pickle', 'rb') as f:
+                with open(f'data/work-error-{problem}.pickle', 'rb') as f:
                     dat = pickle.load(f)
                     success = True
             except (FileNotFoundError, EOFError):
-                success = False
-                dat = load_data(False)
+                dat, success = load_data(False)
         else:
             keys = ['e', 'k_SDC', 'k_Newton', 'k_rhs', 't']
             success = False
@@ -506,14 +505,14 @@ def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no 
         ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**BaseStrategy().style, 'ls': ls[order]})
 
     # store
-    with open('data/work-error.pickle', 'wb') as f:
+    with open(f'data/work-error-{problem}.pickle', 'wb') as f:
         pickle.dump(data, f)
     return None
 
 
 def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
-    problems = [run_vdp, run_Lorenz, run_Schroedinger]
+    problems = [run_vdp, run_Lorenz]  # , run_Schroedinger]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
     for i in range(len(problems)):
         work_life_balance_single(problems[i], axs.flatten()[i], work_key=work_key, reload=reload)
@@ -572,7 +571,7 @@ def make_plots_for_notes():  # pragma no cover
 
 if __name__ == "__main__":
     # plot_adaptivity_stuff()
-    work_life_balance('t', True)
+    work_life_balance('k_Newton', True)
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
