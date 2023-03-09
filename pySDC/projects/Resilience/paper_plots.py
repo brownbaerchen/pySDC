@@ -419,7 +419,7 @@ def plot_vdp_solution():  # pragma no cover
     savefig(fig, 'vdp_sol')
 
 
-def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no cover
+def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=True):  # pragma: no cover
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, LogData
@@ -449,16 +449,15 @@ def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no 
         dat['k_Newton'] += [sum([me[1] for me in get_sorted(stats, type='work_newton')])]
         dat['k_rhs'] += [sum([me[1] for me in get_sorted(stats, type='work_rhs')])]
         dat['t'] += [get_sorted(stats, type='timing_run')[-1][1]]
-        print(dat)
 
-    def load_data(reload):
+    def load_data(reload, problem_name):
         if reload:
             try:
-                with open(f'data/work-error-{problem}.pickle', 'rb') as f:
+                with open(f'data/work-error-{problem_name}.pickle', 'rb') as f:
                     dat = pickle.load(f)
                     success = True
             except (FileNotFoundError, EOFError):
-                dat, success = load_data(False)
+                dat, success = load_data(False, problem_name)
         else:
             keys = ['e', 'k_SDC', 'k_Newton', 'k_rhs', 't']
             success = False
@@ -466,7 +465,7 @@ def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no 
 
         return dat, success
 
-    data, reload = load_data(reload)
+    data, reload = load_data(reload, problem_name)
 
     # adaptivity
     ls = {
@@ -505,7 +504,7 @@ def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no 
         ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**BaseStrategy().style, 'ls': ls[order]})
 
     # store
-    with open(f'data/work-error-{problem}.pickle', 'wb') as f:
+    with open(f'data/work-error-{problem_name}.pickle', 'wb') as f:
         pickle.dump(data, f)
     return None
 
@@ -515,7 +514,9 @@ def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     problems = [run_vdp, run_Lorenz]  # , run_Schroedinger]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
     for i in range(len(problems)):
-        work_life_balance_single(problems[i], axs.flatten()[i], work_key=work_key, reload=reload)
+        work_life_balance_single(
+            problems[i], axs.flatten()[i], problem_name=titles[i], work_key=work_key, reload=reload
+        )
         axs.flatten()[i].set_title(titles[i])
     axs[1, 0].set_xlabel(r'work')
     axs[1, 0].set_ylabel(r'global error')
