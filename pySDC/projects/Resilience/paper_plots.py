@@ -511,14 +511,22 @@ def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=Tru
 
 def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
-    problems = [run_vdp, run_Lorenz]  # , run_Schroedinger]
+    problems = [run_vdp, run_Lorenz, run_Schroedinger]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
     for i in range(len(problems)):
         work_life_balance_single(
             problems[i], axs.flatten()[i], problem_name=titles[i], work_key=work_key, reload=reload
         )
         axs.flatten()[i].set_title(titles[i])
-    axs[1, 0].set_xlabel(r'work')
+
+    xlabels = {
+        't': 'wall clock time / s',
+        'k_SDC': 'SDC iterations',
+        'k_Newton': 'Newton iterations',
+        'k_rhs': 'right hand side evaluations',
+    }
+
+    axs[1, 0].set_xlabel(f'{xlabels.get(work_key, "work")}')
     axs[1, 0].set_ylabel(r'global error')
     axs[1, 0].legend(frameon=False)
     savefig(fig, f'{work_key}-error')
