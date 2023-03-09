@@ -276,7 +276,7 @@ def plot_adaptivity_stuff():  # pragma no cover
     from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
     from pySDC.projects.Resilience.hook import LogData
 
-    stats_analyser = get_stats(run_vdp, 'data/stats')
+    stats_analyser = get_stats(run_Lorenz, 'data/stats')
 
     my_setup_mpl()
     scale = 0.5 if JOURNAL == 'JSC_beamer' else 1.0
@@ -304,14 +304,15 @@ def plot_adaptivity_stuff():  # pragma no cover
         iter_ax.set_ylabel(r'SDC iterations')
 
     force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}}
+    # force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
     for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy]:
         stats, _, _ = stats_analyser.single_run(
             strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData]
         )
         plot_error(stats, axs[1], axs[2], strategy())
 
-        if strategy == AdaptivityStrategy:
-            u = get_sorted(stats, type='u')
+        if strategy == BaseStrategy:
+            u = get_sorted(stats, type='u', recomputed=False)
             axs[0].plot([me[0] for me in u], [me[1][0] for me in u], color='black', label=r'$u$')
             axs[0].plot([me[0] for me in u], [me[1][1] for me in u], color='black', ls='--', label=r'$u_t$')
             axs[0].legend(frameon=False)
@@ -418,6 +419,104 @@ def plot_vdp_solution():  # pragma no cover
     savefig(fig, 'vdp_sol')
 
 
+def work_life_balance_single(problem, ax, t_ax):  # pragma: no cover
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
+    from pySDC.implementations.hooks.log_work import LogWork
+    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, LogData
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+    stats_analyser = get_stats(problem, path='data/stats')
+
+    def run(strategy, force_params):
+        stats, _, _ = stats_analyser.single_run(
+            strategy=strategy(), force_params=force_params, hook_class=[LogGlobalErrorPostRun, LogData, LogWork]
+        )
+        _e = get_sorted(stats, type='e_global_post_run')[-1][1]
+        # _e = max([me[1] for me in get_sorted(stats, type='e_local_post_step', recomputed=False)])
+        newton_k = sum([me[1] for me in get_sorted(stats, type='work_newton')])
+        __k = sum([me[1] for me in get_sorted(stats, type='k')])
+        _k = newton_k if newton_k > 0 else __k
+        timing = get_sorted(stats, type='timing_run')[-1][1]
+
+        restart = sum([me[1] for me in get_sorted(stats, type='restart')])
+        print(
+            f"{stats_analyser.get_name(strategy())}: e={_e:.2e} for k={_k} work units in {timing:.2e}s, {restart} restarts"
+        )
+        return _e, _k, timing
+
+    # adaptivity
+    ls = {
+        5: '-',
+        3: '-.',
+        4: ':',
+    }
+
+    for order in [5, 3]:
+        e = []
+        k = []
+        t = []
+        for e_tol in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]:
+            force_params = {
+                'convergence_controllers': {Adaptivity: {'e_tol': e_tol}},
+                'step_params': {'maxiter': order},
+            }
+            _e, _k, timing = run(AdaptivityStrategy, force_params)
+            e += [_e]
+            k += [_k]
+            t += [timing]
+        ax.loglog(k, e, **{**AdaptivityStrategy().style, 'ls': ls[order]})
+        t_ax.loglog(t, e, **{**AdaptivityStrategy().style, 'ls': ls[order]})
+
+    # iterate
+    for dt in [3e-2, 1e-2]:
+        e = []
+        k = []
+        t = []
+        for tol in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]:
+            force_params = {'level_params': {'restol': tol, 'dt': dt}}
+            _e, _k, timing = run(IterateStrategy, force_params)
+            e += [_e]
+            k += [_k]
+            t += [timing]
+        ax.loglog(k, e, **IterateStrategy().style)
+        t_ax.loglog(t, e, **IterateStrategy().style)
+
+    # base
+    for order in [5, 3]:
+        e = []
+        k = []
+        t = []
+        for tol in [5e-2, 3e-2, 1e-2, 5e-3]:
+            force_params = {'level_params': {'dt': tol}, 'step_params': {'maxiter': order}}
+            _e, _k, timing = run(BaseStrategy, force_params)
+            e += [_e]
+            k += [_k]
+            t += [timing]
+        ax.loglog(k, e, **{**BaseStrategy().style, 'ls': ls[order]})
+        t_ax.loglog(t, e, **{**BaseStrategy().style, 'ls': ls[order]})
+    return None
+
+
+def work_life_balance():  # pragma: no cover
+    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
+    t_fig, t_axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
+    problems = [run_vdp, run_Lorenz, run_Schroedinger]
+    titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
+    for i in range(len(problems)):
+        work_life_balance_single(problems[i], axs.flatten()[i], t_axs.flatten()[i])
+        axs.flatten()[i].set_title(titles[i])
+        t_axs.flatten()[i].set_title(titles[i])
+    axs[1, 0].set_xlabel(r'work')
+    axs[1, 0].set_ylabel(r'global error')
+    axs[1, 0].legend(frameon=False)
+    savefig(fig, 'work-error')
+    t_axs[1, 0].set_xlabel(r'wall time / s')
+    t_axs[1, 0].set_ylabel(r'global error')
+    t_axs[1, 0].legend(frameon=False)
+    savefig(t_fig, 'time-error')
+    plt.show()
+
+
 def make_plots_for_SIAM_CSE23():  # pragma no cover
     """
     Make plots for the SIAM talk
@@ -464,6 +563,9 @@ def make_plots_for_notes():  # pragma no cover
 
 
 if __name__ == "__main__":
+    # plot_adaptivity_stuff()
+    work_life_balance()
+
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    make_plots_for_paper()
+    # make_plots_for_paper()

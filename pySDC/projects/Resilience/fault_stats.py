@@ -696,7 +696,7 @@ class FaultStats:
         else:
             return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
 
-    def single_run(self, strategy, run=0, faults=False, force_params=None, hook_class=None, space_comm=None):
+    def single_run(self, strategy, run=0, faults=False, force_params=None, hook_class=None, space_comm=None, Tend=None):
         '''
         Run the problem once with the specified parameters
 
@@ -752,7 +752,7 @@ class FaultStats:
             num_procs=self.num_procs,
             hook_class=hook_class,
             fault_stuff=fault_stuff,
-            Tend=self.get_Tend(),
+            Tend=self.get_Tend() if Tend is None else Tend,
             custom_controller_params=custom_controller_params,
             custom_problem_params=custom_problem_params,
             space_comm=space_comm,
