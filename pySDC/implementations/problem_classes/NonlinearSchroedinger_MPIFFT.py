@@ -3,7 +3,7 @@ from mpi4py import MPI
 from mpi4py_fft import PFFT
 
 from pySDC.core.Errors import ParameterError, ProblemError
-from pySDC.core.Problem import ptype
+from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 from mpi4py_fft import newDistArray
@@ -101,6 +101,9 @@ class nonlinearschroedinger_imex(ptype):
         self.dx = self.params.L / problem_params['nvars'][0]
         self.dy = self.params.L / problem_params['nvars'][1]
 
+        # work counters
+        self.work_counters['rhs'] = WorkCounter()
+
     def eval_f(self, u, t):
         """
         Routine to evaluate the RHS
@@ -127,6 +130,7 @@ class nonlinearschroedinger_imex(ptype):
             f.impl[:] = self.fft.backward(lap_u_hat, f.impl)
             f.expl = self.ndim * self.params.c * 2j * np.absolute(u) ** 2 * u
 
+        self.work_counters['rhs']()
         return f
 
     def solve_system(self, rhs, factor, u0, t):

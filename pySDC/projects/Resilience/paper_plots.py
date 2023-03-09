@@ -419,30 +419,55 @@ def plot_vdp_solution():  # pragma no cover
     savefig(fig, 'vdp_sol')
 
 
-def work_life_balance_single(problem, ax, t_ax):  # pragma: no cover
+def work_life_balance_single(problem, ax, work_key, reload=True):  # pragma: no cover
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, LogData
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    import pickle
 
     stats_analyser = get_stats(problem, path='data/stats')
 
-    def run(strategy, force_params):
+    orders = {
+        'adaptivity': [3, 5],
+        'fixed': [3, 5],
+        'iterate': [3e-2, 1e-2],
+    }
+
+    def run(strategy, force_params, dat):
         stats, _, _ = stats_analyser.single_run(
             strategy=strategy(), force_params=force_params, hook_class=[LogGlobalErrorPostRun, LogData, LogWork]
         )
-        _e = get_sorted(stats, type='e_global_post_run')[-1][1]
         # _e = max([me[1] for me in get_sorted(stats, type='e_local_post_step', recomputed=False)])
-        newton_k = sum([me[1] for me in get_sorted(stats, type='work_newton')])
-        __k = sum([me[1] for me in get_sorted(stats, type='k')])
-        _k = newton_k if newton_k > 0 else __k
-        timing = get_sorted(stats, type='timing_run')[-1][1]
 
-        restart = sum([me[1] for me in get_sorted(stats, type='restart')])
-        print(
-            f"{stats_analyser.get_name(strategy())}: e={_e:.2e} for k={_k} work units in {timing:.2e}s, {restart} restarts"
-        )
-        return _e, _k, timing
+        # restart = sum([me[1] for me in get_sorted(stats, type='restart')])
+        # print(
+        #    f"{stats_analyser.get_name(strategy())}: e={_e:.2e} for k={_k} work units in {timing:.2e}s, {restart} restarts"
+        # )
+        dat['e'] += [get_sorted(stats, type='e_global_post_run')[-1][1]]
+        dat['k_SDC'] += [sum([me[1] for me in get_sorted(stats, type='k')])]
+        dat['k_Newton'] += [sum([me[1] for me in get_sorted(stats, type='work_newton')])]
+        dat['k_rhs'] += [sum([me[1] for me in get_sorted(stats, type='work_rhs')])]
+        dat['t'] += [get_sorted(stats, type='timing_run')[-1][1]]
+        print(dat)
+
+    def load_data(reload):
+        if reload:
+            try:
+                with open('data/work-error.pickle', 'rb') as f:
+                    dat = pickle.load(f)
+                    success = True
+            except (FileNotFoundError, EOFError):
+                success = False
+                dat = load_data(False)
+        else:
+            keys = ['e', 'k_SDC', 'k_Newton', 'k_rhs', 't']
+            success = False
+            dat = {key: {order: {k: [] for k in keys} for order in orders[key]} for key in orders}
+
+        return dat, success
+
+    data, reload = load_data(reload)
 
     # adaptivity
     ls = {
@@ -451,69 +476,52 @@ def work_life_balance_single(problem, ax, t_ax):  # pragma: no cover
         4: ':',
     }
 
-    for order in [5, 3]:
-        e = []
-        k = []
-        t = []
+    S = 'adaptivity'
+    for order in orders[S]:
         for e_tol in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]:
-            force_params = {
-                'convergence_controllers': {Adaptivity: {'e_tol': e_tol}},
-                'step_params': {'maxiter': order},
-            }
-            _e, _k, timing = run(AdaptivityStrategy, force_params)
-            e += [_e]
-            k += [_k]
-            t += [timing]
-        ax.loglog(k, e, **{**AdaptivityStrategy().style, 'ls': ls[order]})
-        t_ax.loglog(t, e, **{**AdaptivityStrategy().style, 'ls': ls[order]})
+            if not reload:
+                force_params = {
+                    'convergence_controllers': {Adaptivity: {'e_tol': e_tol}},
+                    'step_params': {'maxiter': order},
+                }
+                run(AdaptivityStrategy, force_params, data[S][order])
+        ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**AdaptivityStrategy().style, 'ls': ls[order]})
 
     # iterate
-    for dt in [3e-2, 1e-2]:
-        e = []
-        k = []
-        t = []
-        for tol in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]:
-            force_params = {'level_params': {'restol': tol, 'dt': dt}}
-            _e, _k, timing = run(IterateStrategy, force_params)
-            e += [_e]
-            k += [_k]
-            t += [timing]
-        ax.loglog(k, e, **IterateStrategy().style)
-        t_ax.loglog(t, e, **IterateStrategy().style)
+    S = 'iterate'
+    for order in orders[S]:
+        for tol in [1e-3, 1e-5, 1e-7, 1e-8]:
+            if not reload:
+                force_params = {'level_params': {'restol': tol, 'dt': order}}
+                run(IterateStrategy, force_params, data[S][order])
+        ax.loglog(data[S][order][work_key], data[S][order]['e'], **IterateStrategy().style)
 
     # base
-    for order in [5, 3]:
-        e = []
-        k = []
-        t = []
+    S = 'fixed'
+    for order in orders[S]:
         for tol in [5e-2, 3e-2, 1e-2, 5e-3]:
-            force_params = {'level_params': {'dt': tol}, 'step_params': {'maxiter': order}}
-            _e, _k, timing = run(BaseStrategy, force_params)
-            e += [_e]
-            k += [_k]
-            t += [timing]
-        ax.loglog(k, e, **{**BaseStrategy().style, 'ls': ls[order]})
-        t_ax.loglog(t, e, **{**BaseStrategy().style, 'ls': ls[order]})
+            if not reload:
+                force_params = {'level_params': {'dt': tol}, 'step_params': {'maxiter': order}}
+                run(BaseStrategy, force_params, data[S][order])
+        ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**BaseStrategy().style, 'ls': ls[order]})
+
+    # store
+    with open('data/work-error.pickle', 'wb') as f:
+        pickle.dump(data, f)
     return None
 
 
-def work_life_balance():  # pragma: no cover
+def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
-    t_fig, t_axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
     problems = [run_vdp, run_Lorenz, run_Schroedinger]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
     for i in range(len(problems)):
-        work_life_balance_single(problems[i], axs.flatten()[i], t_axs.flatten()[i])
+        work_life_balance_single(problems[i], axs.flatten()[i], work_key=work_key, reload=reload)
         axs.flatten()[i].set_title(titles[i])
-        t_axs.flatten()[i].set_title(titles[i])
     axs[1, 0].set_xlabel(r'work')
     axs[1, 0].set_ylabel(r'global error')
     axs[1, 0].legend(frameon=False)
-    savefig(fig, 'work-error')
-    t_axs[1, 0].set_xlabel(r'wall time / s')
-    t_axs[1, 0].set_ylabel(r'global error')
-    t_axs[1, 0].legend(frameon=False)
-    savefig(t_fig, 'time-error')
+    savefig(fig, f'{work_key}-error')
     plt.show()
 
 
@@ -564,7 +572,7 @@ def make_plots_for_notes():  # pragma no cover
 
 if __name__ == "__main__":
     # plot_adaptivity_stuff()
-    work_life_balance()
+    work_life_balance('t', True)
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()

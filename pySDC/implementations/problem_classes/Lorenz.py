@@ -45,6 +45,7 @@ class LorenzAttractor(ptype):
             params=problem_params,
         )
         self.work_counters['newton'] = WorkCounter()
+        self.work_counters['rhs'] = WorkCounter()
 
     def eval_f(self, u, t):
         """
@@ -67,6 +68,8 @@ class LorenzAttractor(ptype):
         f[0] = sigma * (u[1] - u[0])
         f[1] = rho * u[0] - u[1] - u[0] * u[2]
         f[2] = u[0] * u[1] - beta * u[2]
+
+        self.work_counters['rhs']()
         return f
 
     def solve_system(self, rhs, dt, u0, t):

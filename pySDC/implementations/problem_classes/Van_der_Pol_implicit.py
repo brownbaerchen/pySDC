@@ -40,6 +40,7 @@ class vanderpol(ptype):
             (problem_params['nvars'], None, np.dtype('float64')), dtype_u, dtype_f, problem_params
         )
         self.work_counters['newton'] = WorkCounter()
+        self.work_counters['rhs'] = WorkCounter()
 
     def u_exact(self, t, u_init=None, t_init=None):
         """
@@ -82,6 +83,8 @@ class vanderpol(ptype):
         f = self.dtype_f(self.init)
         f[0] = x2
         f[1] = self.params.mu * (1 - x1**2) * x2 - x1
+
+        self.work_counters['rhs']()
         return f
 
     def solve_system(self, rhs, dt, u0, t):
