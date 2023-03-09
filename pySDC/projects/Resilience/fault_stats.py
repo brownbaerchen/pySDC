@@ -687,10 +687,11 @@ class FaultStats:
             T = np.array([np.mean(me[1]) for me in temp])
             T_thresh = controller.MS[0].levels[0].prob.params.u_thresh
             time_crossing = min(time[T > T_thresh])
-            dt = np.array([me[1] for me in get_sorted(stats, type='dt', recomputed=False)])
-            dt_crossing = dt[T > T_thresh][0]
+            dt_ = get_sorted(stats, type='dt', recomputed=False)
+            dt = np.array([me[1] for me in dt_])
+            dt_time = np.array([me[0] for me in dt_])
+            dt_crossing = dt[np.argmin((dt_time - time_crossing) ** 2)]
             crossing_error = 0.0 if abs(crossing_ref - time_crossing) < min([1.5 * dt_crossing, 20]) else 10.0
-
             return temperature_error + crossing_error
         else:
             return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
