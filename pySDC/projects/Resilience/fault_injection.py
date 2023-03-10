@@ -254,6 +254,8 @@ class FaultInjector(hooks):
             None
         '''
         L = step.levels[f.level_number]
+        _abs_before = None
+        _abs_after = None
 
         # insert the fault in some target
         if f.target == 0:
@@ -268,14 +270,16 @@ class FaultInjector(hooks):
             fault happens in the last iteration, it will not show up in the residual and the iteration is wrongly
             stopped.
             '''
+            _abs_before = abs(L.u[f.node][tuple(f.problem_pos)])
             L.u[f.node][tuple(f.problem_pos)] = self.flip_bit(L.u[f.node][tuple(f.problem_pos)], f.bit)
             L.f[f.node] = L.prob.eval_f(L.u[f.node], L.time + L.dt * L.sweep.coll.nodes[max([0, f.node - 1])])
             L.sweep.compute_residual()
+            _abs_after = abs(L.u[f.node][tuple(f.problem_pos)])
         else:
             raise NotImplementedError(f'Target {f.target} for faults not implemented!')
 
         # log what happened to stats and screen
-        self.logger.info(f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node}. Target: {f.target}')
+        self.logger.info(f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node}. Target: {f.target}. Abs: {_abs_before:.2e} -> {_abs_after:.2e}')
         self.add_to_stats(
             process=step.status.slot,
             time=L.time,
@@ -420,7 +424,8 @@ class FaultInjector(hooks):
 
         return None
 
-    def to_binary(self, f):
+    @classmethod
+    def to_binary(cls, f):
         '''
         Converts a single float in a string containing its binary representation in memory following IEEE754
         The struct.pack function returns the input with the applied conversion code in 8 bit blocks, which are then
@@ -443,7 +448,8 @@ class FaultInjector(hooks):
 
         return ''.join('{:0>8b}'.format(c) for c in struct.pack(conversion_code, f))
 
-    def to_float(self, s):
+    @classmethod
+    def to_float(cls, s):
         '''
         Converts a string of a IEEE754 binary representation in a float. The string is converted to integer with base 2
         and converted to bytes, which can be unpacked into a Python float by the struct module.
@@ -470,7 +476,8 @@ class FaultInjector(hooks):
 
         return struct.unpack(conversion_code, int(s, 2).to_bytes(byte_count, 'big'))[0]
 
-    def flip_bit(self, target, bit):
+    @classmethod
+    def flip_bit(cls, target, bit):
         '''
         Flips a bit at position bit in a target using the bitwise xor operator
 
@@ -481,8 +488,8 @@ class FaultInjector(hooks):
         Returns:
             (float) The floating point number resulting from flipping the respective bit in target
         '''
-        binary = self.to_binary(target)
-        return self.to_float(f'{binary[:bit]}{int(binary[bit]) ^ 1}{binary[bit+1:]}')
+        binary = cls.to_binary(target)
+        return cls.to_float(f'{binary[:bit]}{int(binary[bit]) ^ 1}{binary[bit+1:]}')
 
 
 def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):

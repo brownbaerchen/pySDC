@@ -155,7 +155,8 @@ def run_leaky_superconductor(
         from pySDC.projects.Resilience.fault_injection import prepare_controller_for_faults
 
         rnd_args = {'iteration': 5, 'min_node': 1}
-        args = {'time': 21.0, 'target': 0}
+        # args = {'time': 21.0, 'target': 0}
+        args = {'time': 51.0, 'target': 0}
         prepare_controller_for_faults(controller, fault_stuff, rnd_args, args)
 
     # get initial values on finest level
@@ -170,6 +171,23 @@ def run_leaky_superconductor(
     return stats, controller, Tend
 
 
+def faults(seed=0):  # pragma: no cover
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    rng = np.random.RandomState(seed)
+    fault_stuff = {'rng': rng, 'args': {}, 'rnd_args': {}}
+
+    controller_params = {'logger_level': 30}
+    description = {'level_params': {'dt': 1e1}, 'step_params': {'maxiter': 5}}
+     
+    stats, controller, _ = run_leaky_superconductor(fault_stuff=fault_stuff, custom_controller_params=controller_params, )
+    plot_solution(stats, controller)
+
+    description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-7, 'dt_max': 1e2, 'dt_min': 1e-3}}
+    stats, controller, _ = run_leaky_superconductor(fault_stuff=fault_stuff, custom_controller_params=controller_params, custom_description=description)
+    plot_solution(stats, controller)
+    plt.show()
+
+
 def plot_solution(stats, controller):  # pragma: no cover
     import matplotlib.pyplot as plt
 
@@ -178,7 +196,7 @@ def plot_solution(stats, controller):  # pragma: no cover
     dt_ax = u_ax.twinx()
 
     u = get_sorted(stats, type='u', recomputed=False)
-    u_ax.plot([me[0] for me in u], [max(me[1]) for me in u], label=r'$T$')
+    u_ax.plot([me[0] for me in u], [np.mean(me[1]) for me in u], label=r'$T$')
 
     dt = get_sorted(stats, type='dt', recomputed=False)
     dt_ax.plot([me[0] for me in dt], [me[1] for me in dt], color='black', ls='--')
@@ -187,6 +205,8 @@ def plot_solution(stats, controller):  # pragma: no cover
     P = controller.MS[0].levels[0].prob
     u_ax.axhline(P.params.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
     u_ax.axhline(P.params.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
+
+    [ax.axvline(me[0], color='grey', label=f'fault at t={me[0]:.2f}') for me in get_sorted(stats, type='bitflip')]
 
     u_ax.legend()
     u_ax.set_xlabel(r'$t$')
