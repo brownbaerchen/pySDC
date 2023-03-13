@@ -448,7 +448,7 @@ def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=Tru
     }
 
     def run(strategy, force_params, dat):
-        #force_params['controller_params'] = {'logger_level': 15}
+        # force_params['controller_params'] = {'logger_level': 15}
         stats, _, _ = stats_analyser.single_run(
             strategy=strategy(), force_params=force_params, hook_class=[LogGlobalErrorPostRun, LogData, LogWork]
         )
@@ -493,14 +493,23 @@ def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=Tru
         for e_tol in [1e-3, 1e-4, 1e-5, 1e-6]:
             if not reload:
                 force_params = {
-                        'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'quad_type': ['RADAU-RIGHT', 'GAUSS']}, 'e_tol': e_tol}},
-                        #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3], 'restol': [e_tol / 10, e_tol]}, 'e_tol': e_tol}},
-                        #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3]}, 'e_tol': e_tol}},
+                    'convergence_controllers': {
+                        AdaptivityCollocation: {
+                            'adaptive_coll_params': {'quad_type': ['RADAU-RIGHT', 'GAUSS']},
+                            'e_tol': e_tol,
+                        }
+                    },
+                    #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3], 'restol': [e_tol / 10, e_tol]}, 'e_tol': e_tol}},
+                    #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3]}, 'e_tol': e_tol}},
                     'step_params': {'maxiter': 99},
                     'level_params': {'restol': e_tol / 10},
                 }
                 run(BaseStrategy, force_params, data[S][order])
-        ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**AdaptivityStrategy().style, 'ls': '-', 'color': 'magenta'})
+        ax.loglog(
+            data[S][order][work_key],
+            data[S][order]['e'],
+            **{**AdaptivityStrategy().style, 'ls': '-', 'color': 'magenta'},
+        )
 
     S = 'adaptivity'
     for order in orders[S]:
@@ -539,7 +548,10 @@ def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=Tru
 
 def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
-    problems = [run_vdp, run_Lorenz, ]#run_Schroedinger, run_leaky_superconductor]
+    problems = [
+        run_vdp,
+        run_Lorenz,
+    ]  # run_Schroedinger, run_leaky_superconductor]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
     for i in range(len(problems)):
         work_life_balance_single(
