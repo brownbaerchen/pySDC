@@ -279,7 +279,9 @@ class FaultInjector(hooks):
             raise NotImplementedError(f'Target {f.target} for faults not implemented!')
 
         # log what happened to stats and screen
-        self.logger.info(f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node}. Target: {f.target}. Abs: {_abs_before:.2e} -> {_abs_after:.2e}')
+        self.logger.info(
+            f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node}. Target: {f.target}. Abs: {_abs_before:.2e} -> {_abs_after:.2e}'
+        )
         self.add_to_stats(
             process=step.status.slot,
             time=L.time,
@@ -442,7 +444,7 @@ class FaultInjector(hooks):
         elif type(f) in [np.float32]:
             conversion_code = '>f'  # big endian, float
         elif type(f) in [np.complex128]:
-            return f'{self.to_binary(f.real)}{self.to_binary(f.imag)}'
+            return f'{cls.to_binary(f.real)}{cls.to_binary(f.imag)}'
         else:
             raise NotImplementedError(f'Don\'t know how to convert number of type {type(f)} to binary')
 
@@ -469,7 +471,7 @@ class FaultInjector(hooks):
         elif len(s) == 128:  # complex floats
             real = s[0:64]
             imag = s[64:128]
-            return self.to_float(real) + self.to_float(imag) * 1j
+            return cls.to_float(real) + cls.to_float(imag) * 1j
 
         else:
             raise NotImplementedError(f'Don\'t know how to convert string of length {len(s)} to float')

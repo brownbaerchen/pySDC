@@ -342,6 +342,9 @@ strategy'
             'level_params': {'restol': restol, 'e_tol': e_tol},
         }
 
+        if problem == run_leaky_superconductor:
+            custom_description['level_params']['dt'] = 26
+
         return {**custom_description, **self.custom_description}
 
 
@@ -671,28 +674,26 @@ class FaultStats:
             float: Error
         """
         if self.prob == run_leaky_superconductor:
-            ref = {
-                AdaptivityStrategy: 0.036832240840408426,
+            from pySDC.projects.Resilience.leaky_superconductor import get_crossing_time
+
+            t_ref = {
+                AdaptivityStrategy: 316.51811071448844,
+                IterateStrategy: 0.0368214748207781,
+                HotRodStrategy: 316.7889908256881,
+                BaseStrategy: 0.03682153860683977,
+            }
+            t_error = abs(t_ref[type(strategy)] - get_crossing_time(controller.return_stats(), controller))
+
+            temp_ref = {
+                AdaptivityStrategy: 0.038371955083597045,
                 IterateStrategy: 0.0368214748207781,
                 HotRodStrategy: 0.03682153860683977,
                 BaseStrategy: 0.03682153860683977,
             }
-            temperature_error = abs(max(u) - ref[type(strategy)])
+            temperature_error = abs(max(u) - temp_ref[type(strategy)])
 
-            # find out when the temperature threshold was crossed
-            crossing_ref = 320.0
-            stats = controller.return_stats()
-            temp = get_sorted(stats, type='u', recomputed=False)
-            time = np.array([me[0] for me in temp])
-            T = np.array([np.mean(me[1]) for me in temp])
-            T_thresh = controller.MS[0].levels[0].prob.params.u_thresh
-            time_crossing = min(time[T > T_thresh])
-            dt_ = get_sorted(stats, type='dt', recomputed=False)
-            dt = np.array([me[1] for me in dt_])
-            dt_time = np.array([me[0] for me in dt_])
-            dt_crossing = dt[np.argmin((dt_time - time_crossing) ** 2)]
-            crossing_error = 0.0 if abs(crossing_ref - time_crossing) < min([1.5 * dt_crossing, 20]) else 10.0
-            return temperature_error + crossing_error
+            print(temperature_error, max(u), t_error, get_crossing_time(controller.return_stats(), controller))
+            return temperature_error + t_error
         else:
             return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
 
@@ -1760,6 +1761,8 @@ def main():
         mode='random',
         stats_path='data/stats-jusuf',
     )
+    stats_analyser.scrutinize(IterateStrategy(), 988, False)
+    return None
 
     stats_analyser.run_stats_generation(runs=1000)
     stats_analyser.get_recovered()

@@ -41,7 +41,7 @@ def get_stats(problem, path='data/stats'):
         mode = 'random'
 
     recovery_thresh_abs = {
-        run_leaky_superconductor: 5e-5,
+        run_leaky_superconductor: 5e-3,
     }
 
     strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
@@ -95,9 +95,21 @@ def analyse_resilience(problem, path='data/stats', **kwargs):  # pragma: no cove
     """
 
     stats_analyser = get_stats(problem, path)
+    stats_analyser.get_recovered()
 
-    compare_strategies(stats_analyser, **kwargs)
-    plot_recovery_rate(stats_analyser, **kwargs)
+    strategy = IterateStrategy()
+    not_fixed = stats_analyser.get_mask(strategy=strategy, key='recovered', val=False)
+    not_overflow = stats_analyser.get_mask(strategy=strategy, key='bit', val=1, op='uneq', old_mask=not_fixed)
+    stats_analyser.print_faults(not_overflow)
+
+    # special = stats_analyser.get_mask(strategy=strategy, key='bit', val=10, op='eq')
+    # stats_analyser.print_faults(special)
+
+    # Adaptivity: 19, ...
+    # stats_analyser.scrutinize(strategy, run=19, faults=True)
+
+    # compare_strategies(stats_analyser, **kwargs)
+    # plot_recovery_rate(stats_analyser, **kwargs)
 
 
 def compare_strategies(stats_analyser, **kwargs):  # pragma: no cover
@@ -575,13 +587,14 @@ def make_plots_for_notes():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'notes/Lorenz'
 
-    analyse_resilience(run_Lorenz, format='png')
+    # analyse_resilience(run_Lorenz, format='png')
+    analyse_resilience(run_leaky_superconductor, path='data/stats-jusuf/', format='png')
 
 
 if __name__ == "__main__":
     # plot_adaptivity_stuff()
-    work_life_balance('k_Newton', True)
+    # work_life_balance('k_Newton', True)
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    # make_plots_for_paper()
+    make_plots_for_paper()

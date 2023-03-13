@@ -172,20 +172,99 @@ def run_leaky_superconductor(
 
 
 def faults(seed=0):  # pragma: no cover
+    import matplotlib.pyplot as plt
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+    fig, ax = plt.subplots(1, 1)
+
     rng = np.random.RandomState(seed)
     fault_stuff = {'rng': rng, 'args': {}, 'rnd_args': {}}
 
     controller_params = {'logger_level': 30}
     description = {'level_params': {'dt': 1e1}, 'step_params': {'maxiter': 5}}
-     
-    stats, controller, _ = run_leaky_superconductor(fault_stuff=fault_stuff, custom_controller_params=controller_params, )
-    plot_solution(stats, controller)
+    stats, controller, _ = run_leaky_superconductor(
+        custom_controller_params=controller_params, custom_description=description
+    )
+    plot_solution_faults(stats, controller, ax, plot_lines=True, label='ref')
+
+    stats, controller, _ = run_leaky_superconductor(
+        fault_stuff=fault_stuff,
+        custom_controller_params=controller_params,
+    )
+    plot_solution_faults(stats, controller, ax, label='fixed')
 
     description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-7, 'dt_max': 1e2, 'dt_min': 1e-3}}
-    stats, controller, _ = run_leaky_superconductor(fault_stuff=fault_stuff, custom_controller_params=controller_params, custom_description=description)
-    plot_solution(stats, controller)
+    stats, controller, _ = run_leaky_superconductor(
+        fault_stuff=fault_stuff, custom_controller_params=controller_params, custom_description=description
+    )
+
+    plot_solution_faults(stats, controller, ax, label='adaptivity', ls='--')
     plt.show()
+
+
+def plot_solution_faults(stats, controller, ax, plot_lines=False, **kwargs):  # pragma: no cover
+    u_ax = ax
+
+    u = get_sorted(stats, type='u', recomputed=False)
+    u_ax.plot([me[0] for me in u], [np.mean(me[1]) for me in u], **kwargs)
+
+    if plot_lines:
+        P = controller.MS[0].levels[0].prob
+        u_ax.axhline(P.params.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
+        u_ax.axhline(P.params.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
+
+    [ax.axvline(me[0], color='grey', label=f'fault at t={me[0]:.2f}') for me in get_sorted(stats, type='bitflip')]
+
+    u_ax.legend()
+    u_ax.set_xlabel(r'$t$')
+    u_ax.set_ylabel(r'$T$')
+
+
+def get_crossing_time(stats, controller, num_points=5, inter_points=50, temperature_error_thresh=1e-5):
+    """
+    Compute the time when the temperature threshold is crossed based on interpolation.
+
+    Args:
+        stats (dict): The stats from a pySDC run
+        controller (pySDC.Controller.controller): The controller
+        num_points (int): The number of points in the solution you want to use for interpolation
+        inter_points (int): The resolution of the interpolation
+        temperature_error_thresh (float): The temperature error compared to the actual threshold you want to allow
+
+    Returns:
+        float: The time when the temperature threshold is crossed
+    """
+    from pySDC.core.Lagrange import LagrangeApproximation
+    from pySDC.core.Collocation import CollBase
+
+    P = controller.MS[0].levels[0].prob
+    u_thresh = P.params.u_thresh
+
+    u = get_sorted(stats, type='u', recomputed=False)
+    temp = np.array([np.mean(me[1]) for me in u])
+    t = np.array([me[0] for me in u])
+
+    crossing_index = np.arange(len(temp))[temp > u_thresh][0]
+
+    # interpolation stuff
+    num_points = min([num_points, crossing_index * 2, len(temp) - crossing_index])
+    idx = np.arange(num_points) - num_points // 2 + crossing_index
+    t_grid = t[idx]
+    u_grid = temp[idx]
+    t_inter = np.linspace(t_grid[0], t_grid[-1], inter_points)
+    interpolator = LagrangeApproximation(points=t_grid)
+    u_inter = interpolator.getInterpolationMatrix(t_inter) @ u_grid
+
+    crossing_inter = np.arange(len(u_inter))[u_inter > u_thresh][0]
+
+    temperature_error = abs(u_inter[crossing_inter] - u_thresh)
+
+    assert temperature_error < temp[crossing_index], "Temperature error is rising due to interpolation!"
+
+    if temperature_error > temperature_error_thresh and inter_points < 300:
+        return get_crossing_time(stats, controller, num_points + 4, inter_points + 15, temperature_error_thresh)
+
+    return t_inter[crossing_inter]
 
 
 def plot_solution(stats, controller):  # pragma: no cover
@@ -280,5 +359,7 @@ def compare_imex_full(plotting=False):
 
 
 if __name__ == '__main__':
-    compare_imex_full(plotting=True)
+    # faults(19)
+    get_crossing_time()
+    # compare_imex_full(plotting=True)
     plt.show()
