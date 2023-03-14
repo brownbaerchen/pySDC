@@ -108,8 +108,8 @@ def analyse_resilience(problem, path='data/stats', **kwargs):  # pragma: no cove
     # Adaptivity: 19, ...
     # stats_analyser.scrutinize(strategy, run=19, faults=True)
 
-    # compare_strategies(stats_analyser, **kwargs)
-    # plot_recovery_rate(stats_analyser, **kwargs)
+    compare_strategies(stats_analyser, **kwargs)
+    plot_recovery_rate(stats_analyser, **kwargs)
 
 
 def compare_strategies(stats_analyser, **kwargs):  # pragma: no cover
@@ -621,8 +621,8 @@ def make_plots_for_notes():  # pragma: no cover
 
 if __name__ == "__main__":
     # plot_adaptivity_stuff()
-    work_life_balance('k_SDC', False)
+    # work_life_balance('k_SDC', False)
 
-    # make_plots_for_notes()
+    make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
     # make_plots_for_paper()

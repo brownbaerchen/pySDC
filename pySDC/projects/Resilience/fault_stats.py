@@ -673,29 +673,29 @@ class FaultStats:
         Returns:
             float: Error
         """
-        if self.prob == run_leaky_superconductor:
-            from pySDC.projects.Resilience.leaky_superconductor import get_crossing_time
+        # if self.prob == run_leaky_superconductor:
+        #    from pySDC.projects.Resilience.leaky_superconductor import get_crossing_time
 
-            t_ref = {
-                AdaptivityStrategy: 316.51811071448844,
-                IterateStrategy: 0.0368214748207781,
-                HotRodStrategy: 316.7889908256881,
-                BaseStrategy: 0.03682153860683977,
-            }
-            t_error = abs(t_ref[type(strategy)] - get_crossing_time(controller.return_stats(), controller))
+        #    t_ref = {
+        #        AdaptivityStrategy: 316.51811071448844,
+        #        IterateStrategy: 0.0368214748207781,
+        #        HotRodStrategy: 316.7889908256881,
+        #        BaseStrategy: 0.03682153860683977,
+        #    }
+        #    t_error = abs(t_ref[type(strategy)] - get_crossing_time(controller.return_stats(), controller))
 
-            temp_ref = {
-                AdaptivityStrategy: 0.038371955083597045,
-                IterateStrategy: 0.0368214748207781,
-                HotRodStrategy: 0.03682153860683977,
-                BaseStrategy: 0.03682153860683977,
-            }
-            temperature_error = abs(max(u) - temp_ref[type(strategy)])
+        #    temp_ref = {
+        #        AdaptivityStrategy: 0.038371955083597045,
+        #        IterateStrategy: 0.0368214748207781,
+        #        HotRodStrategy: 0.03682153860683977,
+        #        BaseStrategy: 0.03682153860683977,
+        #    }
+        #    temperature_error = abs(max(u) - temp_ref[type(strategy)])
 
-            print(temperature_error, max(u), t_error, get_crossing_time(controller.return_stats(), controller))
-            return temperature_error + t_error
-        else:
-            return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
+        #    print(temperature_error, max(u), t_error, get_crossing_time(controller.return_stats(), controller))
+        #    return temperature_error + t_error
+        # else:
+        return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
 
     def single_run(self, strategy, run=0, faults=False, force_params=None, hook_class=None, space_comm=None, Tend=None):
         '''
@@ -1754,15 +1754,13 @@ def main():
         prob=run_leaky_superconductor,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=True,
+        reload=False,
         recovery_thresh=1.1,
         recovery_thresh_abs=5e-5,
         num_procs=1,
         mode='random',
         stats_path='data/stats-jusuf',
     )
-    stats_analyser.scrutinize(IterateStrategy(), 988, False)
-    return None
 
     stats_analyser.run_stats_generation(runs=1000)
     stats_analyser.get_recovered()
