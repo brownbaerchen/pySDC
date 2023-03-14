@@ -288,7 +288,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
     from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
     from pySDC.projects.Resilience.hook import LogData
 
-    stats_analyser = get_stats(run_Lorenz, 'data/stats')
+    stats_analyser = get_stats(run_vdp, 'data/stats')
 
     my_setup_mpl()
     scale = 0.5 if JOURNAL == 'JSC_beamer' else 1.0
@@ -598,13 +598,13 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    plot_vdp_solution()
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
+    # plot_vdp_solution()
+    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
     plot_adaptivity_stuff()
-    plot_efficiency_polar(run_vdp)
-    compare_recovery_rate_problems()
+    # plot_efficiency_polar(run_vdp)
+    # compare_recovery_rate_problems()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -623,6 +623,6 @@ if __name__ == "__main__":
     # plot_adaptivity_stuff()
     # work_life_balance('k_SDC', False)
 
-    make_plots_for_notes()
+    # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    # make_plots_for_paper()
+    make_plots_for_paper()

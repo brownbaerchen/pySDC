@@ -10,7 +10,6 @@ from pySDC.projects.Resilience.hook import hook_collection, LogUAllIter, LogData
 from pySDC.projects.Resilience.fault_injection import get_fault_injector_hook
 from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
-from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
 from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
 from pySDC.implementations.hooks.log_work import LogWork
 
@@ -73,18 +72,7 @@ class FaultStats:
         Returns:
             float: Tend to put into the run
         '''
-        if self.prob == run_vdp:
-            return 2.3752559741400825
-        elif self.prob == run_piline:
-            return 20.0
-        elif self.prob == run_Lorenz:
-            return 1.5
-        elif self.prob == run_Schroedinger:
-            return 1.0
-        elif self.prob == run_leaky_superconductor:
-            return 450
-        else:
-            raise NotImplementedError('I don\'t have a final time for your problem!')
+        return self.strategies[0].get_Tend(self.prob, self.num_procs)
 
     def get_custom_description(self):
         '''
@@ -317,19 +305,11 @@ class FaultStats:
         force_params = {} if force_params is None else force_params
 
         # build the custom description
-        custom_description_prob = self.get_custom_description()
-        custom_description_strategy = strategy.get_custom_description(self.prob, self.num_procs)
-        custom_description = {}
-        for key in list(custom_description_strategy.keys()) + list(custom_description_prob.keys()):
-            custom_description[key] = {
-                **custom_description_prob.get(key, {}),
-                **custom_description_strategy.get(key, {}),
-            }
+        custom_description = strategy.get_custom_description(self.prob, self.num_procs)
         for k in force_params.keys():
             custom_description[k] = {**custom_description.get(k, {}), **force_params[k]}
 
         custom_controller_params = force_params.get('controller_params', {})
-        custom_problem_params = self.get_custom_problem_params()
 
         if faults:
             # make parameters for faults:
@@ -355,7 +335,6 @@ class FaultStats:
             fault_stuff=fault_stuff,
             Tend=self.get_Tend() if Tend is None else Tend,
             custom_controller_params=custom_controller_params,
-            custom_problem_params=custom_problem_params,
             space_comm=space_comm,
         )
 
@@ -1356,7 +1335,7 @@ def main():
         prob=run_leaky_superconductor,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=False,
+        reload=True,
         recovery_thresh=1.1,
         recovery_thresh_abs=5e-5,
         num_procs=1,

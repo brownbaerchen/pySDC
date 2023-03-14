@@ -1,6 +1,18 @@
 import numpy as np
 from matplotlib.colors import TABLEAU_COLORS
+
 cmap = TABLEAU_COLORS
+
+
+def merge_descriptions(descA, descB):
+    # TODO: docs
+    for key in descB.keys():
+        if type(descB[key]) == dict:
+            descA[key] = merge_descriptions(descA.get(key, {}), descB[key])
+        else:
+            descA[key] = descB[key]
+    return descA
+
 
 class Strategy:
     '''
@@ -38,6 +50,9 @@ class Strategy:
             }
         ]
 
+        # stuff for work-precision diagrams
+        self.precision_parameter = None
+
     def get_fixable_params(self, **kwargs):
         """
         Return a list containing dictionaries which can be passed to `FaultStats.get_mask` as keyword arguments to
@@ -47,20 +62,6 @@ class Strategy:
             list: Dictionary of parameters
         """
         return self.fixable
-
-    def get_custom_description(self, problem, num_procs):
-        '''
-        Routine to get a custom description that realizes the resilience strategy and tailors it to the problem at hand
-
-        Args:
-            problem: A function that runs a pySDC problem, see imports for available problems
-            num_procs (int): Number of processes you intend to run with
-
-        Returns:
-            dict: The custom descriptions you can supply to the problem when running it
-        '''
-
-        return self.custom_description
 
     def get_fault_args(self, problem, num_procs):
         '''
@@ -113,6 +114,59 @@ class Strategy:
         """
         return self.name
 
+    def get_Tend(self, problem, num_procs=1):
+        '''
+        Get the final time of runs for fault stats based on the problem
+
+        Args:
+            problem (function): A problem to run
+            num_procs (int): Number of processes
+
+        Returns:
+            float: Tend to put into the run
+        '''
+        if problem.__name__ == "run_vdp":
+            return 2.3752559741400825
+        elif problem.__name__ == "run_piline":
+            return 20.0
+        elif problem.__name__ == "run_Lorenz":
+            return 1.5
+        elif problem.__name__ == "run_Schroedinger":
+            return 1.0
+        elif problem.__name__ == "run_leaky_superconductor":
+            return 450
+        else:
+            raise NotImplementedError('I don\'t have a final time for your problem!')
+
+    def get_custom_description(self, problem, num_procs=1):
+        '''
+        Get a custom description based on the problem
+
+        Args:
+            problem (function): A problem to run
+            num_procs (int): Number of processes
+
+        Returns:
+            dict: Custom description
+        '''
+        custom_description = {}
+        if problem.__name__ == "run_vdp":
+            custom_description['step_params'] = {'maxiter': 3}
+            custom_description['problem_params'] = {
+                'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
+                'crash_at_maxiter': False,
+            }
+        elif problem.__name__ == "run_Lorenz":
+            custom_description['step_params'] = {'maxiter': 5}
+        elif problem.__name__ == "run_Schroedinger":
+            custom_description['step_params'] = {'maxiter': 5}
+            custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
+        elif problem.__name__ == "run_leaky_superconductor":
+            custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
+            custom_description['step_params'] = {'maxiter': 5}
+            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-10}
+        return merge_descriptions(custom_description, self.custom_description)
+
 
 class BaseStrategy(Strategy):
     '''
@@ -123,11 +177,12 @@ class BaseStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super(BaseStrategy, self).__init__()
+        super().__init__()
         self.color = list(cmap.values())[0]
         self.marker = 'o'
         self.name = 'base'
         self.bar_plot_x_label = 'base'
+        self.precision_parameter = 'dt'
 
     @property
     def label(self):
@@ -143,11 +198,12 @@ class AdaptivityStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super(AdaptivityStrategy, self).__init__()
+        super().__init__()
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
         self.bar_plot_x_label = 'adaptivity'
+        self.precision_parameter = 'e_tol'
 
     def get_fixable_params(self, maxiter, **kwargs):
         """
@@ -180,7 +236,7 @@ class AdaptivityStrategy(Strategy):
             The custom descriptions you can supply to the problem when running it
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
-         
+
         custom_description = {}
 
         dt_max = np.inf
@@ -211,7 +267,7 @@ class AdaptivityStrategy(Strategy):
         custom_description['convergence_controllers'] = {
             Adaptivity: {'e_tol': e_tol, 'dt_min': dt_min, 'dt_max': dt_max}
         }
-        return {**custom_description, **self.custom_description}
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
 
 class AdaptiveHotRodStrategy(Strategy):
@@ -223,11 +279,12 @@ class AdaptiveHotRodStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super(AdaptiveHotRodStrategy, self).__init__()
+        super().__init__()
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
         self.bar_plot_x_label = 'adaptive\nHot Rod'
+        self.precision_parameter = 'e_tol'
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -242,7 +299,7 @@ class AdaptiveHotRodStrategy(Strategy):
         '''
         from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
-         
+
         if problem.__name__ == "run_vdp":
             e_tol = 3e-7
             dt_min = 1e-3
@@ -264,7 +321,7 @@ to the strategy'
             'step_params': {'maxiter': maxiter},
         }
 
-        return {**custom_description, **self.custom_description}
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
 
 class IterateStrategy(Strategy):
@@ -276,11 +333,12 @@ class IterateStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super(IterateStrategy, self).__init__()
+        super().__init__()
         self.color = list(cmap.values())[2]
         self.marker = 'v'
         self.name = 'iterate'
         self.bar_plot_x_label = 'iterate'
+        self.precision_parameter = 'restol'
 
     @property
     def label(self):
@@ -325,7 +383,7 @@ strategy'
         if problem.__name__ == "run_leaky_superconductor":
             custom_description['level_params']['dt'] = 26
 
-        return {**custom_description, **self.custom_description}
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
 
 class HotRodStrategy(Strategy):
@@ -337,11 +395,12 @@ class HotRodStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super(HotRodStrategy, self).__init__()
+        super().__init__()
         self.color = list(cmap.values())[3]
         self.marker = '^'
         self.name = 'Hot Rod'
         self.bar_plot_x_label = 'Hot Rod'
+        self.precision_parameter = 'dt'
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -356,7 +415,7 @@ class HotRodStrategy(Strategy):
         '''
         from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
-         
+
         if problem.__name__ == "run_vdp":
             HotRod_tol = 5e-7
             maxiter = 4
@@ -385,4 +444,4 @@ class HotRodStrategy(Strategy):
             'step_params': {'maxiter': maxiter},
         }
 
-        return {**custom_description, **self.custom_description}
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)

@@ -6,6 +6,7 @@ from pySDC.implementations.controller_classes.controller_nonMPI import controlle
 from pySDC.core.Hooks import hooks
 from pySDC.helpers.stats_helper import get_sorted
 from pySDC.projects.Resilience.hook import hook_collection, LogData
+from pySDC.projects.Resilience.strategies import merge_descriptions
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -72,7 +73,6 @@ def run_leaky_superconductor(
     hook_class=LogData,
     fault_stuff=None,
     custom_controller_params=None,
-    custom_problem_params=None,
     imex=False,
     u0=None,
     t0=None,
@@ -88,7 +88,6 @@ def run_leaky_superconductor(
         hook_class (pySDC.Hook): A hook to store data
         fault_stuff (dict): A dictionary with information on how to add faults
         custom_controller_params (dict): Overwrite presets
-        custom_problem_params (dict): Overwrite presets
         imex (bool): Solve the problem IMEX or fully implicit
         u0 (dtype_u): Initial value
         t0 (float): Starting time
@@ -111,9 +110,6 @@ def run_leaky_superconductor(
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {}
-
-    if custom_problem_params is not None:
-        problem_params = {**problem_params, **custom_problem_params}
 
     # initialize step parameters
     step_params = dict()
@@ -138,11 +134,7 @@ def run_leaky_superconductor(
     description['step_params'] = step_params
 
     if custom_description is not None:
-        for k in custom_description.keys():
-            if k == 'sweeper_class':
-                description[k] = custom_description[k]
-                continue
-            description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
+        description = merge_descriptions(description, custom_description)
 
     # set time parameters
     t0 = 0.0 if t0 is None else t0
