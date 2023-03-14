@@ -108,22 +108,18 @@ class piline(ptype):
         me[2] = 0.0  # p3
 
         if t > 0.0:
-            if u_init is not None:
-                if t_init is None:
-                    raise ValueError(
-                        'Please supply `t_init` when you want to get the exact solution from a point that \
-is not 0!'
-                    )
-                me = u_init
-            else:
-                t_init = 0.0
 
-            def rhs(t, u):
+            def eval_rhs(t, u):
+                """
+                Evaluate the right hand side fully explicitly
+
+                Args:
+                    t (float): Current time
+                    u (np.1darray): Current solution
+                """
                 f = self.eval_f(u, t)
-                return f.impl + f.expl  # evaluate only explicitly rather than IMEX
+                return f.impl + f.expl
 
-            tol = 100 * np.finfo(float).eps
-
-            me[:] = solve_ivp(rhs, (t_init, t), me, rtol=tol, atol=tol).y[:, -1]
+            me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init)
 
         return me

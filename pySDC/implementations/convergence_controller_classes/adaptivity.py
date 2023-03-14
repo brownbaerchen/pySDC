@@ -158,6 +158,27 @@ class Adaptivity(AdaptivityBase):
     The behaviour in multi-step SDC is not well studied and it is unclear if anything useful happens there.
     """
 
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Define default parameters here.
+
+        Default parameters are:
+         - control_order (int): The order relative to other convergence controllers
+         - beta (float): The safety factor
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): The params passed for this specific convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            (dict): The updated params dictionary
+        """
+        defaults = {
+            "use_semi_global_estimate": False,  # use the error estimate for the semi global error in a block for MSSDC
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
     def dependencies(self, controller, description, **kwargs):
         """
         Load the embedded error estimator.
@@ -171,11 +192,12 @@ class Adaptivity(AdaptivityBase):
         """
         from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
-        super(Adaptivity, self).dependencies(controller, description)
+        super().dependencies(controller, description)
 
         controller.add_convergence_controller(
             EstimateEmbeddedError.get_implementation("nonMPI" if not self.params.useMPI else "MPI"),
             description=description,
+            params={'use_semi_global_estimate': self.params.use_semi_global_estimate},
         )
 
         # load contraction factor estimator if necessary

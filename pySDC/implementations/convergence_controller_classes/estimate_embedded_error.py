@@ -62,6 +62,7 @@ class EstimateEmbeddedError(ConvergenceController):
         return {
             "control_order": -80,
             "sweeper_type": sweeper_type,
+            "use_semi_global_estimate": False,  # for MSSDC
             **super().setup(controller, params, description, **kwargs),
         }
 
@@ -163,7 +164,11 @@ level"
                 temp = self.estimate_embedded_error_serial(L)
                 L.status.error_embedded_estimate = max([abs(temp - self.buffers.e_em_last), np.finfo(float).eps])
 
-            self.buffers.e_em_last = temp * 1.0
+            # record correction if we want to estimate the local error by linearisation
+            if self.params.use_semi_global_estimate:
+                self.buffers.e_em_last = 0
+            else:
+                self.buffers.e_em_last = temp * 1.0
 
         return None
 
@@ -186,7 +191,7 @@ class EstimateEmbeddedErrorMPI(EstimateEmbeddedError):
         if S.status.iter > 0 or self.params.sweeper_type == "RK":
             for L in S.levels:
                 # get accumulated local errors from previous steps
-                if not S.status.first:
+                if not S.status.first and self.params.use_semi_global_estimate:
                     if not S.status.prev_done:
                         self.buffers.e_em_last = self.recv(comm, S.status.slot - 1)
                 else:
@@ -199,7 +204,7 @@ class EstimateEmbeddedErrorMPI(EstimateEmbeddedError):
                 L.status.error_embedded_estimate = max([abs(temp - self.buffers.e_em_last), np.finfo(float).eps])
 
                 # send the accumulated local errors forward
-                if not S.status.last:
+                if not S.status.last and self.params.use_semi_global_estimate:
                     self.send(comm, dest=S.status.slot + 1, data=temp, blocking=True)
 
         return None
