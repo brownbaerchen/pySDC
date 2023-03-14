@@ -9,6 +9,7 @@ from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import nonlinearschroedinger_imex
 from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_fft
 from pySDC.projects.Resilience.hook import LogData, hook_collection
+from pySDC.projects.Resilience.strategies import merge_descriptions
 
 
 def run_Schroedinger(
@@ -18,7 +19,6 @@ def run_Schroedinger(
     hook_class=LogData,
     fault_stuff=None,
     custom_controller_params=None,
-    custom_problem_params=None,
     use_MPI=False,
     space_comm=None,
     **kwargs,
@@ -33,7 +33,6 @@ def run_Schroedinger(
         hook_class (pySDC.Hook): A hook to store data
         fault_stuff (dict): A dictionary with information on how to add faults
         custom_controller_params (dict): Overwrite presets
-        custom_problem_params (dict): Overwrite presets
         use_MPI (bool): Whether or not to use MPI
 
     Returns:
@@ -64,9 +63,6 @@ def run_Schroedinger(
     problem_params['spectral'] = False
     problem_params['comm'] = space_comm
 
-    if custom_problem_params is not None:
-        problem_params = {**problem_params, **custom_problem_params}
-
     # initialize step parameters
     step_params = dict()
     step_params['maxiter'] = 50
@@ -90,11 +86,7 @@ def run_Schroedinger(
     description['step_params'] = step_params
 
     if custom_description is not None:
-        for k in custom_description.keys():
-            if type(custom_description[k]) == dict:
-                description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
-            else:
-                description[k] = custom_description[k]
+        description = merge_descriptions(description, custom_description)
 
     # set time parameters
     t0 = 0.0

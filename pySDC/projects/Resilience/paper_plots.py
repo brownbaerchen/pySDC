@@ -420,9 +420,8 @@ def plot_vdp_solution():  # pragma: no cover
         fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.33))
 
     custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}}
-    problem_params = {}
 
-    stats, _, _ = run_vdp(custom_description=custom_description, custom_problem_params=problem_params, Tend=28.6)
+    stats, _, _ = run_vdp(custom_description=custom_description, Tend=28.6)
 
     u = get_sorted(stats, type='u')
     ax.plot([me[0] for me in u], [me[1][0] for me in u], color='black')

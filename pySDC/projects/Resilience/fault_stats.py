@@ -74,42 +74,6 @@ class FaultStats:
         '''
         return self.strategies[0].get_Tend(self.prob, self.num_procs)
 
-    def get_custom_description(self):
-        '''
-        Get a custom description based on the problem
-
-        Returns:
-            dict: Custom description
-        '''
-        custom_description = {}
-        if self.prob == run_vdp:
-            custom_description['step_params'] = {'maxiter': 3}
-        elif self.prob == run_Lorenz:
-            custom_description['step_params'] = {'maxiter': 5}
-        elif self.prob == run_Schroedinger:
-            custom_description['step_params'] = {'maxiter': 5}
-            custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
-        elif self.prob == run_leaky_superconductor:
-            custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
-            custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-10}
-        return custom_description
-
-    def get_custom_problem_params(self):
-        '''
-        Get a custom problem parameters based on the problem
-
-        Returns:
-            dict: Custom problem params
-        '''
-        custom_params = {}
-        if self.prob == run_vdp:
-            custom_params = {
-                'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
-                'crash_at_maxiter': False,
-            }
-        return custom_params
-
     def run_stats_generation(self, runs=1000, step=None, comm=None, _reload=False, _runs_partial=0):
         '''
         Run the generation of stats for all strategies in the `self.strategies` variable
@@ -1084,7 +1048,9 @@ class FaultStats:
         Returns:
             Numpy.ndarray with boolean entries that can be used as a mask
         """
-        fixable = strategy.get_fixable_params(maxiter=self.get_custom_description()['step_params']['maxiter'])
+        fixable = strategy.get_fixable_params(
+            maxiter=strategy.get_custom_description(self.prob, self.num_procs)['step_params']['maxiter']
+        )
         mask = self.get_mask(strategy=strategy)
 
         for kwargs in fixable:
