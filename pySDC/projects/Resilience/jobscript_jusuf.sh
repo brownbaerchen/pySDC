@@ -5,10 +5,10 @@
 #SBATCH --output=data/text_output/out%j.txt
 #SBATCH --error=data/text_output/err%j.txt
 #SBATCH -A cstma
-#SBATCH --mail-type=END, FAIL
+#SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=t.baumann@fz-juelich.de
 #SBATCH -p batch
-#SBATCH -J ${1}
+#SBATCH -J red_wedding
 
 module --force purge
 module load Stages/2022

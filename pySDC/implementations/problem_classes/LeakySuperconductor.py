@@ -266,7 +266,7 @@ class LeakySuperconductor(ptype):
 
             def jac(t, u):
                 """
-                Get the Jacobian for the implicit BDF method to use in `scipy.odeint`
+                Get the Jacobian for the implicit BDF method to use in `scipy.solve_ivp`
 
                 Args:
                     t (float): The current time
@@ -354,8 +354,7 @@ class LeakySuperconductorIMEX(LeakySuperconductor):
 
             def jac(t, u):
                 """
-                Get the Jacobian for the implicit BDF method to use in `scipy.odeint`
-
+                Get the Jacobian for the implicit BDF method to use in `scipy.solve_ivp
                 Args:
                     t (float): The current time
                     u (dtype_u): Current solution
