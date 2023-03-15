@@ -52,6 +52,7 @@ class Strategy:
 
         # stuff for work-precision diagrams
         self.precision_parameter = None
+        self.precision_parameter_loc = []
 
     def get_fixable_params(self, **kwargs):
         """
@@ -186,6 +187,7 @@ class BaseStrategy(Strategy):
         self.name = 'base'
         self.bar_plot_x_label = 'base'
         self.precision_parameter = 'dt'
+        self.precision_parameter_loc = ['level_params', 'dt']
 
     @property
     def label(self):
@@ -201,12 +203,15 @@ class AdaptivityStrategy(Strategy):
         '''
         Initialization routine
         '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
         super().__init__()
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
         self.bar_plot_x_label = 'adaptivity'
         self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
 
     def get_fixable_params(self, maxiter, **kwargs):
         """
@@ -282,12 +287,15 @@ class AdaptiveHotRodStrategy(Strategy):
         '''
         Initialization routine
         '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
         super().__init__()
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
         self.bar_plot_x_label = 'adaptive\nHot Rod'
         self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -342,6 +350,7 @@ class IterateStrategy(Strategy):
         self.name = 'iterate'
         self.bar_plot_x_label = 'iterate'
         self.precision_parameter = 'restol'
+        self.precision_parameter_loc = ['level_params', 'restol']
 
     @property
     def label(self):
@@ -404,6 +413,7 @@ class HotRodStrategy(Strategy):
         self.name = 'Hot Rod'
         self.bar_plot_x_label = 'Hot Rod'
         self.precision_parameter = 'dt'
+        self.precision_parameter_loc = ['level_params', 'dt']
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -448,3 +458,120 @@ class HotRodStrategy(Strategy):
         }
 
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+
+
+class AdaptivityCollocationStrategy(Strategy):
+    '''
+    Adaptivity based on collocation as a resilience strategy
+    '''
+
+    def __init__(self):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
+
+        super().__init__()
+        self.color = list(cmap.values())[1]
+        self.marker = '*'
+        self.name = 'adaptivity_coll'
+        self.bar_plot_x_label = 'adaptivity collocation'
+        self.precision_parameter = 'e_tol'
+        self.adaptive_coll_params = {}
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityCollocation, 'e_tol']
+        self.restol = 1e-7
+        self.maxiter = 99
+
+    def get_fixable_params(self, maxiter, **kwargs):
+        """
+        Here faults occurring in the last iteration cannot be fixed.
+
+        Args:
+            maxiter (int): Max. iterations until convergence is declared
+
+        Returns:
+            (list): Contains dictionaries of keyword arguments for `FaultStats.get_mask`
+        """
+        raise NotImplementedError
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
+
+        custom_description = {}
+        custom_description['level_params'] = {'restol': self.restol}
+        custom_description['step_params'] = {'maxiter': self.maxiter}
+
+        dt_max = np.inf
+        dt_min = 1e-5
+
+        if problem.__name__ == "run_piline":
+            e_tol = 1e-7
+            dt_min = 1e-2
+        elif problem.__name__ == "run_vdp":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        elif problem.__name__ == "run_Lorenz":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        elif problem.__name__ == "run_Schroedinger":
+            e_tol = 4e-6
+            dt_min = 1e-3
+        elif problem.__name__ == "run_leaky_superconductor":
+            e_tol = 1e-7
+            dt_min = 1e-3
+            dt_max = 1e2
+        else:
+            raise NotImplementedError(
+                'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
+ strategy'
+            )
+
+        custom_description['convergence_controllers'] = {
+            AdaptivityCollocation: {
+                'e_tol': e_tol,
+                'dt_min': dt_min,
+                'dt_max': dt_max,
+                'adaptive_coll_params': self.adaptive_coll_params,
+            }
+        }
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+
+
+class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
+    def __init__(self):
+        super().__init__()
+        self.color = list(cmap.values())[4]
+        self.marker = '.'
+        self.adaptive_coll_params = {'quad_type': ['RADAU-RIGHT', 'GAUSS']}
+
+    @property
+    def label(self):
+        return 'adaptivity type'
+
+
+class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
+    def __init__(self):
+        super().__init__()
+        self.color = list(cmap.values())[5]
+        self.marker = '^'
+        self.adaptive_coll_params = {'num_nodes': [2, 3]}
+
+    @property
+    def label(self):
+        return 'adaptivity refinement'
+
+
+class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
+    def __init__(self):
+        super().__init__()
+        self.adaptive_coll_params = {'num_nodes': [4, 3]}

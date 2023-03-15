@@ -74,8 +74,8 @@ def set_parameter(dictionary, where, parameter):
         set_parameter(dictionary[where[0]], where[1:], parameter)
 
 
-def get_path(problem, strategy, handle='', base_path='data/work_precision'):
-    return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}.pickle'
+def get_path(problem, strategy, num_procs, handle='', base_path='data/work_precision'):
+    return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}-{num_procs}procs.pickle'
 
 
 def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1):
@@ -87,20 +87,16 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         strategy.get_custom_description(problem, num_procs), {} if custom_description is None else custom_description
     )
     if param == 'e_tol':
-        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
-
-        where = ['convergence_controllers', Adaptivity, 'e_tol']
         power = 1.5 if problem.__name__ == 'run_leaky_superconductor' else 10.0
-        set_parameter(description, ['convergence_controllers', Adaptivity, 'dt_min'], 0)
+        set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
     elif param == 'dt':
-        where = ['level_params', 'dt']
         power = 2.0
     elif param == 'restol':
-        where = ['level_params', 'restol']
         power = 20 if problem.__name__ == 'run_leaky_superconductor' else 10.0
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
+    where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
     param_range = [default * power**i for i in [-2, -1, 0, 1, 2]]
 
@@ -119,7 +115,7 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
                     f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
                 )
 
-    with open(get_path(problem, strategy, handle), 'wb') as f:
+    with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:
         pickle.dump(data, f)
 
 
@@ -130,11 +126,10 @@ def plot_work_precision(
     ax,
     work_key='k_SDC',
     precision_key='e_global',
-    reload=True,
     handle='',
     plotting_params=None,
 ):
-    with open(get_path(problem, strategy, handle=handle), 'rb') as f:
+    with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
         data = pickle.load(f)
 
     work = [np.nanmean(data[key][work_key]) for key in data.keys()]
@@ -175,38 +170,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
     ax.set_title(titles.get(problem.__name__, ''))
 
 
-def execute_configurations(problem, work_key, precision_key, num_procs, ax, decorate, record, runs):
-    description_high_order = {'step_params': {'maxiter': 5}}
-    description_low_order = {'step_params': {'maxiter': 3}}
-    description_large_step = {'level_params': {'dt': 10.0 if problem.__name__ == 'run_leaky_superconductor' else 3e-2}}
-    description_small_step = {'level_params': {'dt': 5.0 if problem.__name__ == 'run_leaky_superconductor' else 1e-2}}
-
-    dashed = {'ls': '--'}
-
-    configurations = {}
-    configurations[0] = {
-        'custom_description': description_high_order,
-        'handle': r'high order',
-        'strategies': [AdaptivityStrategy(), BaseStrategy()],
-    }
-    configurations[1] = {
-        'custom_description': description_low_order,
-        'handle': r'low order',
-        'strategies': [AdaptivityStrategy(), BaseStrategy()],
-        'plotting_params': dashed,
-    }
-    configurations[2] = {
-        'custom_description': description_large_step,
-        'handle': r'large step',
-        'strategies': [IterateStrategy()],
-        'plotting_params': dashed,
-    }
-    configurations[3] = {
-        'custom_description': description_small_step,
-        'handle': r'small step',
-        'strategies': [IterateStrategy()],
-    }
-
+def execute_configurations(problem, configurations, work_key, precision_key, num_procs, ax, decorate, record, runs):
     for _, config in configurations.items():
         for strategy in config['strategies']:
             shared_args = {
@@ -235,22 +199,106 @@ def execute_configurations(problem, work_key, precision_key, num_procs, ax, deco
     )
 
 
-if __name__ == "__main__":
+def compare_strategies(work_key='k_SDC', precision_key='e_global'):
+    description_high_order = {'step_params': {'maxiter': 5}}
+    description_low_order = {'step_params': {'maxiter': 3}}
+    dashed = {'ls': '--'}
+
+    configurations = {}
+    configurations[0] = {
+        'custom_description': description_high_order,
+        'handle': r'high order',
+        'strategies': [AdaptivityStrategy(), BaseStrategy()],
+    }
+    configurations[1] = {
+        'custom_description': description_low_order,
+        'handle': r'low order',
+        'strategies': [AdaptivityStrategy(), BaseStrategy()],
+        'plotting_params': dashed,
+    }
+
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0))
 
     shared_params = {
-        'work_key': 'k_SDC',
-        'precision_key': 'e_global',
+        'work_key': work_key,
+        'precision_key': precision_key,
         'num_procs': 1,
         'runs': 1,
+        'configurations': configurations,
         'record': True,
     }
 
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
-    problems = [run_Schroedinger, run_leaky_superconductor]
 
     for i in range(len(problems)):
+        description_large_step = {
+            'level_params': {'dt': 10.0 if problems[i].__name__ == 'run_leaky_superconductor' else 3e-2}
+        }
+        description_small_step = {
+            'level_params': {'dt': 5.0 if problems[i].__name__ == 'run_leaky_superconductor' else 1e-2}
+        }
+
+        configurations[2] = {
+            'custom_description': description_large_step,
+            'handle': r'large step',
+            'strategies': [IterateStrategy()],
+            'plotting_params': dashed,
+        }
+        configurations[3] = {
+            'custom_description': description_small_step,
+            'handle': r'small step',
+            'strategies': [IterateStrategy()],
+        }
+
         execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 2)
 
     fig.tight_layout()
+    fig.savefig(f'data/wp-{work_key}-{precision_key}.pdf')
+
+
+def compare_adaptivity_modes(work_key='k_SDC', precision_key='e_global'):
+    from pySDC.projects.Resilience.strategies import (
+        AdaptivityCollocationTypeStrategy,
+        AdaptivityCollocationRefinementStrategy,
+        AdaptivityStrategy,
+    )
+
+    strategies = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
+
+    restol = 1e-7
+    for strategy in strategies:
+        strategy.restol = restol
+
+    configurations = {}
+    configurations[1] = {'strategies': strategies}
+    configurations[2] = {'custom_description': {'step_params': {'maxiter': 5}}, 'strategies': [AdaptivityStrategy()]}
+
+    # strategies2 = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
+    # restol = 1e-6
+    # for strategy in strategies2:
+    #    strategy.restol = restol
+    # configurations[3] = {'strategies':strategies2, 'handle': 'low restol', 'plotting_params': {'ls': '--'}}
+
+    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0))
+
+    shared_params = {
+        'work_key': work_key,
+        'precision_key': precision_key,
+        'num_procs': 1,
+        'runs': 5,
+        'configurations': configurations,
+        'record': True,
+    }
+
+    problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
+
+    for i in range(len(problems)):
+        execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 0)
+
+    fig.tight_layout()
+    fig.savefig(f'data/wp-adaptivity-{work_key}-{precision_key}.pdf')
+
+
+if __name__ == "__main__":
+    compare_adaptivity_modes(work_key='k_Newton')
     plt.show()
