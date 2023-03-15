@@ -1,3 +1,4 @@
+from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
@@ -17,7 +18,7 @@ VERBOSE = True
 
 
 def single_run(problem, strategy, data, custom_description, num_procs=1):
-    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRunMPI, LogLocalErrorPostStep
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.hook import LogData
 
@@ -26,11 +27,19 @@ def single_run(problem, strategy, data, custom_description, num_procs=1):
 
     controller_params = {'logger_level': LOGGER_LEVEL}
 
+    comm_world = MPI.COMM_WORLD
+    comm = comm_world.Split(comm_world.rank < num_procs)
+
+    if comm_world.rank >= num_procs:
+        return None
+
     stats, controller, _ = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs),
-        hook_class=[LogData, LogWork, LogGlobalErrorPostRun, LogLocalErrorPostStep],
+        hook_class=[LogData, LogWork, LogGlobalErrorPostRunMPI, LogLocalErrorPostStep],
         custom_controller_params=controller_params,
+        use_MPI=True,
+        comm=comm,
     )
 
     # record all the metrics
@@ -233,11 +242,12 @@ if __name__ == "__main__":
         'work_key': 'k_SDC',
         'precision_key': 'e_global',
         'num_procs': 1,
-        'runs': 10,
+        'runs': 1,
         'record': True,
     }
 
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
+    problems = [run_Schroedinger, run_leaky_superconductor]
 
     for i in range(len(problems)):
         execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 2)

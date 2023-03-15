@@ -1,6 +1,5 @@
-import numpy as np
-from pathlib import Path
 from mpi4py import MPI
+import numpy as np
 
 from pySDC.helpers.stats_helper import get_sorted
 
@@ -40,8 +39,9 @@ def run_Schroedinger(
         controller: The controller
         Tend: The time that was supposed to be integrated to
     """
+    from mpi4py import MPI
 
-    space_comm = MPI.COMM_WORLD if space_comm is None else space_comm
+    space_comm = MPI.COMM_SELF if space_comm is None else space_comm
     rank = space_comm.Get_rank()
 
     # initialize level parameters
@@ -92,11 +92,20 @@ def run_Schroedinger(
     t0 = 0.0
 
     # instantiate controller
-    assert use_MPI == False, "MPI version in time not implemented"
-    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params, description=description)
+    controller_args = {
+        'controller_params': controller_params,
+        'description': description,
+    }
+    if use_MPI:
+        from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
 
-    # get initial values on finest level
-    P = controller.MS[0].levels[0].prob
+        comm = kwargs.get('comm', MPI.COMM_WORLD)
+        controller = controller_MPI(**controller_args, comm=comm)
+        P = controller.S.levels[0].prob
+    else:
+        controller = controller_nonMPI(**controller_args, num_procs=num_procs)
+        P = controller.MS[0].levels[0].prob
+
     uinit = P.u_exact(t0)
 
     # insert faults

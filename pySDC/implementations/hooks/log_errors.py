@@ -81,12 +81,24 @@ class LogGlobalErrorPostRun(hooks):
     the solution is computed in a private attribute of this class.
     """
 
+    def compute_error(self, lvl):
+        """
+        Compute the global error.
+
+        Args:
+            lvl (pySDC.Level.level): The level you want to compute the error on
+
+        Returns:
+            float: The global error
+        """
+        return np.linalg.norm(lvl.prob.u_exact(t=self.t_last_solution) - lvl.uend, np.inf)
+
     def __init__(self):
         """
         Add an attribute for when the last solution was added.
         """
         super().__init__()
-        self.__t_last_solution = 0
+        self.t_last_solution = 0
 
     def post_step(self, step, level_number):
         """
@@ -102,7 +114,7 @@ class LogGlobalErrorPostRun(hooks):
             None
         """
         super().post_step(step, level_number)
-        self.__t_last_solution = step.levels[0].time + step.levels[0].dt
+        self.t_last_solution = step.levels[0].time + step.levels[0].dt
 
     def post_run(self, step, level_number):
         """
@@ -119,8 +131,7 @@ class LogGlobalErrorPostRun(hooks):
 
         if level_number == 0:
             L = step.levels[level_number]
-
-            e_glob = np.linalg.norm(L.prob.u_exact(t=self.__t_last_solution) - L.uend, np.inf)
+            e_glob = self.compute_error(L)
 
             if step.status.last:
                 self.logger.info(f'Finished with a global error of e={e_glob:.2e}')
@@ -134,6 +145,25 @@ class LogGlobalErrorPostRun(hooks):
                 type='e_global_post_run',
                 value=e_glob,
             )
+
+
+class LogGlobalErrorPostRunMPI(LogGlobalErrorPostRun):
+    """
+    The MPI controller shows slightly different behaviour which is why the final solution is stored in a different place
+    than in the nonMPI controller.
+    """
+
+    def compute_error(self, lvl):
+        """
+        Compute the global error.
+
+        Args:
+            lvl (pySDC.Level.level): The level you want to compute the error on
+
+        Returns:
+            float: The global error
+        """
+        return np.linalg.norm(lvl.prob.u_exact(t=self.t_last_solution) - lvl.u[0], np.inf)
 
 
 class LogLocalErrorPostStep(LogError):

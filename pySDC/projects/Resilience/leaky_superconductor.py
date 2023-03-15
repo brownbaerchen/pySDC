@@ -76,6 +76,7 @@ def run_leaky_superconductor(
     imex=False,
     u0=None,
     t0=None,
+    use_MPI=False,
     **kwargs,
 ):
     """
@@ -91,6 +92,7 @@ def run_leaky_superconductor(
         imex (bool): Solve the problem IMEX or fully implicit
         u0 (dtype_u): Initial value
         t0 (float): Starting time
+        use_MPI (bool): Whether or not to use MPI
 
     Returns:
         dict: The stats object
@@ -140,7 +142,22 @@ def run_leaky_superconductor(
     t0 = 0.0 if t0 is None else t0
 
     # instantiate controller
-    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params, description=description)
+    controller_args = {
+        'controller_params': controller_params,
+        'description': description,
+    }
+    if use_MPI:
+        from mpi4py import MPI
+        from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
+
+        comm = kwargs.get('comm', MPI.COMM_WORLD)
+        controller = controller_MPI(**controller_args, comm=comm)
+        P = controller.S.levels[0].prob
+    else:
+        controller = controller_nonMPI(**controller_args, num_procs=num_procs)
+        P = controller.MS[0].levels[0].prob
+
+    uinit = P.u_exact(t0) if u0 is None else u0
 
     # insert faults
     if fault_stuff is not None:
@@ -150,14 +167,11 @@ def run_leaky_superconductor(
         args = {'time': 51.0, 'target': 0}
         prepare_controller_for_faults(controller, fault_stuff, rnd_args, args)
 
-    # get initial values on finest level
-    P = controller.MS[0].levels[0].prob
-    uinit = P.u_exact(t0) if u0 is None else u0
-
     # call main function to get things done...
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
     except ConvergenceError:
+        print('Warning: Premature termination!')
         stats = controller.return_stats()
     return stats, controller, Tend
 
