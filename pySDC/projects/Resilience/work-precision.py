@@ -17,7 +17,7 @@ LOGGER_LEVEL = 30
 VERBOSE = True
 
 
-def single_run(problem, strategy, data, custom_description, num_procs=1):
+def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None):
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRunMPI, LogLocalErrorPostStep
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.hook import LogData
@@ -27,7 +27,6 @@ def single_run(problem, strategy, data, custom_description, num_procs=1):
 
     controller_params = {'logger_level': LOGGER_LEVEL}
 
-    comm_world = MPI.COMM_WORLD
     comm = comm_world.Split(comm_world.rank < num_procs)
 
     if comm_world.rank >= num_procs:
@@ -78,7 +77,7 @@ def get_path(problem, strategy, num_procs, handle='', base_path='data/work_preci
     return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}-{num_procs}procs.pickle'
 
 
-def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1):
+def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None):
     data = {}
 
     # prepare precision parameters
@@ -108,15 +107,17 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         set_parameter(description, where, param_range[i])
         data[param_range[i]] = {key: [] for key in ['e_global', 'e_local_max', 'k_SDC', 'k_Newton', 'k_rhs', 't']}
         for _j in range(runs):
-            single_run(problem, strategy, data[param_range[i]], custom_description=description)
+            single_run(problem, strategy, data[param_range[i]], custom_description=description, comm_world=comm_world)
 
             if VERBOSE:
                 print(
                     f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
                 )
+            comm_world.Barrier()
 
-    with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:
-        pickle.dump(data, f)
+    if comm_world.rank == 0:
+        with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:
+            pickle.dump(data, f)
 
 
 def plot_work_precision(
@@ -128,7 +129,11 @@ def plot_work_precision(
     precision_key='e_global',
     handle='',
     plotting_params=None,
+    comm_world=None,
 ):
+    if comm_world.rank > 0:
+        return None
+
     with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
         data = pickle.load(f)
 
@@ -170,7 +175,9 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
     ax.set_title(titles.get(problem.__name__, ''))
 
 
-def execute_configurations(problem, configurations, work_key, precision_key, num_procs, ax, decorate, record, runs):
+def execute_configurations(
+    problem, configurations, work_key, precision_key, num_procs, ax, decorate, record, runs, comm_world
+):
     for _, config in configurations.items():
         for strategy in config['strategies']:
             shared_args = {
@@ -180,13 +187,19 @@ def execute_configurations(problem, configurations, work_key, precision_key, num
                 'num_procs': config.get('num_procs', num_procs),
             }
             if record:
-                record_work_precision(**shared_args, custom_description=config.get('custom_description', {}), runs=runs)
+                record_work_precision(
+                    **shared_args,
+                    custom_description=config.get('custom_description', {}),
+                    runs=runs,
+                    comm_world=comm_world,
+                )
             plot_work_precision(
                 **shared_args,
                 work_key=work_key,
                 precision_key=precision_key,
                 ax=ax,
                 plotting_params=config.get('plotting_params', {}),
+                comm_world=comm_world,
             )
 
     decorate_panel(
@@ -225,6 +238,7 @@ def compare_strategies(work_key='k_SDC', precision_key='e_global'):
         'num_procs': 1,
         'runs': 1,
         'configurations': configurations,
+        'comm_world': MPI.COMM_WORLD,
         'record': True,
     }
 
@@ -287,6 +301,7 @@ def compare_adaptivity_modes(work_key='k_SDC', precision_key='e_global'):
         'num_procs': 1,
         'runs': 5,
         'configurations': configurations,
+        'comm_world': MPI.COMM_WORLD,
         'record': True,
     }
 

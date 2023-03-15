@@ -527,7 +527,7 @@ class AdaptivityCollocationStrategy(Strategy):
             e_tol = 4e-6
             dt_min = 1e-3
         elif problem.__name__ == "run_leaky_superconductor":
-            e_tol = 1e-7
+            e_tol = 1e-5
             dt_min = 1e-3
             dt_max = 1e2
         else:
