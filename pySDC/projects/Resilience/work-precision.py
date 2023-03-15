@@ -109,11 +109,12 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         for _j in range(runs):
             single_run(problem, strategy, data[param_range[i]], custom_description=description, comm_world=comm_world)
 
-            if VERBOSE:
+            comm_world.Barrier()
+
+            if VERBOSE and comm_world.rank == 0:
                 print(
                     f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
                 )
-            comm_world.Barrier()
 
     if comm_world.rank == 0:
         with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:

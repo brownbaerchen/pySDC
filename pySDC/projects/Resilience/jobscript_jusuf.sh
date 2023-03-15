@@ -2,8 +2,8 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=64
 #SBATCH --time=24:00:00
-#SBATCH --output=data/text_output/out%j.txt
-#SBATCH --error=data/text_output/err%j.txt
+#SBATCH --output=out/out%j.txt
+#SBATCH --error=out/err%j.txt
 #SBATCH -A cstma
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=t.baumann@fz-juelich.de
