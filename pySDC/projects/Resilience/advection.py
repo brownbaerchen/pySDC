@@ -57,11 +57,11 @@ def run_advection(
 
     # fill description dictionary for easy step instantiation
     description = dict()
-    description['problem_class'] = advectionNd  # pass problem class
-    description['problem_params'] = problem_params  # pass problem parameters
-    description['sweeper_class'] = generic_implicit  # pass sweeper
-    description['sweeper_params'] = sweeper_params  # pass sweeper parameters
-    description['level_params'] = level_params  # pass level parameters
+    description['problem_class'] = advectionNd
+    description['problem_params'] = problem_params
+    description['sweeper_class'] = generic_implicit
+    description['sweeper_params'] = sweeper_params
+    description['level_params'] = level_params
     description['step_params'] = step_params
 
     if custom_description is not None:

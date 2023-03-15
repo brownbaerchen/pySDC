@@ -156,8 +156,11 @@ class Strategy:
                 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
                 'crash_at_maxiter': False,
             }
+            custom_description['level_params'] = {'dt': 1e-2}
+
         elif problem.__name__ == "run_Lorenz":
             custom_description['step_params'] = {'maxiter': 5}
+            custom_description['level_params'] = {'dt': 1e-2}
         elif problem.__name__ == "run_Schroedinger":
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
