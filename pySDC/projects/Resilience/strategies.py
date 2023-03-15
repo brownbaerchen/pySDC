@@ -5,7 +5,19 @@ cmap = TABLEAU_COLORS
 
 
 def merge_descriptions(descA, descB):
-    # TODO: docs
+    """
+    Merge two dictionaries that may contain dictionaries, which happens when merging descriptions, for instance.
+
+    Keys that occur in both dictionaries will be overwritten by the ones from `descB` and `descA` will be modified, not
+    copied!
+
+    Args:
+        descA (dict): Dictionary that you want to merge into
+        descB (dict): Dictionary you want to merge from
+
+    Returns:
+        dict: decsA with updated parameters
+    """
     for key in descB.keys():
         if type(descB[key]) == dict:
             descA[key] = merge_descriptions(descA.get(key, {}), descB[key])
@@ -574,4 +586,10 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
 class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
     def __init__(self):
         super().__init__()
+        self.color = list(cmap.values())[6]
+        self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [4, 3]}
+
+    @property
+    def label(self):
+        return 'adaptivity de-refinement'

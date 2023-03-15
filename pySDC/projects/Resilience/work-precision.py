@@ -18,6 +18,20 @@ VERBOSE = True
 
 
 def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None):
+    """
+    Make a single run of a particular problem with a certain strategy.
+
+    Args:
+        problem (function): A problem to run
+        strategy (Strategy): SDC strategy
+        data (dict): Put the results in here
+        custom_description (dict): Overwrite presets
+        num_procs (int): Number of processes for the time communicator
+        comm_world (mpi4py.MPI.Intracomm): Communicator that is available for the entire script
+
+    Returns:
+        None
+    """
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRunMPI, LogLocalErrorPostStep
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.hook import LogData
@@ -60,6 +74,16 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
 
 
 def get_parameter(dictionary, where):
+    """
+    Get a parameter at a certain position in a dictionary of dictionaries.
+
+    Args:
+        dictionary (dict): The dictionary
+        where (list): The list of keys leading to the value you want
+
+    Returns:
+        The value of the dictionary
+    """
     if len(where) == 1:
         return dictionary[where[0]]
     else:
@@ -67,6 +91,17 @@ def get_parameter(dictionary, where):
 
 
 def set_parameter(dictionary, where, parameter):
+    """
+    Set a parameter at a certain position in a dictionary of dictionaries
+
+    Args:
+        dictionary (dict): The dictionary
+        where (list): The list of keys leading to the value you want to set
+        parameter: Whatever you want to set the parameter to
+
+    Returns:
+        None
+    """
     if len(where) == 1:
         dictionary[where[0]] = parameter
     else:
@@ -74,10 +109,38 @@ def set_parameter(dictionary, where, parameter):
 
 
 def get_path(problem, strategy, num_procs, handle='', base_path='data/work_precision'):
+    """
+    Get the path to a certain data.
+
+    Args:
+        problem (function): A problem to run
+        strategy (Strategy): SDC strategy
+        num_procs (int): Number of processes for the time communicator
+        handle (str): The name of the configuration
+        base_path (str): Some path where all the files are stored
+
+    Returns:
+        str: The path to the data you are looking for
+    """
     return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}-{num_procs}procs.pickle'
 
 
 def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None):
+    """
+    Run problem with strategy and record the cost parameters.
+
+    Args:
+        problem (function): A problem to run
+        strategy (Strategy): SDC strategy
+        num_procs (int): Number of processes for the time communicator
+        custom_description (dict): Overwrite presets
+        handle (str): The name of the configuration
+        runs (int): Number of runs you want to do
+        comm_world (mpi4py.MPI.Intracomm): Communicator that is available for the entire script
+
+    Returns:
+        None
+    """
     data = {}
 
     # prepare precision parameters
@@ -132,6 +195,23 @@ def plot_work_precision(
     plotting_params=None,
     comm_world=None,
 ):
+    """
+    Plot data from running a problem with a strategy.
+
+    Args:
+        problem (function): A problem to run
+        strategy (Strategy): SDC strategy
+        num_procs (int): Number of processes for the time communicator
+        ax (matplotlib.pyplot.axes): Somewhere to plot
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+        handle (str): The name of the configuration
+        plotting_params (dict): Will be passed when plotting
+        comm_world (mpi4py.MPI.Intracomm): Communicator that is available for the entire script
+
+    Returns:
+        None
+    """
     if comm_world.rank > 0:
         return None
 
@@ -150,6 +230,20 @@ def plot_work_precision(
 
 
 def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only=False):
+    """
+    Decorate a plot
+
+    Args:
+        ax (matplotlib.pyplot.axes): Somewhere to plot
+        problem (function): A problem to run
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+        num_procs (int): Number of processes for the time communicator
+        title_only (bool): Put only the title on top, or do the whole shebang
+
+    Returns:
+        None
+    """
     xlabels = {
         'k_SDC': 'SDC iterations',
         'k_Newton': 'Newton iterations',
@@ -179,6 +273,24 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
 def execute_configurations(
     problem, configurations, work_key, precision_key, num_procs, ax, decorate, record, runs, comm_world
 ):
+    """
+    Run for multiple configurations.
+
+    Args:
+        problem (function): A problem to run
+        configurations (dict): The configurations you want to run with
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+        num_procs (int): Number of processes for the time communicator
+        ax (matplotlib.pyplot.axes): Somewhere to plot
+        decorate (bool): Whether to decorate fully or only put the title
+        record (bool): Whether to only plot or also record the data first
+        runs (int): Number of runs you want to do
+        comm_world (mpi4py.MPI.Intracomm): Communicator that is available for the entire script
+
+    Returns:
+        None
+    """
     for _, config in configurations.items():
         for strategy in config['strategies']:
             shared_args = {
@@ -214,6 +326,16 @@ def execute_configurations(
 
 
 def compare_strategies(work_key='k_SDC', precision_key='e_global'):
+    """
+    Make a plot comparing basic strategies.
+
+    Args:
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+
+    Returns:
+        None
+    """
     description_high_order = {'step_params': {'maxiter': 5}}
     description_low_order = {'step_params': {'maxiter': 3}}
     dashed = {'ls': '--'}
@@ -272,6 +394,16 @@ def compare_strategies(work_key='k_SDC', precision_key='e_global'):
 
 
 def compare_adaptivity_modes(work_key='k_SDC', precision_key='e_global'):
+    """
+    Make a plot comparing adaptivity strategies.
+
+    Args:
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+
+    Returns:
+        None
+    """
     from pySDC.projects.Resilience.strategies import (
         AdaptivityCollocationTypeStrategy,
         AdaptivityCollocationRefinementStrategy,
