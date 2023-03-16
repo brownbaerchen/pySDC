@@ -36,6 +36,7 @@ class AdaptivityBase(ConvergenceController):
         }
         from pySDC.implementations.hooks.log_step_size import LogStepSize
         from pySDC.implementations.hooks.log_restarts import LogRestarts
+
         controller.add_hook(LogStepSize)
         controller.add_hook(LogRestarts)
         return {**defaults, **super().setup(controller, params, description, **kwargs)}

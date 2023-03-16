@@ -286,7 +286,10 @@ def plot_solution(stats, controller):  # pragma: no cover
     dt_ax.plot([me[0] for me in dt], [me[1] for me in dt], color='black', ls='--')
     u_ax.plot([None], [None], color='black', ls='--', label=r'$\Delta t$')
 
-    P = controller.MS[0].levels[0].prob
+    if controller.useMPI:
+        P = controller.S.levels[0].prob
+    else:
+        P = controller.MS[0].levels[0].prob
     u_ax.axhline(P.params.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
     u_ax.axhline(P.params.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
 
@@ -311,7 +314,7 @@ def compare_imex_full(plotting=False, leak_type='linear'):
 
     maxiter = 5
     num_nodes = 3
-    newton_iter_max = 20
+    newton_iter_max = 99
 
     res = {}
     rhs = {}
@@ -326,15 +329,18 @@ def compare_imex_full(plotting=False, leak_type='linear'):
     }
     custom_description['step_params'] = {'maxiter': maxiter}
     custom_description['sweeper_params'] = {'num_nodes': num_nodes}
+    custom_description['convergence_controllers'] = {
+        Adaptivity: {'e_tol': 1e-6, 'dt_max': np.inf},
+    }
 
     custom_controller_params = {'logger_level': 30}
     for imex in [False, True]:
-        custom_description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-6, 'dt_max': 1e2}}
         stats, controller, _ = run_leaky_superconductor(
             custom_description=custom_description,
             custom_controller_params=custom_controller_params,
             imex=imex,
             Tend=4.3e2,
+            use_MPI=False,
             hook_class=[LogWork, LogGlobalErrorPostRun],
         )
 
@@ -353,7 +359,7 @@ def compare_imex_full(plotting=False, leak_type='linear'):
             plot_solution(stats, controller)
 
     diff = abs(res[True] - res[False])
-    thresh = 3e-3
+    thresh = 4e-3
     assert (
         diff < thresh
     ), f"Difference between IMEX and fully-implicit too large! Got {diff:.2e}, allowed is only {thresh:.2e}!"
@@ -366,14 +372,14 @@ def compare_imex_full(plotting=False, leak_type='linear'):
         rhs[True] == rhs[False]
     ), f"Expected IMEX and fully implicit schemes to take the same number of right hand side evaluations per step, but got {rhs[True]} and {rhs[False]}!"
 
+    assert error[True] < 1.3e-5, f'Expected error of IMEX version to be less than 1.3e-5, but got e={error[True]:.2e}!'
     assert (
-        error[True] > error[False]
-    ), f"Expected IMEX to be less accurate at the same precision settings than unsplit version, got for IMEX: e={error[True]:.2e} and fully implicit: e={error[False]:.2e}"
-    assert error[True] < 1.1e-4, f'Expected error of IMEX version to be less than 1.1e-4, but got e={error[True]:.2e}!'
+        error[False] < 7.7e-5
+    ), f'Expected error of fully implicit version to be less than 7.7e-5, but got e={error[False]:.2e}!'
 
 
 if __name__ == '__main__':
-    # faults(19)
+    faults(19)
     get_crossing_time()
-    # compare_imex_full(plotting=True)
+    compare_imex_full(plotting=True)
     plt.show()

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 
-from pySDC.projects.Resilience.strategies import AdaptivityStrategy, IterateStrategy, BaseStrategy, merge_descriptions
+from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
@@ -29,6 +29,7 @@ MAPPINGS = {
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
 }
+
 
 def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None):
     """
@@ -132,7 +133,9 @@ def get_path(problem, strategy, num_procs, handle='', base_path='data/work_preci
     return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}-{num_procs}procs.pickle'
 
 
-def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None, problem_args=None):
+def record_work_precision(
+    problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None, problem_args=None
+):
     """
     Run problem with strategy and record the cost parameters.
 
@@ -176,7 +179,6 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         elif param == 'e_tol':
             param_range = [5e-5, 1e-5, 1e-6, 1e-7]
 
-
     # run multiple times with different parameters
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
@@ -184,7 +186,14 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         data[param_range[i]]['param'] = [param_range[i]]
         data[param_range[i]][param] = [param_range[i]]
         for _j in range(runs):
-            single_run(problem, strategy, data[param_range[i]], custom_description=description, comm_world=comm_world, problem_args=problem_args)
+            single_run(
+                problem,
+                strategy,
+                data[param_range[i]],
+                custom_description=description,
+                comm_world=comm_world,
+                problem_args=problem_args,
+            )
 
             comm_world.Barrier()
 
@@ -274,7 +283,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'e_local_max': 'max. local error',
         'restart': 'restarts',
         'dt_max': r'$\Delta t_\mathrm{max}$',
-        'param': 'parameter'
+        'param': 'parameter',
     }
 
     if not title_only:
@@ -351,11 +360,8 @@ def get_configs(mode, problem):
     # TODO: docs
     configurations = {}
     if mode == 'compare_strategies':
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityStrategy,
-            IterateStrategy,
-            BaseStrategy
-        )
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+
         description_high_order = {'step_params': {'maxiter': 5}}
         description_low_order = {'step_params': {'maxiter': 3}}
         dashed = {'ls': '--'}
@@ -391,7 +397,7 @@ def get_configs(mode, problem):
             'strategies': [IterateStrategy()],
         }
     elif mode == 'compare_adaptivity':
-        #TODO: configurations not final!
+        # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
             AdaptivityCollocationTypeStrategy,
             AdaptivityCollocationRefinementStrategy,
@@ -405,35 +411,70 @@ def get_configs(mode, problem):
             strategy.restol = restol
 
         configurations[1] = {'strategies': strategies, 'handle': '*'}
-        configurations[2] = {'custom_description': {'step_params': {'maxiter': 5}}, 'strategies': [AdaptivityStrategy()]}
+        configurations[2] = {
+            'custom_description': {'step_params': {'maxiter': 5}},
+            'strategies': [AdaptivityStrategy()],
+        }
 
         # strategies2 = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
         # restol = 1e-6
         # for strategy in strategies2:
         #    strategy.restol = restol
         # configurations[3] = {'strategies':strategies2, 'handle': 'low restol', 'plotting_params': {'ls': '--'}}
-         
+
     elif mode == 'quench':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DoubleAdaptivityStrategy, IterateStrategy, BaseStrategy
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            DoubleAdaptivityStrategy,
+            IterateStrategy,
+            BaseStrategy,
+        )
+
         dumbledoresarmy = DoubleAdaptivityStrategy()
-        #dumbledoresarmy.residual_e_tol_ratio = 1e2
+        # dumbledoresarmy.residual_e_tol_ratio = 1e2
         dumbledoresarmy.residual_e_tol_abs = 1e-3
 
         strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy(), dumbledoresarmy]
         configurations[1] = {'strategies': strategies}
-        configurations[2] = {'strategies': strategies, 'problem_args': {'imex': True}, 'handle': 'IMEX', 'plotting_params': {'ls': '--'}}
+        configurations[2] = {
+            'strategies': strategies,
+            'problem_args': {'imex': True},
+            'handle': 'IMEX',
+            'plotting_params': {'ls': '--'},
+        }
         inexact = {'problem_params': {'newton_iter': 30}}
-        configurations[3] = {'strategies': strategies, 'custom_description': inexact, 'handle': 'inexact', 'plotting_params': {'ls': ':'}}
+        configurations[3] = {
+            'strategies': strategies,
+            'custom_description': inexact,
+            'handle': 'inexact',
+            'plotting_params': {'ls': ':'},
+        }
         LU = {'sweeper_params': {'QI': 'LU'}}
-        configurations[4] = {'strategies': strategies, 'custom_description': LU, 'handle': 'LU', 'plotting_params': {'ls': '-.'}}
+        configurations[4] = {
+            'strategies': strategies,
+            'custom_description': LU,
+            'handle': 'LU',
+            'plotting_params': {'ls': '-.'},
+        }
     elif mode == 'preconditioners':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, IterateStrategy, BaseStrategy
+
         strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy()]
-         
+
         IE = {'sweeper_params': {'QI': 'IE'}}
-        configurations[0] = {'strategies': strategies, 'custom_description': IE, 'handle': 'IE', 'plotting_params': {'ls': '-'}}
+        configurations[0] = {
+            'strategies': strategies,
+            'custom_description': IE,
+            'handle': 'IE',
+            'plotting_params': {'ls': '-'},
+        }
         LU = {'sweeper_params': {'QI': 'LU'}}
-        configurations[1] = {'strategies': strategies, 'custom_description': LU, 'handle': 'LU', 'plotting_params': {'ls': '--'}}
+        configurations[1] = {
+            'strategies': strategies,
+            'custom_description': LU,
+            'handle': 'LU',
+            'plotting_params': {'ls': '--'},
+        }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
 
@@ -467,9 +508,11 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', **kw
     """
     handles, labels = fig.get_axes()[0].get_legend_handles_labels()
     order = np.argsort([me[0] for me in labels])
-    fig.legend([handles[i] for i in order], [labels[i] for i in order], loc='outside lower center', ncols=2, frameon=False)
+    fig.legend(
+        [handles[i] for i in order], [labels[i] for i in order], loc='outside lower center', ncols=2, frameon=False
+    )
 
-    path=f'data/wp-{name}-{work_key}-{precision_key}.{format}'
+    path = f'data/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
     print(f'Stored figure \"{path}\"')
 
@@ -501,9 +544,21 @@ def all_problems(mode='compare_strategies', **kwargs):
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
 
     for i in range(len(problems)):
-        execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 2, configurations=get_configs(mode, problems[i]))
+        execute_configurations(
+            **shared_params,
+            problem=problems[i],
+            ax=axs.flatten()[i],
+            decorate=i == 2,
+            configurations=get_configs(mode, problems[i]),
+        )
 
-    save_fig(fig=fig, name=mode, work_key=shared_params['work_key'], precision_key=shared_params['precision_key'], legend=True)
+    save_fig(
+        fig=fig,
+        name=mode,
+        work_key=shared_params['work_key'],
+        precision_key=shared_params['precision_key'],
+        legend=True,
+    )
 
 
 def single_problem(mode, problem, **kwargs):
@@ -525,20 +580,33 @@ def single_problem(mode, problem, **kwargs):
         'record': False,
         **kwargs,
     }
-     
+
     execute_configurations(**params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem))
 
-    save_fig(fig=fig, name=f'{problem.__name__}-{mode}', work_key=params['work_key'], precision_key=params['precision_key'], legend=False)
+    save_fig(
+        fig=fig,
+        name=f'{problem.__name__}-{mode}',
+        work_key=params['work_key'],
+        precision_key=params['precision_key'],
+        legend=False,
+    )
 
 
 if __name__ == "__main__":
+    comm_world = MPI.COMM_WORLD
     params = {
         'mode': 'preconditioners',
         'problem': run_vdp,
     }
-    record = False
     # single_problem(**params, work_key='t', precision_key='e_global', record=record, runs=1)
-    all_problems(mode='compare_strategies', work_key='t', precision_key='e_global', record=record)
-    all_problems(mode='preconditioners', work_key='t', precision_key='e_global', record=record)
-    all_problems(mode='compare_adaptivity', work_key='t', precision_key='e_global', record=record)
+
+    all_params = {
+        'record': True,
+        'runs': 5,
+        'work_key': 't',
+    }
+
+    for mode in ['compare_strategies', 'preconditioners', 'compare_adaptivity']:
+        all_problems(**all_params, mode=mode)
+        comm_world.Barrier()
     plt.show()

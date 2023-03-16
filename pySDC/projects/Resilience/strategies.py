@@ -283,6 +283,7 @@ class AdaptivityStrategy(Strategy):
             dt_max = 1e2
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
+
             custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
         else:
             raise NotImplementedError(
@@ -598,6 +599,7 @@ class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
     def label(self):
         return 'adaptivity de-refinement'
 
+
 class DoubleAdaptivityStrategy(AdaptivityStrategy):
     '''
     Adaptivity based both on embedded estimate and on residual
@@ -616,7 +618,7 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
         self.bar_plot_x_label = 'double adaptivity'
         self.precision_parameter = 'e_tol'
         self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
-        self.residual_e_tol_ratio = 1.
+        self.residual_e_tol_ratio = 1.0
         self.residual_e_tol_abs = None
 
     @property
@@ -643,7 +645,10 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
             e_tol = self.residual_e_tol_abs
         else:
             e_tol = custom_description['convergence_controllers'][Adaptivity]['e_tol'] * self.residual_e_tol_ratio
-        custom_description['convergence_controllers'][AdaptivityResidual] = {'e_tol': e_tol, 'allowed_modifications': ['decrease']}
+        custom_description['convergence_controllers'][AdaptivityResidual] = {
+            'e_tol': e_tol,
+            'allowed_modifications': ['decrease'],
+        }
         custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
-         
+
         return custom_description

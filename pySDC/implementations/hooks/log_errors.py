@@ -91,6 +91,7 @@ class LogGlobalErrorPostRun(hooks):
     when the solution is computed and when the error is computed. The issue is resolved by recording the time at which
     the solution is computed in a private attribute of this class.
     """
+
     def __init__(self):
         """
         Add an attribute for when the last solution was added.
