@@ -599,9 +599,9 @@ def make_plots_for_paper():  # pragma: no cover
 
     # plot_vdp_solution()
     # plot_recovery_rate(get_stats(run_vdp))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    plot_adaptivity_stuff()
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    # plot_adaptivity_stuff()
     # plot_efficiency_polar(run_vdp)
     # compare_recovery_rate_problems()
 

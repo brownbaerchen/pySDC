@@ -1298,27 +1298,24 @@ class FaultStats:
 
 def main():
     stats_analyser = FaultStats(
-        prob=run_leaky_superconductor,
+        prob=run_vdp,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=True,
+        reload=False,
         recovery_thresh=1.1,
         # recovery_thresh_abs=5e-5,
         num_procs=1,
-        mode='random',
+        mode='combination',
         stats_path='data/stats-jusuf',
     )
 
-    stats_analyser.run_stats_generation(runs=1000)
+    stats_analyser.run_stats_generation(runs=5000)
+
+    if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
+        return None
+
     stats_analyser.get_recovered()
     mask = None
-
-    #####################################
-    strategy = BaseStrategy()
-    mask = stats_analyser.get_mask(strategy=strategy, key='recovered', val=False)
-    stats_analyser.print_faults(mask)
-    return None
-    #####################################
 
     # stats_analyser.compare_strategies()
     stats_analyser.plot_things_per_things(

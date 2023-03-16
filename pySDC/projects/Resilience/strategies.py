@@ -31,10 +31,11 @@ class Strategy:
     Abstract class for resilience strategies
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
+        self.useMPI = useMPI
 
         # set default values for plotting
         self.linestyle = '-'
@@ -191,11 +192,11 @@ class BaseStrategy(Strategy):
     Do a fixed iteration count
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[0]
         self.marker = 'o'
         self.name = 'base'
@@ -213,13 +214,13 @@ class AdaptivityStrategy(Strategy):
     Adaptivity as a resilience strategy
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
@@ -281,9 +282,12 @@ class AdaptivityStrategy(Strategy):
             e_tol = 1e-7
             dt_min = 1e-3
 
-            from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
+            from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
-            custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
+            flavor = 'MPI' if self.useMPI else 'nonMPI'
+            custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {
+                'max_restarts': 15
+            }
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -299,13 +303,13 @@ class AdaptiveHotRodStrategy(Strategy):
     Adaptivity + Hot Rod as a resilience strategy
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
@@ -356,11 +360,11 @@ class IterateStrategy(Strategy):
     Iterate for as much as you want
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[2]
         self.marker = 'v'
         self.name = 'iterate'
@@ -419,11 +423,11 @@ class HotRodStrategy(Strategy):
     Hot Rod as a resilience strategy
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[3]
         self.marker = '^'
         self.name = 'Hot Rod'
@@ -481,13 +485,13 @@ class AdaptivityCollocationStrategy(Strategy):
     Adaptivity based on collocation as a resilience strategy
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity_coll'
@@ -564,8 +568,8 @@ class AdaptivityCollocationStrategy(Strategy):
 
 
 class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, useMPI=False):
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.adaptive_coll_params = {'quad_type': ['RADAU-RIGHT', 'GAUSS']}
@@ -576,8 +580,8 @@ class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, useMPI=False):
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[5]
         self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [2, 3]}
@@ -588,8 +592,8 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, useMPI=False):
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[6]
         self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [4, 3]}
@@ -604,13 +608,13 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
     Adaptivity based both on embedded estimate and on residual
     '''
 
-    def __init__(self):
+    def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__()
+        super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'double_adaptivity'
@@ -636,7 +640,7 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
             The custom descriptions you can supply to the problem when running it
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual, Adaptivity
-        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
         custom_description = super().get_custom_description(problem, num_procs)
 
@@ -648,6 +652,8 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
             'e_tol': e_tol,
             'allowed_modifications': ['decrease'],
         }
-        custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
+
+        flavor = 'MPI' if self.useMPI else 'nonMPI'
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
 
         return custom_description

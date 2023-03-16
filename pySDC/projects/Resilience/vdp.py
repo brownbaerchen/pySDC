@@ -180,7 +180,7 @@ def run_vdp(
         from pySDC.projects.Resilience.fault_injection import prepare_controller_for_faults
 
         rnd_args = {'iteration': 3}
-        args = {'time': 1.0, 'target': 0}
+        args = {'time': 0.9, 'target': 0}
         prepare_controller_for_faults(controller, fault_stuff, rnd_args, args)
 
     # call main function to get things done...

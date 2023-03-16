@@ -11,9 +11,9 @@
 #SBATCH -J red_wedding
 
 module --force purge
-module load Stages/2022
-module load Intel/2021.4.0
-module load IntelMPI/2021.4.0
+module load Stages/2023
+module load Intel/2022.1.0
+module load ParaStationMPI/5.8.0-1
 
 cd /p/project/ccstma/baumann7/pySDC/pySDC/projects/Resilience
 
