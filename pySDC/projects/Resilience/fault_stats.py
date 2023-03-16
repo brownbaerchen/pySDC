@@ -38,7 +38,7 @@ class FaultStats:
         faults=None,
         reload=True,
         recovery_thresh=1 + 1e-3,
-        recovery_thresh_abs=1e9,
+        recovery_thresh_abs=0.0,
         num_procs=1,
         mode='combination',
         stats_path='data/stats',
@@ -1303,7 +1303,7 @@ def main():
         faults=[False, True],
         reload=True,
         recovery_thresh=1.1,
-        recovery_thresh_abs=5e-5,
+        # recovery_thresh_abs=5e-5,
         num_procs=1,
         mode='random',
         stats_path='data/stats-jusuf',
@@ -1312,6 +1312,13 @@ def main():
     stats_analyser.run_stats_generation(runs=1000)
     stats_analyser.get_recovered()
     mask = None
+
+    #####################################
+    strategy = BaseStrategy()
+    mask = stats_analyser.get_mask(strategy=strategy, key='recovered', val=False)
+    stats_analyser.print_faults(mask)
+    return None
+    #####################################
 
     # stats_analyser.compare_strategies()
     stats_analyser.plot_things_per_things(

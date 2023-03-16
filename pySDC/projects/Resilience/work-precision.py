@@ -161,17 +161,16 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_max'], 5000)
     elif param == 'dt':
         power = 2.0
     elif param == 'restol':
-        power = 20 if problem.__name__ == 'run_leaky_superconductor' else 10.0
+        power = 10.0
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in [-3, -2, -1, 0, 1, 2, 3]]
+    param_range = [default * power**i for i in [-2, -1, 0, 1, 2, 3]]
 
     if problem.__name__ == 'run_leaky_superconductor':
         if param == 'restol':
@@ -301,7 +300,17 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
 
 
 def execute_configurations(
-    problem, configurations, work_key, precision_key, num_procs, ax, decorate, record, runs, comm_world
+    problem,
+    configurations,
+    work_key,
+    precision_key,
+    num_procs,
+    ax,
+    decorate,
+    record,
+    runs,
+    comm_world,
+    plotting,
 ):
     """
     Run for multiple configurations.
@@ -317,6 +326,7 @@ def execute_configurations(
         record (bool): Whether to only plot or also record the data first
         runs (int): Number of runs you want to do
         comm_world (mpi4py.MPI.Intracomm): Communicator that is available for the entire script
+        plotting (bool): Whether to plot something
 
     Returns:
         None
@@ -337,14 +347,15 @@ def execute_configurations(
                     comm_world=comm_world,
                     problem_args=config.get('problem_args', {}),
                 )
-            plot_work_precision(
-                **shared_args,
-                work_key=work_key,
-                precision_key=precision_key,
-                ax=ax,
-                plotting_params=config.get('plotting_params', {}),
-                comm_world=comm_world,
-            )
+            if plotting:
+                plot_work_precision(
+                    **shared_args,
+                    work_key=work_key,
+                    precision_key=precision_key,
+                    ax=ax,
+                    plotting_params=config.get('plotting_params', {}),
+                    comm_world=comm_world,
+                )
 
     decorate_panel(
         ax=ax,
@@ -512,7 +523,7 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', **kw
     print(f'Stored figure \"{path}\"')
 
 
-def all_problems(mode='compare_strategies', **kwargs):
+def all_problems(mode='compare_strategies', plotting=True, **kwargs):
     """
     Make a plot comparing various strategies for all problems.
 
@@ -533,6 +544,7 @@ def all_problems(mode='compare_strategies', **kwargs):
         'runs': 1,
         'comm_world': MPI.COMM_WORLD,
         'record': False,
+        'plotting': plotting,
         **kwargs,
     }
 
@@ -547,16 +559,17 @@ def all_problems(mode='compare_strategies', **kwargs):
             configurations=get_configs(mode, problems[i]),
         )
 
-    save_fig(
-        fig=fig,
-        name=mode,
-        work_key=shared_params['work_key'],
-        precision_key=shared_params['precision_key'],
-        legend=True,
-    )
+    if plotting:
+        save_fig(
+            fig=fig,
+            name=mode,
+            work_key=shared_params['work_key'],
+            precision_key=shared_params['precision_key'],
+            legend=True,
+        )
 
 
-def single_problem(mode, problem, **kwargs):
+def single_problem(mode, problem, plotting=True, **kwargs):
     """
     Make a plot for a single problem
 
@@ -573,18 +586,20 @@ def single_problem(mode, problem, **kwargs):
         'runs': 1,
         'comm_world': MPI.COMM_WORLD,
         'record': False,
+        'plotting': plotting,
         **kwargs,
     }
 
     execute_configurations(**params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem))
 
-    save_fig(
-        fig=fig,
-        name=f'{problem.__name__}-{mode}',
-        work_key=params['work_key'],
-        precision_key=params['precision_key'],
-        legend=False,
-    )
+    if plotting:
+        save_fig(
+            fig=fig,
+            name=f'{problem.__name__}-{mode}',
+            work_key=params['work_key'],
+            precision_key=params['precision_key'],
+            legend=False,
+        )
 
 
 if __name__ == "__main__":
@@ -602,9 +617,11 @@ if __name__ == "__main__":
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
+        'plotting': False,
     }
 
-    for mode in ['compare_strategies', 'preconditioners', 'compare_adaptivity']:
+    # for mode in ['compare_strategies', 'preconditioners', 'compare_adaptivity']:
+    for mode in ['preconditioners', 'compare_adaptivity']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
     plt.show()

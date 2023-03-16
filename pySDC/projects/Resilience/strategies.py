@@ -280,7 +280,6 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_leaky_superconductor":
             e_tol = 1e-7
             dt_min = 1e-3
-            dt_max = 1e2
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
 
