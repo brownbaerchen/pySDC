@@ -461,20 +461,15 @@ def get_configs(mode, problem):
 
         strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy()]
 
-        IE = {'sweeper_params': {'QI': 'IE'}}
-        configurations[0] = {
-            'strategies': strategies,
-            'custom_description': IE,
-            'handle': 'IE',
-            'plotting_params': {'ls': '-'},
-        }
-        LU = {'sweeper_params': {'QI': 'LU'}}
-        configurations[1] = {
-            'strategies': strategies,
-            'custom_description': LU,
-            'handle': 'LU',
-            'plotting_params': {'ls': '--'},
-        }
+        precons = ['IE', 'LU', 'MIN', 'MIN3']
+        ls = ['-', '--', '-.', ':']
+        for i in range(len(precons)):
+            configurations[i] = {
+                'strategies': strategies,
+                'custom_description': {'sweeper_params': {'QI': precons[i]}},
+                'handle': precons[i],
+                'plotting_params': {'ls': ls[i]},
+            }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
 
@@ -594,16 +589,19 @@ def single_problem(mode, problem, **kwargs):
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    params = {
-        'mode': 'preconditioners',
-        'problem': run_vdp,
-    }
-    # single_problem(**params, work_key='t', precision_key='e_global', record=record, runs=1)
+    # params = {
+    #    'mode': 'preconditioners',
+    #    'problem': run_vdp,
+    #    'runs': 5,
+    # }
+    # record = True
+    # single_problem(**params, work_key='t', precision_key='e_global_rel', record=record, runs=1)
 
     all_params = {
         'record': True,
         'runs': 5,
         'work_key': 't',
+        'precision_key': 'e_global_rel',
     }
 
     for mode in ['compare_strategies', 'preconditioners', 'compare_adaptivity']:
