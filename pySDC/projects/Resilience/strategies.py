@@ -65,6 +65,7 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
+        self.newton_tol = 1e-8
 
     def get_fixable_params(self, **kwargs):
         """
@@ -147,7 +148,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             return 1.0
         elif problem.__name__ == "run_leaky_superconductor":
-            return 450
+            return 430
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -168,6 +169,7 @@ class Strategy:
             custom_description['problem_params'] = {
                 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
                 'crash_at_maxiter': False,
+                'newton_tol': self.newton_tol,
             }
             custom_description['level_params'] = {'dt': 1e-2}
 
@@ -180,7 +182,7 @@ class Strategy:
         elif problem.__name__ == "run_leaky_superconductor":
             custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-10}
+            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': self.newton_tol}
         return merge_descriptions(custom_description, self.custom_description)
 
 
@@ -258,6 +260,7 @@ class AdaptivityStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
         custom_description = {}
+        custom_description['convergence_controllers'] = {}
 
         dt_max = np.inf
         dt_min = 1e-5
@@ -278,15 +281,16 @@ class AdaptivityStrategy(Strategy):
             e_tol = 1e-7
             dt_min = 1e-3
             dt_max = 1e2
+
+            from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
+            custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
  strategy'
             )
 
-        custom_description['convergence_controllers'] = {
-            Adaptivity: {'e_tol': e_tol, 'dt_min': dt_min, 'dt_max': dt_max}
-        }
+        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': e_tol, 'dt_min': dt_min, 'dt_max': dt_max}
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
 
@@ -491,7 +495,7 @@ class AdaptivityCollocationStrategy(Strategy):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityCollocation, 'e_tol']
-        self.restol = 1e-7
+        self.restol = None
         self.maxiter = 99
 
     def get_fixable_params(self, maxiter, **kwargs):
@@ -520,7 +524,6 @@ class AdaptivityCollocationStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
         custom_description = {}
-        custom_description['level_params'] = {'restol': self.restol}
         custom_description['step_params'] = {'maxiter': self.maxiter}
 
         dt_max = np.inf
@@ -548,6 +551,7 @@ class AdaptivityCollocationStrategy(Strategy):
  strategy'
             )
 
+        custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityCollocation: {
                 'e_tol': e_tol,
@@ -593,3 +597,53 @@ class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
     @property
     def label(self):
         return 'adaptivity de-refinement'
+
+class DoubleAdaptivityStrategy(AdaptivityStrategy):
+    '''
+    Adaptivity based both on embedded estimate and on residual
+    '''
+
+    def __init__(self):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+        super().__init__()
+        self.color = list(cmap.values())[7]
+        self.marker = '^'
+        self.name = 'double_adaptivity'
+        self.bar_plot_x_label = 'double adaptivity'
+        self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
+        self.residual_e_tol_ratio = 1.
+        self.residual_e_tol_abs = None
+
+    @property
+    def label(self):
+        return 'double adaptivity'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual, Adaptivity
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
+
+        custom_description = super().get_custom_description(problem, num_procs)
+
+        if self.residual_e_tol_abs:
+            e_tol = self.residual_e_tol_abs
+        else:
+            e_tol = custom_description['convergence_controllers'][Adaptivity]['e_tol'] * self.residual_e_tol_ratio
+        custom_description['convergence_controllers'][AdaptivityResidual] = {'e_tol': e_tol, 'allowed_modifications': ['decrease']}
+        custom_description['convergence_controllers'][BasicRestartingMPI] = {'max_restarts': 15}
+         
+        return custom_description

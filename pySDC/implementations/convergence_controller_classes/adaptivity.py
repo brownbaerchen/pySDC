@@ -6,7 +6,6 @@ from pySDC.implementations.convergence_controller_classes.step_size_limiter impo
 from pySDC.implementations.convergence_controller_classes.basic_restarting import (
     BasicRestartingNonMPI,
 )
-from pySDC.implementations.hooks.log_step_size import LogStepSize
 
 
 class AdaptivityBase(ConvergenceController):
@@ -35,7 +34,10 @@ class AdaptivityBase(ConvergenceController):
             "control_order": -50,
             "beta": 0.9,
         }
+        from pySDC.implementations.hooks.log_step_size import LogStepSize
+        from pySDC.implementations.hooks.log_restarts import LogRestarts
         controller.add_hook(LogStepSize)
+        controller.add_hook(LogRestarts)
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
     def dependencies(self, controller, description, **kwargs):
@@ -351,6 +353,7 @@ class AdaptivityResidual(AdaptivityBase):
             "e_tol_low": 0,
             "e_tol": np.inf,
             "max_restarts": 99 if "e_tol_low" in params else None,
+            "allowed_modifications": ['increase', 'decrease'],  # what we are allowed to do with the step size
         }
         return {**defaults, **params}
 
@@ -424,10 +427,10 @@ smaller than 0!",
 
             dt_planned = L.status.dt_new if L.status.dt_new is not None else L.params.dt
 
-            if res > self.params.e_tol:
+            if res > self.params.e_tol and 'decrease' in self.params.allowed_modifications:
                 L.status.dt_new = min([dt_planned, L.params.dt / 2.0])
                 self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
-            elif res < self.params.e_tol_low:
+            elif res < self.params.e_tol_low and 'increase' in self.params.allowed_modifications:
                 L.status.dt_new = max([dt_planned, L.params.dt * 2.0])
                 self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
 

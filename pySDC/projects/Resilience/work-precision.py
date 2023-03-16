@@ -16,8 +16,21 @@ setup_mpl(reset=True)
 LOGGER_LEVEL = 30
 VERBOSE = True
 
+MAPPINGS = {
+    'e_global': ('e_global_post_run', max, False),
+    'e_global_rel': ('e_global_rel_post_run', max, False),
+    't': ('timing_run', max, False),
+    'e_local_max': ('e_local_post_step', max, False),
+    'k_SDC': ('k', sum, None),
+    'k_Newton': ('work_newton', sum, None),
+    'k_Newton_no_restart': ('work_newton', sum, False),
+    'k_rhs': ('work_rhs', sum, None),
+    'restart': ('restart', sum, None),
+    'dt_mean': ('dt', np.mean, False),
+    'dt_max': ('dt', max, False),
+}
 
-def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None):
+def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None):
     """
     Make a single run of a particular problem with a certain strategy.
 
@@ -42,6 +55,7 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     controller_params = {'logger_level': LOGGER_LEVEL}
 
     comm = comm_world.Split(comm_world.rank < num_procs)
+    problem_args = {} if problem_args is None else problem_args
 
     if comm_world.rank >= num_procs:
         return None
@@ -53,18 +67,11 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm,
+        **problem_args,
     )
 
     # record all the metrics
-    mappings = {
-        'e_global': ('e_global_post_run', max, False),
-        't': ('timing_run', max, False),
-        'e_local_max': ('e_local_post_step', max, False),
-        'k_SDC': ('k', sum, None),
-        'k_Newton': ('work_newton', sum, None),
-        'k_rhs': ('work_rhs', sum, None),
-    }
-    for key, mapping in mappings.items():
+    for key, mapping in MAPPINGS.items():
         me = get_sorted(stats, type=mapping[0], recomputed=mapping[2])
         if len(me) == 0:
             data[key] += [np.nan]
@@ -125,7 +132,7 @@ def get_path(problem, strategy, num_procs, handle='', base_path='data/work_preci
     return f'{base_path}/{problem.__name__}-{strategy.__class__.__name__}-{handle}{"-wp" if handle else "wp"}-{num_procs}procs.pickle'
 
 
-def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None):
+def record_work_precision(problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None, problem_args=None):
     """
     Run problem with strategy and record the cost parameters.
 
@@ -149,8 +156,9 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
         strategy.get_custom_description(problem, num_procs), {} if custom_description is None else custom_description
     )
     if param == 'e_tol':
-        power = 1.5 if problem.__name__ == 'run_leaky_superconductor' else 10.0
+        power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
+        set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_max'], 5000)
     elif param == 'dt':
         power = 2.0
     elif param == 'restol':
@@ -160,17 +168,23 @@ def record_work_precision(problem, strategy, num_procs=1, custom_description=Non
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in [-2, -1, 0, 1, 2]]
+    param_range = [default * power**i for i in [-3, -2, -1, 0, 1, 2, 3]]
 
-    if problem.__name__ == 'run_leaky_superconductor' and param == 'restol':
-        param_range = [1e-5, 1e-6, 1e-7, 1e-8]
+    if problem.__name__ == 'run_leaky_superconductor':
+        if param == 'restol':
+            param_range = [1e-4, 1e-5, 1e-6, 1e-7]
+        elif param == 'e_tol':
+            param_range = [5e-5, 1e-5, 1e-6, 1e-7]
+
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
-        data[param_range[i]] = {key: [] for key in ['e_global', 'e_local_max', 'k_SDC', 'k_Newton', 'k_rhs', 't']}
+        data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
+        data[param_range[i]]['param'] = [param_range[i]]
+        data[param_range[i]][param] = [param_range[i]]
         for _j in range(runs):
-            single_run(problem, strategy, data[param_range[i]], custom_description=description, comm_world=comm_world)
+            single_run(problem, strategy, data[param_range[i]], custom_description=description, comm_world=comm_world, problem_args=problem_args)
 
             comm_world.Barrier()
 
@@ -221,6 +235,11 @@ def plot_work_precision(
     work = [np.nanmean(data[key][work_key]) for key in data.keys()]
     precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
 
+    for key in [work_key, precision_key]:
+        rel_variance = [np.std(data[me][key]) / np.nanmean(data[me][key]) for me in data.keys()]
+        if not all([me < 1e-2 or not np.isfinite(me) for me in rel_variance]):
+            print(f"WARNING: Variance too large! Got {rel_variance}")
+
     style = merge_descriptions(
         {**strategy.style, 'label': f'{strategy.style["label"]}{f" {handle}" if handle else ""}'},
         plotting_params if plotting_params else {},
@@ -244,22 +263,24 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
     Returns:
         None
     """
-    xlabels = {
+    labels = {
         'k_SDC': 'SDC iterations',
         'k_Newton': 'Newton iterations',
+        'k_Newton_no_restart': 'Newton iterations (restarts excluded)',
         'k_rhs': 'right hand side evaluations',
         't': 'wall clock time / s',
-    }
-
-    ylabels = {
         'e_global': 'global error',
+        'e_global_rel': 'relative global error',
         'e_local_max': 'max. local error',
+        'restart': 'restarts',
+        'dt_max': r'$\Delta t_\mathrm{max}$',
+        'param': 'parameter'
     }
 
     if not title_only:
-        ax.set_xlabel(xlabels.get(work_key, 'work'))
-        ax.set_ylabel(ylabels.get(precision_key, 'precision'))
-        ax.legend(frameon=False)
+        ax.set_xlabel(labels.get(work_key, 'work'))
+        ax.set_ylabel(labels.get(precision_key, 'precision'))
+        # ax.legend(frameon=False)
 
     titles = {
         'run_vdp': 'Van der Pol',
@@ -305,6 +326,7 @@ def execute_configurations(
                     custom_description=config.get('custom_description', {}),
                     runs=runs,
                     comm_world=comm_world,
+                    problem_args=config.get('problem_args', {}),
                 )
             plot_work_precision(
                 **shared_args,
@@ -325,54 +347,36 @@ def execute_configurations(
     )
 
 
-def compare_strategies(work_key='k_SDC', precision_key='e_global'):
-    """
-    Make a plot comparing basic strategies.
-
-    Args:
-        work_key (str): The key in the recorded data you want on the x-axis
-        precision_key (str): The key in the recorded data you want on the y-axis
-
-    Returns:
-        None
-    """
-    description_high_order = {'step_params': {'maxiter': 5}}
-    description_low_order = {'step_params': {'maxiter': 3}}
-    dashed = {'ls': '--'}
-
+def get_configs(mode, problem):
+    # TODO: docs
     configurations = {}
-    configurations[0] = {
-        'custom_description': description_high_order,
-        'handle': r'high order',
-        'strategies': [AdaptivityStrategy(), BaseStrategy()],
-    }
-    configurations[1] = {
-        'custom_description': description_low_order,
-        'handle': r'low order',
-        'strategies': [AdaptivityStrategy(), BaseStrategy()],
-        'plotting_params': dashed,
-    }
+    if mode == 'compare_strategies':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            IterateStrategy,
+            BaseStrategy
+        )
+        description_high_order = {'step_params': {'maxiter': 5}}
+        description_low_order = {'step_params': {'maxiter': 3}}
+        dashed = {'ls': '--'}
 
-    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0))
+        configurations[0] = {
+            'custom_description': description_high_order,
+            'handle': r'high order',
+            'strategies': [AdaptivityStrategy(), BaseStrategy()],
+        }
+        configurations[1] = {
+            'custom_description': description_low_order,
+            'handle': r'low order',
+            'strategies': [AdaptivityStrategy(), BaseStrategy()],
+            'plotting_params': dashed,
+        }
 
-    shared_params = {
-        'work_key': work_key,
-        'precision_key': precision_key,
-        'num_procs': 1,
-        'runs': 1,
-        'configurations': configurations,
-        'comm_world': MPI.COMM_WORLD,
-        'record': True,
-    }
-
-    problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
-
-    for i in range(len(problems)):
         description_large_step = {
-            'level_params': {'dt': 10.0 if problems[i].__name__ == 'run_leaky_superconductor' else 3e-2}
+            'level_params': {'dt': 30.0 if problem.__name__ == 'run_leaky_superconductor' else 3e-2}
         }
         description_small_step = {
-            'level_params': {'dt': 5.0 if problems[i].__name__ == 'run_leaky_superconductor' else 1e-2}
+            'level_params': {'dt': 10.0 if problem.__name__ == 'run_leaky_superconductor' else 1e-2}
         }
 
         configurations[2] = {
@@ -386,16 +390,93 @@ def compare_strategies(work_key='k_SDC', precision_key='e_global'):
             'handle': r'small step',
             'strategies': [IterateStrategy()],
         }
+    elif mode == 'compare_adaptivity':
+        #TODO: configurations not final!
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityCollocationTypeStrategy,
+            AdaptivityCollocationRefinementStrategy,
+            AdaptivityStrategy,
+        )
 
-        execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 2)
+        strategies = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
 
-    fig.tight_layout()
-    fig.savefig(f'data/wp-{work_key}-{precision_key}.pdf')
+        restol = None
+        for strategy in strategies:
+            strategy.restol = restol
+
+        configurations[1] = {'strategies': strategies, 'handle': '*'}
+        configurations[2] = {'custom_description': {'step_params': {'maxiter': 5}}, 'strategies': [AdaptivityStrategy()]}
+
+        # strategies2 = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
+        # restol = 1e-6
+        # for strategy in strategies2:
+        #    strategy.restol = restol
+        # configurations[3] = {'strategies':strategies2, 'handle': 'low restol', 'plotting_params': {'ls': '--'}}
+         
+    elif mode == 'quench':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DoubleAdaptivityStrategy, IterateStrategy, BaseStrategy
+        dumbledoresarmy = DoubleAdaptivityStrategy()
+        #dumbledoresarmy.residual_e_tol_ratio = 1e2
+        dumbledoresarmy.residual_e_tol_abs = 1e-3
+
+        strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy(), dumbledoresarmy]
+        configurations[1] = {'strategies': strategies}
+        configurations[2] = {'strategies': strategies, 'problem_args': {'imex': True}, 'handle': 'IMEX', 'plotting_params': {'ls': '--'}}
+        inexact = {'problem_params': {'newton_iter': 30}}
+        configurations[3] = {'strategies': strategies, 'custom_description': inexact, 'handle': 'inexact', 'plotting_params': {'ls': ':'}}
+        LU = {'sweeper_params': {'QI': 'LU'}}
+        configurations[4] = {'strategies': strategies, 'custom_description': LU, 'handle': 'LU', 'plotting_params': {'ls': '-.'}}
+    elif mode == 'preconditioners':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, IterateStrategy, BaseStrategy
+        strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy()]
+         
+        IE = {'sweeper_params': {'QI': 'IE'}}
+        configurations[0] = {'strategies': strategies, 'custom_description': IE, 'handle': 'IE', 'plotting_params': {'ls': '-'}}
+        LU = {'sweeper_params': {'QI': 'LU'}}
+        configurations[1] = {'strategies': strategies, 'custom_description': LU, 'handle': 'LU', 'plotting_params': {'ls': '--'}}
+    else:
+        raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
+
+    return configurations
 
 
-def compare_adaptivity_modes(work_key='k_SDC', precision_key='e_global'):
+def get_fig(x=1, y=1, **kwargs):
+    # TODO: docs
+    keyword_arguments = {
+        'figsize': figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0),
+        'layout': 'constrained',
+        **kwargs,
+    }
+    return plt.subplots(x, y, **keyword_arguments)
+
+
+def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', **kwargs):
     """
-    Make a plot comparing adaptivity strategies.
+    Save a figure with a legend on the bottom.
+
+    Args:
+        fig (matplotlib.pyplot.Figure): Figure you want to save
+        name (str): Name of the plot to put in the path
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+        legend (bool): Put a legend or not
+        format (str): Format to store the figure with
+
+    Returns:
+        None
+    """
+    handles, labels = fig.get_axes()[0].get_legend_handles_labels()
+    order = np.argsort([me[0] for me in labels])
+    fig.legend([handles[i] for i in order], [labels[i] for i in order], loc='outside lower center', ncols=2, frameon=False)
+
+    path=f'data/wp-{name}-{work_key}-{precision_key}.{format}'
+    fig.savefig(path, bbox_inches='tight', **kwargs)
+    print(f'Stored figure \"{path}\"')
+
+
+def all_problems(mode='compare_strategies', **kwargs):
+    """
+    Make a plot comparing various strategies for all problems.
 
     Args:
         work_key (str): The key in the recorded data you want on the x-axis
@@ -404,49 +485,60 @@ def compare_adaptivity_modes(work_key='k_SDC', precision_key='e_global'):
     Returns:
         None
     """
-    from pySDC.projects.Resilience.strategies import (
-        AdaptivityCollocationTypeStrategy,
-        AdaptivityCollocationRefinementStrategy,
-        AdaptivityStrategy,
-    )
 
-    strategies = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
-
-    restol = 1e-7
-    for strategy in strategies:
-        strategy.restol = restol
-
-    configurations = {}
-    configurations[1] = {'strategies': strategies}
-    configurations[2] = {'custom_description': {'step_params': {'maxiter': 5}}, 'strategies': [AdaptivityStrategy()]}
-
-    # strategies2 = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
-    # restol = 1e-6
-    # for strategy in strategies2:
-    #    strategy.restol = restol
-    # configurations[3] = {'strategies':strategies2, 'handle': 'low restol', 'plotting_params': {'ls': '--'}}
-
-    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0))
+    fig, axs = get_fig(2, 2)
 
     shared_params = {
-        'work_key': work_key,
-        'precision_key': precision_key,
+        'work_key': 'k_SDC',
+        'precision_key': 'e_global',
         'num_procs': 1,
-        'runs': 5,
-        'configurations': configurations,
+        'runs': 1,
         'comm_world': MPI.COMM_WORLD,
-        'record': True,
+        'record': False,
+        **kwargs,
     }
 
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
 
     for i in range(len(problems)):
-        execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 0)
+        execute_configurations(**shared_params, problem=problems[i], ax=axs.flatten()[i], decorate=i == 2, configurations=get_configs(mode, problems[i]))
 
-    fig.tight_layout()
-    fig.savefig(f'data/wp-adaptivity-{work_key}-{precision_key}.pdf')
+    save_fig(fig=fig, name=mode, work_key=shared_params['work_key'], precision_key=shared_params['precision_key'], legend=True)
+
+
+def single_problem(mode, problem, **kwargs):
+    """
+    Make a plot for a single problem
+
+    Args:
+        mode (str): What you want to look at
+        problem (function): A problem to run
+    """
+    fig, ax = get_fig(1, 1)
+
+    params = {
+        'work_key': 'k_SDC',
+        'precision_key': 'e_global',
+        'num_procs': 1,
+        'runs': 1,
+        'comm_world': MPI.COMM_WORLD,
+        'record': False,
+        **kwargs,
+    }
+     
+    execute_configurations(**params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem))
+
+    save_fig(fig=fig, name=f'{problem.__name__}-{mode}', work_key=params['work_key'], precision_key=params['precision_key'], legend=False)
 
 
 if __name__ == "__main__":
-    compare_adaptivity_modes(work_key='k_Newton')
+    params = {
+        'mode': 'preconditioners',
+        'problem': run_vdp,
+    }
+    record = False
+    # single_problem(**params, work_key='t', precision_key='e_global', record=record, runs=1)
+    all_problems(mode='compare_strategies', work_key='t', precision_key='e_global', record=record)
+    all_problems(mode='preconditioners', work_key='t', precision_key='e_global', record=record)
+    all_problems(mode='compare_adaptivity', work_key='t', precision_key='e_global', record=record)
     plt.show()

@@ -28,6 +28,8 @@ class LogError(hooks):
 
         L.sweep.compute_end_point()
 
+        u_ref = L.prob.u_exact(t=L.time + L.dt)
+
         self.add_to_stats(
             process=step.status.slot,
             time=L.time + L.dt,
@@ -35,7 +37,16 @@ class LogError(hooks):
             iter=step.status.iter,
             sweep=L.status.sweep,
             type=f'e_global{suffix}',
-            value=abs(L.prob.u_exact(t=L.time + L.dt) - L.uend),
+            value=abs(u_ref - L.uend),
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
+            type=f'e_global_rel{suffix}',
+            value=abs((u_ref - L.uend / u_ref)),
         )
 
     def log_local_error(self, step, level_number, suffix=''):
@@ -80,19 +91,6 @@ class LogGlobalErrorPostRun(hooks):
     when the solution is computed and when the error is computed. The issue is resolved by recording the time at which
     the solution is computed in a private attribute of this class.
     """
-
-    def compute_error(self, lvl):
-        """
-        Compute the global error.
-
-        Args:
-            lvl (pySDC.Level.level): The level you want to compute the error on
-
-        Returns:
-            float: The global error
-        """
-        return np.linalg.norm(lvl.prob.u_exact(t=self.t_last_solution) - lvl.uend, np.inf)
-
     def __init__(self):
         """
         Add an attribute for when the last solution was added.
@@ -131,10 +129,12 @@ class LogGlobalErrorPostRun(hooks):
 
         if level_number == 0:
             L = step.levels[level_number]
-            e_glob = self.compute_error(L)
+
+            u_num = self.get_final_solution(L)
+            u_ref = L.prob.u_exact(t=self.t_last_solution)
 
             if step.status.last:
-                self.logger.info(f'Finished with a global error of e={e_glob:.2e}')
+                self.logger.info(f'Finished with a global error of e={abs(u_num-u_ref):.2e}')
 
             self.add_to_stats(
                 process=step.status.slot,
@@ -143,8 +143,27 @@ class LogGlobalErrorPostRun(hooks):
                 iter=step.status.iter,
                 sweep=L.status.sweep,
                 type='e_global_post_run',
-                value=e_glob,
+                value=abs(u_num - u_ref),
             )
+            self.add_to_stats(
+                process=step.status.slot,
+                time=L.time + L.dt,
+                level=L.level_index,
+                iter=step.status.iter,
+                sweep=L.status.sweep,
+                type='e_global_rel_post_run',
+                value=abs((u_num - u_ref) / u_ref),
+            )
+
+    def get_final_solution(self, lvl):
+        """
+        Get the final solution from the level
+
+        Args:
+            lvl (pySDC.Level.level): The level
+        """
+        lvl.sweep.compute_end_point()
+        return lvl.uend
 
 
 class LogGlobalErrorPostRunMPI(LogGlobalErrorPostRun):
@@ -153,17 +172,14 @@ class LogGlobalErrorPostRunMPI(LogGlobalErrorPostRun):
     than in the nonMPI controller.
     """
 
-    def compute_error(self, lvl):
+    def get_final_solution(self, lvl):
         """
-        Compute the global error.
+        Get the final solution from the level
 
         Args:
-            lvl (pySDC.Level.level): The level you want to compute the error on
-
-        Returns:
-            float: The global error
+            lvl (pySDC.Level.level): The level
         """
-        return np.linalg.norm(lvl.prob.u_exact(t=self.t_last_solution) - lvl.u[0], np.inf)
+        return lvl.u[0]
 
 
 class LogLocalErrorPostStep(LogError):
