@@ -12,6 +12,7 @@ from pySDC.implementations.convergence_controller_classes.basic_restarting impor
 from pySDC.projects.PinTSimE.piline_model import setup_mpl
 import pySDC.helpers.plot_helper as plt_helper
 from pySDC.core.Hooks import hooks
+from pySDC.implementations.hooks.log_restarts import LogRestarts
 
 from pySDC.projects.PinTSimE.switch_estimator import SwitchEstimator
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
@@ -34,15 +35,6 @@ class log_data(hooks):
             sweep=L.status.sweep,
             type='u',
             value=L.uend,
-        )
-        self.add_to_stats(
-            process=step.status.slot,
-            time=L.time,
-            level=L.level_index,
-            iter=0,
-            sweep=L.status.sweep,
-            type='restart',
-            value=int(step.status.get('restart')),
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -112,7 +104,7 @@ def generate_description(
     problem_params = dict()
     problem_params['newton_maxiter'] = 200
     problem_params['newton_tol'] = 1e-08
-    problem_params['ncapacitors'] = ncapacitors  # number of condensators
+    problem_params['ncapacitors'] = ncapacitors  # number of capacitors
     problem_params['Vs'] = 5.0
     problem_params['Rs'] = 0.5
     problem_params['C'] = C
@@ -128,7 +120,7 @@ def generate_description(
     # initialize controller parameters
     controller_params = dict()
     controller_params['logger_level'] = 30
-    controller_params['hook_class'] = hook_class
+    controller_params['hook_class'] = [hook_class, LogRestarts]
     controller_params['mssdc_jac'] = False
 
     # convergence controllers
