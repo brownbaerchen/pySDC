@@ -572,6 +572,20 @@ def work_life_balance(work_key='t', reload=True):  # pragma: no cover
     plt.show()
 
 
+def work_precision():
+    from pySDC.projects.Resilience.work_precision import all_problems
+
+    all_params = {
+        'record': False,
+        'work_key': 't',
+        'precision_key': 'e_global_rel',
+        'plotting': True,
+    }
+
+    for mode in ['compare_strategies']:
+        all_problems(**all_params, mode=mode, base_path='data/paper/')
+
+
 def make_plots_for_SIAM_CSE23():  # pragma: no cover
     """
     Make plots for the SIAM talk
@@ -624,4 +638,5 @@ if __name__ == "__main__":
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    make_plots_for_paper()
+    work_precision()
+    # make_plots_for_paper()

@@ -12,7 +12,6 @@ from pySDC.implementations.convergence_controller_classes.basic_restarting impor
 from pySDC.projects.PinTSimE.piline_model import setup_mpl
 import pySDC.helpers.plot_helper as plt_helper
 from pySDC.core.Hooks import hooks
-from pySDC.implementations.hooks.log_restarts import LogRestarts
 
 from pySDC.projects.PinTSimE.switch_estimator import SwitchEstimator
 from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
@@ -120,7 +119,7 @@ def generate_description(
     # initialize controller parameters
     controller_params = dict()
     controller_params['logger_level'] = 30
-    controller_params['hook_class'] = [hook_class, LogRestarts]
+    controller_params['hook_class'] = hook_class
     controller_params['mssdc_jac'] = False
 
     # convergence controllers

@@ -20,7 +20,7 @@ MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
     'e_global_rel': ('e_global_rel_post_run', max, False),
     't': ('timing_run', max, False),
-    'e_local_max': ('e_local_post_step', max, False),
+    # 'e_local_max': ('e_local_post_step', max, False),
     'k_SDC': ('k', sum, None),
     'k_Newton': ('work_newton', sum, None),
     'k_Newton_no_restart': ('work_newton', sum, False),
@@ -64,7 +64,7 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     stats, controller, _ = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs),
-        hook_class=[LogData, LogWork, LogGlobalErrorPostRunMPI, LogLocalErrorPostStep],
+        hook_class=[LogData, LogWork, LogGlobalErrorPostRunMPI],
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm,
@@ -161,7 +161,9 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-4, -3, -2, -1, 0, 1, 2, 3]
+        exponents = [-3, -2, -1, 0, 1, 2, 3]
+        if problem.__name__ == 'run_vdp' and strategy.name == 'adaptivity':
+            exponents = [-4] + exponents
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3]
@@ -184,6 +186,11 @@ def record_work_precision(
     # run multiple times with different parameters
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
+
+        if strategy.name == 'adaptivity_coll':
+            # set_parameter(description, ['level_params', 'restol'], 1e-9)
+            set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
+
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
         data[param_range[i]][param] = [param_range[i]]
@@ -247,9 +254,11 @@ def plot_work_precision(
     precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
 
     for key in [work_key, precision_key]:
-        rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.]) for me in data.keys()]
+        rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in data.keys()]
         if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
-            print(f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}")
+            print(
+                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
+            )
 
     style = merge_descriptions(
         {**strategy.style, 'label': f'{strategy.style["label"]}{f" {handle}" if handle else ""}'},
@@ -350,7 +359,7 @@ def execute_configurations(
                     comm_world=comm_world,
                     problem_args=config.get('problem_args', {}),
                 )
-            if plotting:
+            if plotting and comm_world.rank == 0:
                 plot_work_precision(
                     **shared_args,
                     work_key=work_key,
@@ -418,13 +427,16 @@ def get_configs(mode, problem):
             AdaptivityStrategy,
         )
 
-        strategies = [AdaptivityCollocationTypeStrategy(useMPI=True), AdaptivityCollocationRefinementStrategy(useMPI=True)]
+        strategies = [
+            AdaptivityCollocationTypeStrategy(useMPI=True),
+            AdaptivityCollocationRefinementStrategy(useMPI=True),
+        ]
 
         restol = None
         for strategy in strategies:
             strategy.restol = restol
 
-        configurations[1] = {'strategies': strategies, 'handle': '*'}
+        configurations[1] = {'strategies': strategies}
         configurations[2] = {
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -448,7 +460,12 @@ def get_configs(mode, problem):
         # dumbledoresarmy.residual_e_tol_ratio = 1e2
         dumbledoresarmy.residual_e_tol_abs = 1e-3
 
-        strategies = [AdaptivityStrategy(useMPI=True), IterateStrategy(useMPI=True), BaseStrategy(useMPI=True), dumbledoresarmy]
+        strategies = [
+            AdaptivityStrategy(useMPI=True),
+            IterateStrategy(useMPI=True),
+            BaseStrategy(useMPI=True),
+            dumbledoresarmy,
+        ]
         configurations[1] = {'strategies': strategies}
         configurations[2] = {
             'strategies': strategies,
@@ -487,18 +504,24 @@ def get_configs(mode, problem):
 
     elif mode == 'newton_tol':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+
         tol_range = [1e-7, 1e-9, 1e-11]
         ls = ['-', '--', '-.', ':']
         for i in range(len(tol_range)):
             configurations[i] = {
                 'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
-                'custom_description': {'problem_params': {'newton_tol': tol_range[i]}, 'step_params': {'maxiter': 5},},
+                'custom_description': {
+                    'problem_params': {'newton_tol': tol_range[i]},
+                    'step_params': {'maxiter': 5},
+                },
                 'handle': f"Newton tol={tol_range[i]:.1e}",
                 'plotting_params': {'ls': ls[i]},
             }
             configurations[i + len(tol_range)] = {
                 'strategies': [IterateStrategy(useMPI=True)],
-                'custom_description': {'problem_params': {'newton_tol': tol_range[i]},},
+                'custom_description': {
+                    'problem_params': {'newton_tol': tol_range[i]},
+                },
                 'handle': f"Newton tol={tol_range[i]:.1e}",
                 'plotting_params': {'ls': ls[i]},
             }
@@ -509,16 +532,25 @@ def get_configs(mode, problem):
 
 
 def get_fig(x=1, y=1, **kwargs):
-    # TODO: docs
+    """
+    Get a figure to plot in.
+
+    Args:
+        x (int): How many panels in horizontal direction you want
+        y (int): How many panels in vertical direction you want
+
+    Returns:
+        matplotlib.pyplot.Figure
+    """
     keyword_arguments = {
-        'figsize': figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0),
+        'figsize': figsize_by_journal('Springer_Numerical_Algorithms', 0.5 if x == 1 else 1.0, 1.0),
         'layout': 'constrained',
         **kwargs,
     }
     return plt.subplots(x, y, **keyword_arguments)
 
 
-def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', **kwargs):
+def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', **kwargs):
     """
     Save a figure with a legend on the bottom.
 
@@ -536,15 +568,20 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', **kw
     handles, labels = fig.get_axes()[0].get_legend_handles_labels()
     order = np.argsort([me[0] for me in labels])
     fig.legend(
-        [handles[i] for i in order], [labels[i] for i in order], loc='outside lower center', ncols=2, frameon=False
+        [handles[i] for i in order],
+        [labels[i] for i in order],
+        loc='outside lower center',
+        ncols=3,
+        frameon=False,
+        fancybox=True,
     )
 
-    path = f'data/wp-{name}-{work_key}-{precision_key}.{format}'
+    path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
     print(f'Stored figure \"{path}\"')
 
 
-def all_problems(mode='compare_strategies', plotting=True, **kwargs):
+def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
     """
     Make a plot comparing various strategies for all problems.
 
@@ -580,17 +617,18 @@ def all_problems(mode='compare_strategies', plotting=True, **kwargs):
             configurations=get_configs(mode, problems[i]),
         )
 
-    if plotting:
+    if plotting and comm_world.rank == 0:
         save_fig(
             fig=fig,
             name=mode,
             work_key=shared_params['work_key'],
             precision_key=shared_params['precision_key'],
             legend=True,
+            base_path=base_path,
         )
 
 
-def single_problem(mode, problem, plotting=True, **kwargs):
+def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
     """
     Make a plot for a single problem
 
@@ -620,15 +658,16 @@ def single_problem(mode, problem, plotting=True, **kwargs):
             work_key=params['work_key'],
             precision_key=params['precision_key'],
             legend=False,
+            base_path=base_path,
         )
 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-       'mode': 'newton_tol',
-       'problem': run_vdp,
-       'runs': 1,
+        'mode': 'compare_adaptivity',
+        'problem': run_Schroedinger,
+        'runs': 1,
     }
     record = True
     # single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
@@ -641,7 +680,7 @@ if __name__ == "__main__":
         'plotting': False,
     }
 
-    for mode in ['compare_strategies']:#, 'preconditioners', 'compare_adaptivity']:
+    for mode in ['compare_adaptivity']:  # , 'preconditioners', 'compare_adaptivity']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
     plt.show()

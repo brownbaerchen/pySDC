@@ -1312,7 +1312,6 @@ def main():
 
     stats_analyser.run_stats_generation(runs=5000)
 
-
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None
 

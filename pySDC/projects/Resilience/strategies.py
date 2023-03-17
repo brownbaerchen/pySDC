@@ -571,7 +571,11 @@ class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
         super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[4]
         self.marker = '.'
-        self.adaptive_coll_params = {'quad_type': ['RADAU-RIGHT', 'GAUSS']}
+        self.adaptive_coll_params = {
+            'quad_type': ['RADAU-RIGHT', 'GAUSS'],
+            'do_coll_update': [False, True],
+        }
+        # self.adaptive_coll_params = {'quad_type': ['RADAU-LEFT', 'RADAU-RIGHT'], 'num_nodes': [3, 3]}
 
     @property
     def label(self):
@@ -583,7 +587,11 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
         super().__init__(useMPI=useMPI)
         self.color = list(cmap.values())[5]
         self.marker = '^'
-        self.adaptive_coll_params = {'num_nodes': [2, 3]}
+        self.adaptive_coll_params = {
+            'num_nodes': [2, 3],
+            'quad_type': ['GAUSS', 'RADAU-RIGHT'],
+            'do_coll_update': [True, False],
+        }
 
     @property
     def label(self):
