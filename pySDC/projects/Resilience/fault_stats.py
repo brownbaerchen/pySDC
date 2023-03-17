@@ -100,7 +100,7 @@ class FaultStats:
             if comm.rank == 0:
                 already_completed = np.array([self.load(strategy, True).get('runs', 0) for strategy in self.strategies])
                 sorting_index_ = np.argsort(already_completed)
-                sorting_index = sorting_index_[already_completed[sorting_index_] < runs]
+                sorting_index = sorting_index_[already_completed[sorting_index_] < max_runs]
 
             # tell all ranks what strategies to use
             sorting_index = comm.bcast(sorting_index, root=0)
@@ -1301,15 +1301,17 @@ def main():
         prob=run_vdp,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=False,
+        reload=True,
         recovery_thresh=1.1,
         # recovery_thresh_abs=5e-5,
         num_procs=1,
         mode='combination',
         stats_path='data/stats-jusuf',
     )
+    print(stats_analyser.print_faults())
 
     stats_analyser.run_stats_generation(runs=5000)
+
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None

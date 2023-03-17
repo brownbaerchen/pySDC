@@ -66,7 +66,6 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
-        self.newton_tol = 1e-8
 
     def get_fixable_params(self, **kwargs):
         """
@@ -170,7 +169,7 @@ class Strategy:
             custom_description['problem_params'] = {
                 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
                 'crash_at_maxiter': False,
-                'newton_tol': self.newton_tol,
+                'newton_tol': 1e-11,
             }
             custom_description['level_params'] = {'dt': 1e-2}
 
@@ -183,7 +182,7 @@ class Strategy:
         elif problem.__name__ == "run_leaky_superconductor":
             custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': self.newton_tol}
+            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-9}
         return merge_descriptions(custom_description, self.custom_description)
 
 

@@ -161,16 +161,19 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
+        exponents = [-4, -3, -2, -1, 0, 1, 2, 3]
     elif param == 'dt':
         power = 2.0
+        exponents = [-1, 0, 1, 2, 3]
     elif param == 'restol':
         power = 10.0
+        exponents = [-2, -1, 0, 1, 2, 3]
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in [-2, -1, 0, 1, 2, 3]]
+    param_range = [default * power**i for i in exponents]
 
     if problem.__name__ == 'run_leaky_superconductor':
         if param == 'restol':
@@ -244,9 +247,9 @@ def plot_work_precision(
     precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
 
     for key in [work_key, precision_key]:
-        rel_variance = [np.std(data[me][key]) / np.nanmean(data[me][key]) for me in data.keys()]
-        if not all([me < 1e-2 or not np.isfinite(me) for me in rel_variance]):
-            print(f"WARNING: Variance too large! Got {rel_variance}")
+        rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.]) for me in data.keys()]
+        if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
+            print(f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}")
 
     style = merge_descriptions(
         {**strategy.style, 'label': f'{strategy.style["label"]}{f" {handle}" if handle else ""}'},
@@ -380,12 +383,12 @@ def get_configs(mode, problem):
         configurations[0] = {
             'custom_description': description_high_order,
             'handle': r'high order',
-            'strategies': [AdaptivityStrategy(), BaseStrategy()],
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
         }
         configurations[1] = {
             'custom_description': description_low_order,
             'handle': r'low order',
-            'strategies': [AdaptivityStrategy(), BaseStrategy()],
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
             'plotting_params': dashed,
         }
 
@@ -399,13 +402,13 @@ def get_configs(mode, problem):
         configurations[2] = {
             'custom_description': description_large_step,
             'handle': r'large step',
-            'strategies': [IterateStrategy()],
+            'strategies': [IterateStrategy(useMPI=True)],
             'plotting_params': dashed,
         }
         configurations[3] = {
             'custom_description': description_small_step,
             'handle': r'small step',
-            'strategies': [IterateStrategy()],
+            'strategies': [IterateStrategy(useMPI=True)],
         }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
@@ -415,7 +418,7 @@ def get_configs(mode, problem):
             AdaptivityStrategy,
         )
 
-        strategies = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
+        strategies = [AdaptivityCollocationTypeStrategy(useMPI=True), AdaptivityCollocationRefinementStrategy(useMPI=True)]
 
         restol = None
         for strategy in strategies:
@@ -424,10 +427,10 @@ def get_configs(mode, problem):
         configurations[1] = {'strategies': strategies, 'handle': '*'}
         configurations[2] = {
             'custom_description': {'step_params': {'maxiter': 5}},
-            'strategies': [AdaptivityStrategy()],
+            'strategies': [AdaptivityStrategy(useMPI=True)],
         }
 
-        # strategies2 = [AdaptivityCollocationTypeStrategy(), AdaptivityCollocationRefinementStrategy()]
+        # strategies2 = [AdaptivityCollocationTypeStrategy(useMPI=True), AdaptivityCollocationRefinementStrategy(useMPI=True)]
         # restol = 1e-6
         # for strategy in strategies2:
         #    strategy.restol = restol
@@ -441,11 +444,11 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        dumbledoresarmy = DoubleAdaptivityStrategy()
+        dumbledoresarmy = DoubleAdaptivityStrategy(useMPI=True)
         # dumbledoresarmy.residual_e_tol_ratio = 1e2
         dumbledoresarmy.residual_e_tol_abs = 1e-3
 
-        strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy(), dumbledoresarmy]
+        strategies = [AdaptivityStrategy(useMPI=True), IterateStrategy(useMPI=True), BaseStrategy(useMPI=True), dumbledoresarmy]
         configurations[1] = {'strategies': strategies}
         configurations[2] = {
             'strategies': strategies,
@@ -470,7 +473,7 @@ def get_configs(mode, problem):
     elif mode == 'preconditioners':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, IterateStrategy, BaseStrategy
 
-        strategies = [AdaptivityStrategy(), IterateStrategy(), BaseStrategy()]
+        strategies = [AdaptivityStrategy(useMPI=True), IterateStrategy(useMPI=True), BaseStrategy(useMPI=True)]
 
         precons = ['IE', 'LU', 'MIN', 'MIN3']
         ls = ['-', '--', '-.', ':']
@@ -479,6 +482,24 @@ def get_configs(mode, problem):
                 'strategies': strategies,
                 'custom_description': {'sweeper_params': {'QI': precons[i]}},
                 'handle': precons[i],
+                'plotting_params': {'ls': ls[i]},
+            }
+
+    elif mode == 'newton_tol':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+        tol_range = [1e-7, 1e-9, 1e-11]
+        ls = ['-', '--', '-.', ':']
+        for i in range(len(tol_range)):
+            configurations[i] = {
+                'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
+                'custom_description': {'problem_params': {'newton_tol': tol_range[i]}, 'step_params': {'maxiter': 5},},
+                'handle': f"Newton tol={tol_range[i]:.1e}",
+                'plotting_params': {'ls': ls[i]},
+            }
+            configurations[i + len(tol_range)] = {
+                'strategies': [IterateStrategy(useMPI=True)],
+                'custom_description': {'problem_params': {'newton_tol': tol_range[i]},},
+                'handle': f"Newton tol={tol_range[i]:.1e}",
                 'plotting_params': {'ls': ls[i]},
             }
     else:
@@ -604,13 +625,13 @@ def single_problem(mode, problem, plotting=True, **kwargs):
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    # params = {
-    #    'mode': 'preconditioners',
-    #    'problem': run_vdp,
-    #    'runs': 5,
-    # }
-    # record = True
-    # single_problem(**params, work_key='t', precision_key='e_global_rel', record=record, runs=1)
+    params = {
+       'mode': 'newton_tol',
+       'problem': run_vdp,
+       'runs': 1,
+    }
+    record = True
+    # single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': True,
@@ -620,8 +641,7 @@ if __name__ == "__main__":
         'plotting': False,
     }
 
-    # for mode in ['compare_strategies', 'preconditioners', 'compare_adaptivity']:
-    for mode in ['preconditioners', 'compare_adaptivity']:
+    for mode in ['compare_strategies']:#, 'preconditioners', 'compare_adaptivity']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
     plt.show()
