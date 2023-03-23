@@ -66,17 +66,19 @@ def my_setup_mpl(**kwargs):
     mpl.rcParams.update({'lines.markersize': 6})
 
 
-def savefig(fig, name, format='pdf'):  # pragma: no cover
+def savefig(fig, name, format='pdf', tight_layout=True):  # pragma: no cover
     """
     Save a figure to some predefined location.
 
     Args:
         fig (Matplotlib.Figure): The figure of the plot
         name (str): The name of the plot
+        tight_layout (bool): Apply tight layout or leave as is
     Returns:
         None
     """
-    fig.tight_layout()
+    if tight_layout:
+        fig.tight_layout()
     path = f'{BASE_PATH}/{name}.{format}'
     fig.savefig(path, bbox_inches='tight', transparent=True, dpi=200)
     print(f'saved "{path}"')
@@ -235,7 +237,7 @@ def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
     mask = stats_analyser.get_mask()  # get empty mask, potentially put in some other mask later
 
     my_setup_mpl()
-    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=(7 * cm, 7 * cm))
+    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained')
 
     res = {}
     for strategy in stats_analyser.strategies:
@@ -272,8 +274,8 @@ def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
     ax.set_xticks(theta[:-1], [f'{labels[i]}\nmax={norms[i]:.2f}' for i in range(len(labels))])
     ax.set_rlabel_position(90)
 
-    ax.legend(frameon=True, loc='lower right')
-    savefig(fig, 'efficiency')
+    fig.legend(frameon=False, loc='outside right', ncols=1)
+    savefig(fig, 'efficiency', tight_layout=False)
 
 
 def plot_adaptivity_stuff():  # pragma: no cover
@@ -611,13 +613,13 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    plot_vdp_solution()
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    plot_adaptivity_stuff()
+    #plot_vdp_solution()
+    #plot_recovery_rate(get_stats(run_vdp))
+    #plot_fault_vdp(0)
+    #plot_fault_vdp(13)
+    #plot_adaptivity_stuff()
     plot_efficiency_polar(run_vdp)
-    compare_recovery_rate_problems()
+    #compare_recovery_rate_problems()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -638,5 +640,5 @@ if __name__ == "__main__":
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    work_precision()
-    # make_plots_for_paper()
+    # work_precision()
+    make_plots_for_paper()
