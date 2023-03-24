@@ -8,6 +8,7 @@ from pySDC.helpers.stats_helper import get_sorted
 from pySDC.helpers.plot_helper import figsize_by_journal
 from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
+
 def single_run(problem, description=None):
     description = {} if description is None else description
     stats, _, _ = problem(custom_description=description, hook_class=LogGlobalErrorPostRun)
@@ -27,13 +28,13 @@ def multiple_runs(problem, values, expected_order, mode='dt', **kwargs):
         description['step_params'] = {'maxiter': expected_order}
     elif mode == 'nvars':
         description['problem_params'] = {'order': expected_order}
-         
+
     for i in range(len(values)):
         if mode == 'dt':
             description['level_params']['dt'] = values[i]
         elif mode == 'nvars':
             description['problem_params']['nvars'] = values[i]
-             
+
         errors[i] = single_run(problem, description)
     return values, errors
 
@@ -49,19 +50,14 @@ def plot_order(values, errors, ax, thresh=1e-16, color='black', **kwargs):
     values = np.array(values)
     order = get_order(values, errors, thresh=thresh)
     ax.scatter(values, errors, color=color, **kwargs)
-    ax.loglog(values, errors[0] * (values/values[0]) ** order, color=color, label=f'p={order:.2f}', **kwargs)
-
+    ax.loglog(values, errors[0] * (values / values[0]) ** order, color=color, label=f'p={order:.2f}', **kwargs)
 
 
 if __name__ == '__main__':
     fig, ax = plt.subplots()
     problem = run_advection
 
-    base_configs_dt = {
-        'values': np.array([2.**(-i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9]]),
-        'mode': 'dt',
-        'ax': ax
-    }
+    base_configs_dt = {'values': np.array([2.0 ** (-i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9]]), 'mode': 'dt', 'ax': ax}
 
     configs_dt = {}
     configs_dt[2] = {**base_configs_dt, 'color': 'black'}
@@ -70,24 +66,24 @@ if __name__ == '__main__':
     configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
     configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
     configs_dt[6] = {**base_configs_dt, 'color': 'blue'}
-     
+
     for key in configs_dt.keys():
         values, errors = multiple_runs(problem, expected_order=key, **configs_dt[key])
         plot_order(values, errors, ax=configs_dt[key]['ax'], thresh=1e-9, color=configs_dt[key]['color'])
     base_configs_dt['ax'].set_xlabel(r'$\Delta t$')
     base_configs_dt['ax'].set_ylabel('global error')
 
-    #base_configs_nvars = {
+    # base_configs_nvars = {
     #    'values': [128, 256, 512, 1024],
     #    # 'values': np.array([2**(i) for i in [4, 5, 6, 7, 8, 9]]),
     #    'mode': 'nvars',
-    #}
+    # }
 
-    #configs_nvars = {}
-    #configs_nvars[2] = {**base_configs_nvars, 'color': 'black'}
-    #configs_nvars[4] = {**base_configs_nvars, 'color': 'magenta'}
+    # configs_nvars = {}
+    # configs_nvars[2] = {**base_configs_nvars, 'color': 'black'}
+    # configs_nvars[4] = {**base_configs_nvars, 'color': 'magenta'}
 
-    #for key in configs_nvars.keys():
+    # for key in configs_nvars.keys():
     #    values, errors = multiple_runs(problem, expected_order=key, **configs_nvars[key])
     #    plot_order(values, errors, axs[1], color=configs_nvars[key]['color'])
 
