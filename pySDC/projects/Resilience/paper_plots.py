@@ -237,7 +237,9 @@ def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
     mask = stats_analyser.get_mask()  # get empty mask, potentially put in some other mask later
 
     my_setup_mpl()
-    fig, ax = plt.subplots(subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained')
+    fig, ax = plt.subplots(
+        subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
+    )
 
     res = {}
     for strategy in stats_analyser.strategies:
@@ -613,13 +615,13 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    #plot_vdp_solution()
-    #plot_recovery_rate(get_stats(run_vdp))
-    #plot_fault_vdp(0)
-    #plot_fault_vdp(13)
-    #plot_adaptivity_stuff()
+    # plot_vdp_solution()
+    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
+    # plot_adaptivity_stuff()
     plot_efficiency_polar(run_vdp)
-    #compare_recovery_rate_problems()
+    # compare_recovery_rate_problems()
 
 
 def make_plots_for_notes():  # pragma: no cover
