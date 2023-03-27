@@ -1308,7 +1308,6 @@ def main():
         mode='combination',
         stats_path='data/stats-jusuf',
     )
-    print(stats_analyser.print_faults())
 
     stats_analyser.run_stats_generation(runs=5000)
 

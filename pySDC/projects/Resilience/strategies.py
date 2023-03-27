@@ -140,14 +140,15 @@ class Strategy:
             float: Tend to put into the run
         '''
         if problem.__name__ == "run_vdp":
-            return 7.
+            return 11.5
+            return 7.0
             # return 2.3752559741400825  # old stuff
         elif problem.__name__ == "run_piline":
             return 20.0
         elif problem.__name__ == "run_Lorenz":
             return 1.5
         elif problem.__name__ == "run_Schroedinger":
-            return 1.0
+            return 10.0
         elif problem.__name__ == "run_leaky_superconductor":
             return 430
         else:
@@ -168,7 +169,8 @@ class Strategy:
         if problem.__name__ == "run_vdp":
             custom_description['step_params'] = {'maxiter': 3}
             custom_description['problem_params'] = {
-                'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
+                'u0': np.array([2, 0], dtype=np.float64),
+                # 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
                 'crash_at_maxiter': False,
                 'newton_tol': 1e-11,
             }

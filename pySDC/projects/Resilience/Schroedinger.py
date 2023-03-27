@@ -10,6 +10,57 @@ from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_ff
 from pySDC.projects.Resilience.hook import LogData, hook_collection
 from pySDC.projects.Resilience.strategies import merge_descriptions
 
+from pySDC.core.Hooks import hooks
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+
+class live_plotting_with_error(hooks):  # pragma: no cover
+    def __init__(self):
+        super().__init__()
+        self.fig, self.axs = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(12, 7))
+
+        divider = make_axes_locatable(self.axs[1])
+        self.cax_right = divider.append_axes('right', size='5%', pad=0.05)
+        divider = make_axes_locatable(self.axs[0])
+        self.cax_left = divider.append_axes('right', size='5%', pad=0.05)
+
+    def post_step(self, step, level_number):
+        lvl = step.levels[level_number]
+        lvl.sweep.compute_end_point()
+
+        self.axs[0].cla()
+        im1 = self.axs[0].imshow(np.abs(lvl.uend), vmin=0, vmax=2.0)
+        self.fig.colorbar(im1, cax=self.cax_left)
+
+        self.axs[1].cla()
+        im = self.axs[1].imshow(np.abs(lvl.prob.u_exact(lvl.time + lvl.dt) - lvl.uend))
+        self.fig.colorbar(im, cax=self.cax_right)
+
+        self.fig.suptitle(f't={lvl.time:.2f}')
+        self.axs[0].set_title('solution')
+        self.axs[1].set_title('error')
+        plt.pause(1e-9)
+
+
+class live_plotting(hooks):  # pragma: no cover
+    def __init__(self):
+        super().__init__()
+        self.fig, self.ax = plt.subplots()
+        divider = make_axes_locatable(self.ax)
+        self.cax = divider.append_axes('right', size='5%', pad=0.05)
+
+    def post_step(self, step, level_number):
+        lvl = step.levels[level_number]
+        lvl.sweep.compute_end_point()
+
+        self.ax.cla()
+        im = self.ax.imshow(np.abs(lvl.uend), vmin=0.2, vmax=1.8)
+        self.ax.set_title(f't={lvl.time + lvl.dt:.2f}')
+        self.fig.colorbar(im, cax=self.cax)
+        plt.pause(1e-9)
+
 
 def run_Schroedinger(
     custom_description=None,
@@ -46,7 +97,7 @@ def run_Schroedinger(
 
     # initialize level parameters
     level_params = dict()
-    level_params['restol'] = 1e-08
+    level_params['restol'] = 1e-8
     level_params['dt'] = 1e-01 / 2
     level_params['nsweeps'] = 1
 
@@ -61,6 +112,7 @@ def run_Schroedinger(
     problem_params = dict()
     problem_params['nvars'] = (128, 128)
     problem_params['spectral'] = False
+    problem_params['c'] = 1.0
     problem_params['comm'] = space_comm
 
     # initialize step parameters
@@ -125,25 +177,9 @@ def run_Schroedinger(
     return stats, controller, Tend
 
 
-def plot_solution(stats):  # pragma: no cover
-    import matplotlib.pyplot as plt
-
-    u = get_sorted(stats, type='u')
-    fig, axs = plt.subplots(1, 2, figsize=(12, 5))
-    axs[0].imshow(np.abs(u[0][1]))
-    axs[0].set_title(f't={u[0][0]:.2f}')
-    for i in range(len(u)):
-        axs[1].cla()
-        axs[1].imshow(np.abs(u[i][1]))
-        axs[1].set_title(f't={u[i][0]:.2f}')
-        plt.pause(1e-1)
-    fig.tight_layout()
-    plt.show()
-
-
 def main():
-    stats, _, _ = run_Schroedinger(space_comm=MPI.COMM_WORLD)
-    plot_solution(stats)
+    stats, _, _ = run_Schroedinger(space_comm=MPI.COMM_WORLD, hook_class=live_plotting)
+    plt.show()
 
 
 if __name__ == "__main__":
