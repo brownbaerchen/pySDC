@@ -8,8 +8,11 @@ from pySDC.helpers.stats_helper import get_sorted
 from pySDC.helpers.plot_helper import figsize_by_journal
 from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
+from pySDC.implementations.convergence_controller_classes.compression import Compression
+
 def single_run(problem, description=None):
     description = {} if description is None else description
+    description['convergence_controllers'] = {Compression: {}}
     stats, _, _ = problem(custom_description=description, hook_class=LogGlobalErrorPostRun)
     e = get_sorted(stats, type='e_global_post_run')[-1][1]
     return e
@@ -35,6 +38,7 @@ def multiple_runs(problem, values, expected_order, mode='dt', **kwargs):
             description['problem_params']['nvars'] = values[i]
              
         errors[i] = single_run(problem, description)
+    print(errors)
     return values, errors
 
 
@@ -64,12 +68,11 @@ if __name__ == '__main__':
     }
 
     configs_dt = {}
-    configs_dt[2] = {**base_configs_dt, 'color': 'black'}
-    configs_dt[3] = {**base_configs_dt, 'color': 'magenta'}
+    # configs_dt[2] = {**base_configs_dt, 'color': 'black'}
+    # configs_dt[3] = {**base_configs_dt, 'color': 'magenta'}
     configs_dt[4] = {**base_configs_dt, 'color': 'teal'}
-    configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
-    configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
-    configs_dt[6] = {**base_configs_dt, 'color': 'blue'}
+    # configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
+    # configs_dt[6] = {**base_configs_dt, 'color': 'blue'}
      
     for key in configs_dt.keys():
         values, errors = multiple_runs(problem, expected_order=key, **configs_dt[key])
@@ -92,4 +95,5 @@ if __name__ == '__main__':
     #    plot_order(values, errors, axs[1], color=configs_nvars[key]['color'])
 
     ax.legend(frameon=False)
+    fig.savefig('compression.pdf')
     plt.show()
