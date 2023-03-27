@@ -213,7 +213,46 @@ def compare_recovery_rate_problems():  # pragma: no cover
     savefig(fig, 'compare_equations')
 
 
-def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
+def plot_efficiency_polar_vdp(problem, path='data/stats'):  # pragma: no cover
+    stats_analyser = get_stats(problem, path)
+    fig, ax = plt.subplots(
+        subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
+    )
+    theta, norms = plot_efficiency_polar_single(stats_analyser, ax)
+
+    labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
+    ax.set_xticks(theta[:-1], [f'{labels[i]}\nmax={norms[i]:.2f}' for i in range(len(labels))])
+    ax.set_rlabel_position(90)
+
+    fig.legend(frameon=False, loc='outside right', ncols=1)
+    savefig(fig, 'efficiency', tight_layout=False)
+
+def plot_efficiency_polar_other():  # pragma: no cover
+    problems = [run_Lorenz, run_Schroedinger, run_leaky_superconductor]
+    paths = ['./data/stats/', './data/stats-jusuf', './data/stats-jusuf']
+    titles = ['Lorenz attractor', r'Schr\"odinger', 'Quench']
+
+    fig, axs = plt.subplots(
+        1, 3, subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
+    )
+
+    for i in range(len(problems)):
+        stats_analyser = get_stats(problems[i], paths[i])
+        ax = axs[i]
+        theta, norms = plot_efficiency_polar_single(stats_analyser, ax)
+
+        labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
+        ax.set_rlabel_position(90)
+        # ax.set_xticks(theta[:-1], [f'max={norms[i]:.2f}' for i in range(len(labels))])
+        ax.set_xticks(theta[:-1], [f'' for i in range(len(labels))])
+        ax.set_title(titles[i])
+
+    handles, labels = fig.get_axes()[0].get_legend_handles_labels()
+    fig.legend(handles=handles, labels=labels, frameon=False, loc='outside lower center', ncols=4)
+    savefig(fig, 'efficiency_other', tight_layout=False)
+
+     
+def plot_efficiency_polar_single(stats_analyser, ax):  # pragma: no cover
     """
     Plot the recovery rate and the computational cost in a polar plot.
 
@@ -232,14 +271,10 @@ def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
     Returns:
         None
     """
-
-    stats_analyser = get_stats(problem, path)
+    # TODO: fix docs
     mask = stats_analyser.get_mask()  # get empty mask, potentially put in some other mask later
 
     my_setup_mpl()
-    fig, ax = plt.subplots(
-        subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
-    )
 
     res = {}
     for strategy in stats_analyser.strategies:
@@ -271,13 +306,7 @@ def plot_efficiency_polar(problem, path='data/stats'):  # pragma: no cover
     theta = np.array([30, 150, 270, 30]) * 2 * np.pi / 360
     for s in stats_analyser.strategies:
         ax.plot(theta, res_norm[s.name] + [res_norm[s.name][0]], label=s.label, color=s.color, marker=s.marker)
-
-    labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
-    ax.set_xticks(theta[:-1], [f'{labels[i]}\nmax={norms[i]:.2f}' for i in range(len(labels))])
-    ax.set_rlabel_position(90)
-
-    fig.legend(frameon=False, loc='outside right', ncols=1)
-    savefig(fig, 'efficiency', tight_layout=False)
+    return theta, norms
 
 
 def plot_adaptivity_stuff():  # pragma: no cover
@@ -617,10 +646,11 @@ def make_plots_for_paper():  # pragma: no cover
 
     # plot_vdp_solution()
     # plot_recovery_rate(get_stats(run_vdp))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
-    plot_efficiency_polar(run_vdp)
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    plot_adaptivity_stuff()
+    # plot_efficiency_polar_other()
+    #plot_efficiency_polar_vdp(run_vdp)
     # compare_recovery_rate_problems()
 
 

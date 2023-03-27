@@ -140,7 +140,8 @@ class Strategy:
             float: Tend to put into the run
         '''
         if problem.__name__ == "run_vdp":
-            return 2.3752559741400825
+            return 7.
+            # return 2.3752559741400825  # old stuff
         elif problem.__name__ == "run_piline":
             return 20.0
         elif problem.__name__ == "run_Lorenz":

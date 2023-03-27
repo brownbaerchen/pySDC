@@ -1301,7 +1301,7 @@ def main():
         prob=run_vdp,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=True,
+        reload=False,
         recovery_thresh=1.1,
         # recovery_thresh_abs=5e-5,
         num_procs=1,
