@@ -162,7 +162,7 @@ def record_work_precision(
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
         exponents = [-3, -2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
-            exponents = [-3, -2, -1, 0, 1, 2]
+            exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3]
@@ -211,7 +211,8 @@ def record_work_precision(
 
             if VERBOSE and comm_world.rank == 0:
                 print(
-                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}', flush=True
+                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
+                    flush=True,
                 )
 
     if comm_world.rank == 0:
@@ -260,7 +261,8 @@ def plot_work_precision(
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in data.keys()]
         if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
             print(
-                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}", flush=True
+                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}",
+                flush=True,
             )
 
     style = merge_descriptions(
