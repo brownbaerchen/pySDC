@@ -677,5 +677,5 @@ if __name__ == "__main__":
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    # work_precision()
+    work_precision()
     make_plots_for_paper()
