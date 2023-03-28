@@ -161,14 +161,16 @@ def record_work_precision(
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
         exponents = [-3, -2, -1, 0, 1, 2, 3]
-        if problem.__name__ == 'run_vdp' and strategy.name == 'adaptivity':
-            exponents = [-4] + exponents
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3]
+        if problem.__name__ == 'run_leaky_superconductor':
+            exponents = [-1, 0, 1, 2]
     elif param == 'restol':
         power = 10.0
         exponents = [-2, -1, 0, 1, 2, 3]
+        if problem.__name__ == 'run_vdp':
+            exponents = [-4, -3, -2, -1, 0, 1]
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
@@ -381,7 +383,15 @@ def execute_configurations(
 def get_configs(mode, problem):
     # TODO: docs
     configurations = {}
-    if mode == 'compare_strategies':
+    if mode == 'regular':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+
+        handle = 'regular'
+        configurations[0] = {
+            'handle': handle,
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True), IterateStrategy(useMPI=True)],
+        }
+    elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
         description_high_order = {'step_params': {'maxiter': 5}}
@@ -664,19 +674,19 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-        'mode': 'compare_adaptivity',
-        'problem': run_Schroedinger,
+        'mode': 'compare_strategies',
+        'problem': run_vdp,
         'runs': 1,
     }
     record = True
-    # single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': False,
         'runs': 5,
-        'work_key': 't',
+        'work_key': 'param',
         'precision_key': 'e_global_rel',
-        'plotting': True,
+        'plotting': False,
     }
 
     for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:

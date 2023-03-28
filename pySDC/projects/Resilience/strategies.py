@@ -170,7 +170,7 @@ class Strategy:
             custom_description['step_params'] = {'maxiter': 3}
             custom_description['problem_params'] = {
                 'u0': np.array([2, 0], dtype=np.float64),
-                # 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),
+                # 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),  # old stuff
                 'crash_at_maxiter': False,
                 'newton_tol': 1e-11,
             }

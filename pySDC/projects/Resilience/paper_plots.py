@@ -189,7 +189,7 @@ def compare_recovery_rate_problems():  # pragma: no cover
         None
     """
     stats = [
-        get_stats(run_vdp),
+        get_stats(run_vdp, 'data/stats-jusuf'),
         get_stats(run_Lorenz),
         get_stats(run_Schroedinger, 'data/stats-jusuf'),
         get_stats(run_leaky_superconductor, 'data/stats-jusuf'),
@@ -245,7 +245,7 @@ def plot_efficiency_polar_other():  # pragma: no cover
         labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
         ax.set_rlabel_position(90)
         # ax.set_xticks(theta[:-1], [f'max={norms[i]:.2f}' for i in range(len(labels))])
-        ax.set_xticks(theta[:-1], [f'' for i in range(len(labels))])
+        ax.set_xticks(theta[:-1], ['' for i in range(len(labels))])
         ax.set_title(titles[i])
 
     handles, labels = fig.get_axes()[0].get_legend_handles_labels()
@@ -341,7 +341,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
         Returns:
             None
         """
-        markevery = 30
+        markevery = 40
         e = get_sorted(stats, type='e_local_post_step', recomputed=False)
         ax.plot([me[0] for me in e], [me[1] for me in e], markevery=markevery, **strategy.style, **kwargs)
         k = get_sorted(stats, type='k')
@@ -364,7 +364,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
             u = get_sorted(stats, type='u', recomputed=False)
             axs[0].plot([me[0] for me in u], [me[1][0] for me in u], color='black', label=r'$u$')
             # axs[0].plot([me[0] for me in u], [me[1][1] for me in u], color='black', ls='--', label=r'$u_t$')
-            axs[0].legend(frameon=False)
+            # axs[0].legend(frameon=False)
 
     axs[2].set_xlabel(r'$t$')
     axs[0].set_ylabel('solution')
@@ -408,7 +408,8 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
     superscripts = ['*', '']
     subscripts = ['', 't', '']
 
-    run = 779 + 12 * bit
+    run = 779 + 12 * bit  # for faults in u_t
+    #  run = 11 + 12 * bit  # for faults in u
 
     for i in range(len(do_faults)):
         stats, controller, Tend = stats_analyser.single_run(
@@ -419,7 +420,7 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
         )
         u = get_sorted(stats, type='u')
         faults = get_sorted(stats, type='bitflip')
-        for j in [0]:
+        for j in [0, 1]:
             ax.plot(
                 [me[0] for me in u],
                 [me[1][j] for me in u],
@@ -427,7 +428,7 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
                 color=colors[j],
                 label=rf'$u^{{{superscripts[i]}}}_{{{subscripts[j]}}}$',
                 marker=markers[j],
-                markevery=15,
+                markevery=40,
             )
         for idx in range(len(faults)):
             ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
@@ -651,8 +652,8 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_vdp_solution()
     # plot_recovery_rate(get_stats(run_vdp, path='data/stats-jusuf'))
     # plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
+    # plot_fault_vdp(13)
+    plot_adaptivity_stuff()
     # plot_efficiency_polar_other()
     # plot_efficiency_polar_vdp(run_vdp, path='data/stats-jusuf')
     # compare_recovery_rate_problems()
