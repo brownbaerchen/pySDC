@@ -161,6 +161,8 @@ def record_work_precision(
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
         exponents = [-3, -2, -1, 0, 1, 2, 3]
+        if problem.__name__ == 'run_vdp':
+            exponents = [-3, -2, -1, 0, 1, 2]
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3]
