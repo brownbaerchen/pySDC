@@ -209,7 +209,7 @@ def record_work_precision(
 
             if VERBOSE and comm_world.rank == 0:
                 print(
-                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
+                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}', flush=True
                 )
 
     if comm_world.rank == 0:
@@ -258,7 +258,7 @@ def plot_work_precision(
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in data.keys()]
         if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
             print(
-                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
+                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}", flush=True
             )
 
     style = merge_descriptions(
@@ -587,7 +587,7 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base
 
     path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
-    print(f'Stored figure \"{path}\"')
+    print(f'Stored figure \"{path}\"', flush=True)
 
 
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
@@ -676,7 +676,7 @@ if __name__ == "__main__":
     params = {
         'mode': 'compare_strategies',
         'problem': run_vdp,
-        'runs': 1,
+        'runs': 5,
     }
     record = True
     single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
@@ -689,7 +689,7 @@ if __name__ == "__main__":
         'plotting': False,
     }
 
-    for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
-        all_problems(**all_params, mode=mode)
-        comm_world.Barrier()
+    # for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
+    #     all_problems(**all_params, mode=mode)
+    #     comm_world.Barrier()
     plt.show()
