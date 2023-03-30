@@ -394,7 +394,16 @@ def execute_configurations(
 
 
 def get_configs(mode, problem):
-    # TODO: docs
+    """
+    Get configurations for work-precision plots. These are dictionaries containing strategies and handles and so on.
+
+    Args:
+        mode (str): The of the configurations you want to retrieve
+        problem (function): A problem to run
+
+    Returns:
+        dict: Configurations
+    """
     configurations = {}
     if mode == 'regular':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
@@ -403,6 +412,27 @@ def get_configs(mode, problem):
         configurations[0] = {
             'handle': handle,
             'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True), IterateStrategy(useMPI=True)],
+        }
+    elif mode == 'step_size_limiting':
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy
+
+        configurations[0] = {
+            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': 25}}},
+            'handle': 'step limiter',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'plotting_params': {'color': 'teal', 'marker': 'v'},
+        }
+        configurations[1] = {
+            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_slope_max': 2}}},
+            'handle': 'slope limiter',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'plotting_params': {'color': 'magenta', 'marker': 'x'},
+        }
+        configurations[2] = {
+            'custom_description': {},
+            'handle': 'no limits',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
         }
     elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
@@ -687,9 +717,9 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-        'mode': 'compare_strategies',
+        'mode': 'step_size_limiting',
         'problem': run_leaky_superconductor,
-        'runs': 1,
+        'runs': 5,
     }
     record = True
     single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)

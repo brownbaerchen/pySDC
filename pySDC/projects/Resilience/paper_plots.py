@@ -684,6 +684,7 @@ def make_plots_for_paper():  # pragma: no cover
     BASE_PATH = 'data/paper'
 
     # plot_vdp_solution()
+    # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp, path='data/stats-jusuf'))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
@@ -711,6 +712,5 @@ if __name__ == "__main__":
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    plot_quench_solution()
-    # work_precision()
+    work_precision()
     # make_plots_for_paper()
