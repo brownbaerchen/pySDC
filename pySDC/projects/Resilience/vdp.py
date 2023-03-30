@@ -392,9 +392,11 @@ def check_step_size_limiter(size=4, comm=None):
         if limit_step_sizes:
             params['dt_max'] = expect['dt_max'] * 0.9
             params['dt_min'] = np.inf
+            params['dt_slope_max'] = expect['dt_slope_max'] * 0.9
+            params['dt_slope_min'] = expect['dt_slope_min'] * 1.1
             custom_description['convergence_controllers'][StepSizeLimiter] = {'dt_min': expect['dt_min'] * 1.1}
         else:
-            for k in ['dt_max', 'dt_min']:
+            for k in ['dt_max', 'dt_min', 'dt_slope_max', 'dt_slope_min']:
                 params.pop(k, None)
                 custom_description['convergence_controllers'].pop(StepSizeLimiter, None)
 
@@ -409,25 +411,36 @@ def check_step_size_limiter(size=4, comm=None):
         )
 
         # plot the step sizes
-        dt = get_sorted(stats, type='dt', recomputed=False, comm=comm)
+        dt = get_sorted(stats, type='dt', recomputed=None, comm=comm)
 
         # make sure that the convergence controllers are only added once
         convergence_controller_classes = [type(me) for me in controller.convergence_controllers]
         for c in convergence_controller_classes:
             assert convergence_controller_classes.count(c) == 1, f'Convergence controller {c} added multiple times'
 
+        dt_numpy = np.array([me[1] for me in dt])
         if not limit_step_sizes:
-            expect['dt_max'] = max([me[1] for me in dt])
-            expect['dt_min'] = min([me[1] for me in dt])
+            expect['dt_max'] = max(dt_numpy)
+            expect['dt_min'] = min(dt_numpy)
+            expect['dt_slope_max'] = max(dt_numpy[:-2] / dt_numpy[1:-1])
+            expect['dt_slope_min'] = min(dt_numpy[:-2] / dt_numpy[1:-1])
         else:
-            dt_max = max([me[1] for me in dt])
-            dt_min = min([me[1] for me in dt[size:-size]])  # The first and last step might fall below the limits
+            dt_max = max(dt_numpy)
+            dt_min = min(dt_numpy[size:-size])  # The first and last step might fall below the limits
+            dt_slope_max = max(dt_numpy[:-2] / dt_numpy[1:-1])
+            dt_slope_min = min(dt_numpy[:-2] / dt_numpy[1:-1])
             assert (
                 dt_max <= expect['dt_max']
             ), f"Exceeded maximum allowed step size! Got {dt_max:.4e}, allowed {params['dt_max']:.4e}."
             assert (
                 dt_min >= expect['dt_min']
             ), f"Exceeded minimum allowed step size! Got {dt_min:.4e}, allowed {params['dt_min']:.4e}."
+            assert (
+                dt_slope_max <= expect['dt_slope_max']
+            ), f"Exceeded maximum allowed step size slope! Got {dt_slope_max:.4e}, allowed {params['dt_slope_max']:.4e}."
+            assert (
+                dt_slope_min >= expect['dt_slope_min']
+            ), f"Exceeded minimum allowed step size slope! Got {dt_slope_min:.4e}, allowed {params['dt_slope_min']:.4e}."
 
     if comm == None:
         print(f'Passed step size limiter test with {size} ranks in nonMPI implementation')
