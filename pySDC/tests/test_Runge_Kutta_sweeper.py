@@ -247,18 +247,12 @@ def test_embedded_estimate_order(sweeper):
 
     custom_controller_params = {'logger_level': 40}
 
-    expected_order = {
-        Cash_Karp: [5],
-        Heun_Euler: [2],
-        DIRK34: [4],
-    }
-
     Tend = 7e-2
     dt_list = Tend * 2.0 ** (-np.arange(8))
     prob = run_vdp
     plot_all_errors(
         ax,
-        expected_order.get(sweeper, None),
+        [sweeper.get_update_order()],
         True,
         Tend_fixed=Tend,
         custom_description=description,
@@ -284,7 +278,6 @@ def test_embedded_method():
     # change only the things in the description that we need for adaptivity
     adaptivity_params = dict()
     adaptivity_params['e_tol'] = 1e-7
-    adaptivity_params['update_order'] = 5
 
     convergence_controllers = dict()
     convergence_controllers[AdaptivityRK] = adaptivity_params

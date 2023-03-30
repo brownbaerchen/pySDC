@@ -471,6 +471,23 @@ def get_configs(mode, problem):
             'handle': r'small step',
             'strategies': [IterateStrategy(useMPI=True)],
         }
+    elif mode == 'RK':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
+
+        configurations[0] = {
+            'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
+        }
+        configurations[1] = {
+            'custom_description': {'step_params': {'maxiter': 5}},
+            'handle': 'order 5',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+        }
+        configurations[2] = {
+            'custom_description': {'step_params': {'maxiter': 4}},
+            'handle': 'order 4',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'plotting_params': {'ls': '--'},
+        }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
@@ -717,8 +734,8 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-        'mode': 'step_size_limiting',
-        'problem': run_leaky_superconductor,
+        'mode': 'RK',
+        'problem': run_vdp,
         'runs': 5,
     }
     record = True
@@ -735,6 +752,7 @@ if __name__ == "__main__":
     }
 
     for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
-        # all_problems(**all_params, mode=mode)
+        break
+        all_problems(**all_params, mode=mode)
         comm_world.Barrier()
     plt.show()

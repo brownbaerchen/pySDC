@@ -621,6 +621,88 @@ class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
         return 'adaptivity de-refinement'
 
 
+class DIRKStrategy(AdaptivityStrategy):
+    '''
+    DIRK4(3)
+    '''
+
+    def __init__(self, useMPI=False):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+
+        super().__init__(useMPI=useMPI)
+        self.color = list(cmap.values())[7]
+        self.marker = '^'
+        self.name = 'DIRK'
+        self.bar_plot_x_label = 'DIRK4(3)'
+        self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityRK, 'e_tol']
+
+    @property
+    def label(self):
+        return 'DIRK4(3)'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK34
+
+        adaptivity_description = super().get_custom_description(problem, num_procs)
+
+        e_tol = adaptivity_description['convergence_controllers'][Adaptivity]['e_tol']
+        adaptivity_description['convergence_controllers'].pop(Adaptivity, None)
+        adaptivity_description.pop('sweeper_params', None)
+
+        rk_params = {
+            'step_params': {'maxiter': 1},
+            'sweeper_class': DIRK34,
+            'convergence_controllers': {AdaptivityRK: {'e_tol': e_tol}},
+        }
+
+        custom_description = merge_descriptions(adaptivity_description, rk_params)
+
+        return custom_description
+
+
+class ERKStrategy(DIRKStrategy):
+    def __init__(self, useMPI=False):
+        '''
+        Initialization routine
+        '''
+        super().__init__(useMPI=useMPI)
+        self.color = list(cmap.values())[8]
+        self.marker = 'x'
+        self.name = 'ERK'
+        self.bar_plot_x_label = 'ERK5(4)'
+
+    @property
+    def label(self):
+        return 'ERK5(4)'
+
+    """
+    Explicit Cash-Karp's method
+    """
+
+    def get_custom_description(self, problem, num_procs=1):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import Cash_Karp
+
+        desc = super().get_custom_description(problem, num_procs)
+        desc['sweeper_class'] = Cash_Karp
+        return desc
+
+
 class DoubleAdaptivityStrategy(AdaptivityStrategy):
     '''
     Adaptivity based both on embedded estimate and on residual

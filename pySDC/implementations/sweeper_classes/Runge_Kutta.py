@@ -184,6 +184,15 @@ class RungeKutta(generic_implicit):
         self.parallelizable = False
         self.QI = self.coll.Qmat
 
+    @classmethod
+    def get_update_order(cls):
+        """
+        Get the order of the lower order method for doing adaptivity. Only applies to embedded methods.
+        """
+        raise NotImplementedError(
+            f"There is not an update order for RK scheme \"{cls.__name__}\" implemented. Maybe it is not an embedded scheme?"
+        )
+
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes
@@ -284,7 +293,7 @@ class MidpointMethod(RungeKutta):
 
 class RK4(RungeKutta):
     """
-    Explicit Runge-Kutta of fourth order: Everybodies darling.
+    Explicit Runge-Kutta of fourth order: Everybody's darling.
     """
 
     def __init__(self, params):
@@ -311,6 +320,10 @@ class Heun_Euler(RungeKutta):
         params['butcher_tableau'] = ButcherTableauEmbedded(weights, nodes, matrix)
         super(Heun_Euler, self).__init__(params)
 
+    @classmethod
+    def get_update_order(cls):
+        return 2
+
 
 class Cash_Karp(RungeKutta):
     """
@@ -334,6 +347,10 @@ class Cash_Karp(RungeKutta):
         params['butcher_tableau'] = ButcherTableauEmbedded(weights, nodes, matrix)
         super(Cash_Karp, self).__init__(params)
 
+    @classmethod
+    def get_update_order(cls):
+        return 5
+
 
 class DIRK34(RungeKutta):
     """
@@ -354,3 +371,7 @@ class DIRK34(RungeKutta):
         matrix[3, :] = [4007.0 / 6075.0, -31031.0 / 24300.0, -133.0 / 2700.0, 5.0 / 6.0]
         params['butcher_tableau'] = ButcherTableauEmbedded(weights, nodes, matrix)
         super().__init__(params)
+
+    @classmethod
+    def get_update_order(cls):
+        return 4
