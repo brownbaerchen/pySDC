@@ -40,7 +40,7 @@ def run_advection(
     sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'IE'
 
-    problem_params = {'freq': 2, 'nvars': 2**9, 'c': 1.0, 'type': 'center', 'order': 4, 'bc': 'periodic'}
+    problem_params = {'freq': 2, 'nvars': 2**9, 'c': 1.0, 'stencil_type': 'center', 'order': 4, 'bc': 'periodic'}
 
     # initialize step parameters
     step_params = dict()

@@ -22,12 +22,14 @@ MAPPINGS = {
     't': ('timing_run', max, False),
     # 'e_local_max': ('e_local_post_step', max, False),
     'k_SDC': ('k', sum, None),
+    'k_SDC_no_restart': ('k', sum, False),
     'k_Newton': ('work_newton', sum, None),
     'k_Newton_no_restart': ('work_newton', sum, False),
     'k_rhs': ('work_rhs', sum, None),
     'restart': ('restart', sum, None),
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
+    'e_embedded_max': ('error_embedded_estimate', max, False),
 }
 
 
@@ -150,12 +152,20 @@ def record_work_precision(
     Returns:
         None
     """
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorMPI
+
     data = {}
+
+    estimate_embedded_error = {'convergence_controllers': {EstimateEmbeddedErrorMPI: {}}}
 
     # prepare precision parameters
     param = strategy.precision_parameter
     description = merge_descriptions(
-        strategy.get_custom_description(problem, num_procs), {} if custom_description is None else custom_description
+        merge_descriptions(
+            strategy.get_custom_description(problem, num_procs),
+            {} if custom_description is None else custom_description,
+        ),
+        estimate_embedded_error,
     )
     if param == 'e_tol':
         power = 10.0
@@ -166,8 +176,6 @@ def record_work_precision(
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3]
-        if problem.__name__ == 'run_leaky_superconductor':
-            exponents = [-1, 0, 1, 2]
     elif param == 'restol':
         power = 10.0
         exponents = [-2, -1, 0, 1, 2, 3]
@@ -182,9 +190,12 @@ def record_work_precision(
 
     if problem.__name__ == 'run_leaky_superconductor':
         if param == 'restol':
-            param_range = [1e-4, 1e-5, 1e-6, 1e-7]
+            param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'e_tol':
-            param_range = [5e-5, 1e-5, 1e-6, 1e-7]
+            param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
+            # set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_max'], 50.)
+        elif param == 'dt':
+            param_range = [500 / 2.0**me for me in [5, 6, 7, 8]]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
@@ -211,8 +222,7 @@ def record_work_precision(
 
             if VERBOSE and comm_world.rank == 0:
                 print(
-                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
-                    flush=True,
+                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
                 )
 
     if comm_world.rank == 0:
@@ -261,8 +271,7 @@ def plot_work_precision(
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in data.keys()]
         if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
             print(
-                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}",
-                flush=True,
+                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
             )
 
     style = merge_descriptions(
@@ -415,10 +424,10 @@ def get_configs(mode, problem):
         }
 
         description_large_step = {
-            'level_params': {'dt': 30.0 if problem.__name__ == 'run_leaky_superconductor' else 3e-2}
+            'level_params': {'dt': 5.0 if problem.__name__ == 'run_leaky_superconductor' else 3e-2}
         }
         description_small_step = {
-            'level_params': {'dt': 10.0 if problem.__name__ == 'run_leaky_superconductor' else 1e-2}
+            'level_params': {'dt': 1.0 if problem.__name__ == 'run_leaky_superconductor' else 1e-2}
         }
 
         configurations[2] = {
@@ -591,7 +600,7 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base
 
     path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
-    print(f'Stored figure \"{path}\"', flush=True)
+    print(f'Stored figure \"{path}\"')
 
 
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
@@ -679,21 +688,23 @@ if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
         'mode': 'compare_strategies',
-        'problem': run_vdp,
-        'runs': 5,
+        'problem': run_leaky_superconductor,
+        'runs': 1,
     }
     record = True
     single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
+    single_problem(**params, work_key='param', precision_key='e_global_rel', record=False)
 
     all_params = {
         'record': False,
         'runs': 5,
-        'work_key': 'param',
+        'work_key': 't',
         'precision_key': 'e_global_rel',
-        'plotting': False,
+        'plotting': True,
     }
 
-    # for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
-    #     all_problems(**all_params, mode=mode)
-    #     comm_world.Barrier()
+    for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
+        # all_problems(**all_params, mode=mode)
+        comm_world.Barrier()
     plt.show()

@@ -442,6 +442,40 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
     savefig(fig, f'fault_bit_{bit}')
 
 
+def plot_quench_solution():  # pragma: no cover
+    """
+    Plot the solution of Quench problem over time
+
+    Returns:
+        None
+    """
+    my_setup_mpl()
+    if JOURNAL == 'JSC_beamer':
+        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
+    else:
+        fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.45))
+
+    strategy = BaseStrategy()
+
+    custom_description = strategy.get_custom_description(run_leaky_superconductor)
+
+    stats, controller, _ = run_leaky_superconductor(
+        custom_description=custom_description, Tend=strategy.get_Tend(run_leaky_superconductor)
+    )
+
+    prob = controller.MS[0].levels[0].prob
+
+    u = get_sorted(stats, type='u')
+
+    ax.plot([me[0] for me in u], [max(me[1]) for me in u], color='black', label='$T$')
+    ax.axhline(prob.u_thresh, label='$T_\mathrm{thresh}$', ls='--', color='grey', zorder=-1)
+    ax.axhline(prob.u_max, label='$T_\mathrm{max}$', ls=':', color='grey', zorder=-1)
+
+    ax.set_xlabel(r'$t$')
+    ax.legend(frameon=False)
+    savefig(fig, 'quench_sol')
+
+
 def plot_vdp_solution():  # pragma: no cover
     """
     Plot the solution of van der Pol problem over time to illustrate the varying time scales.
@@ -677,5 +711,6 @@ if __name__ == "__main__":
 
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    work_precision()
-    make_plots_for_paper()
+    plot_quench_solution()
+    # work_precision()
+    # make_plots_for_paper()

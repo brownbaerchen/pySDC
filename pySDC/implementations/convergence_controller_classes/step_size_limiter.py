@@ -39,13 +39,15 @@ class StepSizeLimiter(ConvergenceController):
         Returns:
             None
         """
-        slope_limiter_keys = ['dt_slope_min', 'dt_slope_max']                                        
-        available_keys = [me for me in slope_limiter_keys if me in self.params.__dict__.keys()]                          
-                                                                                                                        
-        if len(available_keys) > 0:                                                                                     
-            slope_limiter_params = {key: self.params.__dict__[key] for key in available_keys}                            
+        slope_limiter_keys = ['dt_slope_min', 'dt_slope_max']
+        available_keys = [me for me in slope_limiter_keys if me in self.params.__dict__.keys()]
+
+        if len(available_keys) > 0:
+            slope_limiter_params = {key: self.params.__dict__[key] for key in available_keys}
             slope_limiter_params['control_order'] = self.params.control_order - 1
-            controller.add_convergence_controller(StepSizeSlopeLimiter, params=slope_limiter_params, description=description) 
+            controller.add_convergence_controller(
+                StepSizeSlopeLimiter, params=slope_limiter_params, description=description
+            )
 
         return None
 

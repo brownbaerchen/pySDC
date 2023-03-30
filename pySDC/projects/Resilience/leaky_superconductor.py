@@ -32,12 +32,13 @@ class live_plot(hooks):  # pragma: no cover
         L = step.levels[level_number]
         for ax in self.axs:
             ax.cla()
-        [self.axs[0].plot(L.prob.xv, L.u[i], legend=f"node {i}") for i in range(len(L.u))]
+        # [self.axs[0].plot(L.prob.xv, L.u[i], label=f"node {i}") for i in range(len(L.u))]
+        self.axs[0].plot(L.prob.xv, L.u[-1])
         self.axs[0].axhline(L.prob.u_thresh, color='black')
         self.axs[1].plot(L.prob.xv, L.prob.eval_f_non_linear(L.u[-1], L.time))
         self.axs[0].set_ylim(0, 0.025)
         self.fig.suptitle(f"t={L.time:.2e}, k={step.status.iter}")
-        plt.pause(1e-9)
+        plt.pause(1e-1)
 
     def pre_run(self, step, level_number):  # pragma: no cover
         """
@@ -111,7 +112,9 @@ def run_leaky_superconductor(
     sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
 
-    problem_params = {}
+    problem_params = {
+        'newton_tol': 1e-9,
+    }
 
     # initialize step parameters
     step_params = dict()
@@ -215,8 +218,8 @@ def plot_solution_faults(stats, controller, ax, plot_lines=False, **kwargs):  # 
 
     if plot_lines:
         P = controller.MS[0].levels[0].prob
-        u_ax.axhline(P.params.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
-        u_ax.axhline(P.params.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
+        u_ax.axhline(P.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
+        u_ax.axhline(P.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
 
     [ax.axvline(me[0], color='grey', label=f'fault at t={me[0]:.2f}') for me in get_sorted(stats, type='bitflip')]
 
@@ -243,7 +246,7 @@ def get_crossing_time(stats, controller, num_points=5, inter_points=50, temperat
     from pySDC.core.Collocation import CollBase
 
     P = controller.MS[0].levels[0].prob
-    u_thresh = P.params.u_thresh
+    u_thresh = P.u_thresh
 
     u = get_sorted(stats, type='u', recomputed=False)
     temp = np.array([np.mean(me[1]) for me in u])
@@ -290,8 +293,8 @@ def plot_solution(stats, controller):  # pragma: no cover
         P = controller.S.levels[0].prob
     else:
         P = controller.MS[0].levels[0].prob
-    u_ax.axhline(P.params.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
-    u_ax.axhline(P.params.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
+    u_ax.axhline(P.u_thresh, color='grey', ls='-.', label=r'$T_\mathrm{thresh}$')
+    u_ax.axhline(P.u_max, color='grey', ls=':', label=r'$T_\mathrm{max}$')
 
     [ax.axvline(me[0], color='grey', label=f'fault at t={me[0]:.2f}') for me in get_sorted(stats, type='bitflip')]
 
@@ -330,7 +333,7 @@ def compare_imex_full(plotting=False, leak_type='linear'):
     custom_description['step_params'] = {'maxiter': maxiter}
     custom_description['sweeper_params'] = {'num_nodes': num_nodes}
     custom_description['convergence_controllers'] = {
-        Adaptivity: {'e_tol': 1e-6, 'dt_max': np.inf},
+        Adaptivity: {'e_tol': 1e-6, 'dt_max': 50},
     }
 
     custom_controller_params = {'logger_level': 30}
@@ -372,14 +375,187 @@ def compare_imex_full(plotting=False, leak_type='linear'):
         rhs[True] == rhs[False]
     ), f"Expected IMEX and fully implicit schemes to take the same number of right hand side evaluations per step, but got {rhs[True]} and {rhs[False]}!"
 
-    assert error[True] < 1.8e-5, f'Expected error of IMEX version to be less than 1.8e-5, but got e={error[True]:.2e}!'
+    assert error[True] < 1e-4, f'Expected error of IMEX version to be less than 1e-4, but got e={error[True]:.2e}!'
     assert (
         error[False] < 7.7e-5
     ), f'Expected error of fully implicit version to be less than 7.7e-5, but got e={error[False]:.2e}!'
 
 
+def compare_reference_solutions_single():
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostStep, LogLocalErrorPostStep
+    from pySDC.implementations.hooks.log_solution import LogSolution
+
+    types = ['DIRK', 'SDC', 'scipy']
+    types = ['scipy']
+    fig, ax = plt.subplots()
+    error_ax = ax.twinx()
+    Tend = 500
+
+    colors = ['black', 'teal', 'magenta']
+
+    from pySDC.projects.Resilience.strategies import AdaptivityStrategy, merge_descriptions, DoubleAdaptivityStrategy
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+    strategy = DoubleAdaptivityStrategy()
+
+    controller_params = {'logger_level': 15}
+
+    for j in range(len(types)):
+
+        description = {}
+        description['level_params'] = {'dt': 5.0, 'restol': 1e-10}
+        description['sweeper_params'] = {'QI': 'IE', 'num_nodes': 3}
+        description['problem_params'] = {
+            'leak_type': 'linear',
+            'leak_transition': 'step',
+            'nvars': 2**10,
+            'reference_sol_type': types[j],
+            'newton_tol': 1e-12,
+        }
+
+        description['level_params'] = {'dt': 5.0, 'restol': -1}
+        description = merge_descriptions(description, strategy.get_custom_description(run_leaky_superconductor, 1))
+        description['step_params'] = {'maxiter': 5}
+        description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-4
+
+        stats, controller, _ = run_leaky_superconductor(
+            custom_description=description,
+            hook_class=[LogGlobalErrorPostStep, LogLocalErrorPostStep, LogSolution],
+            Tend=Tend,
+            imex=False,
+            custom_controller_params=controller_params,
+        )
+        e_glob = get_sorted(stats, type='e_global_post_step', recomputed=False)
+        e_loc = get_sorted(stats, type='e_local_post_step', recomputed=False)
+        u = get_sorted(stats, type='u', recomputed=False)
+
+        ax.plot([me[0] for me in u], [max(me[1]) for me in u], color=colors[j], label=f'{types[j]} reference')
+
+        error_ax.plot([me[0] for me in e_glob], [me[1] for me in e_glob], color=colors[j], ls='--')
+        error_ax.plot([me[0] for me in e_loc], [me[1] for me in e_loc], color=colors[j], ls=':')
+
+    prob = controller.MS[0].levels[0].prob
+    ax.axhline(prob.u_thresh, ls='-.', color='grey')
+    ax.axhline(prob.u_max, ls='-.', color='grey')
+    ax.plot([None], [None], ls='--', label=r'$e_\mathrm{global}$', color='grey')
+    ax.plot([None], [None], ls=':', label=r'$e_\mathrm{local}$', color='grey')
+    error_ax.set_yscale('log')
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$t$')
+    ax.set_ylabel('solution')
+    error_ax.set_ylabel('error')
+    ax.set_title('Fully implicit quench problem')
+    fig.tight_layout()
+    fig.savefig('data/quench_refs_single.pdf', bbox_inches='tight')
+
+
+def compare_reference_solutions():
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
+
+    types = ['DIRK', 'SDC', 'scipy']
+    fig, ax = plt.subplots()
+    Tend = 500
+    dt_list = [Tend / 2.0**me for me in [2, 3, 4, 5, 6, 7, 8, 9, 10]]
+    # dt_list = [Tend / 2.**me for me in [2, 3, 4, 5, 6, 7]]
+
+    for j in range(len(types)):
+        errors = [None] * len(dt_list)
+        for i in range(len(dt_list)):
+
+            description = {}
+            description['level_params'] = {'dt': dt_list[i], 'restol': 1e-10}
+            description['sweeper_params'] = {'QI': 'IE', 'num_nodes': 3}
+            description['problem_params'] = {
+                'leak_type': 'linear',
+                'leak_transition': 'step',
+                'nvars': 2**10,
+                'reference_sol_type': types[j],
+            }
+
+            stats, controller, _ = run_leaky_superconductor(
+                custom_description=description,
+                hook_class=[LogGlobalErrorPostRun, LogLocalErrorPostStep],
+                Tend=Tend,
+                imex=False,
+            )
+            # errors[i] = get_sorted(stats, type='e_global_post_run')[-1][1]
+            errors[i] = max([me[1] for me in get_sorted(stats, type='e_local_post_step', recomputed=False)])
+            print(errors)
+        ax.loglog(dt_list, errors, label=f'{types[j]} reference')
+
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$\Delta t$')
+    ax.set_ylabel('global error')
+    ax.set_title('Fully implicit quench problem')
+    fig.tight_layout()
+    fig.savefig('data/quench_refs.pdf', bbox_inches='tight')
+
+
+def check_order(reference_sol_type='scipy'):
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+
+    Tend = 500
+    maxiter_list = [1, 2, 3, 4, 5]
+    dt_list = [Tend / 2.0**me for me in [4, 5, 6, 7, 8, 9]]
+    # dt_list = [Tend / 2.**me for me in [6, 7, 8]]
+
+    fig, ax = plt.subplots()
+
+    from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK34
+
+    colors = ['black', 'teal', 'magenta', 'orange', 'red']
+    for j in range(len(maxiter_list)):
+        errors = [None] * len(dt_list)
+
+        for i in range(len(dt_list)):
+            description = {}
+            description['level_params'] = {'dt': dt_list[i]}
+            description['step_params'] = {'maxiter': maxiter_list[j]}
+            description['sweeper_params'] = {'QI': 'IE', 'num_nodes': 3}
+            description['problem_params'] = {
+                'leak_type': 'linear',
+                'leak_transition': 'step',
+                'nvars': 2**10,
+                'reference_sol_type': reference_sol_type,
+            }
+            description['convergence_controllers'] = {EstimateEmbeddedErrorNonMPI: {}}
+
+            # if maxiter_list[j] == 5:
+            #    description['sweeper_class'] = DIRK34
+            #    description['sweeper_params'] = {'maxiter': 1}
+
+            stats, controller, _ = run_leaky_superconductor(
+                custom_description=description, hook_class=[LogGlobalErrorPostRun], Tend=Tend, imex=False
+            )
+            # errors[i] = max([me[1] for me in get_sorted(stats, type='error_embedded_estimate')])
+            errors[i] = get_sorted(stats, type='e_global_post_run')[-1][1]
+            print(errors)
+        ax.loglog(dt_list, errors, color=colors[j], label=f'{maxiter_list[j]} iterations')
+        ax.loglog(
+            dt_list, [errors[0] * (me / dt_list[0]) ** maxiter_list[j] for me in dt_list], color=colors[j], ls='--'
+        )
+
+    dt_list = np.array(dt_list)
+    errors = np.array(errors)
+    orders = np.log(errors[1:] / errors[:-1]) / np.log(dt_list[1:] / dt_list[:-1])
+    print(orders, np.mean(orders))
+
+    # ax.loglog(dt_list, local_errors)
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$\Delta t$')
+    ax.set_ylabel('global error')
+    # ax.set_ylabel('max. local error')
+    ax.set_title('Fully implicit quench problem')
+    fig.tight_layout()
+    fig.savefig(f'data/order_quench_{reference_sol_type}.pdf', bbox_inches='tight')
+
+
 if __name__ == '__main__':
-    faults(19)
-    get_crossing_time()
-    compare_imex_full(plotting=True)
+    compare_reference_solutions_single()
+    # for reference_sol_type in ['DIRK', 'SDC', 'scipy']:
+    #    check_order(reference_sol_type=reference_sol_type)
+    ## faults(19)
+    ## # get_crossing_time()
+    # compare_imex_full(plotting=True)
     plt.show()

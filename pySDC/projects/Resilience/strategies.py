@@ -150,7 +150,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             return 10.0
         elif problem.__name__ == "run_leaky_superconductor":
-            return 430
+            return 500.0
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -185,7 +185,7 @@ class Strategy:
         elif problem.__name__ == "run_leaky_superconductor":
             custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-9}
+            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-11}
         return merge_descriptions(custom_description, self.custom_description)
 
 
@@ -267,6 +267,7 @@ class AdaptivityStrategy(Strategy):
 
         dt_max = np.inf
         dt_min = 1e-5
+        dt_slope_max = np.inf
 
         if problem.__name__ == "run_piline":
             e_tol = 1e-7
@@ -283,6 +284,8 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_leaky_superconductor":
             e_tol = 1e-7
             dt_min = 1e-3
+            # dt_max = 25
+            # dt_slope_max = 4.
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
@@ -296,7 +299,12 @@ class AdaptivityStrategy(Strategy):
  strategy'
             )
 
-        custom_description['convergence_controllers'][Adaptivity] = {'e_tol': e_tol, 'dt_min': dt_min, 'dt_max': dt_max}
+        custom_description['convergence_controllers'][Adaptivity] = {
+            'e_tol': e_tol,
+            'dt_min': dt_min,
+            'dt_max': dt_max,
+            'dt_slope_max': dt_slope_max,
+        }
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
 
@@ -402,7 +410,7 @@ class IterateStrategy(Strategy):
             restol = 6.5e-7
         elif problem.__name__ == "run_leaky_superconductor":
             # e_tol = 1e-6
-            restol = 1e-11
+            restol = 1e-8
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \
@@ -415,7 +423,7 @@ strategy'
         }
 
         if problem.__name__ == "run_leaky_superconductor":
-            custom_description['level_params']['dt'] = 26
+            custom_description['level_params']['dt'] = 1
 
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 

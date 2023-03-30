@@ -139,7 +139,7 @@ class LogGlobalErrorPostRun(hooks):
 
             self.add_to_stats(
                 process=step.status.slot,
-                time=L.time + L.dt,
+                time=self.t_last_solution,
                 level=L.level_index,
                 iter=step.status.iter,
                 sweep=L.status.sweep,
@@ -148,7 +148,7 @@ class LogGlobalErrorPostRun(hooks):
             )
             self.add_to_stats(
                 process=step.status.slot,
-                time=L.time + L.dt,
+                time=self.t_last_solution,
                 level=L.level_index,
                 iter=step.status.iter,
                 sweep=L.status.sweep,
