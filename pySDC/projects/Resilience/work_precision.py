@@ -474,6 +474,18 @@ def get_configs(mode, problem):
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
 
+        from pySDC.implementations.sweeper_classes.explicit import explicit
+
+        configurations[3] = {
+            'custom_description': {
+                'step_params': {'maxiter': 5},
+                'sweeper_params': {'QE': 'EE'},
+                'sweeper_class': explicit,
+            },
+            'handle': 'explicit order 4',
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'plotting_params': {'ls': ':', 'label': 'explicit SDC5(4)'},
+        }
         configurations[0] = {
             'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
         }
@@ -481,12 +493,13 @@ def get_configs(mode, problem):
             'custom_description': {'step_params': {'maxiter': 5}},
             'handle': 'order 5',
             'strategies': [AdaptivityStrategy(useMPI=True)],
+            'plotting_params': {'label': 'SDC5(4)'},
         }
         configurations[2] = {
             'custom_description': {'step_params': {'maxiter': 4}},
             'handle': 'order 4',
             'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'ls': '--'},
+            'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
@@ -611,12 +624,14 @@ def get_fig(x=1, y=1, **kwargs):
     Returns:
         matplotlib.pyplot.Figure
     """
+    width = 1.0
+    ratio = 1.0 if y == 2 else 0.5
     keyword_arguments = {
-        'figsize': figsize_by_journal('Springer_Numerical_Algorithms', 0.5 if x == 1 else 1.0, 1.0),
+        'figsize': figsize_by_journal('Springer_Numerical_Algorithms', width, ratio),
         'layout': 'constrained',
         **kwargs,
     }
-    return plt.subplots(x, y, **keyword_arguments)
+    return plt.subplots(y, x, **keyword_arguments)
 
 
 def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', **kwargs):
@@ -640,7 +655,7 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base
         [handles[i] for i in order],
         [labels[i] for i in order],
         loc='outside lower center',
-        ncols=3,
+        ncols=3 if len(handles) % 3 == 0 else 4,
         frameon=False,
         fancybox=True,
     )
@@ -697,6 +712,53 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
         )
 
 
+def ODEs(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
+    """
+    Make a plot comparing various strategies for the two ODEs.
+
+    Args:
+        work_key (str): The key in the recorded data you want on the x-axis
+        precision_key (str): The key in the recorded data you want on the y-axis
+
+    Returns:
+        None
+    """
+
+    fig, axs = get_fig(x=2, y=1)
+
+    shared_params = {
+        'work_key': 'k_SDC',
+        'precision_key': 'e_global',
+        'num_procs': 1,
+        'runs': 1,
+        'comm_world': MPI.COMM_WORLD,
+        'record': False,
+        'plotting': plotting,
+        **kwargs,
+    }
+
+    problems = [run_vdp, run_Lorenz]
+
+    for i in range(len(problems)):
+        execute_configurations(
+            **shared_params,
+            problem=problems[i],
+            ax=axs.flatten()[i],
+            decorate=i == 0,
+            configurations=get_configs(mode, problems[i]),
+        )
+
+    if plotting and shared_params['comm_world'].rank == 0:
+        save_fig(
+            fig=fig,
+            name=f'ODEs-{mode}',
+            work_key=shared_params['work_key'],
+            precision_key=shared_params['precision_key'],
+            legend=True,
+            base_path=base_path,
+        )
+
+
 def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
     """
     Make a plot for a single problem
@@ -705,7 +767,7 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
         mode (str): What you want to look at
         problem (function): A problem to run
     """
-    fig, ax = get_fig(1, 1)
+    fig, ax = get_fig(1, 1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.5))
 
     params = {
         'work_key': 'k_SDC',
@@ -735,13 +797,17 @@ if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
         'mode': 'RK',
-        'problem': run_vdp,
         'runs': 5,
     }
+    params_single = {
+        **params,
+        'problem': run_Lorenz,
+    }
     record = True
-    single_problem(**params, work_key='t', precision_key='e_global_rel', record=record)
-    single_problem(**params, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
-    single_problem(**params, work_key='param', precision_key='e_global_rel', record=False)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
+    # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
+    ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': False,

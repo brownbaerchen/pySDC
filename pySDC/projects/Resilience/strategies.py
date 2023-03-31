@@ -677,19 +677,23 @@ class DIRKStrategy(AdaptivityStrategy):
 
 
 class ERKStrategy(DIRKStrategy):
+    """
+    Explicit embedded RK using Cash-Karp's method
+    """
+
     def __init__(self, useMPI=False):
         '''
         Initialization routine
         '''
         super().__init__(useMPI=useMPI)
-        self.color = list(cmap.values())[8]
+        self.color = list(cmap.values())[9]
         self.marker = 'x'
         self.name = 'ERK'
         self.bar_plot_x_label = 'ERK5(4)'
 
     @property
     def label(self):
-        return 'ERK5(4)'
+        return 'CP5(4)'
 
     """
     Explicit Cash-Karp's method

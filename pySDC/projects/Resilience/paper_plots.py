@@ -476,6 +476,67 @@ def plot_quench_solution():  # pragma: no cover
     savefig(fig, 'quench_sol')
 
 
+def plot_Lorenz_solution():  # pragma: no cover
+    """
+    Plot the solution of Lorenz attractor problem over time
+
+    Returns:
+        None
+    """
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    from pySDC.projects.Resilience.strategies import AdaptivityStrategy
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
+
+    strategy = AdaptivityStrategy()
+
+    my_setup_mpl()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    # if JOURNAL == 'JSC_beamer':
+    #    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
+    # else:
+    #    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.33))
+
+    custom_description = strategy.get_custom_description(run_Lorenz, 1)
+    custom_description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-10}}
+
+    stats, _, _ = run_Lorenz(
+        custom_description=custom_description,
+        Tend=strategy.get_Tend(run_Lorenz, 1) * 20,
+        hook_class=LogGlobalErrorPostRun,
+    )
+
+    u = get_sorted(stats, type='u')
+    e = get_sorted(stats, type='e_global_post_run')[-1]
+    print(u[-1], e)
+    ax.plot([me[1][0] for me in u], [me[1][1] for me in u], [me[1][2] for me in u])
+
+    ##################
+    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy, IterateStrategy
+    from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+
+    strategy = ERKStrategy()
+    custom_description = strategy.get_custom_description(run_Lorenz, 1)
+    custom_description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-10}}
+    stats, _, _ = run_Lorenz(
+        custom_description=custom_description,
+        Tend=strategy.get_Tend(run_Lorenz, 1) * 20,
+        hook_class=LogGlobalErrorPostRun,
+    )
+
+    u = get_sorted(stats, type='u')
+    e = get_sorted(stats, type='e_global_post_run')[-1]
+    print(u[-1], e)
+    ax.plot([me[1][0] for me in u], [me[1][1] for me in u], [me[1][2] for me in u], ls='--')
+    ################
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    savefig(fig, 'lorenz_sol')
+
+
 def plot_vdp_solution():  # pragma: no cover
     """
     Plot the solution of van der Pol problem over time to illustrate the varying time scales.
@@ -645,17 +706,21 @@ def work_life_balance(work_key='t', reload=True):  # pragma: no cover
 
 
 def work_precision():
-    from pySDC.projects.Resilience.work_precision import all_problems
+    from pySDC.projects.Resilience.work_precision import all_problems, single_problem, ODEs
 
     all_params = {
         'record': False,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': True,
+        'base_path': 'data/paper',
     }
 
     for mode in ['compare_strategies']:
-        all_problems(**all_params, mode=mode, base_path='data/paper/')
+        all_problems(**all_params, mode=mode)
+
+    single_problem(**all_params, mode='step_size_limiting', problem=run_leaky_superconductor)
+    ODEs(**all_params, mode='RK')
 
 
 def make_plots_for_SIAM_CSE23():  # pragma: no cover
@@ -707,10 +772,9 @@ def make_plots_for_notes():  # pragma: no cover
 
 
 if __name__ == "__main__":
-    # plot_adaptivity_stuff()
-    # work_life_balance('k_SDC', False)
-
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-    work_precision()
+
+    plot_Lorenz_solution()
+    # work_precision()
     # make_plots_for_paper()
