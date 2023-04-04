@@ -520,10 +520,9 @@ def get_configs(mode, problem):
             5: 'loosely dashdotted',
         }
 
-        configurations[-1] = {
-            'strategies': [ERKStrategy(useMPI=False)],
-            'num_procs': 1,
-        }
+        # configurations[-1] = {
+        #         'strategies': [ERKStrategy(useMPI=False)], 'num_procs':1,
+        # }
 
         for num_procs in [1, 2, 3, 4]:
             plotting_params = {'ls': ls[num_procs], 'label': f'{num_procs} procs'}
@@ -870,29 +869,29 @@ if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
         'mode': 'parallel_efficiency',
-        'runs': 5,
+        'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_Schroedinger,
     }
-    record = False
-    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = True
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
-        'plotting': False,
+        'plotting': True,
     }
 
-    for mode in ['parallel_efficiency', 'preconditioners']:  # , 'preconditioners', 'compare_adaptivity']:
+    for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
