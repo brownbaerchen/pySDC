@@ -74,7 +74,7 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
 
     # record all the metrics
     for key, mapping in MAPPINGS.items():
-        me = get_sorted(stats, type=mapping[0], recomputed=mapping[2])
+        me = get_sorted(stats, type=mapping[0], recomputed=mapping[2], comm=comm)
         if len(me) == 0:
             data[key] += [np.nan]
         else:
@@ -216,6 +216,7 @@ def record_work_precision(
                 custom_description=description,
                 comm_world=comm_world,
                 problem_args=problem_args,
+                num_procs=num_procs,
             )
 
             comm_world.Barrier()
@@ -501,6 +502,39 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
+    elif mode == 'parallel_efficiency':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+        desc['step_params'] = {'maxiter': 5}
+
+        descIterate = {}
+        descIterate['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: 'loosely dashdotted',
+        }
+
+        for num_procs in [1, 2, 3, 4]:
+            plotting_params = {'ls': ls[num_procs], 'label': f'{num_procs} procs'}
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(), BaseStrategy()],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
+            configurations[num_procs + 100] = {
+                'strategies': [IterateStrategy()],
+                'custom_description': descIterate,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
+
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
@@ -574,7 +608,7 @@ def get_configs(mode, problem):
 
         strategies = [AdaptivityStrategy(useMPI=True), IterateStrategy(useMPI=True), BaseStrategy(useMPI=True)]
 
-        precons = ['IE', 'LU', 'MIN', 'MIN3']
+        precons = ['IE', 'LU', 'MIN']
         ls = ['-', '--', '-.', ':']
         for i in range(len(precons)):
             configurations[i] = {
@@ -663,6 +697,40 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base
     path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
     print(f'Stored figure \"{path}\"')
+
+
+def parallel_efficiency(work_key, precision_key, mode, problem, **kwargs):
+    from pySDC.core.Lagrange import LagrangeApproximation
+
+    configurations = get_configs(mode, problem)
+
+    fig, ax = plt.subplots(1, 1)
+
+    for _, config in configurations.items():
+        for strategy in config['strategies']:
+            shared_args = {
+                'problem': problem,
+                'strategy': strategy,
+                'handle': config.get('handle', ''),
+                'num_procs': config.get('num_procs', 1),
+            }
+
+            with open(get_path(**shared_args), 'rb') as f:
+                data = pickle.load(f)
+
+            work = [np.nanmean(data[key][work_key]) for key in data.keys()]
+            precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
+
+            interpolator = LagrangeApproximation(points=work)
+
+            work_inter = np.logspace(-1, 1, 100)
+            precision_inter = interpolator.getInterpolationMatrix(work_inter) @ precision
+
+            ax.loglog(work, precision)
+            ax.plot(work_inter, precision_inter)
+
+            break
+        break
 
 
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
@@ -796,29 +864,33 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-        'mode': 'RK',
+        'mode': 'parallel_efficiency',
         'runs': 5,
+        'num_procs': 4,
+        'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Lorenz,
+        'problem': run_vdp,
     }
-    record = True
+    record = False
     # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
-    ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
+    # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
-        'plotting': True,
+        'plotting': False,
     }
 
-    for mode in ['compare_strategies']:  # , 'preconditioners', 'compare_adaptivity']:
-        break
+    for mode in ['parallel_efficiency', 'preconditioners']:  # , 'preconditioners', 'compare_adaptivity']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
-    plt.show()
+
+    if comm_world.rank == 0:
+        # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')
+        plt.show()

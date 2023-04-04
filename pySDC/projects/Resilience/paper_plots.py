@@ -428,7 +428,7 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
                 color=colors[j],
                 label=rf'$u^{{{superscripts[i]}}}_{{{subscripts[j]}}}$',
                 marker=markers[j],
-                markevery=40,
+                markevery=60,
             )
         for idx in range(len(faults)):
             ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
@@ -706,7 +706,16 @@ def work_life_balance(work_key='t', reload=True):  # pragma: no cover
 
 
 def work_precision():
-    from pySDC.projects.Resilience.work_precision import all_problems, single_problem, ODEs
+    from pySDC.projects.Resilience.work_precision import (
+        all_problems,
+        single_problem,
+        ODEs,
+        get_fig,
+        execute_configurations,
+        save_fig,
+        get_configs,
+        MPI,
+    )
 
     all_params = {
         'record': False,
@@ -719,7 +728,44 @@ def work_precision():
     for mode in ['compare_strategies']:
         all_problems(**all_params, mode=mode)
 
+    # Quench stuff
+    fig, axs = get_fig(x=3, y=1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.47))
+    quench_params = {
+        **all_params,
+        'problem': run_leaky_superconductor,
+        'decorate': True,
+        'configurations': get_configs('step_size_limiting', run_leaky_superconductor),
+        'num_procs': 1,
+        'runs': 1,
+        'comm_world': MPI.COMM_WORLD,
+    }
+    quench_params.pop('base_path', None)
+    execute_configurations(**{**quench_params, 'work_key': 'k_SDC', 'precision_key': 'k_Newton'}, ax=axs[2])
+    execute_configurations(**{**quench_params, 'work_key': 'param', 'precision_key': 'restart'}, ax=axs[1])
+    execute_configurations(**{**quench_params, 'work_key': 't', 'precision_key': 'e_global_rel'}, ax=axs[0])
+    axs[1].set_yscale('linear')
+    axs[2].set_yscale('linear')
+    axs[2].set_xscale('linear')
+    axs[1].set_xlabel(r'$e_\mathrm{tol}$')
+
+    for ax in axs:
+        ax.set_title(ax.get_ylabel())
+        ax.set_ylabel('')
+    fig.suptitle('Quench')
+    save_fig(
+        fig=fig,
+        name=f'{run_leaky_superconductor.__name__}',
+        work_key='step-size',
+        precision_key='limiting',
+        legend=True,
+        base_path=all_params["base_path"],
+    )
+
     single_problem(**all_params, mode='step_size_limiting', problem=run_leaky_superconductor)
+    single_problem(
+        **{**all_params, 'work_key': 'param', 'precision_key': 'restart', 'mode': 'step_size_limiting'},
+        problem=run_leaky_superconductor,
+    )
     ODEs(**all_params, mode='RK')
 
 
@@ -751,9 +797,9 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp, path='data/stats-jusuf'))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    plot_adaptivity_stuff()
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    # plot_adaptivity_stuff()
     # plot_efficiency_polar_other()
     # plot_efficiency_polar_vdp(run_vdp, path='data/stats-jusuf')
     # compare_recovery_rate_problems()
@@ -775,6 +821,6 @@ if __name__ == "__main__":
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
 
-    plot_Lorenz_solution()
+    # plot_Lorenz_solution()
     # work_precision()
-    # make_plots_for_paper()
+    make_plots_for_paper()

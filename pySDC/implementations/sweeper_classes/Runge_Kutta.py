@@ -327,7 +327,7 @@ class Heun_Euler(RungeKutta):
 
 class Cash_Karp(RungeKutta):
     """
-    Fifth order explicit embedded Runge-Kutta
+    Fifth order explicit embedded Runge-Kutta. See [here](https://doi.org/10.1145/79505.79507).
     """
 
     def __init__(self, params):

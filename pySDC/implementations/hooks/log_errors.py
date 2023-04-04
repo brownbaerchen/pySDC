@@ -128,7 +128,7 @@ class LogGlobalErrorPostRun(hooks):
         """
         super().post_run(step, level_number)
 
-        if level_number == 0:
+        if level_number == 0 and step.status.last:
             L = step.levels[level_number]
 
             u_num = self.get_final_solution(L)

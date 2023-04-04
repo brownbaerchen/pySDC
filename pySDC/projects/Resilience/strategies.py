@@ -148,7 +148,7 @@ class Strategy:
         elif problem.__name__ == "run_Lorenz":
             return 1.5
         elif problem.__name__ == "run_Schroedinger":
-            return 10.0
+            return 1.0
         elif problem.__name__ == "run_leaky_superconductor":
             return 500.0
         else:
