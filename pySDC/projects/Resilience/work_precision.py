@@ -503,7 +503,7 @@ def get_configs(mode, problem):
             'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
     elif mode == 'parallel_efficiency':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy, ERKStrategy
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
@@ -520,16 +520,21 @@ def get_configs(mode, problem):
             5: 'loosely dashdotted',
         }
 
+        configurations[-1] = {
+            'strategies': [ERKStrategy(useMPI=False)],
+            'num_procs': 1,
+        }
+
         for num_procs in [1, 2, 3, 4]:
             plotting_params = {'ls': ls[num_procs], 'label': f'{num_procs} procs'}
             configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(), BaseStrategy()],
+                'strategies': [AdaptivityStrategy(True), BaseStrategy(True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
             configurations[num_procs + 100] = {
-                'strategies': [IterateStrategy()],
+                'strategies': [IterateStrategy(True)],
                 'custom_description': descIterate,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
@@ -866,7 +871,7 @@ if __name__ == "__main__":
     params = {
         'mode': 'parallel_efficiency',
         'runs': 5,
-        'num_procs': 4,
+        'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
