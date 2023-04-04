@@ -4,6 +4,9 @@ import logging
 from pySDC.core.Sweeper import _Pars
 from pySDC.core.Errors import ParameterError
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+from pySDC.implementations.datatype_classes.mesh import imex_mesh, mesh
+from pySDC.core.Sweeper import sweeper
 
 
 class ButcherTableau(object):
@@ -119,7 +122,7 @@ class ButcherTableauEmbedded(object):
         self.implicit = any([matrix[i, i] != 0 for i in range(self.num_nodes - 2)])
 
 
-class RungeKutta(generic_implicit):
+class RungeKutta(sweeper):
     """
     Runge-Kutta scheme that fits the interface of a sweeper.
     Actually, the sweeper idea fits the Runge-Kutta idea when using only lower triangular rules, where solutions
@@ -193,6 +196,46 @@ class RungeKutta(generic_implicit):
             f"There is not an update order for RK scheme \"{cls.__name__}\" implemented. Maybe it is not an embedded scheme?"
         )
 
+    def get_full_f(self, f):
+        """
+        Get the full right hand side as a `mesh` from the right hand side
+
+        Args:
+            f (dtype_f): Right hand side at a single node
+
+        Returns:
+            mesh: Full right hand side as a mesh
+        """
+        if type(f) == mesh:
+            return f
+        elif type(f) == imex_mesh:
+            return f.impl + f.expl
+        else:
+            raise NotImplementedError(f'Type \"{type(f)}\" not implemented in Runge-Kutta sweeper')
+
+    def integrate(self):
+        """
+        Integrates the right-hand side
+
+        Returns:
+            list of dtype_u: containing the integral as values
+        """
+
+        # get current level and problem description
+        L = self.level
+        P = L.prob
+
+        me = []
+
+        # integrate RHS over all collocation nodes
+        for m in range(1, self.coll.num_nodes + 1):
+            # new instance of dtype_u, initialize values with 0
+            me.append(P.dtype_u(P.init, val=0.0))
+            for j in range(1, self.coll.num_nodes + 1):
+                me[-1] += L.dt * self.coll.Qmat[m, j] * self.get_full_f(L.f[j])
+
+        return me
+
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes
@@ -216,7 +259,7 @@ class RungeKutta(generic_implicit):
             # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
             rhs = L.u[0]
             for j in range(1, m + 1):
-                rhs += L.dt * self.QI[m + 1, j] * L.f[j]
+                rhs += L.dt * self.QI[m + 1, j] * self.get_full_f(L.f[j])
 
             # implicit solve with prefactor stemming from the diagonal of Qd
             if self.coll.implicit:
@@ -232,6 +275,12 @@ class RungeKutta(generic_implicit):
         L.status.updated = True
 
         return None
+
+    def compute_end_point(self):
+        """
+        In this Runge-Kutta implementation, the solution to the step is always stored in the last node
+        """
+        self.level.uend = self.level.u[-1]
 
 
 class RK1(RungeKutta):

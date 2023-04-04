@@ -223,7 +223,7 @@ def record_work_precision(
 
             if VERBOSE and comm_world.rank == 0:
                 print(
-                    f'{problem.__name__} {handle}, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
+                    f'{problem.__name__} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
                 )
 
     if comm_world.rank == 0:
@@ -477,16 +477,16 @@ def get_configs(mode, problem):
 
         from pySDC.implementations.sweeper_classes.explicit import explicit
 
-        configurations[3] = {
-            'custom_description': {
-                'step_params': {'maxiter': 5},
-                'sweeper_params': {'QE': 'EE'},
-                'sweeper_class': explicit,
-            },
-            'handle': 'explicit order 4',
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'ls': ':', 'label': 'explicit SDC5(4)'},
-        }
+        # configurations[3] = {
+        #    'custom_description': {
+        #        'step_params': {'maxiter': 5},
+        #        'sweeper_params': {'QE': 'EE'},
+        #        'sweeper_class': explicit,
+        #    },
+        #    'handle': 'explicit order 4',
+        #    'strategies': [AdaptivityStrategy(useMPI=True)],
+        #    'plotting_params': {'ls': ':', 'label': 'explicit SDC5(4)'},
+        # }
         configurations[0] = {
             'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
         }
@@ -532,12 +532,12 @@ def get_configs(mode, problem):
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
-            configurations[num_procs + 100] = {
-                'strategies': [IterateStrategy(True)],
-                'custom_description': descIterate,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-            }
+            # configurations[num_procs + 100] = {
+            #     'strategies': [IterateStrategy(True)],
+            #     'custom_description': descIterate,
+            #     'num_procs': num_procs,
+            #     'plotting_params': plotting_params,
+            # }
 
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
@@ -868,14 +868,14 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     params = {
-        'mode': 'parallel_efficiency',
+        'mode': 'RK',
         'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_Schroedinger,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
@@ -885,7 +885,7 @@ if __name__ == "__main__":
 
     all_params = {
         'record': False,
-        'runs': 5,
+        'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': True,
