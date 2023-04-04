@@ -152,11 +152,11 @@ def record_work_precision(
     Returns:
         None
     """
-    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorMPI
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
     data = {}
 
-    estimate_embedded_error = {'convergence_controllers': {EstimateEmbeddedErrorMPI: {}}}
+    estimate_embedded_error = {'convergence_controllers': {EstimateEmbeddedError: {}}}
 
     # prepare precision parameters
     param = strategy.precision_parameter
@@ -875,7 +875,7 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_vdp,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)

@@ -493,7 +493,7 @@ def compare_reference_solutions():
 
 def check_order(reference_sol_type='scipy'):
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
-    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
     Tend = 500
     maxiter_list = [1, 2, 3, 4, 5]
@@ -519,7 +519,7 @@ def check_order(reference_sol_type='scipy'):
                 'nvars': 2**10,
                 'reference_sol_type': reference_sol_type,
             }
-            description['convergence_controllers'] = {EstimateEmbeddedErrorNonMPI: {}}
+            description['convergence_controllers'] = {EstimateEmbeddedError: {}}
 
             # if maxiter_list[j] == 5:
             #    description['sweeper_class'] = DIRK34

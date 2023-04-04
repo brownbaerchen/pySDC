@@ -12,7 +12,7 @@ from pySDC.implementations.sweeper_classes.Runge_Kutta import (
     DIRK34,
 )
 from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
-from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 from pySDC.helpers.stats_helper import get_sorted
 
 
@@ -238,7 +238,7 @@ def test_embedded_estimate_order(sweeper):
 
     # change only the things in the description that we need for adaptivity
     convergence_controllers = dict()
-    convergence_controllers[EstimateEmbeddedErrorNonMPI] = {}
+    convergence_controllers[EstimateEmbeddedError] = {}
 
     description = dict()
     description['convergence_controllers'] = convergence_controllers

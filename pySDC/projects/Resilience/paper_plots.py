@@ -318,7 +318,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
     Returns:
         None
     """
-    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
     from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
     from pySDC.projects.Resilience.hook import LogData
 
@@ -352,8 +352,8 @@ def plot_adaptivity_stuff():  # pragma: no cover
         ax.set_ylabel('local error')
         iter_ax.set_ylabel(r'SDC iterations')
 
-    force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}}
-    # force_params = {'convergence_controllers': {EstimateEmbeddedErrorNonMPI: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
+    force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}}
+    # force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
     for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy]:
         stats, _, _ = stats_analyser.single_run(
             strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData]
