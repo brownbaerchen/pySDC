@@ -90,6 +90,11 @@ class LogGlobalErrorPostRun(hooks):
     `post_run` functions of the hooks are called, which results in a mismatch of `L.time + L.dt` as corresponding to
     when the solution is computed and when the error is computed. The issue is resolved by recording the time at which
     the solution is computed in a private attribute of this class.
+
+    There is another issue: The MPI controller instantiates a step after the run is completed, meaning the final
+    solution is not accessed by computing the end point, but by using the initial value on the finest level.
+    Additionally, the number of restarts is reset, which we need to filter recomputed values in post processing.
+    For this reason, we need to mess with the private `__num_restarts` of the core Hooks class.
     """
 
     def __init__(self):
@@ -98,6 +103,7 @@ class LogGlobalErrorPostRun(hooks):
         """
         super().__init__()
         self.t_last_solution = 0
+        self.num_restarts = 0
 
     def post_step(self, step, level_number):
         """
@@ -114,6 +120,7 @@ class LogGlobalErrorPostRun(hooks):
         """
         super().post_step(step, level_number)
         self.t_last_solution = step.levels[0].time + step.levels[0].dt
+        self.num_restarts = step.status.get('restarts_in_a_row', 0)
 
     def post_run(self, step, level_number):
         """
@@ -126,7 +133,8 @@ class LogGlobalErrorPostRun(hooks):
         Returns:
             None
         """
-        super().post_run(step, level_number)
+        super().post_step(step, level_number)
+        self._hooks__num_restarts = self.num_restarts
 
         if level_number == 0 and step.status.last:
             L = step.levels[level_number]
@@ -136,25 +144,26 @@ class LogGlobalErrorPostRun(hooks):
 
             if step.status.last:
                 self.logger.info(f'Finished with a global error of e={abs(u_num-u_ref):.2e}')
+                print(f'Finished with a global error of e={abs(u_num-u_ref):.2e}', step.status.restart)
 
-            self.add_to_stats(
-                process=step.status.slot,
-                time=self.t_last_solution,
-                level=L.level_index,
-                iter=step.status.iter,
-                sweep=L.status.sweep,
-                type='e_global_post_run',
-                value=abs(u_num - u_ref),
-            )
-            self.add_to_stats(
-                process=step.status.slot,
-                time=self.t_last_solution,
-                level=L.level_index,
-                iter=step.status.iter,
-                sweep=L.status.sweep,
-                type='e_global_rel_post_run',
-                value=abs((u_num - u_ref) / u_ref),
-            )
+                self.add_to_stats(
+                    process=step.status.slot,
+                    time=self.t_last_solution,
+                    level=L.level_index,
+                    iter=step.status.iter,
+                    sweep=L.status.sweep,
+                    type='e_global_post_run',
+                    value=abs(u_num - u_ref),
+                )
+                self.add_to_stats(
+                    process=step.status.slot,
+                    time=self.t_last_solution,
+                    level=L.level_index,
+                    iter=step.status.iter,
+                    sweep=L.status.sweep,
+                    type='e_global_rel_post_run',
+                    value=abs((u_num - u_ref) / u_ref),
+                )
 
     def get_final_solution(self, lvl):
         """
@@ -172,6 +181,13 @@ class LogGlobalErrorPostRunMPI(LogGlobalErrorPostRun):
     The MPI controller shows slightly different behaviour which is why the final solution is stored in a different place
     than in the nonMPI controller.
     """
+
+    def __init__(self):
+        super().__init__()
+
+    def post_step(self, step, level_number):
+        super().post_step(step, level_number)
+        self.num_restarts = self._hooks__num_restarts
 
     def get_final_solution(self, lvl):
         """

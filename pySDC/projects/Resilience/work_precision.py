@@ -73,6 +73,13 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     )
 
     # record all the metrics
+    from pySDC.helpers.stats_helper import filter_stats
+
+    print(
+        comm_world.rank,
+        filter_stats(stats, type='e_global_post_run'),
+        filter_stats(stats, type='e_global_post_run', recomputed=False),
+    )
     for key, mapping in MAPPINGS.items():
         me = get_sorted(stats, type=mapping[0], recomputed=mapping[2], comm=comm)
         if len(me) == 0:
@@ -135,7 +142,15 @@ def get_path(problem, strategy, num_procs, handle='', base_path='data/work_preci
 
 
 def record_work_precision(
-    problem, strategy, num_procs=1, custom_description=None, handle='', runs=1, comm_world=None, problem_args=None
+    problem,
+    strategy,
+    num_procs=1,
+    custom_description=None,
+    handle='',
+    runs=1,
+    comm_world=None,
+    problem_args=None,
+    param_range=None,
 ):
     """
     Run problem with strategy and record the cost parameters.
@@ -186,7 +201,7 @@ def record_work_precision(
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in exponents]
+    param_range = [default * power**i for i in exponents] if param_range is None else param_range
 
     if problem.__name__ == 'run_leaky_superconductor':
         if param == 'restol':
@@ -227,6 +242,14 @@ def record_work_precision(
                 )
 
     if comm_world.rank == 0:
+        import socket
+        import time
+
+        data['meta'] = {
+            'hostname': socket.gethostname(),
+            'time': time.time,
+            'runs': runs,
+        }
         with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:
             pickle.dump(data, f)
 
@@ -265,11 +288,12 @@ def plot_work_precision(
     with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
         data = pickle.load(f)
 
-    work = [np.nanmean(data[key][work_key]) for key in data.keys()]
-    precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
+    keys = [key for key in data.keys() if key not in ['meta']]
+    work = [np.nanmean(data[key][work_key]) for key in keys]
+    precision = [np.nanmean(data[key][precision_key]) for key in keys]
 
     for key in [work_key, precision_key]:
-        rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in data.keys()]
+        rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in keys]
         if not all([me < 1e-1 or not np.isfinite(me) for me in rel_variance]):
             print(
                 f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
@@ -281,6 +305,14 @@ def plot_work_precision(
     )
 
     ax.loglog(work, precision, **style)
+
+    if 't' in [work_key, precision_key]:
+        meta = data.get('meta', {})
+
+        if meta.get('hostname', None) in ['thomas-work']:
+            ax.text(0.1, 0.1, "Laptop timings!", transform=ax.transAxes)
+        if meta.get('runs', None) == 1:
+            ax.text(0.1, 0.2, "No sampling!", transform=ax.transAxes)
 
 
 def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only=False):
@@ -300,6 +332,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
     """
     labels = {
         'k_SDC': 'SDC iterations',
+        'k_SDC_no_restart': 'SDC iterations (restarts excluded)',
         'k_Newton': 'Newton iterations',
         'k_Newton_no_restart': 'Newton iterations (restarts excluded)',
         'k_rhs': 'right hand side evaluations',
@@ -309,6 +342,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'e_local_max': 'max. local error',
         'restart': 'restarts',
         'dt_max': r'$\Delta t_\mathrm{max}$',
+        'dt_mean': r'$\bar{\Delta t}$',
         'param': 'parameter',
     }
 
@@ -373,6 +407,7 @@ def execute_configurations(
                     runs=runs,
                     comm_world=comm_world,
                     problem_args=config.get('problem_args', {}),
+                    param_range=config.get('param_range', None),
                 )
             if plotting and comm_world.rank == 0:
                 plot_work_precision(
@@ -538,6 +573,52 @@ def get_configs(mode, problem):
             #     'num_procs': num_procs,
             #     'plotting_params': plotting_params,
             # }
+
+    elif mode[:13] == 'vdp_stiffness':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy
+
+        mu = float(mode[14:])
+
+        problem_desc = {'problem_params': {'mu': mu}}
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+        desc['step_params'] = {'maxiter': 5}
+        desc['problem_params'] = problem_desc['problem_params']
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: 'loosely dashdotted',
+        }
+
+        configurations[2] = {
+            'strategies': [ERKStrategy(useMPI=True)],
+            'num_procs': 1,
+            'handle': mode,
+            'plotting_params': {'label': 'CP5(4)'},
+            'custom_description': problem_desc,
+            #'param_range': [1e-2],
+        }
+        configurations[3] = {
+            'strategies': [DIRKStrategy(useMPI=True)],
+            'num_procs': 1,
+            'handle': mode,
+            'plotting_params': {'label': 'DIRK4(3)'},
+            'custom_description': problem_desc,
+        }
+
+        for num_procs in [1, 4]:
+            plotting_params = {'ls': ls[num_procs], 'label': f'SDC {num_procs} procs'}
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(True)],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+                'handle': mode,
+            }
 
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
@@ -865,20 +946,57 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
         )
 
 
+def vdp_stiffness_plot(base_path='data', **kwargs):
+    fig, axs = get_fig(2, 2, sharex=True)
+
+    mus = [0, 5, 10, 15]
+
+    for i in range(len(mus)):
+        params = {
+            'runs': 1,
+            'problem': run_vdp,
+            'record': False,
+            'work_key': 't',
+            'precision_key': 'e_global_rel',
+            'comm_world': MPI.COMM_WORLD,
+            **kwargs,
+        }
+        params['num_procs'] = min(params['comm_world'].size, 5)
+        params['plotting'] = params['comm_world'].rank == 0
+
+        configurations = get_configs(mode=f'vdp_stiffness-{mus[i]}', problem=run_vdp)
+        execute_configurations(**params, ax=axs.flatten()[i], decorate=True, configurations=configurations)
+        axs.flatten()[i].set_title(rf'$\mu={{{mus[i]}}}$')
+
+    fig.suptitle('Van der Pol')
+    # fig.tight_layout()
+    if params['comm_world'].rank == 0:
+        save_fig(
+            fig=fig,
+            name='vdp-stiffness',
+            work_key=params['work_key'],
+            precision_key=params['precision_key'],
+            legend=False,
+            base_path=base_path,
+        )
+
+
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
+    vdp_stiffness_plot(record=False)
+
     params = {
-        'mode': 'RK',
+        'mode': 'vdp_stiffness-15',
         'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_vdp,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
@@ -891,9 +1009,9 @@ if __name__ == "__main__":
         'plotting': True,
     }
 
-    for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
-        all_problems(**all_params, mode=mode)
-        comm_world.Barrier()
+    # for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
+    #     all_problems(**all_params, mode=mode)
+    #     comm_world.Barrier()
 
     if comm_world.rank == 0:
         # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')

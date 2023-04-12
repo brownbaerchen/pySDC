@@ -715,6 +715,7 @@ def work_precision():
         save_fig,
         get_configs,
         MPI,
+        vdp_stiffness_plot,
     )
 
     all_params = {
@@ -761,12 +762,13 @@ def work_precision():
         base_path=all_params["base_path"],
     )
 
-    single_problem(**all_params, mode='step_size_limiting', problem=run_leaky_superconductor)
-    single_problem(
-        **{**all_params, 'work_key': 'param', 'precision_key': 'restart', 'mode': 'step_size_limiting'},
-        problem=run_leaky_superconductor,
-    )
-    ODEs(**all_params, mode='RK')
+    # single_problem(**all_params, mode='step_size_limiting', problem=run_leaky_superconductor)
+    # single_problem(
+    #     **{**all_params, 'work_key': 'param', 'precision_key': 'restart', 'mode': 'step_size_limiting'},
+    #     problem=run_leaky_superconductor,
+    # )
+    # ODEs(**all_params, mode='RK')
+    vdp_stiffness_plot(base_path='data/paper')
 
 
 def make_plots_for_SIAM_CSE23():  # pragma: no cover
@@ -797,8 +799,8 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp, path='data/stats-jusuf'))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
     # plot_adaptivity_stuff()
     # plot_efficiency_polar_other()
     # plot_efficiency_polar_vdp(run_vdp, path='data/stats-jusuf')
@@ -822,5 +824,5 @@ if __name__ == "__main__":
     # make_plots_for_SIAM_CSE23()
 
     # plot_Lorenz_solution()
-    # work_precision()
-    make_plots_for_paper()
+    work_precision()
+    # make_plots_for_paper()
