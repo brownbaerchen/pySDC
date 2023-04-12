@@ -73,13 +73,6 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     )
 
     # record all the metrics
-    from pySDC.helpers.stats_helper import filter_stats
-
-    print(
-        comm_world.rank,
-        filter_stats(stats, type='e_global_post_run'),
-        filter_stats(stats, type='e_global_post_run', recomputed=False),
-    )
     for key, mapping in MAPPINGS.items():
         me = get_sorted(stats, type=mapping[0], recomputed=mapping[2], comm=comm)
         if len(me) == 0:
@@ -559,20 +552,20 @@ def get_configs(mode, problem):
         #         'strategies': [ERKStrategy(useMPI=False)], 'num_procs':1,
         # }
 
-        for num_procs in [1, 2, 3, 4]:
+        for num_procs in [4, 3, 2, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': f'{num_procs} procs'}
             configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True), BaseStrategy(True)],
+                'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
-            # configurations[num_procs + 100] = {
-            #     'strategies': [IterateStrategy(True)],
-            #     'custom_description': descIterate,
-            #     'num_procs': num_procs,
-            #     'plotting_params': plotting_params,
-            # }
+            configurations[num_procs + 100] = {
+                'strategies': [IterateStrategy(True)],
+                'custom_description': descIterate,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
 
     elif mode[:13] == 'vdp_stiffness':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy
@@ -594,6 +587,16 @@ def get_configs(mode, problem):
             5: 'loosely dashdotted',
         }
 
+        for num_procs in [4, 1]:
+            plotting_params = {'ls': ls[num_procs], 'label': f'SDC {num_procs} procs'}
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(True)],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+                'handle': mode,
+            }
+
         configurations[2] = {
             'strategies': [ERKStrategy(useMPI=True)],
             'num_procs': 1,
@@ -609,16 +612,6 @@ def get_configs(mode, problem):
             'plotting_params': {'label': 'DIRK4(3)'},
             'custom_description': problem_desc,
         }
-
-        for num_procs in [1, 4]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'SDC {num_procs} procs'}
-            configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True)],
-                'custom_description': desc,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-                'handle': mode,
-            }
 
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
@@ -983,7 +976,7 @@ def vdp_stiffness_plot(base_path='data', **kwargs):
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(record=False)
+    vdp_stiffness_plot(record=False, runs=5)
 
     params = {
         'mode': 'vdp_stiffness-15',
@@ -1009,9 +1002,9 @@ if __name__ == "__main__":
         'plotting': True,
     }
 
-    # for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
-    #     all_problems(**all_params, mode=mode)
-    #     comm_world.Barrier()
+    for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
+        all_problems(**all_params, mode=mode)
+        comm_world.Barrier()
 
     if comm_world.rank == 0:
         # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')

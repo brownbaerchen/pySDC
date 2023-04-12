@@ -1298,14 +1298,13 @@ class FaultStats:
 
 def main():
     stats_analyser = FaultStats(
-        prob=run_vdp,
+        prob=run_Schroedinger,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=False,
         recovery_thresh=1.1,
-        # recovery_thresh_abs=5e-5,
         num_procs=1,
-        mode='combination',
+        mode='random',
         stats_path='data/stats-jusuf',
     )
 
