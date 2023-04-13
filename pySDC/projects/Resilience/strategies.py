@@ -183,7 +183,7 @@ class Strategy:
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
         elif problem.__name__ == "run_leaky_superconductor":
-            custom_description['level_params'] = {'restol': -1, 'dt': 10.0}
+            custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-11}
         return merge_descriptions(custom_description, self.custom_description)
@@ -282,7 +282,7 @@ class AdaptivityStrategy(Strategy):
             e_tol = 4e-6
             dt_min = 1e-3
         elif problem.__name__ == "run_leaky_superconductor":
-            e_tol = 1e-7
+            e_tol = 1e-5
             dt_min = 1e-3
             # dt_max = 25
             # dt_slope_max = 4.
@@ -409,8 +409,7 @@ class IterateStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             restol = 6.5e-7
         elif problem.__name__ == "run_leaky_superconductor":
-            # e_tol = 1e-6
-            restol = 1e-8
+            restol = 1e-7
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \

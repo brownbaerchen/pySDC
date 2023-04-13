@@ -552,14 +552,15 @@ def get_configs(mode, problem):
         #         'strategies': [ERKStrategy(useMPI=False)], 'num_procs':1,
         # }
 
-        for num_procs in [4, 3, 2, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'{num_procs} procs'}
+        for num_procs in [4, 2, 1]:
+            plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
+            plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
             configurations[num_procs + 100] = {
                 'strategies': [IterateStrategy(True)],
                 'custom_description': descIterate,
@@ -777,40 +778,6 @@ def save_fig(fig, name, work_key, precision_key, legend=True, format='pdf', base
     print(f'Stored figure \"{path}\"')
 
 
-def parallel_efficiency(work_key, precision_key, mode, problem, **kwargs):
-    from pySDC.core.Lagrange import LagrangeApproximation
-
-    configurations = get_configs(mode, problem)
-
-    fig, ax = plt.subplots(1, 1)
-
-    for _, config in configurations.items():
-        for strategy in config['strategies']:
-            shared_args = {
-                'problem': problem,
-                'strategy': strategy,
-                'handle': config.get('handle', ''),
-                'num_procs': config.get('num_procs', 1),
-            }
-
-            with open(get_path(**shared_args), 'rb') as f:
-                data = pickle.load(f)
-
-            work = [np.nanmean(data[key][work_key]) for key in data.keys()]
-            precision = [np.nanmean(data[key][precision_key]) for key in data.keys()]
-
-            interpolator = LagrangeApproximation(points=work)
-
-            work_inter = np.logspace(-1, 1, 100)
-            precision_inter = interpolator.getInterpolationMatrix(work_inter) @ precision
-
-            ax.loglog(work, precision)
-            ax.plot(work_inter, precision_inter)
-
-            break
-        break
-
-
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):
     """
     Make a plot comparing various strategies for all problems.
@@ -843,7 +810,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             **shared_params,
             problem=problems[i],
             ax=axs.flatten()[i],
-            decorate=i == 2,
+            decorate=True,
             configurations=get_configs(mode, problems[i]),
         )
 
@@ -939,7 +906,7 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):
         )
 
 
-def vdp_stiffness_plot(base_path='data', **kwargs):
+def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):
     fig, axs = get_fig(2, 2, sharex=True)
 
     mus = [0, 5, 10, 15]
@@ -962,7 +929,6 @@ def vdp_stiffness_plot(base_path='data', **kwargs):
         axs.flatten()[i].set_title(rf'$\mu={{{mus[i]}}}$')
 
     fig.suptitle('Van der Pol')
-    # fig.tight_layout()
     if params['comm_world'].rank == 0:
         save_fig(
             fig=fig,
@@ -971,6 +937,7 @@ def vdp_stiffness_plot(base_path='data', **kwargs):
             precision_key=params['precision_key'],
             legend=False,
             base_path=base_path,
+            format=format,
         )
 
 
@@ -999,7 +966,7 @@ if __name__ == "__main__":
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
-        'plotting': True,
+        'plotting': comm_world.rank == 0,
     }
 
     for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:

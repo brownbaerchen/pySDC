@@ -144,7 +144,6 @@ class LogGlobalErrorPostRun(hooks):
 
             if step.status.last:
                 self.logger.info(f'Finished with a global error of e={abs(u_num-u_ref):.2e}')
-                print(f'Finished with a global error of e={abs(u_num-u_ref):.2e}', step.status.restart)
 
                 self.add_to_stats(
                     process=step.status.slot,

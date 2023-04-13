@@ -23,7 +23,7 @@ JOURNAL = 'Springer_Numerical_Algorithms'
 BASE_PATH = 'data/paper'
 
 
-def get_stats(problem, path='data/stats'):
+def get_stats(problem, path='data/stats-jusuf'):
     """
     Create a FaultStats object for a given problem to use for the plots.
     Note that the statistics need to be already generated somewhere else, this function will only load them.
@@ -189,10 +189,10 @@ def compare_recovery_rate_problems():  # pragma: no cover
         None
     """
     stats = [
-        get_stats(run_vdp, 'data/stats-jusuf'),
+        get_stats(run_vdp),
         get_stats(run_Lorenz),
-        get_stats(run_Schroedinger, 'data/stats-jusuf'),
-        get_stats(run_leaky_superconductor, 'data/stats-jusuf'),
+        get_stats(run_Schroedinger),
+        get_stats(run_leaky_superconductor),
     ]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
 
@@ -726,7 +726,7 @@ def work_precision():
         'base_path': 'data/paper',
     }
 
-    for mode in ['compare_strategies']:
+    for mode in ['compare_strategies', 'parallel_efficiency']:
         all_problems(**all_params, mode=mode)
 
     # Quench stuff
@@ -771,6 +771,20 @@ def work_precision():
     vdp_stiffness_plot(base_path='data/paper')
 
 
+def make_plots_for_TIME_X_website():
+    global JOURNAL, BASE_PATH
+    JOURNAL = 'JSC_beamer'
+    BASE_PATH = 'data/paper/time-x_website'
+
+    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 2.0 / 3.0))
+    plot_recovery_rate_recoverable_only(get_stats(run_vdp), fig, ax)
+    savefig(fig, 'recovery_rate', format='png')
+
+    from pySDC.projects.Resilience.work_precision import vdp_stiffness_plot
+
+    vdp_stiffness_plot(base_path=BASE_PATH, format='png')
+
+
 def make_plots_for_SIAM_CSE23():  # pragma: no cover
     """
     Make plots for the SIAM talk
@@ -802,9 +816,8 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
     # plot_adaptivity_stuff()
-    # plot_efficiency_polar_other()
-    # plot_efficiency_polar_vdp(run_vdp, path='data/stats-jusuf')
-    # compare_recovery_rate_problems()
+    compare_recovery_rate_problems()
+    # work_precision()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -822,7 +835,5 @@ def make_plots_for_notes():  # pragma: no cover
 if __name__ == "__main__":
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
-
-    # plot_Lorenz_solution()
-    work_precision()
-    # make_plots_for_paper()
+    # make_plots_for_TIME_X_website()
+    make_plots_for_paper()

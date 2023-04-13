@@ -1296,13 +1296,36 @@ class FaultStats:
         return None
 
 
+def check_local_error():
+    """
+    Make a plot of the resolution over time for all problems
+    """
+    problems = [run_vdp, run_Lorenz, run_Schroedinger, run_leaky_superconductor]
+    problems = [run_leaky_superconductor]
+    strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
+
+    for i in range(len(problems)):
+        stats_analyser = FaultStats(
+            prob=problems[i],
+            strategies=strategies,
+            faults=[False],
+            reload=True,
+            recovery_thresh=1.1,
+            num_procs=1,
+            mode='random',
+        )
+        stats_analyser.compare_strategies()
+    plt.show()
+
+
 def main():
     stats_analyser = FaultStats(
-        prob=run_Schroedinger,
+        prob=run_leaky_superconductor,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=False,
         recovery_thresh=1.1,
+        # recovery_thresh_abs=1e-5,
         num_procs=1,
         mode='random',
         stats_path='data/stats-jusuf',
@@ -1379,4 +1402,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # check_local_error()
     main()
