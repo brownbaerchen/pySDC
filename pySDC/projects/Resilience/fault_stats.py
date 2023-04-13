@@ -1330,6 +1330,13 @@ def main():
         mode='random',
         stats_path='data/stats-jusuf',
     )
+    #######################
+    msk = stats_analyser.get_mask(AdaptivityStrategy(), val=False, key='recovered')
+    stats_analyser.print_faults(msk)
+    stats_analyser.scrutinize(IterateStrategy(), 4979, True)
+    plt.show()
+    return None
+    #######################
 
     stats_analyser.run_stats_generation(runs=5000)
 

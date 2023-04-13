@@ -48,7 +48,7 @@ def get_stats(problem, path='data/stats-jusuf'):
     if JOURNAL not in ['JSC_beamer']:
         strategies += [HotRodStrategy()]
 
-    return FaultStats(
+    stats_analyser = FaultStats(
         prob=problem,
         strategies=strategies,
         faults=[False, True],
@@ -59,6 +59,8 @@ def get_stats(problem, path='data/stats-jusuf'):
         mode=mode,
         stats_path=path,
     )
+    stats_analyser.get_recovered()
+    return stats_analyser
 
 
 def my_setup_mpl(**kwargs):
@@ -563,148 +565,6 @@ def plot_vdp_solution():  # pragma: no cover
     savefig(fig, 'vdp_sol')
 
 
-def work_life_balance_single(problem, ax, problem_name, work_key='t', reload=True):  # pragma: no cover
-    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
-    from pySDC.implementations.hooks.log_work import LogWork
-    from pySDC.projects.Resilience.fault_stats import AdaptivityStrategy, LogData
-    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityCollocation
-    import pickle
-
-    stats_analyser = get_stats(problem, path='data/stats')
-
-    orders = {
-        'adaptivity': [3, 5],
-        'fixed': [3, 5],
-        'iterate': [3e-2, 1e-2],
-        'adaptivity_Q': [1e-7],
-    }
-
-    def run(strategy, force_params, dat):
-        # force_params['controller_params'] = {'logger_level': 15}
-        stats, _, _ = stats_analyser.single_run(
-            strategy=strategy(), force_params=force_params, hook_class=[LogGlobalErrorPostRun, LogData, LogWork]
-        )
-        # _e = max([me[1] for me in get_sorted(stats, type='e_local_post_step', recomputed=False)])
-
-        # restart = sum([me[1] for me in get_sorted(stats, type='restart')])
-        # print(
-        #    f"{stats_analyser.get_name(strategy())}: e={_e:.2e} for k={_k} work units in {timing:.2e}s, {restart} restarts"
-        # )
-        dat['e'] += [get_sorted(stats, type='e_global_post_run')[-1][1]]
-        dat['k_SDC'] += [sum([me[1] for me in get_sorted(stats, type='k')])]
-        dat['k_Newton'] += [sum([me[1] for me in get_sorted(stats, type='work_newton')])]
-        dat['k_rhs'] += [sum([me[1] for me in get_sorted(stats, type='work_rhs')])]
-        dat['t'] += [get_sorted(stats, type='timing_run')[-1][1]]
-
-    def load_data(reload, problem_name):
-        if reload:
-            try:
-                with open(f'data/work-error-{problem_name}.pickle', 'rb') as f:
-                    dat = pickle.load(f)
-                    success = True
-            except (FileNotFoundError, EOFError):
-                dat, success = load_data(False, problem_name)
-        else:
-            keys = ['e', 'k_SDC', 'k_Newton', 'k_rhs', 't']
-            success = False
-            dat = {key: {order: {k: [] for k in keys} for order in orders[key]} for key in orders}
-
-        return dat, success
-
-    data, reload = load_data(reload, problem_name)
-
-    # adaptivity
-    ls = {
-        5: '-',
-        3: '-.',
-        4: ':',
-    }
-
-    S = 'adaptivity_Q'
-    for order in orders[S]:
-        for e_tol in [1e-3, 1e-4, 1e-5, 1e-6]:
-            if not reload:
-                force_params = {
-                    'convergence_controllers': {
-                        AdaptivityCollocation: {
-                            'adaptive_coll_params': {'quad_type': ['RADAU-RIGHT', 'GAUSS']},
-                            'e_tol': e_tol,
-                        }
-                    },
-                    #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3], 'restol': [e_tol / 10, e_tol]}, 'e_tol': e_tol}},
-                    #'convergence_controllers': {AdaptivityCollocation: {'adaptive_coll_params': {'num_nodes': [2, 3]}, 'e_tol': e_tol}},
-                    'step_params': {'maxiter': 99},
-                    'level_params': {'restol': e_tol / 10},
-                }
-                run(BaseStrategy, force_params, data[S][order])
-        ax.loglog(
-            data[S][order][work_key],
-            data[S][order]['e'],
-            **{**AdaptivityStrategy().style, 'ls': '-', 'color': 'magenta'},
-        )
-
-    S = 'adaptivity'
-    for order in orders[S]:
-        for e_tol in [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]:
-            if not reload:
-                force_params = {
-                    'convergence_controllers': {Adaptivity: {'e_tol': e_tol}},
-                    'step_params': {'maxiter': order},
-                }
-                run(AdaptivityStrategy, force_params, data[S][order])
-        ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**AdaptivityStrategy().style, 'ls': ls[order]})
-
-    # iterate
-    S = 'iterate'
-    for order in orders[S]:
-        for tol in [1e-3, 1e-5, 1e-7, 1e-8]:
-            if not reload:
-                force_params = {'level_params': {'restol': tol, 'dt': order}}
-                run(IterateStrategy, force_params, data[S][order])
-        ax.loglog(data[S][order][work_key], data[S][order]['e'], **IterateStrategy().style)
-
-    # base
-    S = 'fixed'
-    for order in orders[S]:
-        for tol in [5e-2, 3e-2, 1e-2, 5e-3]:
-            if not reload:
-                force_params = {'level_params': {'dt': tol}, 'step_params': {'maxiter': order}}
-                run(BaseStrategy, force_params, data[S][order])
-        ax.loglog(data[S][order][work_key], data[S][order]['e'], **{**BaseStrategy().style, 'ls': ls[order]})
-
-    # store
-    with open(f'data/work-error-{problem_name}.pickle', 'wb') as f:
-        pickle.dump(data, f)
-    return None
-
-
-def work_life_balance(work_key='t', reload=True):  # pragma: no cover
-    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.9))
-    problems = [
-        run_vdp,
-        run_Lorenz,
-    ]  # run_Schroedinger, run_leaky_superconductor]
-    titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
-    for i in range(len(problems)):
-        work_life_balance_single(
-            problems[i], axs.flatten()[i], problem_name=titles[i], work_key=work_key, reload=reload
-        )
-        axs.flatten()[i].set_title(titles[i])
-
-    xlabels = {
-        't': 'wall clock time / s',
-        'k_SDC': 'SDC iterations',
-        'k_Newton': 'Newton iterations',
-        'k_rhs': 'right hand side evaluations',
-    }
-
-    axs[1, 0].set_xlabel(f'{xlabels.get(work_key, "work")}')
-    axs[1, 0].set_ylabel(r'global error')
-    axs[1, 0].legend(frameon=False)
-    savefig(fig, f'{work_key}-error')
-    plt.show()
-
-
 def work_precision():
     from pySDC.projects.Resilience.work_precision import (
         all_problems,
@@ -762,12 +622,6 @@ def work_precision():
         base_path=all_params["base_path"],
     )
 
-    # single_problem(**all_params, mode='step_size_limiting', problem=run_leaky_superconductor)
-    # single_problem(
-    #     **{**all_params, 'work_key': 'param', 'precision_key': 'restart', 'mode': 'step_size_limiting'},
-    #     problem=run_leaky_superconductor,
-    # )
-    # ODEs(**all_params, mode='RK')
     vdp_stiffness_plot(base_path='data/paper')
 
 
@@ -810,14 +664,14 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    # plot_vdp_solution()
-    # plot_quench_solution()
-    # plot_recovery_rate(get_stats(run_vdp, path='data/stats-jusuf'))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
+    plot_vdp_solution()
+    plot_quench_solution()
+    plot_recovery_rate(get_stats(run_vdp))
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    plot_adaptivity_stuff()
     compare_recovery_rate_problems()
-    # work_precision()
+    work_precision()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -828,8 +682,8 @@ def make_plots_for_notes():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'notes/Lorenz'
 
-    # analyse_resilience(run_Lorenz, format='png')
-    analyse_resilience(run_leaky_superconductor, path='data/stats-jusuf/', format='png')
+    analyse_resilience(run_Lorenz, format='png')
+    analyse_resilience(run_leaky_superconductor, format='png')
 
 
 if __name__ == "__main__":
