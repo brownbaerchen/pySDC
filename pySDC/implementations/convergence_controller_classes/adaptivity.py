@@ -124,14 +124,24 @@ class AdaptivityBase(ConvergenceController):
                 # see if we try to avoid restarts
                 if self.params.get('avoid_restarts'):
                     more_iter_needed = max([L.status.iter_to_convergence for L in S.levels])
+                    k_final = S.status.iter + more_iter_needed
                     rho = max([L.status.contraction_factor for L in S.levels])
+                    coll_order = S.levels[0].sweep.coll.order
 
                     if rho > 1:
                         S.status.restart = True
                         self.log(f"Convergence factor = {rho:.2e} > 1 -> restarting", S)
-                    elif S.status.iter + more_iter_needed > 2 * S.params.maxiter:
+                    elif k_final > 2 * S.params.maxiter:
                         S.status.restart = True
-                        self.log(f"{more_iter_needed} more iterations needed for convergence -> restart", S)
+                        self.log(
+                            f"{more_iter_needed} more iterations needed for convergence -> restart is more efficient", S
+                        )
+                    elif k_final > coll_order:
+                        S.status.restart = True
+                        self.log(
+                            f"{more_iter_needed} more iterations needed for convergence -> restart because collocation problem would be over resolved",
+                            S,
+                        )
                     else:
                         S.status.force_continue = True
                         self.log(f"{more_iter_needed} more iterations needed for convergence -> no restart", S)

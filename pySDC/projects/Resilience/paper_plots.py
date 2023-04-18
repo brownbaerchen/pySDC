@@ -147,7 +147,7 @@ def plot_recovery_rate(stats_analyser, **kwargs):  # pragma: no cover
     stats_analyser.plot_things_per_things(
         'recovered', 'bit', False, op=stats_analyser.rec_rate, args={'ylabel': 'recovery rate'}, ax=axs[0]
     )
-    plot_recovery_rate_recoverable_only(stats_analyser, fig, axs[1], ylabel='', xlabel='')
+    plot_recovery_rate_recoverable_only(stats_analyser, fig, axs[1], ylabel='')
     axs[1].get_legend().remove()
     axs[0].set_title('All faults')
     axs[1].set_title('Only recoverable faults')
@@ -199,9 +199,9 @@ def compare_recovery_rate_problems():  # pragma: no cover
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
 
     my_setup_mpl()
-    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.7), sharey=True)
+    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.8), sharey=True)
     [
-        plot_recovery_rate_recoverable_only(stats[i], fig, axs.flatten()[i], ylabel='', xlabel='', title=titles[i])
+        plot_recovery_rate_recoverable_only(stats[i], fig, axs.flatten()[i], ylabel='', title=titles[i])
         for i in range(len(stats))
     ]
 
@@ -209,8 +209,8 @@ def compare_recovery_rate_problems():  # pragma: no cover
         ax.get_legend().remove()
 
     axs[1, 1].legend(frameon=False)
-    axs[1, 0].set_xlabel('bit')
     axs[1, 0].set_ylabel('recovery rate')
+    axs[0, 0].set_ylabel('recovery rate')
 
     savefig(fig, 'compare_equations')
 

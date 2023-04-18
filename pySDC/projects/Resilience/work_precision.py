@@ -201,7 +201,6 @@ def record_work_precision(
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'e_tol':
             param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
-            # set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_max'], 50.)
         elif param == 'dt':
             param_range = [500 / 2.0**me for me in [5, 6, 7, 8]]
 
@@ -461,6 +460,7 @@ def get_configs(mode, problem):
         configurations[2] = {
             'custom_description': {},
             'handle': 'no limits',
+            'plotting_params': {'label': 'adaptivity'},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
     elif mode == 'compare_strategies':
@@ -720,6 +720,32 @@ def get_configs(mode, problem):
                 'handle': f"Newton tol={tol_range[i]:.1e}",
                 'plotting_params': {'ls': ls[i]},
             }
+    elif mode == 'avoid_restarts':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            AdaptivityAvoidRestartsStrategy,
+            AdaptivityInterpolationStrategy,
+        )
+
+        desc = {'sweeper_params': {'QI': 'IE'}, 'step_params': {'maxiter': 3}}
+        param_range = [1e-3, 1e-5]
+        configurations[0] = {
+            'strategies': [AdaptivityInterpolationStrategy(useMPI=True)],
+            'plotting_params': {'ls': '--'},
+            'custom_description': desc,
+            'param_range': param_range,
+        }
+        configurations[1] = {
+            'strategies': [AdaptivityAvoidRestartsStrategy(useMPI=True)],
+            'plotting_params': {'ls': '-.'},
+            'custom_description': desc,
+            'param_range': param_range,
+        }
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'param_range': param_range,
+        }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
 
@@ -943,20 +969,19 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(record=False, runs=5)
 
     params = {
-        'mode': 'vdp_stiffness-15',
+        'mode': 'parallel_efficiency',
         'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_Schroedinger,
     }
-    record = True
-    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = False
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
@@ -970,7 +995,7 @@ if __name__ == "__main__":
     }
 
     for mode in ['parallel_efficiency']:  # , 'preconditioners', 'compare_adaptivity']:
-        all_problems(**all_params, mode=mode)
+        # all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
     if comm_world.rank == 0:

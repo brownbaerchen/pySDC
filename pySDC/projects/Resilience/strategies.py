@@ -760,3 +760,73 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
         custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
 
         return custom_description
+
+
+class AdaptivityAvoidRestartsStrategy(AdaptivityStrategy):
+    """
+    Adaptivity with the avoid restarts option
+    """
+
+    @property
+    def label(self):
+        return 'adaptivity (avoid restarts)'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
+        custom_description = super().get_custom_description(problem, num_procs)
+
+        custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = True
+
+        flavor = 'MPI' if self.useMPI else 'nonMPI'
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
+
+        return custom_description
+
+
+class AdaptivityInterpolationStrategy(AdaptivityStrategy):
+    """
+    Adaptivity with interpolation between restarts
+    """
+
+    @property
+    def label(self):
+        return 'adaptivity+interpolation'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.convergence_controller_classes.interpolate_between_restarts import (
+            InterpolateBetweenRestarts,
+        )
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
+        custom_description = super().get_custom_description(problem, num_procs)
+
+        custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = False
+        custom_description['convergence_controllers'][InterpolateBetweenRestarts] = {}
+
+        flavor = 'MPI' if self.useMPI else 'nonMPI'
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
+
+        return custom_description

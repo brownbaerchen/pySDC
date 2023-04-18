@@ -332,6 +332,7 @@ class FaultInjector(hooks):
             'iteration': step.params.maxiter,
             'problem_pos': step.levels[level_number].u[0].shape,
             'bit': bit,  # change manually if you ever have something else
+            **self.rnd_params,
         }
 
         # initialize the faults have been added before we knew the random parameters
@@ -510,10 +511,19 @@ def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
     """
     faultHook = get_fault_injector_hook(controller)
     faultHook.random_generator = fault_stuff['rng']
-    faultHook.add_fault(
-        rnd_args={**rnd_args, **fault_stuff.get('rnd_params', {})},
-        args={**args, **fault_stuff.get('args', {})},
-    )
+
+    for key in ['fault_frequency_iter']:
+        if key in fault_stuff.keys():
+            faultHook.__dict__[key] = fault_stuff[key]
+
+    for key, val in fault_stuff.get('rnd_params', {}).items():
+        faultHook.rnd_params[key] = val
+
+    if not len(faultHook.rnd_params.keys()) > 0:
+        faultHook.add_fault(
+            rnd_args={**rnd_args, **fault_stuff.get('rnd_params', {})},
+            args={**args, **fault_stuff.get('args', {})},
+        )
 
 
 def get_fault_injector_hook(controller):

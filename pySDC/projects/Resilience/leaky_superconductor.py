@@ -401,7 +401,6 @@ def compare_reference_solutions_single():
     controller_params = {'logger_level': 15}
 
     for j in range(len(types)):
-
         description = {}
         description['level_params'] = {'dt': 5.0, 'restol': 1e-10}
         description['sweeper_params'] = {'QI': 'IE', 'num_nodes': 3}

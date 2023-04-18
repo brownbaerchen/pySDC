@@ -278,7 +278,6 @@ class LeakySuperconductor(ptype):
         me = self.dtype_u(self.init, val=0.0)
 
         if t > 0:
-
             if self.reference_sol_type == 'scipy':
 
                 def jac(t, u):
