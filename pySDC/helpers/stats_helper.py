@@ -78,9 +78,7 @@ def filter_recomputed(stats):
     times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])
     for t in times_restarted:
         restarts = max([me.num_restarts for me in filter_stats(stats, type='_recomputed', time=t).keys()])
-        # print(restarts)
         for i in range(restarts):
-            # print([me.type for me in filter_stats(stats, time=t, num_restarts=i).keys()])
             [stats.pop(me) for me in filter_stats(stats, time=t, num_restarts=i).keys()]
 
     # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
