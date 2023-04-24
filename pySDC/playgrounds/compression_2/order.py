@@ -8,7 +8,7 @@ from pySDC.helpers.stats_helper import get_sorted
 from pySDC.helpers.plot_helper import figsize_by_journal
 from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
-from pySDC.implementations.convergence_controller_classes.compression import Compression
+from pySDC.playgrounds.compression_2.compression_convergence_controller import Compression
 
 def single_run(problem, description=None, thresh=1e-10, Tend=2e-1):
     description = {} if description is None else description
