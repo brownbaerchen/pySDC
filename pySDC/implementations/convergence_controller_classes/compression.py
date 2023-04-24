@@ -1,4 +1,5 @@
 from pySDC.core.ConvergenceController import ConvergenceController
+import numpy as np
 import libpressio
 
 class Compression(ConvergenceController):
@@ -33,8 +34,13 @@ class Compression(ConvergenceController):
         """
         assert len(S.levels) == 1
         lvl = S.levels[0]
+        prob = lvl.prob
+        nodes = np.append(0, lvl.sweep.coll.nodes)
+
         for i in range(len(lvl.u)):
             comp_data = self.compressor.encode(lvl.u[i])
             lvl.u[i][:] = self.compressor.decode(comp_data, lvl.u[i][:])
-            metrics = self.compressor.get_metrics()
-            #print(metrics)
+            lvl.f[i] = prob.eval_f(lvl.u[i], lvl.time + lvl.dt * nodes[i])
+
+            # metrics = self.compressor.get_metrics()
+            # print(metrics)

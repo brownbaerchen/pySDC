@@ -10,15 +10,19 @@ from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
 from pySDC.implementations.convergence_controller_classes.compression import Compression
 
-def single_run(problem, description=None):
+def single_run(problem, description=None, thresh=1e-10, Tend=2e-1):
     description = {} if description is None else description
-    description['convergence_controllers'] = {Compression: {}}
-    stats, _, _ = problem(custom_description=description, hook_class=LogGlobalErrorPostRun)
+     
+    compressor_args = {}
+    compressor_args['compressor_config'] = {'pressio:abs': thresh}
+     
+    description['convergence_controllers'] = {Compression: {'compressor_args': compressor_args}}
+    stats, _, _ = problem(custom_description=description, hook_class=LogGlobalErrorPostRun, Tend=Tend)
     e = get_sorted(stats, type='e_global_post_run')[-1][1]
     return e
 
 
-def multiple_runs(problem, values, expected_order, mode='dt', **kwargs):
+def multiple_runs(problem, values, expected_order, mode='dt', thresh=1e-10, **kwargs):
     errors = np.zeros_like(values)
 
     description = {
@@ -34,15 +38,16 @@ def multiple_runs(problem, values, expected_order, mode='dt', **kwargs):
     for i in range(len(values)):
         if mode == 'dt':
             description['level_params']['dt'] = values[i]
+            Tend = values[i] * 5
         elif mode == 'nvars':
             description['problem_params']['nvars'] = values[i]
+            Tend = 2e-1
              
-        errors[i] = single_run(problem, description)
-    print(errors)
+        errors[i] = single_run(problem, description, thresh=thresh, Tend=Tend)
     return values, errors
 
 
-def get_order(values, erros, thresh=1e-16):
+def get_order(values, errors, thresh=1e-16):
     values = np.array(values)
     idx = np.argsort(values)
     local_orders = np.log(errors[idx][1:] / errors[idx][:-1]) / np.log(values[idx][1:] / values[idx][:-1])
@@ -56,29 +61,46 @@ def plot_order(values, errors, ax, thresh=1e-16, color='black', **kwargs):
     ax.loglog(values, errors[0] * (values/values[0]) ** order, color=color, label=f'p={order:.2f}', **kwargs)
 
 
-
-if __name__ == '__main__':
-    fig, ax = plt.subplots()
+def plot_order_in_time(ax, thresh):
     problem = run_advection
 
     base_configs_dt = {
-        'values': np.array([2.**(-i) for i in [1, 2, 3, 4, 5, 6, 7, 8, 9]]),
+        'values': np.array([2.**(-i) for i in [2, 3, 4, 5, 6, 7, 8, 9]]),
         'mode': 'dt',
-        'ax': ax
+        'ax': ax,
+        'thresh': thresh,
     }
 
     configs_dt = {}
-    # configs_dt[2] = {**base_configs_dt, 'color': 'black'}
-    # configs_dt[3] = {**base_configs_dt, 'color': 'magenta'}
+    configs_dt[2] = {**base_configs_dt, 'color': 'black'}
+    configs_dt[3] = {**base_configs_dt, 'color': 'magenta'}
     configs_dt[4] = {**base_configs_dt, 'color': 'teal'}
-    # configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
+    configs_dt[5] = {**base_configs_dt, 'color': 'orange'}
     # configs_dt[6] = {**base_configs_dt, 'color': 'blue'}
      
     for key in configs_dt.keys():
         values, errors = multiple_runs(problem, expected_order=key, **configs_dt[key])
-        plot_order(values, errors, ax=configs_dt[key]['ax'], thresh=1e-9, color=configs_dt[key]['color'])
+        plot_order(values, errors, ax=configs_dt[key]['ax'], thresh=configs_dt[key]['thresh'] * 1e2, color=configs_dt[key]['color'])
     base_configs_dt['ax'].set_xlabel(r'$\Delta t$')
-    base_configs_dt['ax'].set_ylabel('global error')
+    base_configs_dt['ax'].set_ylabel('local error')
+    base_configs_dt['ax'].axhline(base_configs_dt['thresh'], color='grey', ls='--', label=rf'$\|\delta\|={{{thresh:.0e}}}$')
+    base_configs_dt['ax'].legend(frameon=False)
+
+
+
+if __name__ == '__main__':
+    fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1., 1.), sharex=True, sharey=True)
+    threshs = [1e-6, 1e-8, 1e-10, 1e-12]
+
+    for i in range(len(threshs)):
+        ax = axs.flatten()[i]
+        plot_order_in_time(ax, threshs[i])
+        if i != 2:
+            ax.set_ylabel('')
+            ax.set_xlabel('')
+    fig.suptitle('Order in time for advection problem')
+    fig.tight_layout()
+    fig.savefig('compression.pdf')
 
     #base_configs_nvars = {
     #    'values': [128, 256, 512, 1024],
@@ -94,6 +116,4 @@ if __name__ == '__main__':
     #    values, errors = multiple_runs(problem, expected_order=key, **configs_nvars[key])
     #    plot_order(values, errors, axs[1], color=configs_nvars[key]['color'])
 
-    ax.legend(frameon=False)
-    fig.savefig('compression.pdf')
     plt.show()
