@@ -34,7 +34,6 @@ class AdaptivityBase(ConvergenceController):
             "control_order": -50,
             "beta": 0.9,
         }
-
         from pySDC.implementations.hooks.log_step_size import LogStepSize
 
         controller.add_hook(LogStepSize)
