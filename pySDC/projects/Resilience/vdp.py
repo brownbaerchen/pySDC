@@ -111,11 +111,11 @@ def run_vdp(
     """
 
     # initialize level parameters
-    level_params = dict()
+    level_params = {}
     level_params['dt'] = 1e-2
 
     # initialize sweeper parameters
-    sweeper_params = dict()
+    sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'LU'
@@ -128,11 +128,11 @@ def run_vdp(
     }
 
     # initialize step parameters
-    step_params = dict()
+    step_params = {}
     step_params['maxiter'] = 4
 
     # initialize controller parameters
-    controller_params = dict()
+    controller_params = {}
     controller_params['logger_level'] = 30
     controller_params['hook_class'] = hook_collection + (hook_class if type(hook_class) == list else [hook_class])
     controller_params['mssdc_jac'] = False
@@ -141,7 +141,7 @@ def run_vdp(
         controller_params = {**controller_params, **custom_controller_params}
 
     # fill description dictionary for easy step instantiation
-    description = dict()
+    description = {}
     description['problem_class'] = vanderpol  # pass problem class
     description['problem_params'] = problem_params  # pass problem parameters
     description['sweeper_class'] = generic_implicit  # pass sweeper
@@ -212,7 +212,7 @@ def fetch_test_data(stats, comm=None, use_MPI=False):
         if type not in get_list_of_types(stats):
             raise ValueError(f"Can't read type \"{type}\" from stats, only got", get_list_of_types(stats))
 
-        if comm is None or use_MPI == False:
+        if comm is None or use_MPI is False:
             data[type] = [me[1] for me in get_sorted(stats, type=type, recomputed=None, sortby='time')]
         else:
             data[type] = [me[1] for me in get_sorted(stats, type=type, recomputed=None, sortby='time', comm=comm)]
@@ -442,7 +442,14 @@ def check_step_size_limiter(size=4, comm=None):
                 dt_slope_min >= expect['dt_slope_min']
             ), f"Exceeded minimum allowed step size slope! Got {dt_slope_min:.4e}, allowed {params['dt_slope_min']:.4e}."
 
-    if comm == None:
+            assert (
+                dt_slope_max <= expect['dt_slope_max']
+            ), f"Exceeded maximum allowed step size slope! Got {dt_slope_max:.4e}, allowed {params['dt_slope_max']:.4e}."
+            assert (
+                dt_slope_min >= expect['dt_slope_min']
+            ), f"Exceeded minimum allowed step size slope! Got {dt_slope_min:.4e}, allowed {params['dt_slope_min']:.4e}."
+
+    if comm is None:
         print(f'Passed step size limiter test with {size} ranks in nonMPI implementation')
     else:
         if comm.rank == 0:
