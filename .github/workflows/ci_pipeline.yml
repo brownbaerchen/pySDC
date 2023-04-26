@@ -101,8 +101,10 @@ jobs:
       image: brownbaerchen/libpressio
       volumes:
         - pySDC:/pySDC
-      ports: 80
-      options: -it
+      ports:
+        - 80
+      options:
+        - it
 
     steps:
       # - name: Start container
