@@ -103,7 +103,7 @@ jobs:
         - pySDC:/pySDC
       ports:
         - 80
-          #options: -it
+      options: -it
 
     steps:
       # - name: Start container
