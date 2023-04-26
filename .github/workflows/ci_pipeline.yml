@@ -103,7 +103,7 @@ jobs:
         shell: bash -l {0}
 
     container:
-      image: brownbaerchen/libpressio
+      image: brownbaerchen/libpressioamd
       volumes:
         - pySDC:/pySDC
       ports:
