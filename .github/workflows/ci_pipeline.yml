@@ -105,7 +105,7 @@ jobs:
     container:
       image: brownbaerchen/libpressio
       volumes:
-        - .:/pySDC
+        - pySDC:/pySDC
       ports:
         - 80
       options: -ti
@@ -138,7 +138,7 @@ jobs:
       ports:
         - 80
       volumes:
-        - .:/volume_mount
+        - pySDC:/volume_mount
       options: --cpus 1
     steps:
       - name: Check for dockerenv file
