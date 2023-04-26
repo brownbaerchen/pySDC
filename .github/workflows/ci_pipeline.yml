@@ -98,15 +98,14 @@ jobs:
   libpressio:
     runs-on: ubuntu-latest
     container: brownbaerchen/libpressio
+      volumes:
+        - pySDC:/pySDC
 
     defaults:
       run:
         shell: bash -l {0}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
       - name: Install pySDC and pytest
         run: |
           cd /pySDC/pySDC/projects/compression
