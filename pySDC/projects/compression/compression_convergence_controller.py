@@ -2,20 +2,18 @@ from pySDC.core.ConvergenceController import ConvergenceController
 import numpy as np
 import libpressio
 
+
 class Compression(ConvergenceController):
     def setup(self, controller, params, description, **kwargs):
         default_compressor_args = {
             # configure which compressor to use
             "compressor_id": "sz3",
             # configure the set of metrics to be gathered
-            "early_config": {
-                "pressio:metric": "composite",
-                "composite:plugins": ["time", "size", "error_stat"]
-            },
+            "early_config": {"pressio:metric": "composite", "composite:plugins": ["time", "size", "error_stat"]},
             # configure SZ
             "compressor_config": {
                 "pressio:abs": 1e-10,
-            }
+            },
         }
 
         defaults = {
