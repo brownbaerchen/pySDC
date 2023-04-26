@@ -97,7 +97,8 @@ jobs:
 
   libpressio:
     runs-on: ubuntu-latest
-    container: brownbaerchen/libpressio
+    container:
+      image: brownbaerchen/libpressio
       volumes:
         - pySDC:/pySDC
 
