@@ -9,6 +9,7 @@ spack load libpressio
 # install local version of pySDC
 cd /pySDC
 pip install -e .
+python -m pip install pytest
 
 # go back to original working directory
 cd $current_dir

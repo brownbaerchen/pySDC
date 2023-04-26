@@ -95,6 +95,29 @@ jobs:
             data_3.10
             coverage_${{ matrix.env }}_3.10.dat
 
+  libpressio:
+    runs-on: ubuntu-latest
+    container: brownbaerchen/libpressio
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install pySDC and pytest
+        run: |
+          cd /pySDC/pySDC/projects/compression
+          source install_pySDC.sh
+          cd /pySDC
+
+      - name: Run pytest for CPU stuff
+        run: |
+          echo "print('Loading sitecustomize.py...')
+          pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+
 
   user_cpu_tests_macos:
     runs-on: macos-12

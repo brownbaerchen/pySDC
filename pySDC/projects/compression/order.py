@@ -48,16 +48,19 @@ def multiple_runs(problem, values, expected_order, mode='dt', thresh=1e-10, **kw
     return values, errors
 
 
-def get_order(values, errors, thresh=1e-16):
+def get_order(values, errors, thresh=1e-16, expected_order=None):
     values = np.array(values)
     idx = np.argsort(values)
     local_orders = np.log(errors[idx][1:] / errors[idx][:-1]) / np.log(values[idx][1:] / values[idx][:-1])
-    return np.mean(local_orders[errors[idx][1:] > thresh])
+    order = np.mean(local_orders[errors[idx][1:] > thresh])
+    if expected_order is not None:
+        assert np.isclose(order, expected_order, atol=0.5), f"Expected order {expected_order}, but got {order:.2f}!"
+    return order
 
 
-def plot_order(values, errors, ax, thresh=1e-16, color='black', **kwargs):
+def plot_order(values, errors, ax, thresh=1e-16, color='black', expected_order=None, **kwargs):
     values = np.array(values)
-    order = get_order(values, errors, thresh=thresh)
+    order = get_order(values, errors, thresh=thresh, expected_order=expected_order)
     ax.scatter(values, errors, color=color, **kwargs)
     ax.loglog(values, errors[0] * (values / values[0]) ** order, color=color, label=f'p={order:.2f}', **kwargs)
 
@@ -87,6 +90,7 @@ def plot_order_in_time(ax, thresh):
             ax=configs_dt[key]['ax'],
             thresh=configs_dt[key]['thresh'] * 1e2,
             color=configs_dt[key]['color'],
+            expected_order=key + 1,
         )
     base_configs_dt['ax'].set_xlabel(r'$\Delta t$')
     base_configs_dt['ax'].set_ylabel('local error')
@@ -96,7 +100,7 @@ def plot_order_in_time(ax, thresh):
     base_configs_dt['ax'].legend(frameon=False)
 
 
-if __name__ == '__main__':
+def order_in_time_different_error_bounds():
     fig, axs = plt.subplots(
         2, 2, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1.0, 1.0), sharex=True, sharey=True
     )
@@ -111,6 +115,10 @@ if __name__ == '__main__':
     fig.suptitle('Order in time for advection problem')
     fig.tight_layout()
     fig.savefig('compression-order-time.pdf')
+
+
+if __name__ == '__main__':
+    order_in_time_different_error_bounds()
 
     # base_configs_nvars = {
     #    'values': [128, 256, 512, 1024],
