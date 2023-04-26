@@ -103,6 +103,10 @@ jobs:
         - pySDC:/pySDC
 
     steps:
+      - name: Start container
+        run: |
+          docker run -ti --rm libpressio
+           
       - name: Install pySDC and pytest
         run: |
           cd /pySDC/pySDC/projects/compression
