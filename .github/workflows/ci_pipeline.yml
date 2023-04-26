@@ -108,7 +108,7 @@ jobs:
         - pySDC:/pySDC
       ports:
         - 80
-      options: -ti
+      options: --cpus 1
 
     steps:
       # - name: Start container
@@ -117,7 +117,10 @@ jobs:
       #
            
       - name: Preliminaries
-        run: docker image ls
+        run: |
+          ls
+          docker image ls
+           
       - name: Install pySDC and pytest
         run: |
           cd /pySDC/pySDC/projects/compression
