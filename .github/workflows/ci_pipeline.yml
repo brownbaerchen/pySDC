@@ -105,7 +105,7 @@ jobs:
     container:
       image: brownbaerchen/libpressio
       volumes:
-        - pySDC:/pySDC
+        - .:/pySDC
       ports:
         - 80
       options: -ti
@@ -114,7 +114,10 @@ jobs:
       # - name: Start container
       #   run: |
       #     docker run -ti --rm libpressio
+      #
            
+      - name: Preliminaries
+        run: docker image ls
       - name: Install pySDC and pytest
         run: |
           cd /pySDC/pySDC/projects/compression
