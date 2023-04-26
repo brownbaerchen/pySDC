@@ -97,6 +97,11 @@ jobs:
 
   libpressio:
     runs-on: ubuntu-latest
+       
+    defaults:
+      run:
+        shell: bash -l {0}
+
     container:
       image: brownbaerchen/libpressio
       volumes:
@@ -105,21 +110,21 @@ jobs:
         - 80
       options: -ti --rm
 
-    steps:
-      # - name: Start container
-      #   run: |
-      #     docker run -ti --rm libpressio
-           
-      - name: Install pySDC and pytest
-        run: |
-          cd /pySDC/pySDC/projects/compression
-          source install_pySDC.sh
-          cd /pySDC
+      steps:
+        # - name: Start container
+        #   run: |
+        #     docker run -ti --rm libpressio
+             
+        - name: Install pySDC and pytest
+          run: |
+            cd /pySDC/pySDC/projects/compression
+            source install_pySDC.sh
+            cd /pySDC
 
-      - name: Run pytest for CPU stuff
-        run: |
-          echo "print('Loading sitecustomize.py...')
-          pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+        - name: Run pytest for CPU stuff
+          run: |
+            echo "print('Loading sitecustomize.py...')
+            pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
   test:
     runs-on: ubuntu-latest
