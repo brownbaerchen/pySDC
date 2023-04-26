@@ -106,17 +106,21 @@ jobs:
       - name: Start container
         run: |
           docker run -ti --rm libpressio
-           
-      - name: Install pySDC and pytest
-        run: |
           cd /pySDC/pySDC/projects/compression
           source install_pySDC.sh
           cd /pySDC
-
-      - name: Run pytest for CPU stuff
-        run: |
-          echo "print('Loading sitecustomize.py...')
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+           
+          #- name: Install pySDC and pytest
+          #  run: |
+          #    cd /pySDC/pySDC/projects/compression
+          #    source install_pySDC.sh
+          #    cd /pySDC
+
+          #- name: Run pytest for CPU stuff
+          #  run: |
+          #    echo "print('Loading sitecustomize.py...')
+          #    pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
 
   user_cpu_tests_macos:
