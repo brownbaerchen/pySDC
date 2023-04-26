@@ -108,7 +108,7 @@ jobs:
         - pySDC:/pySDC
       ports:
         - 80
-      options: --cpus 1 --ARCH amd64
+      options: --cpus 1
 
     steps:
       # - name: Start container
