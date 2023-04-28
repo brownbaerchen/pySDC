@@ -13,3 +13,5 @@ RUN spack install libpressio+python+sz3
 # RUN eval `spack load --sh   libpressio`  # bash/zsh/sh
 # RUN pip install pySDC
 # RUN pip uninstall -y pySDC
+
+# CMD spack load libpressio && source /pySDC/pySDC/projects/compression/install_pySDC.sh
