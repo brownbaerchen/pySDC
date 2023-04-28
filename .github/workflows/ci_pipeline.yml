@@ -132,6 +132,22 @@ jobs:
           # echo "print('Loading sitecustomize.py...')
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
+  name: 'Hello World'
+    description: 'Greet someone and record the time'
+    inputs:
+      who-to-greet:  # id of input
+        description: 'Who to greet'
+        required: true
+        default: 'World'
+    outputs:
+      time: # id of output
+        description: 'The time we greeted you'
+    runs:
+      using: 'docker'
+      image: '/pySDC/projects/compression/basic_test/Dockerfile'
+      args:
+        - ${{ inputs.who-to-greet }}
+
   test2:
     runs-on: ubuntu-latest
     container:
