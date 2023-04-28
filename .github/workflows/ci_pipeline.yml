@@ -141,7 +141,8 @@ jobs:
       ports:
         - 80
       volumes:
-        - /pySDC:/pySDC
+        - /pySDC:/pySDCmaybe
+        - /pySDC
       options: --cpus 1
     steps:
       - name: Check for dockerenv file
