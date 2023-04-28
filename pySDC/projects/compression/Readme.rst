@@ -1,14 +1,27 @@
 Instructions for using libpressio in the Docker container
 ---------------------------------------------------------
 
+TODOs
+-----
+ - Streamline the multiplatform business. See, for instance :ref:`here<https://docs.docker.com/build/building/multi-platform/>`
+ - Make use of the `ENTRYPOINT` and `CMD` commands in the Dockerfile to possibly automate the installation process
+ - Take care of the "layered inheritance" is that needed, I don't think so. This ties in with the above point.
+
 If you haven't done this already, build the container using
  
 ```
 docker build -t libpressio .
 ```
 
-in this directory. This creates an image with the name 'libpressio'
+in this directory. This creates an image with the name 'libpressio'.
+Please pay attention to the platform you are using and you intend to run on. If you use this command on an ARM machine and try to use the image in a GitHub action, it will not run because it requires AMD architecture. You can build a platform specific version for GitHub using
 
+```
+docker buildx build --platform linux/amd64 -t libpressio:amd64 .
+```
+
+If you are on an ARM machine like me, replace `amd64` by `arm64` to build an image for you local machine. Remember to replace the tag with something useful, such as  `-t libpressio:arm64`.
+ 
 Start the image using
 
 ```
@@ -16,6 +29,7 @@ docker run -v <local_absolute_path_to_pySDC_installation>:/pySDC -ti --rm libpre
 ```
 
 the `-v` does a :ref:`"bind_mount"<https://docs.docker.com/storage/bind-mounts/>` to pySDC on your local machine.
+You may have to change the tag to the platform specific version.
 We want that because it let's us access the same version of pySDC that we have locally inside the container, in particular with all modifications.
 
 While we have installed all dependencies for pySDC already in the Docker container, we need to install pySDC itself.
