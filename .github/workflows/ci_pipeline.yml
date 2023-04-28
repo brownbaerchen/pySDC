@@ -154,10 +154,7 @@ jobs:
       ports:
         - 80
       volumes:
-        - /pySDC:/pySDCmaybe
-        - /pySDC:/whatever
-        - /pySDC/pySDC/projects:/pySDC
-        - /Mars:/Mars
+        - /home/runner/work/pySDC/pySDC/pySDC:/pySDC
       options: --cpus 1
     steps:
       - name: Checkout
