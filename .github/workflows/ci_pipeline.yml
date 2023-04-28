@@ -104,7 +104,6 @@ jobs:
 
     container:
       image: brownbaerchen/libpressio:test
-      entrypoint: 'entrypoint.sh'
       volumes:
         - pySDC:/pySDC
       ports:
@@ -133,6 +132,21 @@ jobs:
           # echo "print('Loading sitecustomize.py...')
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
+  test2:
+    runs-on: ubuntu-latest
+    container:
+      image: brownbaerchen/libpressio:test
+      env:
+        NODE_ENV: development
+      ports:
+        - 80
+      volumes:
+        - pySDC:/volume_mount
+      options: --cpus 1
+    steps:
+      - name: Check for dockerenv file
+        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+           
   test:
     runs-on: ubuntu-latest
     container:
