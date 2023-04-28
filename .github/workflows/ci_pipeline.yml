@@ -160,8 +160,8 @@ jobs:
         - /Mars:/Mars
       options: --cpus 1
     steps:
-      - name: Check for dockerenv file
-        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+      - name: Checkout
+        uses: actions/checkout@v3
       - name: ls
         run: ls /
       - name: Check mount generic
