@@ -109,6 +109,7 @@ jobs:
       ports:
         - 80
       options: --cpus 1
+      entrypoint: entrypoint.sh
 
     steps:
       # - name: Start container
