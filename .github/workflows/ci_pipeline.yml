@@ -133,10 +133,6 @@ jobs:
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
   basictest:
-    defaults:
-      run:
-        shell: bash -l {0}
-
     runs-on: ubuntu-latest
     container:
       image: brownbaerchen/basic_test
@@ -151,7 +147,7 @@ jobs:
       - name: Check for dockerenv file
         run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
       - name: Check mount generic
-        run: ls /pySDC
+        run: /bin/bash -c ls /pySDC
       - name: Check mount pySDC
         run: ls /pySDC/projects/compression
            
