@@ -164,7 +164,7 @@ jobs:
       - name: Check mount generic
         run: ls /pySDC
       - name: Check mount pySDC
-        run: ls /pySDC/projects/compression
+        run: ls /pySDC/pySDC/projects/compression
            
   test:
     runs-on: ubuntu-latest
