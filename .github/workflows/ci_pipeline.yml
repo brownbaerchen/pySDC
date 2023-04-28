@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      name: 'Hello World'
+      - name: 'Hello World'
         description: 'Greet someone and record the time'
         inputs:
           who-to-greet:  # id of input
