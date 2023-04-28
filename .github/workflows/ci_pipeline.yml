@@ -146,6 +146,8 @@ jobs:
     steps:
       - name: Check for dockerenv file
         run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
+      - name: ls
+        run: ls /
       - name: Check mount generic
         run: ls /pySDC
       - name: Check mount pySDC
