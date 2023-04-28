@@ -132,7 +132,7 @@ jobs:
           # echo "print('Loading sitecustomize.py...')
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
-  name: 'Hello World'
+  Hello World:
     description: 'Greet someone and record the time'
     inputs:
       who-to-greet:  # id of input
@@ -148,21 +148,6 @@ jobs:
       args:
         - ${{ inputs.who-to-greet }}
 
-  test2:
-    runs-on: ubuntu-latest
-    container:
-      image: brownbaerchen/libpressio:test
-      env:
-        NODE_ENV: development
-      ports:
-        - 80
-      volumes:
-        - pySDC:/volume_mount
-      options: --cpus 1
-    steps:
-      - name: Check for dockerenv file
-        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
-           
   test:
     runs-on: ubuntu-latest
     container:
