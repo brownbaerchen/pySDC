@@ -132,6 +132,15 @@ jobs:
           # echo "print('Loading sitecustomize.py...')
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
+  path_stuff:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: ls
+        run: ls
+      - name: pwd
+        run: pwd
+           
   basictest:
     runs-on: ubuntu-latest
     container:
