@@ -134,6 +134,10 @@ jobs:
 
   basic_test:
     runs-on: ubuntu-latest
+    container: 'docker'
+     image: '/pySDC/projects/compression/basic_test/Dockerfile'
+     args:
+       - ${{ inputs.who-to-greet }}
 
     steps:
       - name: 'Hello World'
@@ -146,11 +150,7 @@ jobs:
         outputs:
           time: # id of output
             description: 'The time we greeted you'
-        runs:
-          using: 'docker'
-          image: '/pySDC/projects/compression/basic_test/Dockerfile'
-          args:
-            - ${{ inputs.who-to-greet }}
+        run:
 
   test:
     runs-on: ubuntu-latest
