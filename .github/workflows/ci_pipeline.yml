@@ -101,7 +101,7 @@ jobs:
     container:
       image: brownbaerchen/libpressio:test
       volumes:
-        - /home/runner/work/pySDC/pySDC:/pySDC
+        - ${{ github.workspace }}:/pySDC
       ports:
         - 80
       options: --cpus 1
@@ -120,19 +120,6 @@ jobs:
       - name: Run pytest for CPU stuff
         run: |
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
-
-  path_stuff:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: ls
-        run: ls
-      - name: pwd
-        run: echo $(pwd)
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: ls after checkout
-        run: ls
            
   basictest:
     runs-on: ubuntu-latest
@@ -144,7 +131,6 @@ jobs:
         - 80
       volumes:
         - ${{ github.workspace }}:/pySDC
-          # - /home/runner/work/pySDC/pySDC:/pySDC
       options: --cpus 1
     steps:
       - name: Checkout
@@ -156,21 +142,6 @@ jobs:
       - name: Check mount pySDC
         run: ls /pySDC/pySDC/projects/compression
            
-  test:
-    runs-on: ubuntu-latest
-    container:
-      image: node:14.16
-      env:
-        NODE_ENV: development
-      ports:
-        - 80
-      volumes:
-        - pySDC:/volume_mount
-      options: --cpus 1
-    steps:
-      - name: Check for dockerenv file
-        run: (ls /.dockerenv && echo Found dockerenv) || (echo No dockerenv)
-
 
   user_cpu_tests_macos:
     runs-on: macos-12
