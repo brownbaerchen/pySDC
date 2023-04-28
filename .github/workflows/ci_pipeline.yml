@@ -134,7 +134,7 @@ jobs:
 
   basic_test:
     runs-on: ubuntu-latest
-    container: 'docker'
+    container:
      image: '/pySDC/projects/compression/basic_test/Dockerfile'
      args:
        - ${{ inputs.who-to-greet }}
@@ -150,7 +150,7 @@ jobs:
         outputs:
           time: # id of output
             description: 'The time we greeted you'
-        run:
+        run: ls
 
   test:
     runs-on: ubuntu-latest
