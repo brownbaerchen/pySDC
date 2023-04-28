@@ -133,6 +133,10 @@ jobs:
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
   basictest:
+    defaults:
+      run:
+        shell: bash -l {0}
+
     runs-on: ubuntu-latest
     container:
       image: brownbaerchen/basic_test
