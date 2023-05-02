@@ -118,7 +118,7 @@ jobs:
       - name: Install pySDC and pytest
         run: |
           cd /pySDC/pySDC/projects/compression
-          sudo -H source install_pySDC.sh
+          source install_pySDC.sh
           cd /pySDC
 
       - name: Run pytest
