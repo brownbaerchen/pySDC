@@ -134,6 +134,7 @@ jobs:
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
           import coverage
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          mv data data_libpressio
           coverage combine
           mv .coverage coverage_libpressio_3.dat
 
@@ -142,7 +143,7 @@ jobs:
         with:
           name: cpu-test-artifacts
           path: |
-            data
+            data_libpressio
             coverage_libpressio_3.10.dat
            
             #user_cpu_tests_macos:
