@@ -1,7 +1,7 @@
 import pytest
 
 
-@pytest.mark.libressio
+@pytest.mark.libpressio
 @pytest.mark.parametrize("thresh", [1e-6, 1e-12])
 def test_compression_proof_of_concept(thresh):
     import matplotlib.pyplot as plt
