@@ -58,6 +58,8 @@ jobs:
 
     strategy:
       matrix:
+        # python: ['3.7', '3.8', '3.9', '3.10']
+        # env: ['base', 'fenics', 'mpi4py', 'petsc']
         python: ['3.10']
         env: ['fenics','petsc']
 
@@ -198,7 +200,7 @@ jobs:
   post-processing:
     runs-on: ubuntu-latest
 
-    if: ${{ github.repository_owner == 'Parallel-in-Time'}}
+      # if: ${{ github.repository_owner == 'Parallel-in-Time'}}
 
     needs:
       - lint
