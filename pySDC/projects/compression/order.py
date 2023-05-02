@@ -59,7 +59,6 @@ def get_order(values, errors, thresh=1e-16, expected_order=None):
     order = np.mean(local_orders[errors[idx][1:] > max([thresh, MACHINEPRECISION])])
     if expected_order is not None:
         assert np.isclose(order, expected_order, atol=0.5), f"Expected order {expected_order}, but got {order:.2f}!"
-        raise AssertionError
     return order
 
 

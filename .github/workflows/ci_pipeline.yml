@@ -139,7 +139,7 @@ jobs:
           coverage combine
           mv .coverage coverage_libpressio_3.10.dat
 
-      - name: Uploading artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: cpu-test-artifacts
