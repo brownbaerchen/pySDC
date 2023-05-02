@@ -123,6 +123,9 @@ jobs:
           source install_pySDC.sh
           cd /pySDC
 
+      - name: Fail intentionally
+        run: spack load libpressio
+
       - name: Run pytest
         run: |
           source /opt/spack/share/spack/setup-env.sh
