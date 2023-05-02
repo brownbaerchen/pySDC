@@ -10,7 +10,9 @@ from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
 from pySDC.projects.compression.compression_convergence_controller import Compression
 
-MACHINEPRECISION = 1e-9  # generous tolerance below which we ascribe errors to floating point rounding errors rather than compression
+MACHINEPRECISION = (
+    1e-9  # generous tolerance below which we ascribe errors to floating point rounding errors rather than compression
+)
 
 
 def single_run(problem, description=None, thresh=1e-10, Tend=2e-1):
@@ -55,7 +57,7 @@ def get_order(values, errors, thresh=1e-16, expected_order=None):
     idx = np.argsort(values)
     local_orders = np.log(errors[idx][1:] / errors[idx][:-1]) / np.log(values[idx][1:] / values[idx][:-1])
     order = np.mean(local_orders[errors[idx][1:] > max([thresh, MACHINEPRECISION])])
-    #if expected_order is not None:
+    # if expected_order is not None:
     #    assert np.isclose(order, expected_order, atol=0.5), f"Expected order {expected_order}, but got {order:.2f}!"
     return order
 
