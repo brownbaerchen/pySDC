@@ -120,13 +120,28 @@ jobs:
           cd /pySDC/pySDC/projects/compression
           source install_pySDC.sh
           cd /pySDC
-          pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
       - name: Run pytest
         run: |
           source /opt/spack/share/spack/setup-env.sh
           spack load libpressio
+           
+          echo "print('Loading sitecustomize.py...')
+          coverage.process_startup() " > sitecustomize.py
+           
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          import coverage
+          coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          coverage combine
+          mv .coverage coverage_libpressio_3.dat
+
+      - name: Uploading artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cpu-test-artifacts
+          path: |
+            data
+            coverage_libpressio_3.10.dat
            
   basictest:
     runs-on: ubuntu-latest
