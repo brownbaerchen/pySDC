@@ -102,9 +102,6 @@ jobs:
       image: brownbaerchen/libpressio:amd64
       volumes:
         - ${{ github.workspace }}:/pySDC
-          #ports:
-          #  - 80
-          #options: --cpus 1
 
     defaults:
       run:
