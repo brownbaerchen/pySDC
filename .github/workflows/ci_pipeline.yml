@@ -120,9 +120,11 @@ jobs:
           cd /pySDC/pySDC/projects/compression
           source install_pySDC.sh
           cd /pySDC
+          pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
       - name: Run pytest for CPU stuff
         run: |
+          spack load libpressio
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
            
   basictest:
