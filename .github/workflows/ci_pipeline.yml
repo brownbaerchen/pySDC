@@ -106,16 +106,20 @@ jobs:
         - 80
       options: --cpus 1
 
+    defaults:
+      run:
+        shell: bash -l {0}
+
     steps:
            
       - name: Checkout
         uses: actions/checkout@v3
            
-          # - name: Install pySDC and pytest
-          #   run: |
-          #     cd /pySDC/pySDC/projects/compression
-          #     source install_pySDC.sh
-          #     cd /pySDC
+      - name: Install pySDC and pytest
+        run: |
+          cd /pySDC/pySDC/projects/compression
+          source install_pySDC.sh
+          cd /pySDC
 
       - name: Run pytest for CPU stuff
         run: |
