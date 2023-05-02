@@ -122,8 +122,9 @@ jobs:
           cd /pySDC
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
 
-      - name: Run pytest for CPU stuff
+      - name: Run pytest
         run: |
+          source /opt/spack/share/spack/setup-env.sh
           spack load libpressio
           pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
            
