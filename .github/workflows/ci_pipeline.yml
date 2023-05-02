@@ -131,7 +131,7 @@ jobs:
           echo "print('Loading sitecustomize.py...')
           coverage.process_startup() " > sitecustomize.py
            
-          import coverage
+          # import coverage
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
           echo $?
           mv data data_libpressio
