@@ -95,7 +95,54 @@ jobs:
             data_3.10
             coverage_${{ matrix.env }}_3.10.dat
 
+  user_libpressio_tests:
+    runs-on: ubuntu-latest
 
+    container:
+      image: brownbaerchen/libpressio:amd64
+      volumes:
+        - ${{ github.workspace }}:/pySDC
+      ports:
+        - 80
+      options: --cpus 1
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+           
+      - name: Checkout
+        uses: actions/checkout@v3
+           
+      - name: Install pySDC and pytest
+        run: |
+          cd /pySDC/pySDC/projects/compression
+          source install_pySDC.sh
+          cd /pySDC
+
+      - name: Run pytest
+        run: |
+          source /opt/spack/share/spack/setup-env.sh
+          spack load libpressio
+           
+          echo "print('Loading sitecustomize.py...')
+          coverage.process_startup() " > sitecustomize.py
+           
+          pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          import coverage
+          coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          coverage combine
+          mv .coverage coverage_libpressio_3.dat
+
+      - name: Uploading artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cpu-test-artifacts
+          path: |
+            data
+            coverage_libpressio_3.10.dat
+           
   user_cpu_tests_macos:
     runs-on: macos-12
 
@@ -156,6 +203,7 @@ jobs:
     needs:
       - lint
       - user_cpu_tests_linux
+      - user_libpressio_tests
 #       - wait_for_gitlab
 
     defaults:
