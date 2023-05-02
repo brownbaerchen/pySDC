@@ -100,8 +100,8 @@ jobs:
 
     container:
       image: brownbaerchen/libpressio:amd64
-        #volumes:
-        #  - ${{ github.workspace }}:/pySDC
+        volumes:
+          - ${{ github.workspace }}:/pySDC
         #ports:
         #  - 80
         #options: --cpus 1
