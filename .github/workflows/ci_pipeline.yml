@@ -141,7 +141,7 @@ jobs:
       - name: Uploading artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: cpu-test-artifacts
+          name: libpressio-test-artifacts
           path: |
             data_libpressio
             coverage_libpressio_3.10.dat
