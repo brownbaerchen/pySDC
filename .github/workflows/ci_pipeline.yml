@@ -119,9 +119,9 @@ jobs:
            
       - name: Install pySDC and pytest
         run: |
-          cd /pySDC/pySDC/projects/compression
-          source install_pySDC.sh
-          cd /pySDC
+          # cd /pySDC/pySDC/projects/compression
+          source /pySDC/pySDC/projects/compression/install_pySDC.sh
+          # cd /pySDC
 
       - name: Run pytest
         run: |
@@ -132,7 +132,7 @@ jobs:
           #coverage.process_startup() " > sitecustomize.py
            
           #import coverage
-          coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/tests -m base
+          coverage run -m pytest --continue-on-collection-errors -v --durations=0 pySDC/tests -m libpressio
           #echo exit code $(?)
 
       - name: Make coverage report
