@@ -57,8 +57,8 @@ def get_order(values, errors, thresh=1e-16, expected_order=None):
     idx = np.argsort(values)
     local_orders = np.log(errors[idx][1:] / errors[idx][:-1]) / np.log(values[idx][1:] / values[idx][:-1])
     order = np.mean(local_orders[errors[idx][1:] > max([thresh, MACHINEPRECISION])])
-    # if expected_order is not None:
-    #    assert np.isclose(order, expected_order, atol=0.5), f"Expected order {expected_order}, but got {order:.2f}!"
+    if expected_order is not None:
+       assert np.isclose(order, expected_order, atol=0.5), f"Expected order {expected_order}, but got {order:.2f}!"
     return order
 
 
