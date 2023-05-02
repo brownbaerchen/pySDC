@@ -129,18 +129,15 @@ jobs:
           spack load libpressio
            
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 pySDC/tests -m libpressio
+
+      - name: Make coverage report
+        run: |
+          source /opt/spack/share/spack/setup-env.sh
+          spack load libpressio
+
           mv data data_libpressio
           coverage combine
           mv .coverage coverage_libpressio_3.10.dat
-
-          #- name: Make coverage report
-          #  run: |
-          #    source /opt/spack/share/spack/setup-env.sh
-          #    spack load libpressio
-
-          #    mv data data_libpressio
-          #    coverage combine
-          #    mv .coverage coverage_libpressio_3.10.dat
 
       - name: Uploading artifacts
         uses: actions/upload-artifact@v3
