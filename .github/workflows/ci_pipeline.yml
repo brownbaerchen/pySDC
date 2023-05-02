@@ -133,6 +133,7 @@ jobs:
            
           import coverage
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/pySDC/tests -m libpressio
+          echo $?
           mv data data_libpressio
           coverage combine
           mv .coverage coverage_libpressio_3.10.dat
