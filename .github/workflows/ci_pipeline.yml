@@ -114,7 +114,7 @@ jobs:
            
       - name: Install pySDC and pytest
         run: |
-          source /pySDC/pySDC/projects/compression/install_pySDC.sh
+          source /pySDC/pySDC/projects/compression/Docker/install_pySDC.sh
 
       - name: Run pytest
         run: |
