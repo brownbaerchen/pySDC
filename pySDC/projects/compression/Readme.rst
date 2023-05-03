@@ -34,7 +34,7 @@ The ``-ti`` flag opens the image in an interactive manner, which allows us to ru
 
 We have specified an entry point in the Docker file which will install the local version of pySDC using ``pip``.
 If you run into trouble, you may consult the file ``Docker/docker-entrypoint.sh`` in the compression project folder for what is required to install pySDC.
-Keep in mind that spack wants its own python, which means we are not working with Conda here. Just use ``pip`` to install more dependencies. You can also add ``pip`` commands to the entry point file in order to make persistent changes to the container or you can create a new Dockerfile based on the current one and replace the entry point by whatever you want if you doing something non-generic.
+Keep in mind that spack wants its own python, which means we are not working with Conda here. Just use ``pip`` to install more dependencies. You can also add ``pip`` commands to the entry point file in order to make persistent changes to the container or you can create a new Dockerfile based on the current one and replace the entry point by whatever you want if you're doing something non-generic.
 
 Have fun!
 
