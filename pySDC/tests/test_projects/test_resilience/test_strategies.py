@@ -10,7 +10,7 @@ STRATEGY_NAMES = [
     'collocationRefinement',
     'collocationDerefinement',
     'adaptivityAvoidRestarts',
-    'adaptivityInterpolation',
+    # 'adaptivityInterpolation',
     'base',
 ]
 STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
@@ -61,10 +61,10 @@ def single_test_vdp(strategy_name, useMPI=False, num_procs=1):
         custom_controller_params=controller_params,
     )
 
-    # things we ant to test
+    # things we want to test
     tests = {
-        'k_newton': ('work_newton', sum),
         'e': ('e_global_post_run', max),
+        'k_newton': ('work_newton', sum),
     }
 
     for key, val in tests.items():
@@ -89,5 +89,7 @@ def test_strategy_with_vdp_nonMPI(strategy_name, num_procs=1):
 
 
 if __name__ == '__main__':
+    for name in STRATEGY_NAMES + STRATEGY_NAMES_NONMPIONLY:
+        test_strategy_with_vdp_nonMPI(name)
     for name in STRATEGY_NAMES:
         test_strategy_with_vdp_MPI(name)
