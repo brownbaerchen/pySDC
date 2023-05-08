@@ -22,7 +22,7 @@ class StepSizeLimiter(ConvergenceController):
             (dict): The updated params dictionary
         """
         defaults = {
-            "control_order": +92,
+            "control_order": +990,
             "dt_min": 0,
             "dt_max": np.inf,
         }
@@ -107,7 +107,7 @@ class StepSizeSlopeLimiter(ConvergenceController):
             (dict): The updated params dictionary
         """
         defaults = {
-            "control_order": +91,
+            "control_order": 980,
             "dt_slope_min": 0,
             "dt_slope_max": np.inf,
         }

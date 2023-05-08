@@ -817,3 +817,77 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
 
         return custom_description
+
+
+class AdaptivityExtrapolationWithinQStrategy(Strategy):
+    '''
+    Adaptivity based on extrapolation between collocation nodes as a resilience strategy
+    '''
+
+    def __init__(self, useMPI=False):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
+
+        super().__init__(useMPI=useMPI)
+        self.color = list(cmap.values())[8]
+        self.marker = '*'
+        self.name = 'adaptivity_extraQ'
+        self.bar_plot_x_label = 'adaptivity Q'
+        self.precision_parameter = 'e_tol'
+        self.adaptive_coll_params = {}
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityExtrapolationWithinQ, 'e_tol']
+        self.restol = None
+        self.maxiter = 99
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
+
+        custom_description = {}
+        custom_description['step_params'] = {'maxiter': self.maxiter}
+
+        dt_max = np.inf
+        dt_min = 1e-5
+
+        if problem.__name__ == "run_vdp":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        # elif problem.__name__ == "run_piline":
+        #     e_tol = 1e-7
+        #     dt_min = 1e-2
+        # elif problem.__name__ == "run_Lorenz":
+        #     e_tol = 2e-5
+        #     dt_min = 1e-3
+        # elif problem.__name__ == "run_Schroedinger":
+        #     e_tol = 4e-6
+        #     dt_min = 1e-3
+        # elif problem.__name__ == "run_quench":
+        #     e_tol = 1e-5
+        #     dt_min = 1e-3
+        #     dt_max = 1e2
+        else:
+            raise NotImplementedError(
+                'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
+ strategy'
+            )
+
+        custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
+        custom_description['convergence_controllers'] = {
+            AdaptivityExtrapolationWithinQ: {
+                'e_tol': e_tol,
+                'dt_min': dt_min,
+                'dt_max': dt_max,
+            }
+        }
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)

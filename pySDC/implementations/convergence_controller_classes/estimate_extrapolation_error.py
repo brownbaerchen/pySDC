@@ -495,4 +495,9 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
 
         # store the error
         lvl.status.error_extrapolation_estimate = abs(u_ex - lvl.u[-1]) * self.coeff.prefactor
+
+        # output for debugging
+        self.log(
+            f'Error estimate from extrapolation within Q: e={lvl.status.error_extrapolation_estimate:.2e}', S, level=10
+        )
         return None

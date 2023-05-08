@@ -25,7 +25,7 @@ class SpreadStepSizesBlockwise(ConvergenceController):
             (dict): The updated params dictionary
         """
         defaults = {
-            "control_order": +100,
+            "control_order": +1000,
         }
 
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
