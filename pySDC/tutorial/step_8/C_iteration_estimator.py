@@ -4,6 +4,7 @@ from pathlib import Path
 from pySDC.helpers.stats_helper import get_sorted
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
 from pySDC.implementations.problem_classes.HeatEquation_ND_FD import heatNd_forced
 from pySDC.implementations.problem_classes.AdvectionEquation_ND_FD import advectionNd
 from pySDC.implementations.problem_classes.Auzinger_implicit import auzinger
@@ -11,11 +12,11 @@ from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.transfer_classes.TransferMesh import mesh_to_mesh
 from pySDC.implementations.transfer_classes.TransferMesh_NoCoarse import mesh_to_mesh as mesh_to_mesh_nc
-from pySDC.implementations.convergence_controller_classes.check_iteration_estimator import CheckIterationEstimatorNonMPI
+from pySDC.implementations.convergence_controller_classes.check_iteration_estimator import CheckIterationEstimator
 from pySDC.tutorial.step_8.HookClass_error_output import error_output
 
 
-def setup_diffusion(dt=None, ndim=None, ml=False):
+def setup_diffusion(dt=None, ndim=None, ml=False, useMPI=False):
     # initialize level parameters
     level_params = dict()
     level_params['restol'] = 1e-10
@@ -55,7 +56,7 @@ def setup_diffusion(dt=None, ndim=None, ml=False):
 
     # setup the iteration estimator
     convergence_controllers = dict()
-    convergence_controllers[CheckIterationEstimatorNonMPI] = {'errtol': 1e-7}
+    convergence_controllers[CheckIterationEstimator.get_implementation(useMPI=useMPI)] = {'errtol': 1e-7}
 
     # initialize controller parameters
     controller_params = dict()
@@ -78,7 +79,7 @@ def setup_diffusion(dt=None, ndim=None, ml=False):
     return description, controller_params
 
 
-def setup_advection(dt=None, ndim=None, ml=False):
+def setup_advection(dt=None, ndim=None, ml=False, useMPI=False):
     # initialize level parameters
     level_params = dict()
     level_params['restol'] = 1e-10
@@ -119,7 +120,7 @@ def setup_advection(dt=None, ndim=None, ml=False):
 
     # setup the iteration estimator
     convergence_controllers = dict()
-    convergence_controllers[CheckIterationEstimatorNonMPI] = {'errtol': 1e-7}
+    convergence_controllers[CheckIterationEstimator.get_implementation(useMPI=useMPI)] = {'errtol': 1e-7}
 
     # initialize controller parameters
     controller_params = dict()
@@ -142,7 +143,7 @@ def setup_advection(dt=None, ndim=None, ml=False):
     return description, controller_params
 
 
-def setup_auzinger(dt=None, ml=False):
+def setup_auzinger(dt=None, ml=False, useMPI=False):
     # initialize level parameters
     level_params = dict()
     level_params['restol'] = 1e-10
@@ -171,7 +172,7 @@ def setup_auzinger(dt=None, ml=False):
 
     # setup the iteration estimator
     convergence_controllers = dict()
-    convergence_controllers[CheckIterationEstimatorNonMPI] = {'errtol': 1e-7}
+    convergence_controllers[CheckIterationEstimator.get_implementation(useMPI=useMPI)] = {'errtol': 1e-7}
 
     # initialize controller parameters
     controller_params = dict()
@@ -193,7 +194,7 @@ def setup_auzinger(dt=None, ml=False):
     return description, controller_params
 
 
-def run_simulations(type=None, ndim_list=None, Tend=None, nsteps_list=None, ml=False, nprocs=None):
+def run_simulations(type=None, ndim_list=None, Tend=None, nsteps_list=None, ml=False, nprocs=None, useMPI=False):
     """
     A simple test program to do SDC runs for the heat equation in various dimensions
     """
@@ -212,20 +213,20 @@ def run_simulations(type=None, ndim_list=None, Tend=None, nsteps_list=None, ml=F
                 # set time parameters
                 t0 = 0.0
                 dt = (Tend - t0) / nsteps
-                description, controller_params = setup_diffusion(dt, ndim, ml)
+                description, controller_params = setup_diffusion(dt, ndim, ml, useMPI=useMPI)
                 mean_number_of_iterations = 3.00 if ml else 5.75
             elif type == 'advection':
                 # set time parameters
                 t0 = 0.0
                 dt = (Tend - t0) / nsteps
-                description, controller_params = setup_advection(dt, ndim, ml)
+                description, controller_params = setup_advection(dt, ndim, ml, useMPI=useMPI)
                 mean_number_of_iterations = 2.00 if ml else 4.00
             elif type == 'auzinger':
                 assert ndim == 1
                 # set time parameters
                 t0 = 0.0
                 dt = (Tend - t0) / nsteps
-                description, controller_params = setup_auzinger(dt, ml)
+                description, controller_params = setup_auzinger(dt, ml, useMPI=useMPI)
                 mean_number_of_iterations = 3.62 if ml else 5.62
 
             out = f'Running {type} in {ndim} dimensions with time-step size {dt}...\n'
@@ -237,14 +238,24 @@ def run_simulations(type=None, ndim_list=None, Tend=None, nsteps_list=None, ml=F
             description['step_params']['controller_params'] = controller_params
 
             # instantiate controller
-            controller = controller_nonMPI(
-                num_procs=nprocs, controller_params=controller_params, description=description
-            )
+            controller_params['logger_level'] = 5
+            if useMPI:
+                from mpi4py import MPI
+
+                controller = controller_MPI(
+                    controller_params=controller_params, description=description, comm=MPI.COMM_WORLD
+                )
+            else:
+                controller = controller_nonMPI(
+                    num_procs=nprocs, controller_params=controller_params, description=description
+                )
 
             # get initial values on finest level
-            P = controller.MS[0].levels[0].prob
+            step = controller.S if useMPI else controller.MS[0]
+            P = step.levels[0].prob
             uinit = P.u_exact(t0)
 
+            print(useMPI, (controller), step)
             # call main function to get things done...
             uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
@@ -288,16 +299,16 @@ def run_simulations(type=None, ndim_list=None, Tend=None, nsteps_list=None, ml=F
 {mean_number_of_iterations:.2f} mean iterations, but got {np.mean(niters):.2f}'
 
 
-def main():
-    run_simulations(type='diffusion', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1)
-    run_simulations(type='diffusion', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1)
+def main(useMPI=False):
+    run_simulations(type='diffusion', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1, useMPI=useMPI)
+    run_simulations(type='diffusion', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1, useMPI=useMPI)
 
-    run_simulations(type='advection', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1)
-    run_simulations(type='advection', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1)
+    run_simulations(type='advection', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1, useMPI=useMPI)
+    run_simulations(type='advection', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1, useMPI=useMPI)
 
-    run_simulations(type='auzinger', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1)
-    run_simulations(type='auzinger', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1)
+    run_simulations(type='auzinger', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=False, nprocs=1, useMPI=useMPI)
+    run_simulations(type='auzinger', ndim_list=[1], Tend=1.0, nsteps_list=[8], ml=True, nprocs=1, useMPI=useMPI)
 
 
 if __name__ == "__main__":
-    main()
+    main(True)

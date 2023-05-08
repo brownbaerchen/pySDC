@@ -45,7 +45,7 @@ This example takes three different test cases and checks how well the iteration 
 
 Important things to note:
 
-- The estimator also works for PFASST, where is ensures that up to each step (!) the tolerance is met.
+- The estimator also works for PFASST, where it ensures that up to each step (!) the tolerance is met.
 - The method also works for the parallel `controller_MPI` controller by using interrupts for checking when to stop (not tested here).
 
 .. include:: doc_step_8_C.rst
