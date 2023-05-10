@@ -247,13 +247,13 @@ def test_embedded_estimate_order(sweeper_name):
     import matplotlib.pyplot as plt
     from pySDC.projects.Resilience.vdp import run_vdp
     from pySDC.projects.Resilience.accuracy_check import plot_all_errors
-    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedErrorNonMPI
+    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
     fig, ax = plt.subplots(1, 1)
 
     # change only the things in the description that we need for adaptivity
     convergence_controllers = {}
-    convergence_controllers[EstimateEmbeddedErrorNonMPI] = {}
+    convergence_controllers[EstimateEmbeddedError] = {}
 
     description = {}
     description['convergence_controllers'] = convergence_controllers
