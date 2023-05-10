@@ -458,7 +458,7 @@ class HotRodStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
 
         if problem.__name__ == "run_vdp":
-            HotRod_tol = 5e-7
+            HotRod_tol = 7e-6 if num_procs > 1 else 5e-7
             maxiter = 4
         elif problem.__name__ == "run_Lorenz":
             HotRod_tol = 4e-7

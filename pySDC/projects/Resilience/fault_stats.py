@@ -42,6 +42,7 @@ class FaultStats:
         num_procs=1,
         mode='combination',
         stats_path='data/stats',
+        use_MPI=False,
         **kwargs,
     ):
         '''
@@ -63,6 +64,7 @@ class FaultStats:
         self.recovery_thresh = recovery_thresh
         self.recovery_thresh_abs = recovery_thresh_abs
         self.num_procs = num_procs
+        self.use_MPI = use_MPI
         self.mode = mode
         self.stats_path = stats_path
         self.kwargs = {
@@ -274,7 +276,17 @@ class FaultStats:
         """
         return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
 
-    def single_run(self, strategy, run=0, faults=False, force_params=None, hook_class=None, space_comm=None, Tend=None):
+    def single_run(
+        self,
+        strategy,
+        run=0,
+        faults=False,
+        force_params=None,
+        hook_class=None,
+        space_comm=None,
+        Tend=None,
+        time_comm=None,
+    ):
         '''
         Run the problem once with the specified parameters
 
@@ -284,6 +296,8 @@ class FaultStats:
             faults (bool): Whether or not to put faults in
             force_params (dict): Change parameters in the description of the problem
             space_comm (MPI.Communicator): A communicator for space parallelisation
+            Tend (float): Time you want to run to
+            time_comm (MPI.Intracomm.Communicator): Communicator in time
 
         Returns:
             dict: Stats object containing statistics for each step, each level and each iteration
@@ -333,6 +347,8 @@ class FaultStats:
             Tend=self.get_Tend() if Tend is None else Tend,
             custom_controller_params=custom_controller_params,
             space_comm=space_comm,
+            comm=time_comm,
+            use_MPI=time_comm is not None,
         )
 
     def compare_strategies(self, run=0, faults=False, ax=None):  # pragma: no cover
@@ -427,29 +443,36 @@ class FaultStats:
             fig.tight_layout()
             plt.savefig(f'data/{self.get_name()}-{strategy.name}-details.pdf', transparent=True)
 
-    def scrutinize(self, strategy, run, faults=True):
+    def scrutinize(self, strategy, logger_level=15, **kwargs):
         '''
         Take a closer look at a specific run
 
         Args:
             strategy (Strategy): The resilience strategy you plan on using
-            run (int): The number of the run to get the appropriate random generator
-            faults (bool): Whether or not to include faults
 
         Returns:
             None
         '''
         force_params = {}
-        force_params['controller_params'] = {'logger_level': 15}
+        force_params['controller_params'] = {'logger_level': logger_level}
 
-        stats, controller, Tend = self.single_run(strategy=strategy, run=run, faults=faults, force_params=force_params)
+        stats, controller, Tend = self.single_run(strategy=strategy, force_params=force_params, **kwargs)
 
-        t, u = get_sorted(stats, type='u')[-1]
-        print(max(u))
-        k = [me[1] for me in get_sorted(stats, type='k')]
-        print(k)
+        u_all = get_sorted(stats, type='u', recomputed=False)
+        t, u = get_sorted(stats, type='u', recomputed=False)[np.argmax([me[0] for me in u_all])]
+        k = get_sorted(stats, type='k')
 
         print(f'\nOverview for {strategy.name} strategy')
+        # print faults
+        faults = get_sorted(stats, type='bitflip')
+        print('\nfaults:')
+        print('    t   | level | iter | node | bit | trgt | rank | pos')
+        print('--------+-------+------+------+-----+------+-----------')
+        for f in faults:
+            print(
+                f' {f[0]:6.2f} | {f[1][0]:5d} | {f[1][1]:4d} | {f[1][2]:4d} | {f[1][4]:3d} | {f[1][5]:4d} | {f[1][6]:4d} |',
+                f[1][3],
+            )
 
         # see if we can determine if the faults where recovered
         no_faults = self.load(strategy=strategy, faults=False)
@@ -481,14 +504,6 @@ class FaultStats:
         # restarts
         restarts = [me[1] for me in get_sorted(stats, type='restarts')]
         print(f'restarts: {sum(restarts)}, without faults: {no_faults["restarts"][0]}')
-
-        # print faults
-        faults = get_sorted(stats, type='bitflip')
-        print('\nfaults:')
-        print('    t   | level | iter | node | bit | trgt | pos')
-        print('--------+-------+------+------+-----+------+----')
-        for f in faults:
-            print(f' {f[0]:6.2f} | {f[1][0]:5d} | {f[1][1]:4d} | {f[1][2]:4d} | {f[1][4]:3d} | {f[1][5]:4d} |', f[1][3])
 
         return None
 
@@ -570,7 +585,8 @@ class FaultStats:
         else:
             mode_thing = ''
 
-        return f'{prob_name}{strategy_name}{fault_name}-{self.num_procs}procs{mode_thing}'
+        mpi_thing = '-MPI' if self.use_MPI else ''
+        return f'{prob_name}{strategy_name}{fault_name}-{self.num_procs}procs{mode_thing}{mpi_thing}'
 
     def store(self, dat, **kwargs):
         '''
@@ -1221,6 +1237,7 @@ class FaultStats:
             (0, faultHook.rnd_params['node'] + 1),
             (1, faultHook.rnd_params['iteration'] + 1),
             (0, faultHook.rnd_params['bit']),
+            (0, faultHook.rnd_params['rank'] + 1),
         ]
         ranges += [(0, i) for i in faultHook.rnd_params['problem_pos']]
         return np.prod([me[1] - me[0] for me in ranges], dtype=int)
@@ -1398,22 +1415,10 @@ def main():
         reload=True,
         recovery_thresh=1.1,
         # recovery_thresh_abs=1e-5,
-        num_procs=1,
-        mode='random',
+        num_procs=4,
+        mode='combination',
         stats_path='data/stats-jusuf',
     )
-    ########################
-    # msk = stats_analyser.get_mask(AdaptivityStrategy(), val=False, key='recovered')
-    # stats_analyser.print_faults(msk)
-    fig, ax = plt.subplots()
-    iter_ax = ax.twinx()
-    kwargs_range = {'fault_frequency_iter': (10, 100, 1000, 10000)}
-    stats_analyser.run_stats_generation(runs=10, kwargs_range=kwargs_range)
-    stats_analyser.fault_frequency_plot(ax=ax, iter_ax=iter_ax, kwargs_range=kwargs_range)
-    # stats_analyser.scrutinize(AdaptivityStrategy(), 4, True)
-    plt.show()
-    return None
-    ########################
 
     stats_analyser.run_stats_generation(runs=5000)
 

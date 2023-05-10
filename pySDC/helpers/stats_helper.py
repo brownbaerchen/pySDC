@@ -77,7 +77,7 @@ def filter_recomputed(stats):
     # delete values that have been recorded and superseded by similar, but not identical keys
     times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])
     for t in times_restarted:
-        restarts = max([me.num_restarts for me in filter_stats(stats, type='_recomputed', time=t).keys()])
+        restarts = max([me.num_restarts for me in filter_stats(stats, type='_recomputed', time=t).keys()] + [0])
         for i in range(restarts):
             [stats.pop(me) for me in filter_stats(stats, time=t, num_restarts=i).keys()]
 
