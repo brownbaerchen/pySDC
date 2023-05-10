@@ -210,29 +210,6 @@ class RungeKutta(sweeper):
         else:
             raise NotImplementedError(f'Type \"{type(f)}\" not implemented in Runge-Kutta sweeper')
 
-    def integrate(self):
-        """
-        Integrates the right-hand side
-
-        Returns:
-            list of dtype_u: containing the integral as values
-        """
-
-        # get current level and problem description
-        L = self.level
-        P = L.prob
-
-        me = []
-
-        # integrate RHS over all collocation nodes
-        for m in range(1, self.coll.num_nodes + 1):
-            # new instance of dtype_u, initialize values with 0
-            me.append(P.dtype_u(P.init, val=0.0))
-            for j in range(1, self.coll.num_nodes + 1):
-                me[-1] += L.dt * self.coll.Qmat[m, j] * self.get_full_f(L.f[j])
-
-        return me
-
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes
@@ -278,6 +255,14 @@ class RungeKutta(sweeper):
         In this Runge-Kutta implementation, the solution to the step is always stored in the last node
         """
         self.level.uend = self.level.u[-1]
+
+    def compute_residual(self):
+        """
+        Because diagonally implicit and explicit RK methods are direct methods, the residual is 0 after the first
+        iteration. While monitoring it may be useful for testing, it takes a considerable amount of time and should be
+        avoided to allow for a fair comparison.
+        """
+        self.level.status.residual = 0.0
 
 
 class RK1(RungeKutta):
