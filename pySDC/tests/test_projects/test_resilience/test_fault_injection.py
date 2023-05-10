@@ -84,6 +84,7 @@ def test_fault_injection():
         'iteration': 3,
         'problem_pos': (2,),
         'bit': 64,
+        'rank': 4,
     }
 
     reference = {
@@ -97,17 +98,19 @@ def test_fault_injection():
             'bit': 48,
             'target': 0,
             'when': 'after',
+            'rank': 2,
         },
         1: {
             'time': 1.0,
             'timestep': None,
             'level_number': 0,
             'iteration': 3,
-            'node': 3,
-            'problem_pos': [0],
-            'bit': 26,
+            'node': 2,
+            'problem_pos': [1],
+            'bit': 29,
             'target': 0,
             'when': 'after',
+            'rank': 1,
         },
         2: {
             'time': 1.0,
@@ -119,6 +122,7 @@ def test_fault_injection():
             'bit': 0,
             'target': 0,
             'when': 'after',
+            'rank': 0,
         },
         3: {
             'time': 1.0,
@@ -130,6 +134,7 @@ def test_fault_injection():
             'bit': 0,
             'target': 0,
             'when': 'after',
+            'rank': 0,
         },
     }
 
@@ -138,9 +143,10 @@ def test_fault_injection():
         injector.add_fault(args=args, rnd_args=rnd_args)
         if i >= 1:  # switch to combination based adding
             injector.random_generator = i - 1
-        assert (
-            injector.faults[i].__dict__ == reference[i]
-        ), f'Expected fault with parameters {reference[i]}, got {injector.faults[i].__dict__}!'
+        for key in reference[i].keys():
+            assert (
+                injector.faults[i].__dict__[key] == reference[i][key]
+            ), f'Expected fault with parameter {key}={reference[i][key]}, got {injector.faults[i].__dict__[key]}!'
 
 
 @pytest.mark.mpi4py
