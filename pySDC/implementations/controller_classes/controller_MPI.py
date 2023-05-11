@@ -39,7 +39,7 @@ class controller_MPI(controller):
         # insert data on time communicator to the steps (helpful here and there)
         self.S.status.time_size = num_procs
 
-        self.base_convergence_controllers += [BasicRestarting.get_implementation("MPI")]
+        self.base_convergence_controllers += [BasicRestarting.get_implementation(useMPI=True)]
         for convergence_controller in self.base_convergence_controllers:
             self.add_convergence_controller(convergence_controller, description)
 

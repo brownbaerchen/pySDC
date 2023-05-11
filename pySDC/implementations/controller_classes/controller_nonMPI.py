@@ -44,7 +44,7 @@ class controller_nonMPI(controller):
             for _ in range(num_procs - 1):
                 self.MS.append(stepclass.step(description))
 
-        self.base_convergence_controllers += [BasicRestarting.get_implementation("nonMPI")]
+        self.base_convergence_controllers += [BasicRestarting.get_implementation(useMPI=False)]
         for convergence_controller in self.base_convergence_controllers:
             self.add_convergence_controller(convergence_controller, description)
 

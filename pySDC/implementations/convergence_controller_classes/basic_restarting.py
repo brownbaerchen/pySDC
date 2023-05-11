@@ -15,22 +15,20 @@ class BasicRestarting(ConvergenceController):
     """
 
     @classmethod
-    def get_implementation(cls, flavor):
+    def get_implementation(cls, useMPI):
         """
         Retrieve the implementation for a specific flavor of this class.
 
         Args:
-            flavor (str): The implementation that you want
+            useMPI (bool): Get MPI or non-MPI version
 
         Returns:
             cls: The child class that implements the desired flavor
         """
-        if flavor == 'MPI':
+        if useMPI:
             return BasicRestartingMPI
-        elif flavor == 'nonMPI':
-            return BasicRestartingNonMPI
         else:
-            raise NotImplementedError(f'Flavor {flavor} of BasicRestarting is not implemented!')
+            return BasicRestartingNonMPI
 
     def __init__(self, controller, params, description, **kwargs):
         """
