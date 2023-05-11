@@ -315,7 +315,7 @@ class ConvergenceController(object):
         # log what's happening for debug purposes
         self.logger.debug(f'Step {comm.rank} initiates send to step {dest}')
 
-        kwargs['tag'] = kwargs.get('tag', self.params.control_order)
+        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         if blocking:
             req = comm.send(data, dest=dest, **kwargs)
@@ -341,7 +341,7 @@ class ConvergenceController(object):
         # log what's happening for debug purposes
         self.logger.debug(f'Step {comm.rank} initiates receive from step {source}')
 
-        kwargs['tag'] = kwargs.get('tag', self.params.control_order)
+        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         data = comm.recv(source=source, **kwargs)
 

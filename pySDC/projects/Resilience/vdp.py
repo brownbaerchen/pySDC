@@ -522,6 +522,8 @@ def interpolation_stuff():  # pragma: no cover
 
 
 if __name__ == "__main__":
+    import sys
+
     try:
         from mpi4py import MPI
 
@@ -533,8 +535,18 @@ if __name__ == "__main__":
         comm = None
         size = 1
 
-    mpi_vs_nonMPI(MPI_ready, comm)
-    check_step_size_limiter(size, comm)
+    if len(sys.argv) == 1:
+        mpi_vs_nonMPI(MPI_ready, comm)
+        check_step_size_limiter(size, comm)
 
-    if size == 1:
+        if size == 1:
+            check_adaptivity_with_avoid_restarts(comm=None, size=1)
+
+    elif 'mpi_vs_nonMPI' in sys.argv:
+        mpi_vs_nonMPI(MPI_ready, comm)
+    elif 'check_step_size_limiter' in sys.argv:
+        check_step_size_limiter(MPI_ready, comm)
+    elif 'check_adaptivity_with_avoid_restarts' and size == 1:
         check_adaptivity_with_avoid_restarts(comm=None, size=1)
+    else:
+        raise NotImplementedError('Your test is not implemented!')
