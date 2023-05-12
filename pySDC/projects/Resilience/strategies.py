@@ -662,7 +662,10 @@ class DIRKStrategy(AdaptivityStrategy):
         rk_params = {
             'step_params': {'maxiter': 1},
             'sweeper_class': DIRK34,
-            'convergence_controllers': {AdaptivityRK: {'e_tol': e_tol}, BasicRestarting.get_implementation(useMPI=self.useMPI): {'max_restarts': 50}},
+            'convergence_controllers': {
+                AdaptivityRK: {'e_tol': e_tol},
+                BasicRestarting.get_implementation(useMPI=self.useMPI): {'max_restarts': 50},
+            },
         }
 
         custom_description = merge_descriptions(adaptivity_description, rk_params)
@@ -751,7 +754,9 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
             'allowed_modifications': ['decrease'],
         }
 
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description
 
@@ -783,7 +788,9 @@ class AdaptivityAvoidRestartsStrategy(AdaptivityStrategy):
 
         custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = True
 
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description
 
@@ -819,6 +826,8 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = False
         custom_description['convergence_controllers'][InterpolateBetweenRestarts] = {}
 
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description

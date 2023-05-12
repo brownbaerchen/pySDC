@@ -125,6 +125,7 @@ def run_vdp(
         'newton_tol': 1e-9,
         'newton_maxiter': 99,
         'u0': np.array([2.0, 0.0]),
+        'crash_at_maxiter': False,
     }
 
     # initialize step parameters
@@ -187,8 +188,8 @@ def run_vdp(
     # call main function to get things done...
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
-    except (ProblemError, ConvergenceError):
-        print('Warning: Premature termination!')
+    except (ProblemError, ConvergenceError) as E:
+        print('Warning: Premature termination!', E)
         stats = controller.return_stats()
 
     return stats, controller, Tend

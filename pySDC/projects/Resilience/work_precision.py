@@ -540,7 +540,7 @@ def get_configs(mode, problem):
             2: '--',
             3: '-.',
             4: ':',
-            5: 'loosely dashdotted',
+            5: ':',
         }
 
         # configurations[-1] = {
@@ -580,11 +580,11 @@ def get_configs(mode, problem):
             2: '--',
             3: '-.',
             4: ':',
-            5: 'loosely dashdotted',
+            5: ':',
         }
 
         for num_procs in [4, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'SDC {num_procs} procs'}
+            plotting_params = {'ls': ls[num_procs], 'label': f'GSSDC {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
@@ -932,7 +932,8 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):  #
 def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no cover
     fig, axs = get_fig(2, 2, sharex=True)
 
-    mus = [0, 5, 10, 15]
+    # mus = [0, 5, 10, 15]
+    mus = [0, 10, 20, 30]
 
     for i in range(len(mus)):
         params = {
@@ -966,18 +967,19 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
+    # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'parallel_efficiency',
+        'mode': 'vdp_stiffness-20',
         'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_vdp,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
