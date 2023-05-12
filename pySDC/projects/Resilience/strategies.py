@@ -566,16 +566,32 @@ class HotRodStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
 
         if problem.__name__ == "run_vdp":
+            if num_procs == 4:
+                HotRod_tol = 3.444181e-05
+            elif num_procs == 5:
+                HotRod_tol = 5.996650e-05
+            else:  # 1 process
+                HotRod_tol = 5e-7
             HotRod_tol = 7e-6 if num_procs > 1 else 5e-7
             maxiter = 4
         elif problem.__name__ == "run_Lorenz":
-            HotRod_tol = 4e-7
+            if num_procs == 5:
+                HotRod_tol = 1.000372e-01
+            elif num_procs == 4:
+                HotRod_tol = 8.256632e-02
+            else:
+                HotRod_tol = 4e-7
             maxiter = 6
         elif problem.__name__ == "run_Schroedinger":
             HotRod_tol = 3e-7
             maxiter = 6
         elif problem.__name__ == "run_quench":
-            HotRod_tol = 3e-5
+            if num_procs == 5:
+                HotRod_tol = 5.474112e-04
+            elif num_procs == 5:
+                HotRod_tol = 5.474112e-04
+            else:
+                HotRod_tol = 3e-5
             maxiter = 6
         else:
             raise NotImplementedError(
@@ -583,7 +599,7 @@ class HotRodStrategy(Strategy):
  strategy'
             )
 
-        no_storage = num_procs > 1
+        no_storage = False  # num_procs > 1
 
         custom_description = {
             'convergence_controllers': {
