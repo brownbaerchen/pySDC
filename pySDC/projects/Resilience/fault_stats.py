@@ -65,7 +65,6 @@ class FaultStats:
         self.recovery_thresh_abs = recovery_thresh_abs
         self.num_procs = num_procs
         self.use_MPI = use_MPI
-        self.mode = mode
         self.stats_path = stats_path
         self.kwargs = {
             'fault_frequency_iter': 500,
@@ -1466,12 +1465,9 @@ def main():
         reload=True,
         recovery_thresh=1.1,
         # recovery_thresh_abs=1e-5,
-        num_procs=4,
-        mode='combination',
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-
     stats_analyser.run_stats_generation(runs=5000)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
