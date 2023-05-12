@@ -638,7 +638,6 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
         """
         defaults = {
             **super().setup(controller, params, description, **kwargs),
-            "control_order": 410,
         }
         return defaults
 
@@ -699,7 +698,9 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
             None
         """
         # check if the step is converged
-        if S.status.done:
+        from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
+
+        if CheckConvergence.check_convergence(S):
             L = S.levels[0]
 
             # compute next step size

@@ -33,7 +33,7 @@ class SwitchEstimator(ConvergenceController):
         )
 
         defaults = {
-            'control_order': 1100,
+            'control_order': 100,
             'tol': description['level_params']['dt'],
             'nodes': coll.nodes,
         }

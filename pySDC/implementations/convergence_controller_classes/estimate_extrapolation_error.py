@@ -443,7 +443,6 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         num_nodes = description['sweeper_params']['num_nodes']
 
         default_params = {
-            "control_order": 400,
             'Taylor_order': 2 * num_nodes,
             'n': num_nodes,
         }
@@ -461,7 +460,9 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         Returns:
             None
         """
-        if not S.status.done:
+        from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
+
+        if not CheckConvergence.check_convergence(S):
             return None
 
         lvl = S.levels[0]
@@ -495,9 +496,4 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
 
         # store the error
         lvl.status.error_extrapolation_estimate = abs(u_ex - lvl.u[-1]) * self.coeff.prefactor
-
-        # output for debugging
-        self.log(
-            f'Error estimate from extrapolation within Q: e={lvl.status.error_extrapolation_estimate:.2e}', S, level=10
-        )
         return None

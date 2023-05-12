@@ -64,7 +64,7 @@ class BasicRestarting(ConvergenceController):
             (dict): The updated params dictionary
         """
         defaults = {
-            "control_order": 995,
+            "control_order": 95,
             "max_restarts": 10,
             "crash_after_max_restarts": True,
             "step_size_spreader": SpreadStepSizesBlockwise.get_implementation(useMPI=params['useMPI']),
