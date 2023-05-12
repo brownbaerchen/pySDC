@@ -1441,7 +1441,7 @@ def main():
     import sys
 
     kwargs = {
-        'prob': run_Lorenz,
+        'prob': run_Schroedinger,
         'num_procs': 4,
     }
     for i in range(len(sys.argv)):
