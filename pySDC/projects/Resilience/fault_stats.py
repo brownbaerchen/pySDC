@@ -40,7 +40,7 @@ class FaultStats:
         recovery_thresh=1 + 1e-3,
         recovery_thresh_abs=0.0,
         num_procs=1,
-        mode='combination',
+        mode='default',
         stats_path='data/stats',
         use_MPI=False,
         **kwargs,
@@ -65,12 +65,20 @@ class FaultStats:
         self.recovery_thresh_abs = recovery_thresh_abs
         self.num_procs = num_procs
         self.use_MPI = use_MPI
-        self.mode = mode
         self.stats_path = stats_path
         self.kwargs = {
             'fault_frequency_iter': 500,
             **kwargs,
         }
+
+        # decide mode
+        if mode == 'default':
+            if prob.__name__ in ['run_vdp', 'run_Lorenz']:
+                self.mode = 'combination'
+            else:
+                self.mode = 'random'
+        else:
+            self.mode = mode
 
     def get_Tend(self):
         '''
@@ -241,7 +249,7 @@ class FaultStats:
             dat['error'][i] = error
             dat['total_iteration'][i] = total_iteration
             dat['total_newton_iteration'][i] = total_newton_iteration
-            dat['restarts'][i] = sum([me[1] for me in get_sorted(stats, type='restarts')])
+            dat['restarts'][i] = sum([me[1] for me in get_sorted(stats, type='restart')])
 
         dat_full = {}
         for k in dat.keys():
@@ -430,7 +438,7 @@ class FaultStats:
 
         # plot restarts
         if plot_restarts:
-            restarts = get_sorted(stats, type='restarts')
+            restarts = get_sorted(stats, type='restart')
             [ax.axvline(me[0], color='black', ls='-.') if me[1] else '' for me in restarts]
 
         # decorate
@@ -502,7 +510,7 @@ class FaultStats:
         print(f'dt: min: {np.min(dt):.2e}, max: {np.max(dt):.2e}, mean: {np.mean(dt):.2e}')
 
         # restarts
-        restarts = [me[1] for me in get_sorted(stats, type='restarts')]
+        restarts = [me[1] for me in get_sorted(stats, type='restart')]
         print(f'restarts: {sum(restarts)}, without faults: {no_faults["restarts"][0]}')
 
         return None
@@ -1384,6 +1392,28 @@ class FaultStats:
 
         return None
 
+    def get_HR_tol(self):
+        from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
+
+        HR_strategy = HotRodStrategy(useMPI=self.use_MPI)
+
+        description = HR_strategy.get_custom_description(self.prob, self.num_procs)
+        description['convergence_controllers'][HotRod]['HotRod_tol'] = 1e2
+
+        stats, _, _ = self.single_run(HR_strategy, force_params=description)
+
+        e_extrapolation = get_sorted(stats, type='error_extrapolation_estimate')
+        diff = []
+        for i in range(len(e_extrapolation)):
+            if e_extrapolation[i][1] is not None:
+                e_embedded = get_sorted(stats, type='error_embedded_estimate', time=e_extrapolation[i][0])
+                diff += [abs(e_extrapolation[i][1] - e_embedded[-1][1])]
+
+        max_diff = max(diff)
+        print(
+            f'Max. diff: {max_diff:.6e} -> proposed HR tolerance: {max_diff + 1e-4:.6e} for {self.prob.__name__} problem with {self.num_procs} procs.'
+        )
+
 
 def check_local_error():  # pragma: no cover
     """
@@ -1408,18 +1438,36 @@ def check_local_error():  # pragma: no cover
 
 
 def main():
+    import sys
+
+    kwargs = {
+        'prob': run_Lorenz,
+        'num_procs': 4,
+    }
+    for i in range(len(sys.argv)):
+        if 'prob' in sys.argv[i]:
+            if sys.argv[i + 1] == 'run_Lorenz':
+                kwargs['prob'] = run_Lorenz
+            elif sys.argv[i + 1] == 'run_vdp':
+                kwargs['prob'] = run_vdp
+            elif sys.argv[i + 1] == 'run_Schroedinger':
+                kwargs['prob'] = run_Schroedinger
+            elif sys.argv[i + 1] == 'run_quench':
+                kwargs['prob'] = run_quench
+            else:
+                raise NotImplementedError
+        elif 'num_procs' in sys.argv[i]:
+            kwargs['num_procs'] = int(sys.argv[i + 1])
+
     stats_analyser = FaultStats(
-        prob=run_vdp,
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=True,
         recovery_thresh=1.1,
         # recovery_thresh_abs=1e-5,
-        num_procs=4,
-        mode='combination',
         stats_path='data/stats-jusuf',
+        **kwargs,
     )
-
     stats_analyser.run_stats_generation(runs=5000)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
