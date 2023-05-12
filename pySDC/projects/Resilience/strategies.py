@@ -583,12 +583,17 @@ class HotRodStrategy(Strategy):
                 HotRod_tol = 4e-7
             maxiter = 6
         elif problem.__name__ == "run_Schroedinger":
-            HotRod_tol = 3e-7
+            if num_procs == 5:
+                HotRod_tol = 2.366298e-03
+            elif num_procs == 4:
+                HotRod_tol = 1.821892e-03
+            else:
+                HotRod_tol = 1.002238e-04
             maxiter = 6
         elif problem.__name__ == "run_quench":
             if num_procs == 5:
                 HotRod_tol = 5.474112e-04
-            elif num_procs == 5:
+            elif num_procs == 4:
                 HotRod_tol = 5.474112e-04
             else:
                 HotRod_tol = 3e-5
