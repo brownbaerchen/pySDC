@@ -160,20 +160,13 @@ def record_work_precision(
     Returns:
         None
     """
-    from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
-
     data = {}
-
-    estimate_embedded_error = {'convergence_controllers': {EstimateEmbeddedError: {}}}
 
     # prepare precision parameters
     param = strategy.precision_parameter
     description = merge_descriptions(
-        merge_descriptions(
-            strategy.get_custom_description(problem, num_procs),
-            {} if custom_description is None else custom_description,
-        ),
-        estimate_embedded_error,
+        strategy.get_custom_description(problem, num_procs),
+        {} if custom_description is None else custom_description,
     )
     if param == 'e_tol':
         power = 10.0
@@ -615,6 +608,7 @@ def get_configs(mode, problem):
             AdaptivityCollocationTypeStrategy,
             AdaptivityCollocationRefinementStrategy,
             AdaptivityStrategy,
+            AdaptivityExtrapolationWithinQStrategy,
         )
 
         strategies = [
@@ -626,8 +620,12 @@ def get_configs(mode, problem):
         for strategy in strategies:
             strategy.restol = restol
 
-        configurations[1] = {'strategies': strategies}
-        configurations[2] = {
+        configurations[1] = {
+            'custom_description': {'step_params': {'maxiter': 99}, 'level_params': {'restol': 1e-11}},
+            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+        }
+        configurations[2] = {'strategies': strategies}
+        configurations[3] = {
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
@@ -993,7 +991,7 @@ if __name__ == "__main__":
         'plotting': comm_world.rank == 0,
     }
 
-    for _mode in ['parallel_efficiency', 'compare_strategies']:
+    for mode in ['parallel_efficiency', 'compare_strategies']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
