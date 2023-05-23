@@ -1498,17 +1498,14 @@ def main():
         **kwargs,
     )
     ###############################################################################
-    stats_analyser.run_stats_generation(runs=runs)
-    return None
-    # plt.show()
-    strategy = AdaptivityStrategy()
+    strategy = HotRodStrategy()
     stats_analyser.get_recovered()
     fixable = stats_analyser.get_fixable_faults_only(strategy)
     not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
     exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
     stats_analyser.print_faults(exponent_bits)
-    # stats_analyser.scrutinize(strategy, run=65, faults=True)
-    stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    stats_analyser.scrutinize(strategy, run=2715, faults=True)
+    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # plt.show()
     return None
     stats_analyser.plot_things_per_things(
