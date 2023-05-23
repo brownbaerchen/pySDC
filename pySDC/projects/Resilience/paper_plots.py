@@ -710,5 +710,5 @@ if __name__ == "__main__":
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
     # make_plots_for_TIME_X_website()
-    plot_recovery_thresholds(run_Schroedinger)
+    # plot_recovery_thresholds(run_Schroedinger)
     make_plots_for_paper()

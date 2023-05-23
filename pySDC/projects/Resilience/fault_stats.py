@@ -89,7 +89,9 @@ class FaultStats:
         '''
         return self.strategies[0].get_Tend(self.prob, self.num_procs)
 
-    def run_stats_generation(self, runs=1000, step=None, comm=None, kwargs_range=None, _reload=False, _runs_partial=0):
+    def run_stats_generation(
+        self, runs=1000, step=None, comm=None, kwargs_range=None, faults=None, _reload=False, _runs_partial=0
+    ):
         '''
         Run the generation of stats for all strategies in the `self.strategies` variable
 
@@ -97,12 +99,20 @@ class FaultStats:
             runs (int): Number of runs you want to do
             step (int): Number of runs you want to do between saving
             comm (MPI.Communicator): Communicator for distributing runs
+            faults (bool): Whether to do stats with faults or without
             kw_args_range (dict): Range for the parameters
             _reload, _runs_partial: Variables only used for recursion. Do not change!
 
         Returns:
             None
         '''
+        if faults is None:
+            [
+                self.run_stats_generation(runs=runs, step=step, comm=comm, kwargs_range=kwargs_range, faults=f)
+                for f in self.faults
+            ]
+            return None
+
         for key, val in kwargs_range.items() if kwargs_range is not None else {}:
             if type(val) == int:
                 self.kwargs[key] = val
@@ -124,7 +134,7 @@ class FaultStats:
             sorting_index = None
             if comm.rank == 0:
                 already_completed = np.array(
-                    [self.load(strategy=strategy, faults=True).get('runs', 0) for strategy in self.strategies]
+                    [self.load(strategy=strategy, faults=faults).get('runs', 0) for strategy in self.strategies]
                 )
                 sorting_index_ = np.argsort(already_completed)
                 sorting_index = sorting_index_[already_completed[sorting_index_] < max_runs]
@@ -140,18 +150,17 @@ class FaultStats:
         strategy_comm = comm.Split(comm.rank % len(strategies))
 
         for j in range(0, len(strategies), comm.size):
-            for f in self.faults:
-                if f:
-                    runs_partial = min(_runs_partial, max_runs)
-                else:
-                    runs_partial = min([5, _runs_partial])
-                self.generate_stats(
-                    strategy=strategies[j + (comm.rank % len(strategies) % (len(strategies)) - j)],
-                    runs=runs_partial,
-                    faults=f,
-                    reload=reload,
-                    comm=strategy_comm,
-                )
+            if faults:
+                runs_partial = min(_runs_partial, max_runs)
+            else:
+                runs_partial = min([5, _runs_partial])
+            self.generate_stats(
+                strategy=strategies[j + (comm.rank % len(strategies) % (len(strategies)) - j)],
+                runs=runs_partial,
+                faults=faults,
+                reload=reload,
+                comm=strategy_comm,
+            )
         self.run_stats_generation(runs=runs, step=step, comm=comm, _reload=True, _runs_partial=_runs_partial + step)
 
         return None
@@ -211,7 +220,7 @@ class FaultStats:
 
         # prepare a message
         involved_ranks = comm.gather(MPI.COMM_WORLD.rank, root=0)
-        msg = f'{comm.size} rank(s) ({involved_ranks}) doing {strategy.name}{" with faults" if faults else ""} from {already_completed["runs"]} to {runs}'
+        msg = f'{comm.size} rank(s) ({involved_ranks}) doing {strategy.name}{" with faults" if faults else ""} for {self.prob.__name__} from {already_completed["runs"]} to {runs}'
         if comm.rank == 0 and already_completed['runs'] < runs:
             print(msg, flush=True)
 
@@ -265,10 +274,7 @@ class FaultStats:
             if comm.rank == 0:
                 self.store(dat_full, **identifier_args)
                 if self.faults:
-                    try:
-                        self.get_recovered(strategy=strategy)
-                    except KeyError:
-                        print('Warning: Can\'t compute recovery rate right now')
+                    self.get_recovered(strategy=strategy)
 
         return None
 
@@ -656,8 +662,10 @@ class FaultStats:
                 with_faults = self.load(faults=True, **kwargs)
                 with_faults['recovered'] = with_faults['error'] < self.get_thresh(kwargs['strategy'])
                 self.store(faults=True, dat=with_faults, **kwargs)
-            except KeyError:
-                print("Can\'t compute recovery rate right now")
+            except KeyError as error:
+                print(
+                    f'Warning: Can\'t compute recovery rate for strategy {kwargs["strategy"].name} in {self.prob.__name__} problem right now: KeyError: {error}'
+                )
 
         return None
 
@@ -1490,6 +1498,9 @@ def main():
         **kwargs,
     )
     ###############################################################################
+    stats_analyser.run_stats_generation(runs=runs)
+    return None
+    # plt.show()
     strategy = AdaptivityStrategy()
     stats_analyser.get_recovered()
     fixable = stats_analyser.get_fixable_faults_only(strategy)
@@ -1498,8 +1509,7 @@ def main():
     stats_analyser.print_faults(exponent_bits)
     # stats_analyser.scrutinize(strategy, run=65, faults=True)
     stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    stats_analyser.run_stats_generation(runs=runs)
-    plt.show()
+    # plt.show()
     return None
     stats_analyser.plot_things_per_things(
         'recovered',
