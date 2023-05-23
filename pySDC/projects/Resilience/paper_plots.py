@@ -23,7 +23,7 @@ JOURNAL = 'Springer_Numerical_Algorithms'
 BASE_PATH = 'data/paper'
 
 
-def get_stats(problem, path='data/stats-jusuf'):
+def get_stats(problem, path='data/stats-jusuf', num_procs=1):
     """
     Create a FaultStats object for a given problem to use for the plots.
     Note that the statistics need to be already generated somewhere else, this function will only load them.
@@ -55,9 +55,9 @@ def get_stats(problem, path='data/stats-jusuf'):
         reload=True,
         recovery_thresh=1.1,
         recovery_thresh_abs=recovery_thresh_abs.get(problem, 0),
-        num_procs=1,
         mode=mode,
         stats_path=path,
+        num_procs=num_procs,
     )
     stats_analyser.get_recovered()
     return stats_analyser
@@ -182,7 +182,7 @@ def plot_recovery_rate_recoverable_only(stats_analyser, fig, ax, **kwargs):  # p
         )
 
 
-def compare_recovery_rate_problems():  # pragma: no cover
+def compare_recovery_rate_problems(num_procs=1):  # pragma: no cover
     """
     Compare the recovery rate for vdP, Lorenz and Schroedinger problems.
     Only faults that can be recovered are shown.
@@ -191,10 +191,10 @@ def compare_recovery_rate_problems():  # pragma: no cover
         None
     """
     stats = [
-        get_stats(run_vdp),
-        get_stats(run_Lorenz),
-        get_stats(run_Schroedinger),
-        get_stats(run_quench),
+        get_stats(run_vdp, num_procs=num_procs),
+        get_stats(run_Lorenz, num_procs=num_procs),
+        get_stats(run_Schroedinger, num_procs=num_procs),
+        get_stats(run_quench, num_procs=num_procs),
     ]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
 
@@ -212,7 +212,28 @@ def compare_recovery_rate_problems():  # pragma: no cover
     axs[1, 0].set_ylabel('recovery rate')
     axs[0, 0].set_ylabel('recovery rate')
 
-    savefig(fig, 'compare_equations')
+    savefig(fig, f'compare_equations{f"-{num_procs}procs" if num_procs > 1 else ""}')
+
+
+def plot_recovery_thresholds(problem, num_procs_list=None):
+    num_procs_list = [1, 4] if num_procs_list is None else num_procs_list
+    stats_dict = {n: get_stats(problem, num_procs=n) for n in num_procs_list}
+    strategies = [AdaptivityStrategy(useMPI=True)]
+    thresh_range = np.linspace(0.9, 1.4, 100)
+
+    fig, ax = plt.subplots()
+    [
+        stats.plot_recovery_thresholds(
+            strategies=strategies,
+            thresh_range=thresh_range,
+            ax=ax,
+            mask=stats.get_fixable_faults_only(strategies[0]),
+            label=f'{n} procs',
+            ls='-' if n == 1 else '--',
+        )
+        for n, stats in stats_dict.items()
+    ]
+    savefig(fig, 'threshold', tight_layout=False)
 
 
 def plot_efficiency_polar_vdp(problem, path='data/stats'):  # pragma: no cover
@@ -662,14 +683,15 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    plot_vdp_solution()
-    plot_quench_solution()
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    plot_adaptivity_stuff()
-    compare_recovery_rate_problems()
-    work_precision()
+    # plot_vdp_solution()
+    # plot_quench_solution()
+    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
+    # plot_adaptivity_stuff()
+    for i in [1, 4]:
+        compare_recovery_rate_problems(i)
+    # work_precision()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -688,4 +710,5 @@ if __name__ == "__main__":
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
     # make_plots_for_TIME_X_website()
+    plot_recovery_thresholds(run_Schroedinger)
     make_plots_for_paper()

@@ -1,7 +1,7 @@
 import numpy as np
-import pickle
 import matplotlib.pyplot as plt
 from mpi4py import MPI
+import pickle
 
 import pySDC.helpers.plot_helper as plot_helper
 from pySDC.helpers.stats_helper import get_sorted
@@ -187,6 +187,7 @@ class FaultStats:
             'total_newton_iteration': np.zeros(runs),
             'restarts': np.zeros(runs),
             'target': np.zeros(runs),
+            'rank': np.zeros(runs),
         }
 
         # store arguments for storing and loading
@@ -202,8 +203,9 @@ class FaultStats:
                 already_completed_ = self.load(**identifier_args)
             already_completed = comm.bcast(already_completed_, root=0)
             if already_completed['runs'] > 0 and already_completed['runs'] <= runs and comm.rank == 0:
+                avail_len = min([already_completed['runs'], runs])
                 for k in dat.keys():
-                    dat[k][: min([already_completed['runs'], runs])] = already_completed.get(k, [])
+                    dat[k][:avail_len] = already_completed.get(k, [None] * avail_len)
         else:
             already_completed = {'runs': 0}
 
@@ -213,7 +215,7 @@ class FaultStats:
         if comm.rank == 0 and already_completed['runs'] < runs:
             print(msg, flush=True)
 
-        space_comm = comm.Split(comm.rank)
+        space_comm = MPI.COMM_SELF
 
         # perform the remaining experiments
         for i in range(already_completed['runs'], runs):
@@ -244,6 +246,7 @@ class FaultStats:
                     dat['problem_pos'] += [faults_run[0][1][3]]
                     dat['bit'][i] = faults_run[0][1][4]
                     dat['target'][i] = faults_run[0][1][5]
+                    dat['rank'][i] = faults_run[0][1][6]
                 else:
                     assert self.mode == 'regular', f'No faults where recorded in run {i} of strategy {strategy.name}!'
             dat['error'][i] = error
@@ -841,7 +844,9 @@ class FaultStats:
 
         return None
 
-    def plot_recovery_thresholds(self, strategies=None, thresh_range=None, ax=None):  # pragma: no cover
+    def plot_recovery_thresholds(
+        self, strategies=None, thresh_range=None, ax=None, mask=None, **kwargs
+    ):  # pragma: no cover
         '''
         Plot the recovery rate for a range of thresholds
 
@@ -849,12 +854,14 @@ class FaultStats:
             strategies (list): List of the strategies you want to plot, if None, all will be plotted
             thresh_range (list): thresholds for deciding whether to accept as recovered
             ax (Matplotlib.axes): Somewhere to plot
+            mask (Numpy.ndarray of shape (n)): The mask you want to know about
 
         Returns:
             None
         '''
         # fill default values if nothing is specified
         strategies = self.strategies if strategies is None else strategies
+
         thresh_range = 1 + np.linspace(-4e-2, 4e-2, 100) if thresh_range is None else thresh_range
         if ax is None:
             fig, ax = plt.subplots(1, 1)
@@ -867,10 +874,20 @@ class FaultStats:
             with_faults = self.load(strategy=strategy, faults=True)
 
             for thresh_idx in range(len(thresh_range)):
-                rec_mask = with_faults['error'] < thresh_range[thresh_idx] * fault_free['error'].mean()
-                rec_rates[strategy_idx][thresh_idx] = len(with_faults['error'][rec_mask]) / len(with_faults['error'])
+                rec_mask = self.get_mask(
+                    strategy=strategy,
+                    key='error',
+                    val=(thresh_range[thresh_idx] * fault_free['error'].mean()),
+                    op='gt',
+                    old_mask=mask,
+                )
+                rec_rates[strategy_idx][thresh_idx] = 1.0 - len(with_faults['error'][rec_mask]) / len(
+                    with_faults['error']
+                )
 
-            ax.plot(thresh_range, rec_rates[strategy_idx], color=strategy.color, label=strategy.label)
+            ax.plot(
+                thresh_range, rec_rates[strategy_idx], **{'color': strategy.color, 'label': strategy.label, **kwargs}
+            )
         ax.legend(frameon=False)
         ax.set_ylabel('recovery rate')
         ax.set_xlabel('threshold as ratio to fault-free error')
@@ -1033,13 +1050,14 @@ class FaultStats:
         index = self.get_index(mask)
         dat = self.load()
 
+        e_star = np.mean(self.load(faults=False).get('error', [0]))
+
         # make a header
-        print('  run  | bit | node | iter | space pos')
-        print('-------+-----+------+------+-----------')
+        print('  run  | bit | node | iter | rel err | space pos')
+        print('-------+-----+------+------+---------+-----------')
         for i in index:
             print(
-                f' {i:5d} | {dat["bit"][i]:3.0f} | {dat["node"][i]:4.0f} | {dat["iteration"][i]:4.0f} | \
-{dat["problem_pos"][i]}'
+                f' {i:5d} | {dat["bit"][i]:3.0f} | {dat["node"][i]:4.0f} | {dat["iteration"][i]:4.0f} | {dat["error"][i] / e_star:.1e} | {dat["problem_pos"][i]}'
             )
 
         return None
@@ -1444,6 +1462,7 @@ def main():
         'prob': run_Schroedinger,
         'num_procs': 4,
     }
+    runs = 5000
     for i in range(len(sys.argv)):
         if 'prob' in sys.argv[i]:
             if sys.argv[i + 1] == 'run_Lorenz':
@@ -1458,6 +1477,8 @@ def main():
                 raise NotImplementedError
         elif 'num_procs' in sys.argv[i]:
             kwargs['num_procs'] = int(sys.argv[i + 1])
+        elif 'runs' in sys.argv[i]:
+            runs = int(sys.argv[i + 1])
 
     stats_analyser = FaultStats(
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
@@ -1468,7 +1489,32 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.run_stats_generation(runs=5000)
+    ###############################################################################
+    strategy = AdaptivityStrategy()
+    stats_analyser.get_recovered()
+    fixable = stats_analyser.get_fixable_faults_only(strategy)
+    not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+    stats_analyser.print_faults(exponent_bits)
+    # stats_analyser.scrutinize(strategy, run=65, faults=True)
+    stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    stats_analyser.run_stats_generation(runs=runs)
+    plt.show()
+    return None
+    stats_analyser.plot_things_per_things(
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        mask=fixable,
+        args={'ylabel': 'recovery rate'},
+        store=False,
+        strategies=[strategy],
+    )
+    plt.show()
+    return None
+    ###############################################################################
+    stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None
