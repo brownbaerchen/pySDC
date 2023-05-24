@@ -95,13 +95,14 @@ smaller than 0!",
 
         return True, ""
 
-    def determine_restart(self, controller, S, **kwargs):
+    def determine_restart(self, controller, S, MS, **kwargs):
         """
         Check if the difference between the error estimates exceeds the allowed tolerance
 
         Args:
             controller (pySDC.Controller): The controller
             S (pySDC.Step): The current step
+            MS (list): List of steps
 
         Returns:
             None
@@ -122,6 +123,11 @@ smaller than 0!",
                         f"Triggering restart: delta={diff:.2e}, tol={self.params.HotRod_tol:.2e}",
                         S,
                     )
+
+        # communicate restart globally because of startup phase
+        restarts_all = any(me.status.restart for me in MS)
+        for me in MS:
+            me.status.restart = restarts_all
 
         return None
 

@@ -108,9 +108,11 @@ class FaultStats:
         '''
         if faults is None:
             for f in self.faults:
-                if not f or _runs_partial > 5:
-                    continue
-                self.run_stats_generation(runs=runs, step=step, comm=comm, kwargs_range=kwargs_range, faults=f)
+                self.run_stats_generation(
+                    runs=runs if f else 5, step=step, comm=comm, kwargs_range=kwargs_range, faults=f
+                )
+            return None
+        elif faults == False and _runs_partial > 5:
             return None
 
         for key, val in kwargs_range.items() if kwargs_range is not None else {}:
@@ -478,6 +480,7 @@ class FaultStats:
         '''
         force_params = {}
         force_params['controller_params'] = {'logger_level': logger_level}
+        force_params['sweeper_params'] = {'skip_residual_computation': ()}
 
         stats, controller, Tend = self.single_run(strategy=strategy, force_params=force_params, **kwargs)
 
@@ -1067,11 +1070,11 @@ class FaultStats:
         e_star = np.mean(self.load(faults=False).get('error', [0]))
 
         # make a header
-        print('  run  | bit | node | iter | rel err | space pos')
-        print('-------+-----+------+------+---------+-----------')
+        print('  run  | bit | node | iter | rank | rel err | space pos')
+        print('-------+-----+------+------+------+---------+-----------')
         for i in index:
             print(
-                f' {i:5d} | {dat["bit"][i]:3.0f} | {dat["node"][i]:4.0f} | {dat["iteration"][i]:4.0f} | {dat["error"][i] / e_star:.1e} | {dat["problem_pos"][i]}'
+                f' {i:5d} | {dat["bit"][i]:3.0f} | {dat["node"][i]:4.0f} | {dat["iteration"][i]:4.0f} | {dat.get("rank", np.zeros_like(dat["iteration"]))[i]:4.0f} | {dat["error"][i] / e_star:.1e} | {dat["problem_pos"][i]}'
             )
 
         return None
@@ -1503,7 +1506,31 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-
+    ################################################################################
+    ##stats_analyser.run_stats_generation(runs=runs)
+    # strategy = HotRodStrategy()
+    # stats_analyser.get_recovered()
+    # fixable = stats_analyser.get_fixable_faults_only(strategy)
+    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+    # stats_analyser.print_faults(exponent_bits)
+    # stats_analyser.scrutinize(strategy, run=2614, faults=True)
+    # return None
+    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    ## return None
+    # stats_analyser.plot_things_per_things(
+    #    'recovered',
+    #    'bit',
+    #    False,
+    #    op=stats_analyser.rec_rate,
+    #    mask=fixable,
+    #    args={'ylabel': 'recovery rate'},
+    #    store=False,
+    #    strategies=[strategy],
+    # )
+    # plt.show()
+    # return None
+    ################################################################################
     stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data

@@ -550,7 +550,9 @@ def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
             rnd_args={**rnd_args, **fault_stuff.get('rnd_params', {})},
             args={**args, **fault_stuff.get('args', {})},
         )
-    faultHook.rnd_params['rank'] = {**rnd_args, **fault_stuff.get('rnd_params', {})}.get('rank', 0)
+    faultHook.rnd_params['rank'] = {'rank': len(controller.MS), **rnd_args, **fault_stuff.get('rnd_params', {})}.get(
+        'rank', 0
+    )
 
 
 def get_fault_injector_hook(controller):
