@@ -67,6 +67,7 @@ class BasicRestarting(ConvergenceController):
             "control_order": 95,
             "max_restarts": 10,
             "crash_after_max_restarts": True,
+            "restart_from_first_step": False,
             "step_size_spreader": SpreadStepSizesBlockwise.get_implementation(useMPI=params['useMPI']),
         }
 
@@ -174,7 +175,7 @@ class BasicRestartingNonMPI(BasicRestarting):
 
         return None
 
-    def determine_restart(self, controller, S, **kwargs):
+    def determine_restart(self, controller, S, MS, **kwargs):
         """
         Restart all steps after the first one which wants to be restarted as well, but also check if we lost patience
         with the restarts and want to move on anyways.
@@ -182,13 +183,16 @@ class BasicRestartingNonMPI(BasicRestarting):
         Args:
             controller (pySDC.Controller): The controller
             S (pySDC.Step): The current step
+            MS (list): List of active steps
 
         Returns:
             None
         """
         # check if we performed too many restarts
         if S.status.first:
+
             self.buffers.max_restart_reached = S.status.restarts_in_a_row >= self.params.max_restarts
+
             if self.buffers.max_restart_reached and S.status.restart:
                 if self.params.crash_after_max_restarts:
                     raise ConvergenceError(f"Restarted {S.status.restarts_in_a_row} time(s) already, surrendering now.")
@@ -200,6 +204,10 @@ on...",
 
         self.buffers.restart = S.status.restart or self.buffers.restart
         S.status.restart = (S.status.restart or self.buffers.restart) and not self.buffers.max_restart_reached
+
+        if S.status.last and self.params.restart_from_first_step and not self.buffers.max_restart_reached:
+            for step in MS:
+                step.status.restart = self.buffers.restart
 
         return None
 
@@ -259,5 +267,8 @@ on...",
         # send information about restarts forward
         if not S.status.last:
             self.send(comm, dest=S.status.slot + 1, data=(S.status.restart, self.buffers.max_restart_reached))
+
+        if self.params.restart_from_first_step:
+            raise NotImplementedError("Restart from first step in the block not implemented in MPI yet")
 
         return None

@@ -332,7 +332,7 @@ class sweeper(object):
         L.status.unlocked = True
         L.status.updated = True
 
-    def compute_residual(self, stage=None):
+    def compute_residual(self, stage=''):
         """
         Computation of the residual using the collocation matrix Q
 

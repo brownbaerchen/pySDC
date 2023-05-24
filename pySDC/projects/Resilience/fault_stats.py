@@ -25,6 +25,8 @@ from pySDC.projects.Resilience.strategies import BaseStrategy, AdaptivityStrateg
 
 plot_helper.setup_mpl(reset=True)
 
+LOGGER_LEVEL = 30
+
 
 class FaultStats:
     '''
@@ -112,8 +114,6 @@ class FaultStats:
                     runs=runs if f else 5, step=step, comm=comm, kwargs_range=kwargs_range, faults=f
                 )
             return None
-        elif faults == False and _runs_partial > 5:
-            return None
 
         for key, val in kwargs_range.items() if kwargs_range is not None else {}:
             if type(val) == int:
@@ -131,7 +131,8 @@ class FaultStats:
         _runs_partial = step if _runs_partial == 0 else _runs_partial
         reload = self.reload or _reload
 
-        max_runs = self.get_max_combinations() if self.mode == 'combination' else runs
+        # see if we limit the number of runs we want to do
+        max_runs = (self.get_max_combinations() if self.mode == 'combination' else runs) if faults else 5
 
         if reload:
             # sort the strategies to do some load balancing
@@ -156,13 +157,9 @@ class FaultStats:
         strategy_comm = comm.Split(comm.rank % len(strategies))
 
         for j in range(0, len(strategies), comm.size):
-            if faults:
-                runs_partial = min(_runs_partial, max_runs)
-            else:
-                runs_partial = min([5, _runs_partial])
             self.generate_stats(
                 strategy=strategies[j + (comm.rank % len(strategies) % (len(strategies)) - j)],
-                runs=runs_partial,
+                runs=min(_runs_partial, max_runs),
                 faults=faults,
                 reload=reload,
                 comm=strategy_comm,
@@ -337,7 +334,10 @@ class FaultStats:
         for k in force_params.keys():
             custom_description[k] = {**custom_description.get(k, {}), **force_params[k]}
 
-        custom_controller_params = force_params.get('controller_params', {})
+        custom_controller_params = {
+            'logger_level': LOGGER_LEVEL,
+            **force_params.get('controller_params', {}),
+        }
 
         if faults:
             fault_stuff = {
@@ -1509,12 +1509,12 @@ def main():
     ################################################################################
     ##stats_analyser.run_stats_generation(runs=runs)
     # strategy = HotRodStrategy()
-    # stats_analyser.get_recovered()
-    # fixable = stats_analyser.get_fixable_faults_only(strategy)
-    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
-    # stats_analyser.print_faults(exponent_bits)
-    # stats_analyser.scrutinize(strategy, run=2614, faults=True)
+    ##stats_analyser.get_recovered()
+    ##fixable = stats_analyser.get_fixable_faults_only(strategy)
+    ##not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    ##exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+    ##stats_analyser.print_faults(exponent_bits)
+    # stats_analyser.scrutinize(strategy, run=0, faults=True)
     # return None
     # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     ## return None

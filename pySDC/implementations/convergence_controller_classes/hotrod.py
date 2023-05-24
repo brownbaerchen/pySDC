@@ -1,9 +1,6 @@
 import numpy as np
 
 from pySDC.core.ConvergenceController import ConvergenceController
-from pySDC.implementations.convergence_controller_classes.estimate_extrapolation_error import (
-    EstimateExtrapolationErrorNonMPI,
-)
 
 
 class HotRod(ConvergenceController):
@@ -55,8 +52,18 @@ class HotRod(ConvergenceController):
             description=description,
         )
         if not self.params.useMPI:
+            from pySDC.implementations.convergence_controller_classes.estimate_extrapolation_error import (
+                EstimateExtrapolationErrorNonMPI,
+            )
+            from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
+
             controller.add_convergence_controller(
                 EstimateExtrapolationErrorNonMPI, description=description, params={'no_storage': self.params.no_storage}
+            )
+            controller.add_convergence_controller(
+                BasicRestartingNonMPI,
+                description=description,
+                params={'restart_from_first_step': True},
             )
         else:
             raise NotImplementedError("Don't know how to estimate extrapolated error with MPI")
@@ -123,11 +130,6 @@ smaller than 0!",
                         f"Triggering restart: delta={diff:.2e}, tol={self.params.HotRod_tol:.2e}",
                         S,
                     )
-
-        # communicate restart globally because of startup phase
-        restarts_all = any(me.status.restart for me in MS)
-        for me in MS:
-            me.status.restart = restarts_all
 
         return None
 
