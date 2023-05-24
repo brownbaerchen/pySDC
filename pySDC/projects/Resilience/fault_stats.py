@@ -110,9 +110,7 @@ class FaultStats:
         '''
         if faults is None:
             for f in self.faults:
-                self.run_stats_generation(
-                    runs=runs if f else 5, step=step, comm=comm, kwargs_range=kwargs_range, faults=f
-                )
+                self.run_stats_generation(runs=runs, step=step, comm=comm, kwargs_range=kwargs_range, faults=f)
             return None
 
         for key, val in kwargs_range.items() if kwargs_range is not None else {}:
@@ -132,7 +130,9 @@ class FaultStats:
         reload = self.reload or _reload
 
         # see if we limit the number of runs we want to do
-        max_runs = (self.get_max_combinations() if self.mode == 'combination' else runs) if faults else 5
+        max_runs = (
+            (min(self.get_max_combinations(), runs) if self.mode == 'combination' else runs) if faults else min(runs, 5)
+        )
 
         if reload:
             # sort the strategies to do some load balancing
@@ -478,6 +478,8 @@ class FaultStats:
         Returns:
             None
         '''
+        from pySDC.projects.Resilience.fault_injection import FaultInjector
+
         force_params = {}
         force_params['controller_params'] = {'logger_level': logger_level}
         force_params['sweeper_params'] = {'skip_residual_computation': ()}
@@ -487,6 +489,9 @@ class FaultStats:
         u_all = get_sorted(stats, type='u', recomputed=False)
         t, u = get_sorted(stats, type='u', recomputed=False)[np.argmax([me[0] for me in u_all])]
         k = get_sorted(stats, type='k')
+
+        fault_hook = [me for me in controller.hooks if type(me) == FaultInjector][0]
+        unhappened_faults = fault_hook.faults
 
         print(f'\nOverview for {strategy.name} strategy')
         # print faults
@@ -498,6 +503,12 @@ class FaultStats:
             print(
                 f' {f[0]:6.2f} | {f[1][0]:5d} | {f[1][1]:4d} | {f[1][2]:4d} | {f[1][4]:3d} | {f[1][5]:4d} | {f[1][6]:4d} |',
                 f[1][3],
+            )
+        print('--------+-------+------+------+-----+------+-----------')
+        for f in unhappened_faults:
+            print(
+                f'!{f.time:6.2f} | {f.level_number:5d} | {f.iteration:4d} | {f.node:4d} | {f.bit:3d} | {f.target:4d} | {f.rank:4d} |',
+                f.problem_pos,
             )
 
         # see if we can determine if the faults where recovered
@@ -1480,6 +1491,8 @@ def main():
         'num_procs': 4,
     }
     runs = 5000
+    mode = 'default'
+
     for i in range(len(sys.argv)):
         if 'prob' in sys.argv[i]:
             if sys.argv[i + 1] == 'run_Lorenz':
@@ -1496,6 +1509,8 @@ def main():
             kwargs['num_procs'] = int(sys.argv[i + 1])
         elif 'runs' in sys.argv[i]:
             runs = int(sys.argv[i + 1])
+        elif 'mode' in sys.argv[i]:
+            mode = str(sys.argv[i + 1])
 
     stats_analyser = FaultStats(
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
@@ -1504,20 +1519,21 @@ def main():
         recovery_thresh=1.1,
         # recovery_thresh_abs=1e-5,
         stats_path='data/stats-jusuf',
+        mode=mode,
         **kwargs,
     )
-    ################################################################################
-    ##stats_analyser.run_stats_generation(runs=runs)
+    # ################################################################################
+    # stats_analyser.run_stats_generation(runs=runs)
     # strategy = HotRodStrategy()
-    ##stats_analyser.get_recovered()
-    ##fixable = stats_analyser.get_fixable_faults_only(strategy)
-    ##not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    ##exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
-    ##stats_analyser.print_faults(exponent_bits)
-    # stats_analyser.scrutinize(strategy, run=0, faults=True)
+    # stats_analyser.get_recovered()
+    # fixable = stats_analyser.get_fixable_faults_only(strategy)
+    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+    # stats_analyser.print_faults(mask=not_recovered)
+    # # stats_analyser.scrutinize(strategy, run=5, faults=True)
     # return None
-    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    ## return None
+    # #stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    # # return None
     # stats_analyser.plot_things_per_things(
     #    'recovered',
     #    'bit',
@@ -1530,7 +1546,7 @@ def main():
     # )
     # plt.show()
     # return None
-    ################################################################################
+    # ###############################################################################
     stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data

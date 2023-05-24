@@ -79,7 +79,7 @@ class Fault(FrozenClass):
             'iteration': random_generator.randint(low=1, high=rnd_params['iteration'] + 1),
             'problem_pos': [random_generator.randint(low=0, high=i) for i in rnd_params['problem_pos']],
             'bit': random_generator.randint(low=0, high=rnd_params['bit']),
-            'rank': random_generator.randint(low=0, high=rnd_params['rank'] + 1),
+            'rank': random_generator.randint(low=0, high=rnd_params['rank']),
         }
 
         return cls({**random, **args})
@@ -107,7 +107,7 @@ class Fault(FrozenClass):
             (rnd_params.get('min_node', 0), rnd_params['node'] + 1),
             (1, rnd_params['iteration'] + 1),
             (0, rnd_params['bit']),
-            (0, rnd_params['rank'] + 1),
+            (0, rnd_params['rank']),
         ]
         ranges += [(0, i) for i in rnd_params['problem_pos']]
 
@@ -551,7 +551,7 @@ def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
             args={**args, **fault_stuff.get('args', {})},
         )
     faultHook.rnd_params['rank'] = {'rank': len(controller.MS), **rnd_args, **fault_stuff.get('rnd_params', {})}.get(
-        'rank', 0
+        'rank', 1
     )
 
 
