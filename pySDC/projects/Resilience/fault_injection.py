@@ -304,7 +304,7 @@ class FaultInjector(hooks):
 
         # log what happened to stats and screen
         self.logger.info(
-            f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node}. Target: {f.target}. Abs: {_abs_before:.2e} -> {_abs_after:.2e}'
+            f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node} on rank {f.rank}. Target: {f.target}. Abs: {_abs_before:.2e} -> {_abs_after:.2e}'
         )
         self.add_to_stats(
             process=step.status.slot,
@@ -448,7 +448,7 @@ class FaultInjector(hooks):
                 self.inject_fault(step, f)
             # based on time
             elif f.time is not None:
-                if step.time > f.time and step.status.iter == f.iteration:
+                if step.time > f.time and step.status.iter == f.iteration and step.status.slot == f.rank:
                     self.inject_fault(step, f)
 
         return None
