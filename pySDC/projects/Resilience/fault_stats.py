@@ -107,10 +107,10 @@ class FaultStats:
             None
         '''
         if faults is None:
-            [
+            for f in self.faults:
+                if not f or _runs_partial > 5:
+                    continue
                 self.run_stats_generation(runs=runs, step=step, comm=comm, kwargs_range=kwargs_range, faults=f)
-                for f in self.faults
-            ]
             return None
 
         for key, val in kwargs_range.items() if kwargs_range is not None else {}:
@@ -119,7 +119,9 @@ class FaultStats:
             else:
                 for me in val:
                     kwargs_range_me = {**kwargs_range, key: me}
-                    self.run_stats_generation(runs=runs, step=step, comm=comm, kwargs_range=kwargs_range_me)
+                    self.run_stats_generation(
+                        runs=runs, step=step, comm=comm, kwargs_range=kwargs_range_me, faults=faults
+                    )
                 return None
 
         comm = MPI.COMM_WORLD if comm is None else comm
@@ -138,9 +140,11 @@ class FaultStats:
                 )
                 sorting_index_ = np.argsort(already_completed)
                 sorting_index = sorting_index_[already_completed[sorting_index_] < max_runs]
+                _runs_partial = max(min(already_completed), _runs_partial)
 
             # tell all ranks what strategies to use
             sorting_index = comm.bcast(sorting_index, root=0)
+            _runs_partial = comm.bcast(_runs_partial, root=0)
             strategies = [self.strategies[i] for i in sorting_index]
             if len(strategies) == 0:  # check if we are already done
                 return None
@@ -161,7 +165,9 @@ class FaultStats:
                 reload=reload,
                 comm=strategy_comm,
             )
-        self.run_stats_generation(runs=runs, step=step, comm=comm, _reload=True, _runs_partial=_runs_partial + step)
+        self.run_stats_generation(
+            runs=runs, step=step, comm=comm, faults=faults, _reload=True, _runs_partial=_runs_partial + step
+        )
 
         return None
 
@@ -1497,30 +1503,7 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    ###############################################################################
-    strategy = HotRodStrategy()
-    stats_analyser.get_recovered()
-    fixable = stats_analyser.get_fixable_faults_only(strategy)
-    not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
-    stats_analyser.print_faults(exponent_bits)
-    stats_analyser.scrutinize(strategy, run=2715, faults=True)
-    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    # plt.show()
-    return None
-    stats_analyser.plot_things_per_things(
-        'recovered',
-        'bit',
-        False,
-        op=stats_analyser.rec_rate,
-        mask=fixable,
-        args={'ylabel': 'recovery rate'},
-        store=False,
-        strategies=[strategy],
-    )
-    plt.show()
-    return None
-    ###############################################################################
+
     stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
