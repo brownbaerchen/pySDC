@@ -1076,7 +1076,7 @@ class FaultStats:
             None
         '''
         index = self.get_index(mask)
-        dat = self.load()
+        dat = self.load(strategy=BaseStrategy())
 
         e_star = np.mean(self.load(faults=False).get('error', [0]))
 
@@ -1438,7 +1438,7 @@ class FaultStats:
 
         return None
 
-    def get_HR_tol(self):
+    def get_HR_tol(self, verbose=False):
         from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
 
         HR_strategy = HotRodStrategy(useMPI=self.use_MPI)
@@ -1456,9 +1456,13 @@ class FaultStats:
                 diff += [abs(e_extrapolation[i][1] - e_embedded[-1][1])]
 
         max_diff = max(diff)
-        print(
-            f'Max. diff: {max_diff:.6e} -> proposed HR tolerance: {max_diff + 1e-4:.6e} for {self.prob.__name__} problem with {self.num_procs} procs.'
-        )
+        proposed_tol = 2 * max_diff
+        if verbose:
+            print(
+                f'Max. diff: {max_diff:.6e} -> proposed HR tolerance: {proposed_tol:.6e} for {self.prob.__name__} problem with {self.num_procs} procs.'
+            )
+        else:
+            print(f'{proposed_tol:.6e}')
 
 
 def check_local_error():  # pragma: no cover
@@ -1492,6 +1496,7 @@ def main():
     }
     runs = 5000
     mode = 'default'
+    reload = True
 
     for i in range(len(sys.argv)):
         if 'prob' in sys.argv[i]:
@@ -1511,11 +1516,13 @@ def main():
             runs = int(sys.argv[i + 1])
         elif 'mode' in sys.argv[i]:
             mode = str(sys.argv[i + 1])
+        elif 'reload' in sys.argv[i]:
+            reload = False if sys.argv[i + 1] == 'False' else True
 
     stats_analyser = FaultStats(
         strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=True,
+        reload=reload,
         recovery_thresh=1.1,
         # recovery_thresh_abs=1e-5,
         stats_path='data/stats-jusuf',
@@ -1524,22 +1531,24 @@ def main():
     )
     # ################################################################################
     # stats_analyser.run_stats_generation(runs=runs)
+    # return None
     # strategy = HotRodStrategy()
     # stats_analyser.get_recovered()
     # fixable = stats_analyser.get_fixable_faults_only(strategy)
+    # intermediate_bit = stats_analyser.get_mask(strategy, key='bit', val=12, op='gt', old_mask=stats_analyser.get_mask(strategy, key='bit', val=39, op='lt', old_mask=fixable))
     # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
     # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
     # stats_analyser.print_faults(mask=not_recovered)
-    # # stats_analyser.scrutinize(strategy, run=5, faults=True)
+    # stats_analyser.scrutinize(strategy, run=4579, faults=True)
     # return None
     # #stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # # return None
     # stats_analyser.plot_things_per_things(
     #    'recovered',
-    #    'bit',
+    #    'iteration',
     #    False,
     #    op=stats_analyser.rec_rate,
-    #    mask=fixable,
+    #    mask=intermediate_bit,
     #    args={'ylabel': 'recovery rate'},
     #    store=False,
     #    strategies=[strategy],
