@@ -567,36 +567,36 @@ class HotRodStrategy(Strategy):
 
         if problem.__name__ == "run_vdp":
             if num_procs == 4:
-                HotRod_tol = 1.399404e-04
+                HotRod_tol = 1.800804e-04
             elif num_procs == 5:
-                HotRod_tol = 2.701206e-04
+                HotRod_tol = 9.329361e-05
             else:  # 1 process
-                HotRod_tol = 5e-7
+                HotRod_tol = 1.347949e-06  # 5e-7
             HotRod_tol = 7e-6 if num_procs > 1 else 5e-7
             maxiter = 4
         elif problem.__name__ == "run_Lorenz":
             if num_procs == 5:
-                HotRod_tol = 1.430902e-05
+                HotRod_tol = 9.539348e-06
             elif num_procs == 4:
-                HotRod_tol = 9.602313e-06
+                HotRod_tol = 6.401542e-06
             else:
-                HotRod_tol = 4e-7
+                HotRod_tol = 7.720589e-07  # 4e-7
             maxiter = 6
         elif problem.__name__ == "run_Schroedinger":
             if num_procs == 5:
-                HotRod_tol = 3.746545e-06
+                HotRod_tol = 2.497697e-06
             elif num_procs == 4:
-                HotRod_tol = 2.865607e-06
+                HotRod_tol = 1.910405e-06
             else:
-                HotRod_tol = 6.715185e-07
+                HotRod_tol = 4.476790e-07
             maxiter = 6
         elif problem.__name__ == "run_quench":
             if num_procs == 5:
-                HotRod_tol = 1.526301e-03
+                HotRod_tol = 1.017534e-03
             elif num_procs == 4:
-                HotRod_tol = 1.526301e-03
+                HotRod_tol = 1.017534e-03
             else:
-                HotRod_tol = 7.797930e-04
+                HotRod_tol = 5.198620e-04
             maxiter = 6
         else:
             raise NotImplementedError(
