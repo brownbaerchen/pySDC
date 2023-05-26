@@ -277,6 +277,10 @@ class AdaptivityStrategy(Strategy):
         self.precision_parameter = 'e_tol'
         self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
 
+    @property
+    def label(self):
+        return r'$\Delta t$ adaptivity'
+
     def get_fixable_params(self, maxiter, **kwargs):
         """
         Here faults occurring in the last iteration cannot be fixed.
