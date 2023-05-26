@@ -243,11 +243,7 @@ class FaultStats:
             faults_run = get_sorted(stats, type='bitflip')
             t, u = get_sorted(stats, type='u', recomputed=False)[-1]
 
-            # check if we ran to the end
-            if t < Tend:
-                error = np.inf
-            else:
-                error = self.get_error(u, t, controller, strategy)
+            error = self.get_error(u, t, controller, strategy, Tend)
             total_iteration = sum([k[1] for k in get_sorted(stats, type='k')])
             total_newton_iteration = sum([k[1] for k in get_sorted(stats, type='work_newton')])
 
@@ -283,7 +279,7 @@ class FaultStats:
 
         return None
 
-    def get_error(self, u, t, controller, strategy):
+    def get_error(self, u, t, controller, strategy, Tend):
         """
         Compute the error.
 
@@ -292,11 +288,21 @@ class FaultStats:
             t (float): Time at which `u` was recorded
             controller (pySDC.controller.controller): The controller
             strategy (Strategy): The resilience strategy
+            Tend (float): Time you want to run to
 
         Returns:
             float: Error
         """
-        return abs(u - controller.MS[0].levels[0].prob.u_exact(t=t))
+        lvl = controller.MS[0].levels[0]
+
+        # decide if we reached Tend
+        Tend_reached = t + lvl.params.dt_initial >= Tend
+
+        if Tend_reached:
+            return abs(u - lvl.prob.u_exact(t=t))
+        else:
+            print(f'Final time was not reached! Code crashed at t={t:.2f} instead of reaching Tend={Tend:.2f}')
+            return np.inf
 
     def single_run(
         self,
@@ -490,8 +496,9 @@ class FaultStats:
         t, u = get_sorted(stats, type='u', recomputed=False)[np.argmax([me[0] for me in u_all])]
         k = get_sorted(stats, type='k')
 
-        fault_hook = [me for me in controller.hooks if type(me) == FaultInjector][0]
-        unhappened_faults = fault_hook.faults
+        fault_hook = [me for me in controller.hooks if type(me) == FaultInjector]
+
+        unhappened_faults = fault_hook[0].faults if len(fault_hook) > 0 else []
 
         print(f'\nOverview for {strategy.name} strategy')
         # print faults
@@ -514,11 +521,7 @@ class FaultStats:
         # see if we can determine if the faults where recovered
         no_faults = self.load(strategy=strategy, faults=False)
         e_star = np.mean(no_faults.get('error', [0]))
-        if t < Tend:
-            error = np.inf
-            print(f'Final time was not reached! Code crashed at t={t:.2f} instead of reaching Tend={Tend:.2f}')
-        else:
-            error = self.get_error(u, t, controller, strategy)
+        error = self.get_error(u, t, controller, strategy, Tend)
         recovery_thresh = self.get_thresh(strategy)
 
         print(
@@ -665,7 +668,9 @@ class FaultStats:
             strategy (Strategy): The resilience strategy
         """
         fault_free = self.load(strategy=strategy, faults=False)
-        assert fault_free['error'].std() / fault_free['error'].mean() < 1e-5
+        assert (
+            fault_free['error'].std() / fault_free['error'].mean() < 1e-5
+        ), f'Got too large variation of errors in {strategy} strategy!'
         return self.recovery_thresh_abs + self.recovery_thresh * fault_free["error"].mean()
 
     def get_recovered(self, **kwargs):
@@ -1531,6 +1536,7 @@ def main():
     )
     # ################################################################################
     # stats_analyser.run_stats_generation(runs=runs)
+    # # stats_analyser.scrutinize(BaseStrategy(), run=0, faults=False)
     # return None
     # strategy = HotRodStrategy()
     # stats_analyser.get_recovered()

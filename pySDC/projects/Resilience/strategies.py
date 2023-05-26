@@ -76,6 +76,9 @@ class Strategy:
         self.precision_parameter = None
         self.precision_parameter_loc = []
 
+    def __str__(self):
+        return self.name
+
     def get_fixable_params(self, **kwargs):
         """
         Return a list containing dictionaries which can be passed to `FaultStats.get_mask` as keyword arguments to
