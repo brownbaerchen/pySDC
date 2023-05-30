@@ -76,16 +76,26 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
         restarts = [me.status.restart for me in MS]
         if True in restarts:
             restart_at = np.where(restarts)[0][0]
+            # we want to spread the smallest step size out of the steps that want to be restarted
+            new_steps = [
+                me.levels[0].status.__dict__.get('dt_new', len(MS) - me.status.slot)
+                for me in MS
+                if me.status.slot >= restart_at
+            ]
+            spread_from_step = restart_at + np.argmin(new_steps)
+            self.debug(f'Detected restart from step {restart_at}. Spreading step size from step {spread_from_step}.', S)
         else:
-            restart_at = len(restarts) - 1
+            restart_at = len(MS) - 1
+            spread_from_step = restart_at
+            self.debug('Spreading step size from last step.', S)
 
         # Compute the maximum allowed step size based on Tend.
         dt_max = (Tend - time[0]) / size
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
-        for i in range(len(MS[restart_at].levels)):
-            l = MS[restart_at].levels[i]
+        for i in range(len(MS[spread_from_step].levels)):
+            l = MS[spread_from_step].levels[i]
             # overrule the step size control to reach Tend if needed
             new_steps[i] = min(
                 [
@@ -103,6 +113,7 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
                 )
 
         # spread the step sizes to all levels
+        print(f'new step size {new_steps[0]:.4e}, restart_at: {restart_at}, spread_from_step: {spread_from_step}')
         for i in range(len(S.levels)):
             S.levels[i].params.dt = new_steps[i]
 

@@ -1552,7 +1552,7 @@ def main():
     exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
     # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    stats_analyser.scrutinize(strategy, run=80, faults=True)
+    stats_analyser.scrutinize(strategy, run=80, faults=True, logger_level=10)
     return None
     stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     stats_analyser.plot_things_per_things(

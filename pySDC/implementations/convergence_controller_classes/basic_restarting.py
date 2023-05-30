@@ -67,7 +67,7 @@ class BasicRestarting(ConvergenceController):
             "control_order": 95,
             "max_restarts": 10,
             "crash_after_max_restarts": True,
-            "restart_from_first_step": False,
+            "restart_from_first_step": True,
             "step_size_spreader": SpreadStepSizesBlockwise.get_implementation(useMPI=params['useMPI']),
         }
 
@@ -208,6 +208,9 @@ on...",
         if S.status.last and self.params.restart_from_first_step and not self.buffers.max_restart_reached:
             for step in MS:
                 step.status.restart = self.buffers.restart
+        print(
+            [me.status.restart for me in MS], self.params.restart_from_first_step, self.params.restart_from_first_step
+        )
 
         return None
 

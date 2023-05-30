@@ -63,6 +63,21 @@ class ConvergenceController(object):
         self.logger.log(level, f'Process {S.status.slot:2d} on time {S.time:.6f} - {msg}')
         return None
 
+    def debug(self, msg, S, **kwargs):
+        """
+        Shortcut to pass messages at debug level to the logger.
+
+        Args:
+            msg (str): Message you want to log
+            S (pySDC.step): The current step
+            level (int): the level passed to the logger
+
+        Returns:
+            None
+        """
+        self.log(msg=msg, S=S, level=10, **kwargs)
+        return None
+
     def setup(self, controller, params, description, **kwargs):
         """
         Setup various variables that only need to be set once in the beginning.
