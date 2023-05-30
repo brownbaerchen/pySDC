@@ -81,7 +81,6 @@ class Fault(FrozenClass):
             'bit': random_generator.randint(low=0, high=rnd_params['bit']),
             'rank': random_generator.randint(low=0, high=rnd_params['rank']),
         }
-
         return cls({**random, **args})
 
     @classmethod

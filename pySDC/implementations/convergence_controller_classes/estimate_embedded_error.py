@@ -169,7 +169,7 @@ class EstimateEmbeddedErrorLinearizedNonMPI(EstimateEmbeddedError):
             dict: Updated parameters
         """
         return {
-            'averaged': True,
+            'averaged': False,
             **super().setup(controller, params, description, **kwargs),
         }
 
@@ -208,6 +208,8 @@ level"
 
             if self.params.averaged:
                 averaging = float(S.status.slot + 1)
+            else:
+                averaging = 1.0
 
             for L in S.levels:
                 temp = self.estimate_embedded_error_serial(L)

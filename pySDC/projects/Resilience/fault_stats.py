@@ -229,7 +229,7 @@ class FaultStats:
         if comm.rank == 0 and already_completed['runs'] < runs:
             print(msg, flush=True)
 
-        space_comm = MPI.COMM_SELF
+        space_comm = MPI.COMM_SELF.Split(True)
 
         # perform the remaining experiments
         for i in range(already_completed['runs'], runs):
@@ -263,6 +263,9 @@ class FaultStats:
             dat['total_iteration'][i] = total_iteration
             dat['total_newton_iteration'][i] = total_newton_iteration
             dat['restarts'][i] = sum([me[1] for me in get_sorted(stats, type='restart')])
+
+        # free the space communicator
+        space_comm.Free()
 
         dat_full = {}
         for k in dat.keys():
@@ -505,13 +508,13 @@ class FaultStats:
         faults = get_sorted(stats, type='bitflip')
         print('\nfaults:')
         print('    t   | level | iter | node | bit | trgt | rank | pos')
-        print('--------+-------+------+------+-----+------+-----------')
+        print('--------+-------+------+------+-----+------+---------------------')
         for f in faults:
             print(
                 f' {f[0]:6.2f} | {f[1][0]:5d} | {f[1][1]:4d} | {f[1][2]:4d} | {f[1][4]:3d} | {f[1][5]:4d} | {f[1][6]:4d} |',
                 f[1][3],
             )
-        print('--------+-------+------+------+-----+------+-----------')
+        print('--------+-------+------+------+-----+------+---------------------')
         for f in unhappened_faults:
             print(
                 f'!{f.time:6.2f} | {f.level_number:5d} | {f.iteration:4d} | {f.node:4d} | {f.bit:3d} | {f.target:4d} | {f.rank:4d} |',
@@ -1070,20 +1073,23 @@ class FaultStats:
 
         return [e_em[i][-1] for i in [0, 1]], [e_ex[i][-1] for i in [0, 1]], e_glob
 
-    def print_faults(self, mask=None):  # pragma: no cover
+    def print_faults(self, mask=None, strategy=None):  # pragma: no cover
         '''
         Print all faults that happened within a certain mask
 
         Args:
             mask (Numpy.ndarray of shape (n)): The mask you want to know the contents of
+            strategy (Strategy): The resilience strategy you want to see the error for
 
         Returns:
             None
         '''
-        index = self.get_index(mask)
-        dat = self.load(strategy=BaseStrategy())
+        strategy = BaseStrategy() if strategy is None else strategy
 
-        e_star = np.mean(self.load(faults=False).get('error', [0]))
+        index = self.get_index(mask)
+        dat = self.load(strategy=strategy)
+
+        e_star = np.mean(self.load(faults=False, strategy=strategy).get('error', [0]))
 
         # make a header
         print('  run  | bit | node | iter | rank | rel err | space pos')
@@ -1534,34 +1540,34 @@ def main():
         mode=mode,
         **kwargs,
     )
-    # ################################################################################
+    ################################################################################
     # stats_analyser.run_stats_generation(runs=runs)
-    # # stats_analyser.scrutinize(BaseStrategy(), run=0, faults=False)
+    # stats_analyser.get_HR_tol()
     # return None
-    # strategy = HotRodStrategy()
-    # stats_analyser.get_recovered()
-    # fixable = stats_analyser.get_fixable_faults_only(strategy)
-    # intermediate_bit = stats_analyser.get_mask(strategy, key='bit', val=12, op='gt', old_mask=stats_analyser.get_mask(strategy, key='bit', val=39, op='lt', old_mask=fixable))
-    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
-    # stats_analyser.print_faults(mask=not_recovered)
-    # stats_analyser.scrutinize(strategy, run=4579, faults=True)
-    # return None
-    # #stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    # # return None
-    # stats_analyser.plot_things_per_things(
-    #    'recovered',
-    #    'iteration',
-    #    False,
-    #    op=stats_analyser.rec_rate,
-    #    mask=intermediate_bit,
-    #    args={'ylabel': 'recovery rate'},
-    #    store=False,
-    #    strategies=[strategy],
-    # )
-    # plt.show()
-    # return None
-    # ###############################################################################
+    strategy = AdaptivityStrategy()
+    stats_analyser.get_recovered()
+    fixable = stats_analyser.get_fixable_faults_only(strategy)
+    not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
+    not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+
+    # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
+    stats_analyser.scrutinize(strategy, run=80, faults=True)
+    return None
+    stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    stats_analyser.plot_things_per_things(
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        mask=fixable,
+        args={'ylabel': 'recovery rate'},
+        store=False,
+        strategies=[BaseStrategy(), strategy],
+    )
+    plt.show()
+    return None
+    ###############################################################################
     stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
