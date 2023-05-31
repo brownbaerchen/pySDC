@@ -27,6 +27,7 @@ class SpreadStepSizesBlockwise(ConvergenceController):
         defaults = {
             "control_order": +100,
             "spread_from_first_restarted": True,
+            "overwrite_to_reach_Tend": True,
         }
 
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
@@ -119,7 +120,7 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
         spread_from_step = self.get_step_from_which_to_spread(MS, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = (Tend - time[0]) / size
+        dt_max = (Tend - time[0]) / size if self.params.overwrite_to_reach_Tend else np.inf
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
@@ -181,7 +182,7 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
             self.debug('Spreading step size from last step.', S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = comm.bcast((Tend - time) / size, root=restart_at)
+        dt_max = comm.bcast((Tend - time) / size, root=restart_at) if self.params.overwrite_to_reach_Tend else np.inf
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
