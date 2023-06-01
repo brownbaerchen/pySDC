@@ -66,7 +66,6 @@ def run_problem(
             if (step.status.iter == maxiter or step.level.status.residual <= step.level.restol) and len(
                 self.min_dt
             ) > 0:
-
                 step.levels[0].status.dt_new = dt * (2.0 + abs(step.status.slot - self.min_dt[0]))
 
                 if step.status.last:
@@ -261,7 +260,6 @@ def spread_step_sizes_single_test(**kwargs):
     dt_new_last_block = []
     restarted = []
     for i in range(len(dts)):
-
         time = dts[index[i]][0].time
         dt = dts[index[i]][1]
         dt_new = dt_news[index[i]][1]
@@ -273,7 +271,6 @@ def spread_step_sizes_single_test(**kwargs):
                 print('-------------------------------------------------------------------', flush=True)
 
             if len(restarted) == arguments['num_procs']:
-
                 # figure out from which step the next block was started
                 if any(restarted):
                     restarted_from = min(np.arange(len(restarted))[restarted])

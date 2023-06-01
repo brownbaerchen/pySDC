@@ -175,7 +175,6 @@ class BasicRestartingNonMPI(BasicRestarting):
         """
         # check if we performed too many restarts
         if S.status.first:
-
             self.buffers.max_restart_reached = S.status.restarts_in_a_row >= self.params.max_restarts
 
             if self.buffers.max_restart_reached and S.status.restart:
