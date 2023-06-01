@@ -27,6 +27,7 @@ def run_problem(
     from pySDC.core.Hooks import hooks
     from pySDC.core.ConvergenceController import ConvergenceController
     from pySDC.implementations.hooks.log_step_size import LogStepSize
+    from pySDC.implementations.hooks.log_restarts import LogRestarts
 
     class ArtificialRestarts(ConvergenceController):
         def __init__(self, controller, params, description, **kwargs):
@@ -131,7 +132,7 @@ def run_problem(
     # initialize controller parameters
     controller_params = {}
     controller_params['logger_level'] = 10
-    controller_params['hook_class'] = [ArtificialAdaptivity, LogStepSize]
+    controller_params['hook_class'] = [ArtificialAdaptivity, LogStepSize, LogRestarts]
     controller_params['mssdc_jac'] = False
 
     # fill description dictionary for easy step instantiation
@@ -170,17 +171,44 @@ def run_problem(
     return stats
 
 
-# @pytest.mark.base
-# def test_spread_step_size(num_procs=4, restart_from_first_step=False, spread_from_first_restarted=True):
-#     from pySDC.helpers.stats_helper import get_sorted
-#     import numpy as np
-#
-#     dt = 1.e-1
-#     n_steps = 24
-#     min_dt = [2, 1, 3]
-#     planned_restarts = [0.6, 1.0]
-#
-#     stats = run_problem(num_procs=num_procs, n_steps=n_steps, restarts=planned_restarts, min_dt=min_dt, dt=dt, restart_from_first_step=restart_from_first_step, spread_from_first_restarted=spread_from_first_restarted)
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('num_procs', [1, 4, 3])
+@pytest.mark.parametrize('spread_from_first_restarted', [0, 1])
+def test_SpreadStepSizesMPI(num_procs, spread_from_first_restarted):
+    import os
+    import subprocess
+
+    kwargs = {}
+    kwargs['useMPI'] = 1
+    kwargs['num_procs'] = num_procs
+    kwargs['spread_from_first_restarted'] = spread_from_first_restarted
+    kwargs['test'] = 1
+
+    # Set python path once
+    my_env = os.environ.copy()
+    my_env['PYTHONPATH'] = '../../..:.'
+    my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
+
+    # run code with different number of MPI processes
+    kwargs_str = "".join([f"{key}:{item} " for key, item in kwargs.items()])
+    cmd = f"mpirun -np {num_procs} python {__file__} {kwargs_str}".split()
+
+    p = subprocess.Popen(cmd, env=my_env, cwd=".")
+
+    p.wait()
+    assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
+        p.returncode,
+        num_procs,
+    )
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('num_procs', [1, 3, 4])
+@pytest.mark.parametrize('spread_from_first_restarted', [False, True])
+def test_SpreadStepSizesNonMPI(num_procs, spread_from_first_restarted):
+    spread_step_sizes_single_test(
+        useMPI=False, num_procs=num_procs, spread_from_first_restarted=spread_from_first_restarted
+    )
 
 
 def spread_step_sizes_single_test(**kwargs):
@@ -194,7 +222,7 @@ def spread_step_sizes_single_test(**kwargs):
         'num_procs': 1,
         "restart_from_first_step": False,
         "spread_from_first_restarted": True,
-        'min_dt': [2, 1, 3, 1, 2, 1, 0],
+        'min_dt': [2, 1, 3, 1, 2, 1, 0, 3, 1, 2, 1, 0, 2, 1, 3, 0, 0, 1, 2, 1, 3, 0, 2],
         'Tend': 3.5,
         **kwargs,
     }
@@ -210,12 +238,37 @@ def spread_step_sizes_single_test(**kwargs):
 
     # compute the time blocks
 
-    restarts = {key: value for key, value in filter_stats(stats, type='restart', recomputed=False).items() if value}
+    restarts = {
+        key: value for key, value in filter_stats(stats, type='restart', recomputed=False, comm=comm).items() if value
+    }
     times_restarted = [key.time for key, value in restarts.items()]
 
-    dts = [(key, value) for key, value in filter_stats(stats, type='dt').items()]
-    dts_no_restarts = [(key, value) for key, value in filter_stats(stats, type='dt', recomputed=False).items()]
-    dt_news = [(key, value) for key, value in filter_stats(stats, type='dt_new').items()]
+    dts = [(key, value) for key, value in filter_stats(stats, type='dt', comm=comm).items()]
+    dts_no_restarts = [
+        (key, value) for key, value in filter_stats(stats, type='dt', recomputed=False, comm=comm).items()
+    ]
+    dt_news = [(key, value) for key, value in filter_stats(stats, type='dt_new', comm=comm).items()]
+
+    index = []
+    procs = np.array([me[0].process for me in dts])
+    for i in range(len(dts)):
+        for j in range(arguments['num_procs']):
+            mask = procs == j
+            forbidden_fruit = np.arange(len(dts))[mask]
+            if len(forbidden_fruit) > i:
+                index += [forbidden_fruit[i]]
+
+    # if arguments['useMPI']:
+    # individual_length = len(dts) // arguments['num_procs']
+    # index = [i * individual_length + j for j in range(arguments['num_procs']) for i in range(arguments['num_procs'])]
+    if comm.rank == 0:
+        print([me[0].process for me in dts])
+        print(index, flush=True)
+        # print('unsorted', dts, flush=True)
+        print('sorted', [dts[index[i]] for i in range(len(index))], flush=True)
+        print(dts_no_restarts)
+    # else:
+    # index = np.arange(len(dts))
 
     last_block_started_at = 0
     times_restarted_left = times_restarted.copy()
@@ -224,13 +277,15 @@ def spread_step_sizes_single_test(**kwargs):
     restarted = []
     for i in range(len(dts)):
 
-        time = dts[i][0].time
-        dt = dts[i][1]
-        dt_new = dt_news[i][1]
+        time = dts[index[i]][0].time
+        dt = dts[index[i]][1]
+        dt_new = dt_news[index[i]][1]
 
         # figure out if a new block started
         if (i - last_block_started_at) % arguments['num_procs'] == 0:
             last_block_started_at = i * 1
+            if comm.rank == 0:
+                print('-------------------------------------------------------------------')
 
             if len(restarted) == arguments['num_procs']:
 
@@ -241,11 +296,12 @@ def spread_step_sizes_single_test(**kwargs):
                     restarted_from = arguments['num_procs'] - 1
 
                 # figure out which step size we expect from this
+                print(dt_new_last_block, restarted_from, restarted, times_restarted_left)
                 if arguments['spread_from_first_restarted']:
                     expected_step = dt_new_last_block[restarted_from]
                 else:
                     expected_step = min(
-                        [dt_new_last_block[i] for i in range(len(dt_new_last_block)) if i >= restarted_from]
+                        [dt_new_last_block[j] for j in range(len(dt_new_last_block)) if j >= restarted_from]
                     )
 
             dt_new_last_block = []
@@ -254,9 +310,10 @@ def spread_step_sizes_single_test(**kwargs):
                 times_restarted_left.remove(time)
 
         dt_new_last_block += [dt_new]
-        restarted += [dts[i] in dts_no_restarts and time in times_restarted_left]
+        restarted += [dts[index[i]] in dts_no_restarts and time in times_restarted_left]
 
-        print(f'{i:3d}: t={time:.2e}, dt={dt:.2e}, expected: {expected_step:.2e}, dt_new: {dt_new:.2e}')
+        if comm.rank == 0:
+            print(f'{i:3d}: t={time:.2e}, dt={dt:.2e}, expected: {expected_step:.2e}, dt_new: {dt_new:.2e}')
 
         # make sure we got everything we expected
         assert np.isclose(
@@ -308,8 +365,8 @@ def basic_restarting_single_test(**kwargs):
 
     arguments = {
         'useMPI': False,
-        'restarts': [0.6, 1.0],
-        'dt': 1.0e-1,
+        'restarts': [6, 10.0],
+        'dt': 1.0e0,
         'n_steps': 24,
         'num_procs': 1,
         "max_restarts": 10,
@@ -333,26 +390,43 @@ def basic_restarting_single_test(**kwargs):
 
     restarts = get_sorted(stats, type='restart', comm=comm)
     times_restarted = [me[0] for me in restarts if me[1]]
+    restarts_filtered = get_sorted(stats, type='restart', recomputed=False, comm=comm)
 
     # compute expected restarts
     expected_restarts = []
+    num_filtered = 0
+    roll_back = 0.0
     for me in arguments['restarts']:
         if me > arguments['n_steps'] * arguments['dt']:
             continue
 
         # figure out the block I happened in
-        my_block_start = max(block_starts[block_starts <= me + arguments['dt'] / 10.0])
+        my_block_start = max(block_starts[block_starts - roll_back <= me + arguments['dt'] / 3.0]) - roll_back
         my_block = [my_block_start + arguments['dt'] * i for i in range(arguments['num_procs'])]
 
         if arguments['restart_from_first_step']:
             expected_restarts += my_block
+            num_filtered += max(len(my_block), 0)
         else:
             expected_restarts += [t for t in my_block if t >= me]
+            num_filtered += max(len([t for t in my_block if t >= me]), 0)
+            roll_back += my_block[-1] + arguments['dt'] - me
 
+    times_filtered = [me[0] for me in restarts_filtered]
     times_restarted = sorted(times_restarted)
     expected_restarts = sorted(expected_restarts)
 
     # make sure we got everything we expected
+    assert all(me[1] == 0 for me in restarts_filtered), "Got restarts in filtered stats!"
+
+    assert (
+        len(times_filtered) == arguments['n_steps']
+    ), f"Got unexpected number of times in filtered stats! Expected {arguments['n_steps']}, got {len(times_filtered)}"
+
+    assert len(times_restarted) == len(
+        expected_restarts
+    ), f"Didn\'t get as many restarts as expected! Got {len(times_restarted)}, expected {len(expected_restarts)}!"
+
     assert all(
         np.isclose(times_restarted[i], expected_restarts[i], atol=arguments['dt'] / 10)
         for i in range(len(expected_restarts))

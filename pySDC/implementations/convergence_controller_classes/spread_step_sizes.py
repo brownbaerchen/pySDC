@@ -150,6 +150,26 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
 
 
 class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
+    """
+    MPI version
+    """
+
+    def get_step_from_which_to_spread(self, comm, S):
+        """
+        Return the index of the step from which to spread the step size to all steps in the next block.
+
+        Args:
+            comm (mpi4py.MPI.Intracomm): Communicator
+            S (pySDC.Step.step): The current step
+
+        Returns:
+            int: The index of the step from which we want to spread the step size
+        """
+        restarts = comm.allgather(S.status.restart)
+        new_steps = [me if me is not None else 1e9 for me in comm.allgather(S.levels[0].status.dt_new)]
+
+        return super().get_step_from_which_to_spread(restarts, new_steps, comm.size, S)
+
     def prepare_next_block(self, controller, S, size, time, Tend, comm, **kwargs):
         """
         Spread the step size of the last step with no restarted predecessors to all steps and limit the step size based
@@ -166,23 +186,12 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
         Returns:
             None
         """
-
-        # figure out where the block is restarted
-        restarts = comm.allgather(S.status.restart)
-        if True in restarts:
-            restart_at = np.where(restarts)[0][0]
-            self.log('Not Implemented!', S, level=100)
-            # we want to spread the smallest step size out of the steps that want to be restarted
-            new_steps = comm.allgather(S.levels[0].status.dt_new if S.levels[0].status.dt_new else 1e9)
-            spread_from_step = restart_at + np.argmin(new_steps)
-            self.debug(f'Detected restart from step {restart_at}. Spreading step size from step {spread_from_step}.', S)
-        else:
-            restart_at = len(restarts) - 1
-            spread_from_step = restart_at
-            self.debug('Spreading step size from last step.', S)
+        spread_from_step = self.get_step_from_which_to_spread(comm, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = comm.bcast((Tend - time) / size, root=restart_at) if self.params.overwrite_to_reach_Tend else np.inf
+        dt_max = (
+            comm.bcast((Tend - time) / size, root=spread_from_step) if self.params.overwrite_to_reach_Tend else np.inf
+        )
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
