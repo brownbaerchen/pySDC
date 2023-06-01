@@ -150,7 +150,7 @@ class controller_nonMPI(controller):
 
             for S in MS_active[:restart_at]:
                 for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
-                    C.post_step_processing(self, S)
+                    C.post_step_processing(self, S, MS=MS_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 [C.prepare_next_block(self, S, len(active_slots), time, Tend, MS=MS_active) for S in self.MS]

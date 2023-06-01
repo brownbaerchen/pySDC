@@ -133,7 +133,7 @@ def run_vdp(
 
     # initialize controller parameters
     controller_params = {}
-    controller_params['logger_level'] = 30
+    controller_params['logger_level'] = 15
     controller_params['hook_class'] = hook_collection + (hook_class if type(hook_class) == list else [hook_class])
     controller_params['mssdc_jac'] = False
 
@@ -235,9 +235,13 @@ def check_if_tests_match(data_nonMPI, data_MPI):
         for op in ops:
             val_nonMPI = op(data_nonMPI[type])
             val_MPI = op(data_MPI[type])
+            missmatch = np.arange(len(data_MPI[type]))[
+                [data_MPI[type][i] != data_nonMPI[type][i] for i in range(len(data_MPI[type]))]
+            ]
             assert np.isclose(val_nonMPI, val_MPI), (
                 f"Mismatch in operation {op.__name__} on type \"{type}\": with {data_MPI['size'][0]} ranks: "
                 f"nonMPI: {val_nonMPI}, MPI: {val_MPI}"
+                f"\nnonMPI {data_nonMPI[type]}, \n   MPI {data_MPI[type]} \n missmatch: {missmatch}"
             )
     print(f'Passed with {data_MPI["size"][0]} ranks')
 

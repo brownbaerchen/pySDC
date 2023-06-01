@@ -146,6 +146,7 @@ class controller_MPI(controller):
                     C.post_step_processing(self, self.S, comm=comm_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
+                comm_active.Barrier()
                 C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
 
             all_dt = comm_active.allgather(self.S.dt)
