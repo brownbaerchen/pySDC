@@ -76,7 +76,7 @@ def filter_recomputed(stats, comm=None):
     Returns:
         dict: The filtered stats dict
     """
-    stats = filter_stats(stats, comm=comm)
+    stats = filter_stats(stats, comm=comm) if comm is not None else stats
 
     # delete values that have been recorded and superseded by similar, but not identical keys
     times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])
@@ -93,7 +93,7 @@ def filter_recomputed(stats, comm=None):
     # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
     other_restarted_steps = [me for me in filter_stats(stats, type='_recomputed') if stats[me]]
     for step in other_restarted_steps:
-        [stats.pop(me) for me in filter_stats(stats, time=step.time, comm=comm).keys()]
+        [stats.pop(me) for me in filter_stats(stats, time=step.time).keys()]
 
     return stats
 
