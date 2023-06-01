@@ -74,7 +74,6 @@ class SpreadStepSizesBlockwise(ConvergenceController):
             spread_from_step = restart_at
             self.debug('Spreading step size from last step.', S)
 
-        print(f'restart from {restart_at}, spread from {spread_from_step}, ')
         return spread_from_step, restart_at
 
 
@@ -121,7 +120,10 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
         spread_from_step, restart_at = self.get_step_from_which_to_spread(MS, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = (Tend - time[restart_at]) / size if self.params.overwrite_to_reach_Tend else np.inf
+        all_dt = [me.dt for me in MS]
+        dt_max = (
+            (Tend - time[restart_at] - all_dt[restart_at]) / size if self.params.overwrite_to_reach_Tend else np.inf
+        )
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
@@ -142,7 +144,6 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
                 self.log(
                     f"Overwriting stepsize control to reach Tend: {Tend:.2e}! New step size: {new_steps[i]:.2e}", S
                 )
-                print(Tend, time[spread_from_step], spread_from_step, Tend - time[spread_from_step], new_steps[i], size)
 
         # spread the step sizes to all levels
         for i in range(len(S.levels)):
@@ -191,7 +192,9 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
         spread_from_step, restart_at = self.get_step_from_which_to_spread(comm, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = comm.bcast((Tend - time) / size, root=restart_at) if self.params.overwrite_to_reach_Tend else np.inf
+        dt_max = (
+            comm.bcast((Tend - time - S.dt) / size, root=restart_at) if self.params.overwrite_to_reach_Tend else np.inf
+        )
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)

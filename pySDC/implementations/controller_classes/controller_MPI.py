@@ -136,7 +136,6 @@ class controller_MPI(controller):
                 tend = comm_active.bcast(self.S.time, root=restart_at)
                 self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
             else:
-                time += self.S.dt
                 uend = self.S.levels[0].uend.bcast(root=num_procs - 1, comm=comm_active)
                 tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
 
@@ -146,7 +145,6 @@ class controller_MPI(controller):
                     C.post_step_processing(self, self.S, comm=comm_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
-                comm_active.Barrier()
                 C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
 
             all_dt = comm_active.allgather(self.S.dt)

@@ -30,4 +30,3 @@ class LogStepSize(hooks):
             type='dt',
             value=L.dt,
         )
-        print('logging', L.dt)
