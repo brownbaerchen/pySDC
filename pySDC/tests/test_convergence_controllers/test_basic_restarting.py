@@ -217,13 +217,13 @@ def spread_step_sizes_single_test(**kwargs):
 
     arguments = {
         'useMPI': False,
-        'restarts': [0.2, 1.35],
-        'dt': 1.0e-1,
+        'restarts': [2.0, 13.5],
+        'dt': 1.0e0,
         'num_procs': 1,
         "restart_from_first_step": False,
         "spread_from_first_restarted": True,
         'min_dt': [2, 1, 3, 1, 2, 1, 0, 3, 1, 2, 1, 0, 2, 1, 3, 0, 0, 1, 2, 1, 3, 0, 2],
-        'Tend': 3.5,
+        'Tend': 35.0,
         **kwargs,
     }
 
@@ -239,14 +239,11 @@ def spread_step_sizes_single_test(**kwargs):
     # compute the time blocks
 
     restarts = {
-        key: value for key, value in filter_stats(stats, type='restart', recomputed=False, comm=comm).items() if value
+        key: value for key, value in filter_stats(stats, type='restart', recomputed=None, comm=comm).items() if value
     }
     times_restarted = [key.time for key, value in restarts.items()]
 
     dts = [(key, value) for key, value in filter_stats(stats, type='dt', comm=comm).items()]
-    dts_no_restarts = [
-        (key, value) for key, value in filter_stats(stats, type='dt', recomputed=False, comm=comm).items()
-    ]
     dt_news = [(key, value) for key, value in filter_stats(stats, type='dt_new', comm=comm).items()]
 
     index = []
@@ -257,18 +254,6 @@ def spread_step_sizes_single_test(**kwargs):
             forbidden_fruit = np.arange(len(dts))[mask]
             if len(forbidden_fruit) > i:
                 index += [forbidden_fruit[i]]
-
-    # if arguments['useMPI']:
-    # individual_length = len(dts) // arguments['num_procs']
-    # index = [i * individual_length + j for j in range(arguments['num_procs']) for i in range(arguments['num_procs'])]
-    if comm.rank == 0:
-        print([me[0].process for me in dts])
-        print(index, flush=True)
-        # print('unsorted', dts, flush=True)
-        print('sorted', [dts[index[i]] for i in range(len(index))], flush=True)
-        print(dts_no_restarts)
-    # else:
-    # index = np.arange(len(dts))
 
     last_block_started_at = 0
     times_restarted_left = times_restarted.copy()
@@ -284,8 +269,8 @@ def spread_step_sizes_single_test(**kwargs):
         # figure out if a new block started
         if (i - last_block_started_at) % arguments['num_procs'] == 0:
             last_block_started_at = i * 1
-            if comm.rank == 0:
-                print('-------------------------------------------------------------------')
+            if comm.rank == 0 if comm is not None else True:
+                print('-------------------------------------------------------------------', flush=True)
 
             if len(restarted) == arguments['num_procs']:
 
@@ -296,7 +281,6 @@ def spread_step_sizes_single_test(**kwargs):
                     restarted_from = arguments['num_procs'] - 1
 
                 # figure out which step size we expect from this
-                print(dt_new_last_block, restarted_from, restarted, times_restarted_left)
                 if arguments['spread_from_first_restarted']:
                     expected_step = dt_new_last_block[restarted_from]
                 else:
@@ -310,10 +294,10 @@ def spread_step_sizes_single_test(**kwargs):
                 times_restarted_left.remove(time)
 
         dt_new_last_block += [dt_new]
-        restarted += [dts[index[i]] in dts_no_restarts and time in times_restarted_left]
+        restarted += [time in times_restarted_left]
 
-        if comm.rank == 0:
-            print(f'{i:3d}: t={time:.2e}, dt={dt:.2e}, expected: {expected_step:.2e}, dt_new: {dt_new:.2e}')
+        if comm.rank == 0 if comm is not None else True:
+            print(f'{i:3d}: t={time:.2e}, dt={dt:.2e}, expected: {expected_step:.2e}, dt_new: {dt_new:.2e}', flush=True)
 
         # make sure we got everything we expected
         assert np.isclose(
