@@ -139,11 +139,6 @@ class controller_MPI(controller):
                 uend = self.S.levels[0].uend.bcast(root=num_procs - 1, comm=comm_active)
                 tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
 
-            # update time for the next block
-            all_dt = comm_active.allgather(self.S.dt)
-            all_time = [tend + sum(all_dt[0:i]) for i in range(num_procs)]
-            time = all_time[rank]
-
             # do convergence controller stuff
             if not self.S.status.restart:
                 for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
@@ -152,6 +147,10 @@ class controller_MPI(controller):
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
 
+            all_dt = comm_active.allgather(self.S.dt)
+            all_time = [tend + sum(all_dt[0:i]) for i in range(num_procs)]
+
+            time = all_time[rank]
             all_active = all_time < Tend - 10 * np.finfo(float).eps
             active = all_active[rank]
             if not all(all_active):

@@ -148,16 +148,16 @@ class controller_nonMPI(controller):
                 uend = self.MS[active_slots[-1]].levels[0].uend
                 time[active_slots[0]] = time[active_slots[-1]] + self.MS[active_slots[-1]].dt
 
-            # setup the times of the steps for the next block
-            for i in range(1, len(active_slots)):
-                time[active_slots[i]] = time[active_slots[i] - 1] + self.MS[active_slots[i] - 1].dt
-
             for S in MS_active[:restart_at]:
                 for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                     C.post_step_processing(self, S, MS=MS_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 [C.prepare_next_block(self, S, len(active_slots), time, Tend, MS=MS_active) for S in self.MS]
+
+            # setup the times of the steps for the next block
+            for i in range(1, len(active_slots)):
+                time[active_slots[i]] = time[active_slots[i] - 1] + self.MS[active_slots[i] - 1].dt
 
             # determine new set of active steps and compress slots accordingly
             active = [time[p] < Tend - 10 * np.finfo(float).eps for p in slots]
