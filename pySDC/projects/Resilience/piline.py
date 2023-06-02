@@ -234,15 +234,15 @@ def check_solution(data, use_adaptivity, num_procs, generate_reference=False):
     elif use_adaptivity and num_procs == 4:
         error_msg = 'Error when using adaptivity in parallel:'
         expected = {
-            'v1': 83.88381454625784,
-            'v2': 80.62665765672298,
-            'p3': 16.135148863736386,
-            'e_em': 3.517956059795324e-08,
-            'e_ex': 5.327927314151541e-08,
-            'dt': 0.08417511596759848,
+            'v1': 83.88320903115796,
+            'v2': 80.6269822629629,
+            'p3': 16.136084724243805,
+            'e_em': 4.0668446388281154e-09,
+            'e_ex': 4.901094641240463e-09,
+            'dt': 0.05,
             'restarts': 48.0,
-            'sweeps': 2584.0,
-            't': 20.009850053410382,
+            'sweeps': 2592.0,
+            't': 20.041499821475185,
         }
 
     elif not use_adaptivity and num_procs == 4:
