@@ -130,7 +130,7 @@ def run_problem(
 
     # initialize controller parameters
     controller_params = {}
-    controller_params['logger_level'] = 10
+    controller_params['logger_level'] = 11
     controller_params['hook_class'] = [ArtificialAdaptivity, LogStepSize, LogRestarts]
     controller_params['mssdc_jac'] = False
 
@@ -277,6 +277,9 @@ def spread_step_sizes_single_test(**kwargs):
                 else:
                     restarted_from = arguments['num_procs'] - 1
 
+                if comm.rank == 0 if comm is not None else True:
+                    print(f' -> restarted at {restarted_from}, {restarted}, {times_restarted_left}', flush=True)
+
                 # figure out which step size we expect from this
                 if arguments['spread_from_first_restarted']:
                     expected_step = dt_new_last_block[restarted_from]
@@ -287,11 +290,11 @@ def spread_step_sizes_single_test(**kwargs):
 
             dt_new_last_block = []
             restarted = []
-            if time in times_restarted_left:
-                times_restarted_left.remove(time)
 
         dt_new_last_block += [dt_new]
         restarted += [time in times_restarted_left]
+        if time in times_restarted_left:
+            times_restarted_left.remove(time)
 
         if comm.rank == 0 if comm is not None else True:
             print(f'{i:3d}: t={time:.2e}, dt={dt:.2e}, expected: {expected_step:.2e}, dt_new: {dt_new:.2e}', flush=True)
