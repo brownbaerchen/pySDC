@@ -759,7 +759,7 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
             if key == 'work_newton' and op == sum:
                 return 1881
             elif key == 'e_global_post_run' and op == max:
-                return 3.3428689244496823e-06
+                return 3.3428689164005654e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 

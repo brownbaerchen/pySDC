@@ -120,9 +120,9 @@ class SpreadStepSizesBlockwiseNonMPI(SpreadStepSizesBlockwise):
         spread_from_step, restart_at = self.get_step_from_which_to_spread(MS, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_all = [0] + [me.dt for me in MS if not me.status.first]
+        dt_all = [0.0] + [me.dt for me in MS if not me.status.first]
         dt_max = (
-            (Tend - time[restart_at] + dt_all[restart_at]) / size if self.params.overwrite_to_reach_Tend else np.inf
+            (Tend - time[restart_at] - dt_all[restart_at]) / size if self.params.overwrite_to_reach_Tend else np.inf
         )
 
         # record the step sizes to restart with from all the levels of the step
@@ -193,7 +193,7 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
 
         # Compute the maximum allowed step size based on Tend.
         dt_max = (
-            comm.bcast((Tend - time + (S.dt if not S.status.first else 0)) / size, root=restart_at)
+            comm.bcast((Tend - time - (S.dt if not S.status.first else 0.0)) / size, root=restart_at)
             if self.params.overwrite_to_reach_Tend
             else np.inf
         )
