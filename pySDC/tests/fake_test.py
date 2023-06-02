@@ -1,6 +1,6 @@
 import pytest
 
 
-@pytest.mark.base
+@pytest.mark.fenics
 def test_fake():
     raise
