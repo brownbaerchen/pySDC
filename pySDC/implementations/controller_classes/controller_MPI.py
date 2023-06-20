@@ -88,7 +88,7 @@ class controller_MPI(controller):
 
         # setup time initially
         time = t0
-        comm_active = self.comm
+        comm_active = self.comm.Split(True)
 
         if comm_active.size > 1:
             if not comm_active.rank == 0:
@@ -97,7 +97,10 @@ class controller_MPI(controller):
                 comm_active.send(time + self.S.dt, dest=comm_active.rank + 1)
 
         active = time < Tend - 10 * np.finfo(float).eps
-        comm_active = comm_active.Split(active)
+
+        comm_active_new = comm_active.Split(active)
+        comm_active.Free()
+        comm_active = comm_active_new
         self.S.status.slot = comm_active.rank
 
         # initialize block of steps with u0
