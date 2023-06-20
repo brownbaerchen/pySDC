@@ -311,13 +311,13 @@ on...",
             self.send(
                 comm,
                 dest=S.status.slot - restart_from,
-                data=S.status.restarts_in_a_row + 1 if S.status.restart else 0,
+                data=[S.status.restarts_in_a_row + 1 if S.status.restart else 0],
                 blocking=False,
             )
 
         # receive new number of restarts in a row
         if S.status.slot + restart_from < size:
-            S.status.restarts_in_a_row = self.recv(comm, source=(S.status.slot + restart_from))
+            S.status.restarts_in_a_row = self.recv(comm, source=(S.status.slot + restart_from))[0]
         else:
             S.status.restarts_in_a_row = 0
 
