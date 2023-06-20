@@ -79,6 +79,8 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
             data[key] += [np.nan]
         else:
             data[key] += [mapping[1]([you[1] for you in me])]
+
+    comm.Free()
     return None
 
 
