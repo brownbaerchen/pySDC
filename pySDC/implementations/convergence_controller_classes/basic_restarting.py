@@ -308,6 +308,10 @@ on...",
 
         # send "backward" the number of restarts in a row
         if S.status.slot >= restart_from:
+            print(
+                f'{comm.rank} sending to {S.status.slot - restart_from}: {[S.status.restarts_in_a_row + 1 if S.status.restart else 0]}',
+                flush=True,
+            )
             self.send(
                 comm,
                 dest=S.status.slot - restart_from,
@@ -318,6 +322,7 @@ on...",
         # receive new number of restarts in a row
         if S.status.slot + restart_from < size:
             S.status.restarts_in_a_row = self.recv(comm, source=(S.status.slot + restart_from))[0]
+            print(f'{comm.rank} received from {S.status.slot + restart_from}: {S.status.restarts_in_a_row}', flush=True)
         else:
             S.status.restarts_in_a_row = 0
 
