@@ -243,7 +243,7 @@ class BasicRestartingMPI(BasicRestarting):
 
         self.OR = MPI.LOR
         self.INT = MPI.INT
-        self.buff = np.empty(1)
+        self.buff = np.empty(1, dtype=int)
 
         super().__init__(controller, params, description)
         self.buffers = Pars({"restart": False, "max_restart_reached": False, 'restart_earlier': False})
