@@ -15,7 +15,7 @@ STRATEGY_NAMES = [
     'base',
 ]
 STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
-LOGGER_LEVEL = 30
+LOGGER_LEVEL = 10
 
 
 def single_test_vdp(strategy_name, useMPI=False, num_procs=1):
