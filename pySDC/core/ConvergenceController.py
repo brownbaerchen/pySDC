@@ -364,6 +364,57 @@ class ConvergenceController(object):
 
         return data
 
+    def Send(self, comm, dest, buffer, blocking=False, **kwargs):
+        """
+        Send data to a different rank
+
+        Args:
+            comm (mpi4py.MPI.Intracomm): Communicator
+            dest (int): The target rank
+            buffer: Buffer for the data
+            blocking (bool): Whether the communication is blocking or not
+
+        Returns:
+            request handle of the communication
+        """
+        # log what's happening for debug purposes
+        self.logger.debug(f'Step {comm.rank} initiates send to step {dest}')
+
+        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
+
+        if blocking:
+            req = comm.Send(buffer, dest=dest, **kwargs)
+        else:
+            req = comm.Isend(buffer, dest=dest, **kwargs)
+
+        # log what's, buffer] happening for debug purposes
+        self.logger.debug(f'Step {comm.rank} leaves send to step {dest}')
+
+        return req
+
+    def Recv(self, comm, source, buffer, **kwargs):
+        """
+        Receive some data
+
+        Args:
+            comm (mpi4py.MPI.Intracomm): Communicator
+            source (int): Where to look for receiving
+
+        Returns:
+            whatever has been received
+        """
+        # log what's happening for debug purposes
+        self.logger.debug(f'Step {comm.rank} initiates receive from step {source}')
+
+        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
+
+        data = comm.Recv(buffer, source=source, **kwargs)
+
+        # log what's happening for debug purposes
+        self.logger.debug(f'Step {comm.rank} leaves receive from step {source}')
+
+        return data
+
     def reset_variable(self, controller, name, MPI=False, place=None, where=None, init=None):
         """
         Utility function for resetting variables. This function will call the `add_variable` function with all the same

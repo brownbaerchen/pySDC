@@ -239,8 +239,12 @@ class BasicRestartingMPI(BasicRestarting):
             description (dict): The description object used to instantiate the controller
         """
         from mpi4py import MPI
+        import numpy as np
 
         self.OR = MPI.LOR
+        self.INT = MPI.INT
+        self.buff = np.empty(1)
+
         super().__init__(controller, params, description)
         self.buffers = Pars({"restart": False, "max_restart_reached": False, 'restart_earlier': False})
 
@@ -308,21 +312,23 @@ on...",
 
         # send "backward" the number of restarts in a row
         if S.status.slot >= restart_from:
+            self.buff[0] = int(S.status.restarts_in_a_row + 1 if S.status.restart else 0)
             print(
-                f'{comm.rank} sending to {S.status.slot - restart_from}: {S.status.restarts_in_a_row + 1 if S.status.restart else 0}',
+                f'{comm.rank} sending to {S.status.slot - restart_from}: {self.buff}',
                 flush=True,
             )
-            self.send(
+            self.Send(
                 comm,
                 dest=S.status.slot - restart_from,
-                data=int(S.status.restarts_in_a_row + 1 if S.status.restart else 0),
+                buffer=[self.buff, self.INT],
                 blocking=False,
             )
 
         # receive new number of restarts in a row
         if S.status.slot + restart_from < size:
-            S.status.restarts_in_a_row = self.recv(comm, source=(S.status.slot + restart_from))
-            print(f'{comm.rank} received from {S.status.slot + restart_from}: {S.status.restarts_in_a_row}', flush=True)
+            self.Recv(comm, source=(S.status.slot + restart_from), buffer=[self.buff, self.INT])
+            S.status.restarts_in_a_row = self.buff[0]
+            print(f'{comm.rank} received from {S.status.slot + restart_from}: {self.buff}', flush=True)
         else:
             S.status.restarts_in_a_row = 0
 
