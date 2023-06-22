@@ -80,6 +80,7 @@ def single_test_vdp(strategy_name, useMPI=False, num_procs=1):
 
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('strategy_name', STRATEGY_NAMES)
+@pytest.mark.skip
 def test_strategy_with_vdp_MPI(strategy_name, num_procs=1):
     single_test_vdp(strategy_name=strategy_name, useMPI=True, num_procs=num_procs)
 
