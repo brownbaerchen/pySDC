@@ -18,7 +18,7 @@ STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
 LOGGER_LEVEL = 10
 
 
-def single_test_vdp(strategy_name, useMPI=False, num_procs=1):
+def single_test_vdp(strategy_name, useMPI, num_procs):
     import numpy as np
     from pySDC.helpers.stats_helper import get_sorted
     from pySDC.projects.Resilience.vdp import run_vdp
