@@ -86,29 +86,26 @@ class controller_MPI(controller):
         for hook in self.hooks:
             hook.reset_stats()
 
-        # find active processes and put into new communicator
-        rank = self.comm.Get_rank()
-        num_procs = self.comm.Get_size()
-        all_dt = self.comm.allgather(self.S.dt)
-        all_time = [t0 + sum(all_dt[0:i]) for i in range(num_procs)]
-        time = all_time[rank]
-        all_active = all_time < Tend - 10 * np.finfo(float).eps
+        # setup time initially
+        time = t0
+        comm_active = self.comm.Split(True)
 
-        if not any(all_active):
-            raise ControllerError('Nothing to do, check t0, dt and Tend')
+        if comm_active.size > 1:
+            if not comm_active.rank == 0:
+                time = comm_active.recv(source=comm_active.rank - 1)
+            if not comm_active.rank == comm_active.size - 1:
+                comm_active.send(time + self.S.dt, dest=comm_active.rank + 1)
 
-        active = all_active[rank]
-        if not all(all_active):
-            comm_active = self.comm.Split(active)
-            rank = comm_active.Get_rank()
-            num_procs = comm_active.Get_size()
-        else:
-            comm_active = self.comm
+        active = time < Tend - 10 * np.finfo(float).eps
 
-        self.S.status.slot = rank
+        comm_active_new = comm_active.Split(active)
+        comm_active.Free()
+        comm_active = comm_active_new
+
+        self.S.status.slot = comm_active.rank
 
         # initialize block of steps with u0
-        self.restart_block(num_procs, time, u0, comm=comm_active)
+        self.restart_block(comm_active.size, time, u0, comm=comm_active)
         uend = u0
 
         # call post-setup hook
@@ -124,7 +121,7 @@ class controller_MPI(controller):
         # while any process still active...
         while active:
             while not self.S.status.done:
-                self.pfasst(comm_active, num_procs)
+                self.pfasst(comm_active, comm_active.size)
 
             # determine where to restart
             restarts = comm_active.allgather(self.S.status.restart)
@@ -133,35 +130,47 @@ class controller_MPI(controller):
             # communicate time and solution to be used as next initial conditions
             if True in restarts:
                 uend = self.S.levels[0].u[0].bcast(root=restart_at, comm=comm_active)
-                tend = comm_active.bcast(self.S.time, root=restart_at)
+
+                if self.S.status.slot == restart_at:
+                    comm_active.isend(time, dest=0)
+                if self.S.status.slot == 0:
+                    time = comm_active.recv(source=restart_at)
+
                 self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
             else:
-                time += self.S.dt
-                uend = self.S.levels[0].uend.bcast(root=num_procs - 1, comm=comm_active)
-                tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
+                uend = self.S.levels[0].uend.bcast(root=comm_active.size - 1, comm=comm_active)
+
+                if self.S.status.last:
+                    comm_active.isend(time + self.S.dt, dest=0)
+                if self.S.status.first:
+                    time = comm_active.recv(source=restart_at)
 
             # do convergence controller stuff
             if not self.S.status.restart:
                 for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
-                    C.post_step_processing(self, self.S)
+                    C.post_step_processing(self, self.S, comm=comm_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
 
-            all_dt = comm_active.allgather(self.S.dt)
-            all_time = [tend + sum(all_dt[0:i]) for i in range(num_procs)]
+            # setup time for next block
+            if comm_active.size > 1:
+                if not self.S.status.first:
+                    time = comm_active.recv(source=self.S.status.slot - 1)
+                if not self.S.status.last:
+                    comm_active.send(time + self.S.dt, dest=self.S.status.slot + 1)
 
-            time = all_time[rank]
-            all_active = all_time < Tend - 10 * np.finfo(float).eps
-            active = all_active[rank]
-            if not all(all_active):
-                comm_active = comm_active.Split(active)
-                rank = comm_active.Get_rank()
-                num_procs = comm_active.Get_size()
-                self.S.status.slot = rank
+            active = time < Tend - 10 * np.finfo(float).eps
+
+            comm_active_new = comm_active.Split(active)
+            comm_active.Free()
+            comm_active = comm_active_new
+
+            self.S.status.slot = comm_active.rank
 
             # initialize block of steps with u0
-            self.restart_block(num_procs, time, uend, comm=comm_active)
+            if active:
+                self.restart_block(comm_active.size, time, uend, comm=comm_active)
 
         # call post-run hook
         for hook in self.hooks:

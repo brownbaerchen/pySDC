@@ -207,23 +207,7 @@ class LogGlobalErrorPostRun(hooks):
 
 
 class LogGlobalErrorPostRunMPI(LogGlobalErrorPostRun):
-    """
-    The MPI controller shows slightly different behaviour which is why the final solution is stored in a different place
-    than in the nonMPI controller.
-    """
-
-    def post_step(self, step, level_number):
-        super().post_step(step, level_number)
-        self.num_restarts = self._hooks__num_restarts
-
-    def get_final_solution(self, lvl):
-        """
-        Get the final solution from the level
-
-        Args:
-            lvl (pySDC.Level.level): The level
-        """
-        return lvl.u[0]
+    pass
 
 
 class LogLocalErrorPostStep(LogError):
