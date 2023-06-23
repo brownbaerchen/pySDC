@@ -133,7 +133,7 @@ class controller_MPI(controller):
 
                 if self.S.status.slot == restart_at:
                     comm_active.isend(time, dest=0)
-                if self.S.status.first:
+                if self.S.status.slot == 0:
                     time = comm_active.recv(source=restart_at)
 
                 self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
@@ -169,7 +169,8 @@ class controller_MPI(controller):
             self.S.status.slot = comm_active.rank
 
             # initialize block of steps with u0
-            self.restart_block(comm_active.size, time, uend, comm=comm_active)
+            if active:
+                self.restart_block(comm_active.size, time, uend, comm=comm_active)
 
         # call post-run hook
         for hook in self.hooks:
