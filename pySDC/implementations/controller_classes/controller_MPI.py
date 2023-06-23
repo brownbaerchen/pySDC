@@ -87,8 +87,8 @@ class controller_MPI(controller):
             hook.reset_stats()
 
         # setup time initially
-        time = t0
-        comm_active = self.comm.Split(True)
+        time = float(t0)
+        comm_active = self.comm
 
         if comm_active.size > 1:
             if not comm_active.rank == 0:
@@ -97,11 +97,7 @@ class controller_MPI(controller):
                 comm_active.send(time + self.S.dt, dest=comm_active.rank + 1)
 
         active = time < Tend - 10 * np.finfo(float).eps
-
-        comm_active_new = comm_active.Split(active)
-        comm_active.Free()
-        comm_active = comm_active_new
-
+        comm_active = comm_active.Split(active)
         self.S.status.slot = comm_active.rank
 
         # initialize block of steps with u0
@@ -125,25 +121,16 @@ class controller_MPI(controller):
 
             # determine where to restart
             restarts = comm_active.allgather(self.S.status.restart)
-            restart_at = np.where(restarts)[0][0] if True in restarts else comm_active.size - 1
 
             # communicate time and solution to be used as next initial conditions
             if True in restarts:
+                restart_at = np.where(restarts)[0][0]
                 uend = self.S.levels[0].u[0].bcast(root=restart_at, comm=comm_active)
+                time = comm_active.bcast(time, root=restart_at)
 
-                if self.S.status.slot == restart_at:
-                    comm_active.isend(time, dest=0)
-                if self.S.status.slot == 0:
-                    time = comm_active.recv(source=restart_at)
-
-                self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
             else:
                 uend = self.S.levels[0].uend.bcast(root=comm_active.size - 1, comm=comm_active)
-
-                if self.S.status.last:
-                    comm_active.isend(time + self.S.dt, dest=0)
-                if self.S.status.first:
-                    time = comm_active.recv(source=restart_at)
+                time = comm_active.bcast(time + self.S.dt, root=comm_active.size - 1)
 
             # do convergence controller stuff
             if not self.S.status.restart:
@@ -153,7 +140,7 @@ class controller_MPI(controller):
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
 
-            # setup time for next block
+            # increment time with step size for subsequent steps
             if comm_active.size > 1:
                 if not self.S.status.first:
                     time = comm_active.recv(source=self.S.status.slot - 1)
