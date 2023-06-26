@@ -98,7 +98,7 @@ def test_fault_injection():
             'bit': 48,
             'target': 0,
             'when': 'after',
-            'rank': 2,
+            'rank': 3,
         },
         1: {
             'time': 1.0,
@@ -106,8 +106,8 @@ def test_fault_injection():
             'level_number': 0,
             'iteration': 3,
             'node': 2,
-            'problem_pos': [1],
-            'bit': 29,
+            'problem_pos': [0],
+            'bit': 7,
             'target': 0,
             'when': 'after',
             'rank': 1,
@@ -146,7 +146,7 @@ def test_fault_injection():
         for key in reference[i].keys():
             assert (
                 injector.faults[i].__dict__[key] == reference[i][key]
-            ), f'Expected fault with parameter {key}={reference[i][key]}, got {injector.faults[i].__dict__[key]}!'
+            ), f'Expected fault with parameter {key}={reference[i][key]}, got {injector.faults[i].__dict__[key]} in fault number {i}!'
 
 
 @pytest.mark.mpi4py
