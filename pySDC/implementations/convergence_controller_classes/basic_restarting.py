@@ -297,7 +297,7 @@ on...",
             controller (pySDC.Controller): The controller
             S (pySDC.Step): The current step
             size (int): The number of ranks
-            time (list): List containing the time of all the steps
+            time (float): Time of the first step
             Tend (float): Final time of the simulation
             comm (mpi4py.MPI.Intracomm): Communicator
 

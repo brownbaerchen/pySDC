@@ -182,7 +182,7 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
             controller (pySDC.Controller): The controller
             S (pySDC.step): The current step
             size (int): The number of ranks
-            time (list): List containing the time of all the steps handled by the controller (or float in MPI implementation)
+            time (float): Time of the first step
             Tend (float): Final time of the simulation
             comm (mpi4py.MPI.Intracomm): Communicator
 
@@ -192,11 +192,7 @@ class SpreadStepSizesBlockwiseMPI(SpreadStepSizesBlockwise):
         spread_from_step, restart_at = self.get_step_from_which_to_spread(comm, S)
 
         # Compute the maximum allowed step size based on Tend.
-        dt_max = (
-            comm.bcast((Tend - time - (S.dt if not S.status.first else 0.0)) / size, root=restart_at)
-            if self.params.overwrite_to_reach_Tend
-            else np.inf
-        )
+        dt_max = comm.bcast((Tend - time) / size, root=restart_at) if self.params.overwrite_to_reach_Tend else np.inf
 
         # record the step sizes to restart with from all the levels of the step
         new_steps = [None] * len(S.levels)
