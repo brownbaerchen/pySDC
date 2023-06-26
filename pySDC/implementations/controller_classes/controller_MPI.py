@@ -144,9 +144,11 @@ class controller_MPI(controller):
 
             active = time < Tend - 10 * np.finfo(float).eps
 
-            comm_active_new = comm_active.Split(active)
-            comm_active.Free()
-            comm_active = comm_active_new
+            # check if we need to split the communicator
+            if tend + sum(all_dt[:-1]) >= Tend - 10 * np.finfo(float).eps:
+                comm_active_new = comm_active.Split(active)
+                comm_active.Free()
+                comm_active = comm_active_new
 
             self.S.status.slot = comm_active.rank
 
