@@ -123,12 +123,12 @@ class controller_MPI(controller):
             if True in restarts:
                 restart_at = np.where(restarts)[0][0]
                 uend = self.S.levels[0].u[0].bcast(root=restart_at, comm=comm_active)
-                tend = comm_active.bcast(time, root=restart_at)
+                tend = comm_active.bcast(self.S.time, root=restart_at)
                 self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
 
             else:
                 uend = self.S.levels[0].uend.bcast(root=comm_active.size - 1, comm=comm_active)
-                tend = comm_active.bcast(time + self.S.dt, root=comm_active.size - 1)
+                tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
 
             # do convergence controller stuff
             if not self.S.status.restart:
