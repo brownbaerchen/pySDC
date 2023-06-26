@@ -22,15 +22,13 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
     from pySDC.projects.Resilience.vdp import run_vdp
     import pySDC.projects.Resilience.strategies as strategies
     from pySDC.implementations.hooks.log_work import LogWork
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
     if useMPI:
         from mpi4py import MPI
-        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRunMPI as errorhook
 
         comm = MPI.COMM_WORLD.Split(True)
     else:
-        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun as errorhook
-
         comm = None
 
     # load the strategy
@@ -60,7 +58,7 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
     controller_params = {'logger_level': LOGGER_LEVEL}
     stats, _, Tend = prob(
         custom_description=strategy.get_custom_description(problem=prob, num_procs=num_procs),
-        hook_class=[errorhook, LogWork],
+        hook_class=[LogGlobalErrorPostRun, LogWork],
         use_MPI=useMPI,
         custom_controller_params=controller_params,
         comm=comm,
