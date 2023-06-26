@@ -123,7 +123,7 @@ class controller_MPI(controller):
             if True in restarts:
                 restart_at = np.where(restarts)[0][0]
                 uend = self.S.levels[0].u[0].bcast(root=restart_at, comm=comm_active)
-                time = comm_active.bcast(time, root=restart_at)
+                tend = comm_active.bcast(self.S.time, root=restart_at)
                 self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
 
             else:
@@ -145,7 +145,7 @@ class controller_MPI(controller):
             active = time < Tend - 10 * np.finfo(float).eps
 
             # check if we need to split the communicator
-            if tend + sum(all_dt[:-1]) >= Tend - 10 * np.finfo(float).eps:
+            if tend + sum(all_dt[: comm_active.size - 1]) >= Tend - 10 * np.finfo(float).eps:
                 comm_active_new = comm_active.Split(active)
                 comm_active.Free()
                 comm_active = comm_active_new
