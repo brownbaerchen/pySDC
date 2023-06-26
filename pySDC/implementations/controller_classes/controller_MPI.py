@@ -87,22 +87,15 @@ class controller_MPI(controller):
             hook.reset_stats()
 
         # setup time initially
-        time = t0
-        comm_active = self.comm.Split(True)
-
-        if comm_active.size > 1:
-            if not comm_active.rank == 0:
-                time = comm_active.recv(source=comm_active.rank - 1)
-            if not comm_active.rank == comm_active.size - 1:
-                comm_active.send(time + self.S.dt, dest=comm_active.rank + 1)
+        all_dt = self.comm.allgather(self.S.dt)
+        time = t0 + sum(all_dt[: self.comm.rank])
 
         active = time < Tend - 10 * np.finfo(float).eps
-
-        comm_active_new = comm_active.Split(active)
-        comm_active.Free()
-        comm_active = comm_active_new
-
+        comm_active = self.comm.Split(active)
         self.S.status.slot = comm_active.rank
+
+        if self.comm.rank == 0 and not active:
+            raise ControllerError('Nothing to do, check t0, dt and Tend!')
 
         # initialize block of steps with u0
         self.restart_block(comm_active.size, time, u0, comm=comm_active)
@@ -135,7 +128,7 @@ class controller_MPI(controller):
 
             else:
                 uend = self.S.levels[0].uend.bcast(root=comm_active.size - 1, comm=comm_active)
-                time = comm_active.bcast(time + self.S.dt, root=comm_active.size - 1)
+                tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
 
             # do convergence controller stuff
             if not self.S.status.restart:
@@ -143,20 +136,19 @@ class controller_MPI(controller):
                     C.post_step_processing(self, self.S, comm=comm_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
-                C.prepare_next_block(self, self.S, self.S.status.time_size, time, Tend, comm=comm_active)
+                C.prepare_next_block(self, self.S, self.S.status.time_size, tend, Tend, comm=comm_active)
 
-            # increment time with step size for subsequent steps
-            if comm_active.size > 1:
-                if not self.S.status.first:
-                    time = comm_active.recv(source=self.S.status.slot - 1)
-                if not self.S.status.last:
-                    comm_active.send(time + self.S.dt, dest=self.S.status.slot + 1)
+            # set new time
+            all_dt = comm_active.allgather(self.S.dt)
+            time = tend + sum(all_dt[: self.S.status.slot])
 
             active = time < Tend - 10 * np.finfo(float).eps
 
-            comm_active_new = comm_active.Split(active)
-            comm_active.Free()
-            comm_active = comm_active_new
+            # check if we need to split the communicator
+            if tend + sum(all_dt[:-1]) >= Tend - 10 * np.finfo(float).eps:
+                comm_active_new = comm_active.Split(active)
+                comm_active.Free()
+                comm_active = comm_active_new
 
             self.S.status.slot = comm_active.rank
 
