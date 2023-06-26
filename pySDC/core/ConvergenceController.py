@@ -364,57 +364,6 @@ class ConvergenceController(object):
 
         return data
 
-    def Send(self, comm, dest, buffer, blocking=False, **kwargs):
-        """
-        Send data to a different rank
-
-        Args:
-            comm (mpi4py.MPI.Intracomm): Communicator
-            dest (int): The target rank
-            buffer: Buffer for the data
-            blocking (bool): Whether the communication is blocking or not
-
-        Returns:
-            request handle of the communication
-        """
-        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates Send to step {dest} with tag {kwargs["tag"]}')
-
-        if blocking:
-            req = comm.Send(buffer, dest=dest, **kwargs)
-        else:
-            req = comm.Isend(buffer, dest=dest, **kwargs)
-
-        # log what's, buffer] happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves Send to step {dest} with tag {kwargs["tag"]}')
-
-        return req
-
-    def Recv(self, comm, source, buffer, **kwargs):
-        """
-        Receive some data
-
-        Args:
-            comm (mpi4py.MPI.Intracomm): Communicator
-            source (int): Where to look for receiving
-
-        Returns:
-            whatever has been received
-        """
-        kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates Receive from step {source} with tag {kwargs["tag"]}')
-
-        data = comm.Recv(buffer, source=source, **kwargs)
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves Receive from step {source} with tag {kwargs["tag"]}')
-
-        return data
-
     def reset_variable(self, controller, name, MPI=False, place=None, where=None, init=None):
         """
         Utility function for resetting variables. This function will call the `add_variable` function with all the same

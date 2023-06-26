@@ -3,7 +3,6 @@ from pySDC.implementations.convergence_controller_classes.spread_step_sizes impo
     SpreadStepSizesBlockwise,
 )
 from pySDC.core.Errors import ConvergenceError
-import numpy as np
 
 
 class BasicRestarting(ConvergenceController):
@@ -242,7 +241,6 @@ class BasicRestartingMPI(BasicRestarting):
         from mpi4py import MPI
 
         self.OR = MPI.LOR
-        self.INT = MPI.INT
 
         super().__init__(controller, params, description)
         self.buffers = Pars({"restart": False, "max_restart_reached": False, 'restart_earlier': False})
@@ -260,7 +258,6 @@ class BasicRestartingMPI(BasicRestarting):
         Returns:
             None
         """
-        assert S.status.slot == comm.rank
 
         if S.status.first:
             # check if we performed too many restarts
@@ -307,31 +304,20 @@ on...",
         Returns:
             None
         """
-        print(comm.size)
-
         restart_from = min(comm.allgather(S.status.slot if S.status.restart else S.status.time_size - 1))
 
         # send "backward" the number of restarts in a row
         if S.status.slot >= restart_from:
-            buff = np.empty(1, dtype=int)
-            buff[0] = int(S.status.restarts_in_a_row + 1 if S.status.restart else 0)
-            # print(
-            #    f'{comm.rank} sending to {S.status.slot - restart_from}: {buff}',
-            #    flush=True,
-            # )
-            self.Send(
+            self.send(
                 comm,
                 dest=S.status.slot - restart_from,
-                buffer=[buff, self.INT],
+                data=S.status.restarts_in_a_row + 1 if S.status.restart else 0,
                 blocking=False,
             )
 
         # receive new number of restarts in a row
         if S.status.slot + restart_from < size:
-            buff = np.empty(1, dtype=int)
-            self.Recv(comm, source=(S.status.slot + restart_from), buffer=[buff, self.INT])
-            S.status.restarts_in_a_row = buff[0]
-            # print(f'{comm.rank} received from {S.status.slot + restart_from}: {buff}', flush=True)
+            S.status.restarts_in_a_row = self.recv(comm, source=(S.status.slot + restart_from))
         else:
             S.status.restarts_in_a_row = 0
 

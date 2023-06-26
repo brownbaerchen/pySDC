@@ -11,9 +11,11 @@ STRATEGY_NAMES = [
     'adaptivity',
     'iterate',
     'base',
+    'DIRK',
+    'explicitRK',
 ]
-STRATEGY_NAMES_NONMPIONLY = ['DIRK', 'explicitRK', 'adaptiveHR', 'HotRod']
-LOGGER_LEVEL = 10
+STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
+LOGGER_LEVEL = 30
 
 
 def single_test_vdp(strategy_name, useMPI, num_procs):
