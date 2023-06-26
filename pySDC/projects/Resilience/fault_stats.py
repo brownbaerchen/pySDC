@@ -164,6 +164,7 @@ class FaultStats:
                 reload=reload,
                 comm=strategy_comm,
             )
+        strategy_comm.Free()
         self.run_stats_generation(
             runs=runs, step=step, comm=comm, faults=faults, _reload=True, _runs_partial=_runs_partial + step
         )

@@ -1,9 +1,11 @@
 import numpy as np
 
 
-def filter_stats(stats, process=None, time=None, level=None, iter=None, type=None, recomputed=None, num_restarts=None):
+def filter_stats(
+    stats, process=None, time=None, level=None, iter=None, type=None, recomputed=None, num_restarts=None, comm=None
+):
     """
-    Helper function to extract data from the dictrionary of statistics
+    Helper function to extract data from the dictionary of statistics
 
     Args:
         stats (dict): raw statistics from a controller run
@@ -13,13 +15,14 @@ def filter_stats(stats, process=None, time=None, level=None, iter=None, type=Non
         iter (int): the requested iteration count
         type (str): string to describe the requested type of value
         recomputed (bool): filter recomputed values from stats if set to anything other than None
+        comm (mpi4py.MPI.Intracomm): Communicator (or None if not applicable)
 
     Returns:
         dict: dictionary containing only the entries corresponding to the filter
     """
     result = {}
 
-    for k, v in stats.items() if recomputed is None else filter_recomputed(stats.copy()).items():
+    for k, v in stats.items() if recomputed is None else filter_recomputed(stats.copy(), comm=comm).items():
         # get data if key matches the filter (if specified)
         if (
             (k.time == time or time is None)
@@ -31,17 +34,20 @@ def filter_stats(stats, process=None, time=None, level=None, iter=None, type=Non
         ):
             result[k] = v
 
+    if comm is not None:
+        # gather the results across all ranks and the flatten the list
+        result = {key: value for sub_result in comm.allgather(result) for key, value in sub_result.items()}
+
     return result
 
 
-def sort_stats(stats, sortby, comm=None):
+def sort_stats(stats, sortby):
     """
     Helper function to transform stats dictionary to sorted list of tuples
 
     Args:
         stats (dict): dictionary of statistics
         sortby (str): string to specify which key to use for sorting
-        comm (mpi4py.MPI.Intracomm): Communicator (or None if not applicable)
 
     Returns:
         list: list of tuples containing the sortby item and the value
@@ -53,33 +59,36 @@ def sort_stats(stats, sortby, comm=None):
         item = getattr(k, sortby)
         result.append((item, v))
 
-    if comm is not None:
-        # gather the results across all ranks and the flatten the list
-        result = [item for sub_result in comm.allgather(result) for item in sub_result]
-
     # sort by first element of the tuple (which is the sortby key) and return
     sorted_data = sorted(result, key=lambda tup: tup[0])
 
     return sorted_data
 
 
-def filter_recomputed(stats):
+def filter_recomputed(stats, comm=None):
     """
     Filter recomputed values from the stats and remove them.
 
     Args:
         stats (dict): Raw statistics from a controller run
+        comm (mpi4py.MPI.Intracomm): Communicator (or None if not applicable)
 
     Returns:
         dict: The filtered stats dict
     """
+    stats = filter_stats(stats, comm=comm) if comm is not None else stats
 
     # delete values that have been recorded and superseded by similar, but not identical keys
     times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])
     for t in times_restarted:
-        restarts = max([me.num_restarts for me in filter_stats(stats, type='_recomputed', time=t).keys()] + [0])
-        for i in range(restarts):
-            [stats.pop(me) for me in filter_stats(stats, time=t, num_restarts=i).keys()]
+        restarts = [(me.type, me.num_restarts) for me in filter_stats(stats, time=t).keys()]
+        [
+            [
+                [stats.pop(you, None) for you in filter_stats(stats, time=t, type=me[0], num_restarts=i).keys()]
+                for i in range(me[1])
+            ]
+            for me in restarts
+        ]
 
     # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
     other_restarted_steps = [me for me in filter_stats(stats, type='_recomputed') if stats[me]]
@@ -108,14 +117,13 @@ def get_list_of_types(stats):
     return type_list
 
 
-def get_sorted(stats, sortby='time', comm=None, **kwargs):
+def get_sorted(stats, sortby='time', **kwargs):
     """
-    Utility for filtering and sorting stats in a single call. Pass a communicatior if using MPI.
+    Utility for filtering and sorting stats in a single call. Pass a communicator if using MPI.
     Keyword arguments are passed to `filter_stats` for filtering.
 
     stats (dict): raw statistics from a controller run
     sortby (str): string to specify which key to use for sorting
-    comm (mpi4py.MPI.Intracomm): Communicator (or None if not applicable)
 
     Returns:
         list: list of tuples containing the sortby item and the value
@@ -124,5 +132,4 @@ def get_sorted(stats, sortby='time', comm=None, **kwargs):
     return sort_stats(
         filter_stats(stats, **kwargs),
         sortby=sortby,
-        comm=comm,
     )

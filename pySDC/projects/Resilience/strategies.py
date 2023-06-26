@@ -340,8 +340,7 @@ class AdaptivityStrategy(Strategy):
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
-            flavor = 'MPI' if self.useMPI else 'nonMPI'
-            custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {
+            custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
                 'max_restarts': 15
             }
         else:
@@ -788,7 +787,7 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
             if key == 'work_newton' and op == sum:
                 return 1881
             elif key == 'e_global_post_run' and op == max:
-                return 3.3428689244496823e-06
+                return 3.3428689164005654e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
@@ -1003,8 +1002,9 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
             'allowed_modifications': ['decrease'],
         }
 
-        flavor = 'MPI' if self.useMPI else 'nonMPI'
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description
 
@@ -1057,8 +1057,9 @@ class AdaptivityAvoidRestartsStrategy(AdaptivityStrategy):
 
         custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = True
 
-        flavor = 'MPI' if self.useMPI else 'nonMPI'
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description
 
@@ -1115,8 +1116,9 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         custom_description['convergence_controllers'][Adaptivity]['avoid_restarts'] = False
         custom_description['convergence_controllers'][InterpolateBetweenRestarts] = {}
 
-        flavor = 'MPI' if self.useMPI else 'nonMPI'
-        custom_description['convergence_controllers'][BasicRestarting.get_implementation(flavor)] = {'max_restarts': 15}
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 15
+        }
 
         return custom_description
 
