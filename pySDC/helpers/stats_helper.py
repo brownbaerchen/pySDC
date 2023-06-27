@@ -76,7 +76,7 @@ def filter_recomputed(stats, comm=None):
     Returns:
         dict: The filtered stats dict
     """
-    stats = filter_stats(stats, comm=comm) if comm is not None else stats
+    stats = filter_stats(stats, comm=comm, recomputed=None) if comm is not None else stats
 
     # delete values that have been recorded and superseded by similar, but not identical keys
     times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])

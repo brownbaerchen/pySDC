@@ -9,7 +9,7 @@ from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 
-from pySDC.helpers.stats_helper import get_sorted
+from pySDC.helpers.stats_helper import get_sorted, filter_recomputed, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
@@ -72,9 +72,15 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
         **problem_args,
     )
 
+    stats_all = filter_stats(stats, comm=comm)
+    stats_filtered = filter_recomputed(stats_all)
+
     # record all the metrics
     for key, mapping in MAPPINGS.items():
-        me = get_sorted(stats, type=mapping[0], recomputed=mapping[2], comm=comm)
+        if mapping[2]:
+            me = get_sorted(stats_filtered, type=mapping[0])
+        else:
+            me = get_sorted(stats_all, type=mapping[0])
         if len(me) == 0:
             data[key] += [np.nan]
         else:
@@ -982,20 +988,20 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(runs=5, record=True)
+    # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'step_size_limiting',
+        'mode': 'dynamic_restarts',
         'runs': 1,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
     record = True
-    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
@@ -1006,6 +1012,7 @@ if __name__ == "__main__":
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
+        'num_procs': 4,
     }
 
     for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
