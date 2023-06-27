@@ -458,6 +458,21 @@ def get_configs(mode, problem):
             'plotting_params': {'label': 'adaptivity'},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
+    elif mode == 'dynamic_restarts':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
+
+        configurations[1] = {
+            'custom_description': {},
+            'handle': 'regular',
+            'plotting_params': {'label': 'adaptivity'},
+            'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
+        }
+        configurations[2] = {
+            'custom_description': {},
+            'handle': 'dynamic restarts',
+            'plotting_params': {'label': 'adaptivity (dynamic restarts)', 'ls': '-.'},
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+        }
     elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
@@ -980,20 +995,20 @@ if __name__ == "__main__":
         'problem': run_quench,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
-        'runs': 1,
+        'record': True,
+        'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
     }
 
-    for mode in ['parallel_efficiency', 'compare_strategies']:
+    for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
