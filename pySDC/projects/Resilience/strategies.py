@@ -383,6 +383,7 @@ class AdaptivityRestartFirstStep(AdaptivityStrategy):
     def __init__(self, useMPI=False):
         super().__init__(useMPI=useMPI)
         self.color = 'teal'
+        self.name = 'adaptivityRestartFirstStep'
 
     def get_custom_description(self, problem, num_procs):
         '''

@@ -22,6 +22,7 @@ from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 
 from pySDC.projects.Resilience.strategies import BaseStrategy, AdaptivityStrategy, IterateStrategy, HotRodStrategy
+import logging
 
 plot_helper.setup_mpl(reset=True)
 
@@ -81,6 +82,17 @@ class FaultStats:
                 self.mode = 'random'
         else:
             self.mode = mode
+
+        self.logger = logging.getLogger('FaultStats')
+        self.logger.level = LOGGER_LEVEL
+
+        msg = 'Starting FaultStats with attributes'
+        for key, val in self.__dict__.items():
+            if key in ['logger']:
+                continue
+            item = [str(me) for me in val] if type(val) == list else str(val)
+            msg += '\n\t' f'{key}: {item}'
+        self.logger.log(30, msg)
 
     def get_Tend(self):
         '''
@@ -1534,7 +1546,7 @@ def main():
     from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
 
     stats_analyser = FaultStats(
-        strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep(), HotRodStrategy()],
+        strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep()],
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=reload,
@@ -1548,6 +1560,8 @@ def main():
     # # stats_analyser.run_stats_generation(runs=runs)
     # # stats_analyser.get_HR_tol()
     # # return None
+    #
+    # strategy = AdaptivityStrategy()
     # strategy = AdaptivityRestartFirstStep()
     # stats_analyser.get_recovered()
     # fixable = stats_analyser.get_fixable_faults_only(strategy)
@@ -1555,8 +1569,13 @@ def main():
     # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
     # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
+    # adaptivity_not_rec = stats_analyser.get_mask(AdaptivityStrategy(), key='recovered', val=False)
+    # adaptivity_bla_not_rec = stats_analyser.get_mask(AdaptivityRestartFirstStep(), key='recovered', val=True, old_mask=adaptivity_not_rec)
+    # #stats_analyser.print_faults(mask=adaptivity_not_rec)
+    # #return None
+
     # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    # stats_analyser.scrutinize(strategy, run=4996, faults=True, logger_level=11)
+    # stats_analyser.scrutinize(strategy, run=3201, faults=True, logger_level=11)
     # return None
     # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # stats_analyser.plot_things_per_things(
