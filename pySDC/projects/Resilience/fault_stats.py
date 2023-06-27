@@ -1531,8 +1531,11 @@ def main():
         elif 'reload' in sys.argv[i]:
             reload = False if sys.argv[i + 1] == 'False' else True
 
+    from pySDC.projects.Resilience.strategies import AdaptivityVariableRestart
+
     stats_analyser = FaultStats(
-        strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        strategies=[AdaptivityStrategy(), AdaptivityVariableRestart(), HotRodStrategy()],
+        # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=reload,
         recovery_thresh=1.1,
@@ -1541,34 +1544,34 @@ def main():
         mode=mode,
         **kwargs,
     )
-    ################################################################################
-    # stats_analyser.run_stats_generation(runs=runs)
-    # stats_analyser.get_HR_tol()
-    # return None
-    strategy = AdaptivityStrategy()
-    stats_analyser.get_recovered()
-    fixable = stats_analyser.get_fixable_faults_only(strategy)
-    not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
-    not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
+    # ################################################################################
+    # # stats_analyser.run_stats_generation(runs=runs)
+    # # stats_analyser.get_HR_tol()
+    # # return None
+    # strategy = AdaptivityVariableRestart()
+    # stats_analyser.get_recovered()
+    # fixable = stats_analyser.get_fixable_faults_only(strategy)
+    # not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
+    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
+    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
     # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    stats_analyser.scrutinize(strategy, run=80, faults=True, logger_level=10)
-    return None
-    stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    stats_analyser.plot_things_per_things(
-        'recovered',
-        'bit',
-        False,
-        op=stats_analyser.rec_rate,
-        mask=fixable,
-        args={'ylabel': 'recovery rate'},
-        store=False,
-        strategies=[BaseStrategy(), strategy],
-    )
-    plt.show()
-    return None
-    ###############################################################################
+    # stats_analyser.scrutinize(strategy, run=4996, faults=True, logger_level=10)
+    # return None
+    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
+    # stats_analyser.plot_things_per_things(
+    #     'recovered',
+    #     'bit',
+    #     False,
+    #     op=stats_analyser.rec_rate,
+    #     mask=fixable,
+    #     args={'ylabel': 'recovery rate'},
+    #     store=False,
+    #     strategies=[BaseStrategy(), strategy],
+    # )
+    # plt.show()
+    # return None
+    # ###############################################################################
     stats_analyser.run_stats_generation(runs=runs)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data

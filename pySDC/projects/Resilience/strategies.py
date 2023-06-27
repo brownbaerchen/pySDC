@@ -276,6 +276,7 @@ class AdaptivityStrategy(Strategy):
         self.bar_plot_x_label = 'adaptivity'
         self.precision_parameter = 'e_tol'
         self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
+        self.restart_from_first_step = True
 
     @property
     def label(self):
@@ -341,7 +342,8 @@ class AdaptivityStrategy(Strategy):
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
             custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
-                'max_restarts': 15
+                'max_restarts': 15,
+                'restart_from_first_step': self.restart_from_first_step,
             }
         else:
             raise NotImplementedError(
@@ -377,6 +379,12 @@ class AdaptivityStrategy(Strategy):
                 return 1.3370376368393444e-05
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+
+class AdaptivityVariableRestart(AdaptivityStrategy):
+    def __init__(self, useMPI=False):
+        super().__init__(useMPI=useMPI)
+        self.restart_from_first_step = False
 
 
 class AdaptiveHotRodStrategy(Strategy):
