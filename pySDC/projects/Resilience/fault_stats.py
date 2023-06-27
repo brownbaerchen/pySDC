@@ -1531,10 +1531,10 @@ def main():
         elif 'reload' in sys.argv[i]:
             reload = False if sys.argv[i + 1] == 'False' else True
 
-    from pySDC.projects.Resilience.strategies import AdaptivityVariableRestart
+    from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
 
     stats_analyser = FaultStats(
-        strategies=[AdaptivityStrategy(), AdaptivityVariableRestart(), HotRodStrategy()],
+        strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep(), HotRodStrategy()],
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
         reload=reload,
@@ -1548,7 +1548,7 @@ def main():
     # # stats_analyser.run_stats_generation(runs=runs)
     # # stats_analyser.get_HR_tol()
     # # return None
-    # strategy = AdaptivityVariableRestart()
+    # strategy = AdaptivityRestartFirstStep()
     # stats_analyser.get_recovered()
     # fixable = stats_analyser.get_fixable_faults_only(strategy)
     # not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
@@ -1556,7 +1556,7 @@ def main():
     # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
     # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    # stats_analyser.scrutinize(strategy, run=4996, faults=True, logger_level=10)
+    # stats_analyser.scrutinize(strategy, run=4996, faults=True, logger_level=11)
     # return None
     # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # stats_analyser.plot_things_per_things(

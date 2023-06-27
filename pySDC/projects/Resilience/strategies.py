@@ -276,7 +276,6 @@ class AdaptivityStrategy(Strategy):
         self.bar_plot_x_label = 'adaptivity'
         self.precision_parameter = 'e_tol'
         self.precision_parameter_loc = ['convergence_controllers', Adaptivity, 'e_tol']
-        self.restart_from_first_step = True
 
     @property
     def label(self):
@@ -343,7 +342,6 @@ class AdaptivityStrategy(Strategy):
 
             custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
                 'max_restarts': 15,
-                'restart_from_first_step': self.restart_from_first_step,
             }
         else:
             raise NotImplementedError(
@@ -381,10 +379,34 @@ class AdaptivityStrategy(Strategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityVariableRestart(AdaptivityStrategy):
+class AdaptivityRestartFirstStep(AdaptivityStrategy):
     def __init__(self, useMPI=False):
         super().__init__(useMPI=useMPI)
-        self.restart_from_first_step = False
+        self.color = 'teal'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Add the other version of basic restarting.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        custom_description = super().get_custom_description(problem, num_procs)
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
+        custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 15,
+            'restart_from_first_step': True,
+        }
+        return custom_description
+
+    @property
+    def label(self):
+        return 'bla'
 
 
 class AdaptiveHotRodStrategy(Strategy):
@@ -623,7 +645,11 @@ class HotRodStrategy(Strategy):
         custom_description = {
             'convergence_controllers': {
                 HotRod: {'HotRod_tol': HotRod_tol, 'no_storage': no_storage},
-                BasicRestartingNonMPI: {'max_restarts': 2, 'crash_after_max_restarts': False},
+                BasicRestartingNonMPI: {
+                    'max_restarts': 2,
+                    'crash_after_max_restarts': False,
+                    'restart_from_first_step': True,
+                },
             },
             'step_params': {'maxiter': maxiter},
         }
