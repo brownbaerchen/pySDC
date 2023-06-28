@@ -11,7 +11,7 @@ from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 
-from pySDC.helpers.stats_helper import get_sorted, filter_recomputed, filter_stats
+from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
@@ -83,30 +83,14 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     logger.debug(f'Finished run in {t_now - t_last:.2e} s')
     t_last = perf_counter()
 
-    stats_all = filter_stats(stats, comm=comm)
-    t_now = perf_counter()
-    logger.debug(f'Communicated statistics in {t_now - t_last:.2e} s')
-    t_last = perf_counter()
-
-    # stats_filtered = filter_recomputed(stats_all)
-    # t_now = perf_counter()
-    # logger.debug(f'Filtered recomputed values out of statistics in {t_now - t_last:.2e} s')
-    # t_last = perf_counter()
-
     # record all the metrics
     for key, mapping in MAPPINGS.items():
-        me = get_sorted(stats_all, type=mapping[0], recomputed=mapping[2])
-        print(f'Reduced {key} from {len(get_sorted(stats_all, type=mapping[0]))} to {len(me)}')
-        # if mapping[2]:
-        #     me = get_sorted(stats_all, type=mapping[0], recomputed=mapping[2])
-        #     print(f'Reduced {key} from {len(get_sorted(stats_all, type=mapping[0]))} to {len(me)}')
-        #     # me = get_sorted(stats_filtered, type=mapping[0])
-        # else:
-        #     me = get_sorted(stats_all, type=mapping[0])
+        me = get_sorted(stats, comm=comm, type=mapping[0], recomputed=mapping[2])
         if len(me) == 0:
             data[key] += [np.nan]
         else:
             data[key] += [mapping[1]([you[1] for you in me])]
+
     t_now = perf_counter()
     logger.debug(f'Recorded all data after {t_now - t_last:.2e} s')
     t_last = perf_counter()
@@ -1031,31 +1015,8 @@ if __name__ == "__main__":
         **params,
         'problem': run_vdp,
     }
-    ##############################################################################
-    # fig, axs = get_fig(2, 1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.5), sharex=True, sharey=True)
-
-    # params = {
-    #    'work_key': 'k_Newton_no_restart',
-    #    'precision_key': 'k_Newton',
-    #    'runs': 1,
-    #    'comm_world': MPI.COMM_WORLD,
-    #    'record': False,
-    #    'plotting': True,
-    #    **params,
-    #    **params_single,
-    #    'num_procs': 4,
-    # }
-
-    # params.pop('mode', None)
-    # execute_configurations(**params, ax=axs[0], decorate=True, configurations=get_configs('dynamic_restarts', 'run_vdp'))
-    # params['work_key']= 'k_Newton'
-    # execute_configurations(**params, ax=axs[1], decorate=True, configurations=get_configs('dynamic_restarts', 'run_vdp'))
-    # for ax in axs:
-    #    ax.plot([1e4,1e5], [1e4, 1e5])
-    # plt.show()
-    ###############################################
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
@@ -1072,7 +1033,7 @@ if __name__ == "__main__":
     }
 
     for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
-        # all_problems(**all_params, mode=mode)
+        all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
     if comm_world.rank == 0:
