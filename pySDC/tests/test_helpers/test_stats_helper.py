@@ -88,9 +88,21 @@ def test_filter_recomputed(test_type):
     ), f'{msg} Some unwanted values have made it into the filtered stats!\nFull stats: {filtered},\nFiltered: {filtered_recomputed}'
     assert len(filtered_recomputed) == len(
         [val for key, val in filtered.items() if val]
-    ), f'{msg} Too many values have been removed in the process of filtering!'
-    assert len(filtered_recomputed) < len(stats), f'{msg} Apparently, nothing was filtered!'
+    ), f'{msg} Too many values have been removed in the process of filtering!\nFull stats: {filtered},\nFiltered: {filtered_recomputed}'
+    assert len(filtered_recomputed) < len(
+        stats
+    ), f'{msg} Apparently, nothing was filtered!\nFull stats: {filtered},\nFiltered: {filtered_recomputed}'
+
+    # check the implementation in `filter_stats`
+    end = filter_stats(stats, type='end', recomputed=False)
+    assert all(
+        val for key, val in end.items()
+    ), f'{msg} Error in the integration in `filter_stats`.\nFiltered: {filter_stats(filtered_recomputed, type="end")},\nFrom `filter_stats`: {end}'
+    assert len(end) == len(
+        filter_stats(filtered_recomputed, type='end')
+    ), f'{msg} Error in the integration in `filter_stats`.\nFiltered: {filter_stats(filtered_recomputed, type="end")},\nFrom `filter_stats`: {end}'
+    print(end)
 
 
 if __name__ == '__main__':
-    test_filter_recomputed(1)
+    test_filter_recomputed(2)

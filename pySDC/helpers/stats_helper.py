@@ -39,8 +39,23 @@ def filter_stats(
         result = {key: value for sub_result in comm.allgather(result) for key, value in sub_result.items()}
 
     if recomputed is not None:
-        # remove recomputed values
-        result = filter_recomputed(result)
+
+        # delete values that have been recorded and superseded by similar, but not identical keys
+        times_restarted = np.unique([me.time for me in result.keys() if me.num_restarts > 0])
+        for t in times_restarted:
+            restarts = [(me.type, me.num_restarts) for me in filter_stats(result, time=t).keys()]
+            [
+                [
+                    [result.pop(you, None) for you in filter_stats(result, time=t, type=me[0], num_restarts=i).keys()]
+                    for i in range(me[1])
+                ]
+                for me in restarts
+            ]
+
+        # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
+        other_restarted_steps = [me for me in filter_stats(stats, type='_recomputed') if stats[me]]
+        for step in other_restarted_steps:
+            [result.pop(me) for me in filter_stats(result, time=step.time).keys()]
 
     return result
 
