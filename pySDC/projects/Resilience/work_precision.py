@@ -232,7 +232,8 @@ def record_work_precision(
 
             if VERBOSE and comm_world.rank == 0:
                 print(
-                    f'{problem.__name__} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}'
+                    f'{problem.__name__} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
+                    flush=True,
                 )
 
     if comm_world.rank == 0:
