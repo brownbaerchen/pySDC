@@ -53,9 +53,12 @@ def filter_stats(
             ]
 
         # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
-        other_restarted_steps = [me for me in filter_stats(stats, type='_recomputed') if stats[me]]
-        for step in other_restarted_steps:
-            [result.pop(me) for me in filter_stats(result, time=step.time).keys()]
+        if type != '_recomputed':
+            other_restarted_steps = [
+                me for me in filter_stats(stats, type='_recomputed', recomputed=False) if stats[me]
+            ]
+            for step in other_restarted_steps:
+                [result.pop(me) for me in filter_stats(result, time=step.time).keys()]
 
     return result
 
@@ -82,39 +85,6 @@ def sort_stats(stats, sortby):
     sorted_data = sorted(result, key=lambda tup: tup[0])
 
     return sorted_data
-
-
-def filter_recomputed(stats, comm=None):
-    """
-    Filter recomputed values from the stats and remove them.
-
-    Args:
-        stats (dict): Raw statistics from a controller run
-        comm (mpi4py.MPI.Intracomm): Communicator (or None if not applicable)
-
-    Returns:
-        dict: The filtered stats dict
-    """
-    stats = filter_stats(stats, comm=comm, recomputed=None) if comm is not None else stats
-
-    # delete values that have been recorded and superseded by similar, but not identical keys
-    times_restarted = np.unique([me.time for me in stats.keys() if me.num_restarts > 0])
-    for t in times_restarted:
-        restarts = [(me.type, me.num_restarts) for me in filter_stats(stats, time=t).keys()]
-        [
-            [
-                [stats.pop(you, None) for you in filter_stats(stats, time=t, type=me[0], num_restarts=i).keys()]
-                for i in range(me[1])
-            ]
-            for me in restarts
-        ]
-
-    # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
-    other_restarted_steps = [me for me in filter_stats(stats, type='_recomputed') if stats[me]]
-    for step in other_restarted_steps:
-        [stats.pop(me) for me in filter_stats(stats, time=step.time).keys()]
-
-    return stats
 
 
 def get_list_of_types(stats):
