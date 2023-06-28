@@ -119,6 +119,7 @@ def test_filter_recomputed(test_type, num_procs, comm=None):
     assert len(filtered_recomputed) + len(removed) == len(
         filtered
     ), f'{msg} Some values have gone missing!\nFull stats: {filtered},\nFiltered: {filtered_recomputed}'
+    assert len(filtered) == 2 * num_procs * 3, 'Incorrect number of entries in the stats!'
 
 
 @pytest.mark.mpi4py
