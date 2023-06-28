@@ -54,6 +54,7 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
 
     comm = comm_world.Split(comm_world.rank < num_procs)
     if comm_world.rank >= num_procs:
+        comm.Free()
         return None
 
     strategy_description = strategy.get_custom_description(problem, num_procs)
