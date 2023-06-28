@@ -39,7 +39,6 @@ def filter_stats(
         result = {key: value for sub_result in comm.allgather(result) for key, value in sub_result.items()}
 
     if recomputed is not None:
-
         # delete values that have been recorded and superseded by similar, but not identical keys
         times_restarted = np.unique([me.time for me in result.keys() if me.num_restarts > 0])
         for t in times_restarted:
