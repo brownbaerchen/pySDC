@@ -39,7 +39,6 @@ def filter_stats(
         result = {key: value for sub_result in comm.allgather(result) for key, value in sub_result.items()}
 
     if recomputed is not None:
-        # remove recomputed values
         result = filter_recomputed(result)
 
     return result
