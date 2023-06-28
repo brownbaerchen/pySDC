@@ -54,7 +54,9 @@ def filter_stats(
         # delete values that were recorded at times that shouldn't be recorded because we performed a different step after the restart
         if type != '_recomputed':
             other_restarted_steps = [
-                me for me in filter_stats(stats, type='_recomputed', recomputed=False) if stats[me]
+                me
+                for me in filter_stats(stats, type='_recomputed', recomputed=False, comm=comm)
+                if filter_stats(stats, comm=comm)[me]
             ]
             for step in other_restarted_steps:
                 [result.pop(me) for me in filter_stats(result, time=step.time).keys()]
