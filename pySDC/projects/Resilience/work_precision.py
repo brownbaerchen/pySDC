@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pickle
 import logging
+from time import perf_counter
 
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
@@ -55,6 +56,8 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.hook import LogData
 
+    t_last = perf_counter()
+
     comm = comm_world.Split(comm_world.rank < num_procs)
     if comm_world.rank >= num_procs:
         comm.Free()
@@ -76,24 +79,34 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
         **problem_args,
     )
 
-    logger.debug('Finished run')
+    t_now = perf_counter()
+    logger.debug(f'Finished run in {t_now - t_last:.2e} s')
+    t_last = perf_counter()
 
     stats_all = filter_stats(stats, comm=comm)
-    logger.debug('Communicated statistics')
-    stats_filtered = filter_recomputed(stats_all)
-    logger.debug('Filtered recomputed values out of statistics')
+    t_now = perf_counter()
+    logger.debug(f'Communicated statistics in {t_now - t_last:.2e} s')
+    t_last = perf_counter()
+
+    # stats_filtered = filter_recomputed(stats_all)
+    # t_now = perf_counter()
+    # logger.debug(f'Filtered recomputed values out of statistics in {t_now - t_last:.2e} s')
+    # t_last = perf_counter()
 
     # record all the metrics
     for key, mapping in MAPPINGS.items():
         if mapping[2]:
-            me = get_sorted(stats_filtered, type=mapping[0])
+            me = get_sorted(stats_all, type=mapping[0], recomputed=False)
+            # me = get_sorted(stats_filtered, type=mapping[0])
         else:
             me = get_sorted(stats_all, type=mapping[0])
         if len(me) == 0:
             data[key] += [np.nan]
         else:
             data[key] += [mapping[1]([you[1] for you in me])]
-    logger.debug('Recorded all data')
+    t_now = perf_counter()
+    logger.debug(f'Recorded all data after {t_now - t_last:.2e} s')
+    t_last = perf_counter()
 
     comm.Free()
     return None

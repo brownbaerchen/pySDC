@@ -22,7 +22,7 @@ def filter_stats(
     """
     result = {}
 
-    for k, v in stats.items() if recomputed is None else filter_recomputed(stats.copy(), comm=comm).items():
+    for k, v in stats.items():
         # get data if key matches the filter (if specified)
         if (
             (k.time == time or time is None)
@@ -35,8 +35,12 @@ def filter_stats(
             result[k] = v
 
     if comm is not None:
-        # gather the results across all ranks and the flatten the list
+        # gather the results across all ranks
         result = {key: value for sub_result in comm.allgather(result) for key, value in sub_result.items()}
+
+    if recomputed is not None:
+        # remove recomputed values
+        result = filter_recomputed(result)
 
     return result
 
