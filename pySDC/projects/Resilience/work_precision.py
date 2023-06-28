@@ -2,6 +2,7 @@ from mpi4py import MPI
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
+import logging
 
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
@@ -13,8 +14,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_recomputed, filter_sta
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 30
-VERBOSE = True
+LOGGER_LEVEL = 10
 
 MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
@@ -31,6 +31,9 @@ MAPPINGS = {
     'dt_max': ('dt', max, False),
     'e_embedded_max': ('error_embedded_estimate', max, False),
 }
+
+logger = logging.getLogger('WorkPrecision')
+logger.setLevel(LOGGER_LEVEL)
 
 
 def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None):
@@ -73,8 +76,12 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
         **problem_args,
     )
 
+    logger.debug('Finished run')
+
     stats_all = filter_stats(stats, comm=comm)
+    logger.debug('Communicated statistics')
     stats_filtered = filter_recomputed(stats_all)
+    logger.debug('Filtered recomputed values out of statistics')
 
     # record all the metrics
     for key, mapping in MAPPINGS.items():
@@ -86,6 +93,7 @@ def single_run(problem, strategy, data, custom_description, num_procs=1, comm_wo
             data[key] += [np.nan]
         else:
             data[key] += [mapping[1]([you[1] for you in me])]
+    logger.debug('Recorded all data')
 
     comm.Free()
     return None
@@ -230,10 +238,10 @@ def record_work_precision(
 
             comm_world.Barrier()
 
-            if VERBOSE and comm_world.rank == 0:
-                print(
+            if comm_world.rank == 0:
+                logger.log(
+                    25,
                     f'{problem.__name__} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
-                    flush=True,
                 )
 
     if comm_world.rank == 0:
@@ -246,6 +254,7 @@ def record_work_precision(
             'runs': runs,
         }
         with open(get_path(problem, strategy, num_procs, handle), 'wb') as f:
+            logger.debug(f'Dumping file \"{get_path(problem, strategy, num_procs, handle=handle)}\"')
             pickle.dump(data, f)
 
 
@@ -281,6 +290,7 @@ def plot_work_precision(
         return None
 
     with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
+        logger.debug(f'Loading file \"{get_path(problem, strategy, num_procs, handle=handle)}\"')
         data = pickle.load(f)
 
     keys = [key for key in data.keys() if key not in ['meta']]
@@ -290,7 +300,7 @@ def plot_work_precision(
     for key in [work_key, precision_key]:
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in keys]
         if not all(me < 1e-1 or not np.isfinite(me) for me in rel_variance):
-            print(
+            logger.watning(
                 f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
             )
 
@@ -396,6 +406,7 @@ def execute_configurations(
                 'num_procs': config.get('num_procs', num_procs),
             }
             if record:
+                logger.debug('Recording work precision')
                 record_work_precision(
                     **shared_args,
                     custom_description=config.get('custom_description', {}),
@@ -405,6 +416,7 @@ def execute_configurations(
                     param_range=config.get('param_range', None),
                 )
             if plotting and comm_world.rank == 0:
+                logger.debug('Plotting')
                 plot_work_precision(
                     **shared_args,
                     work_key=work_key,
@@ -414,14 +426,15 @@ def execute_configurations(
                     comm_world=comm_world,
                 )
 
-    decorate_panel(
-        ax=ax,
-        problem=problem,
-        work_key=work_key,
-        precision_key=precision_key,
-        num_procs=num_procs,
-        title_only=not decorate,
-    )
+    if comm_world.rank == 0:
+        decorate_panel(
+            ax=ax,
+            problem=problem,
+            work_key=work_key,
+            precision_key=precision_key,
+            num_procs=num_procs,
+            title_only=not decorate,
+        )
 
 
 def get_configs(mode, problem):
@@ -821,7 +834,7 @@ def save_fig(
 
     path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
-    print(f'Stored figure \"{path}\"')
+    logger.info(f'Stored figure \"{path}\"')
 
 
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):  # pragma: no cover
@@ -1003,7 +1016,7 @@ if __name__ == "__main__":
         'problem': run_vdp,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
