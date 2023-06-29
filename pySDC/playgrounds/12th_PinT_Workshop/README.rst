@@ -37,6 +37,13 @@ Only installations made with ``micromamba`` or ``pip`` are affected by changing 
 Use `branches <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-branches>`_
 to isolate development work.
 
+Finally, install `pySDC` via `pip` in editable mode using:
+
+.. code-block:: bash
+
+    pip install -e <local_path_to_pySDC>
+
+
 Testing
 -------
 
@@ -58,12 +65,6 @@ In order to work with the Jupyter notebooks, we need one more magical package, t
     pip install jdc
 
 These `Jupyter Dynamic Classes <https://alexhagen.github.io/jdc/>`_ allows us to define a class spanning multiple cells to keep things short and to have sufficient documentation.
-Continue with one of the playgrounds in this directory then. You may have to augment the ``PYTHONPATH`` to find the root directory of `pySDC` before things run from the ``playgrounds`` directory:
-
-.. code-block:: bash
-
-    export PYTHONPATH=$PYTHONPATH:<path_to_pySDC>
-
 Then, if you want to run stuff in parallel (but locally), start an ``ipcluster`` with
 
 .. code-block:: bash
