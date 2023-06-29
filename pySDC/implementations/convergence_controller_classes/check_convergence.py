@@ -146,7 +146,6 @@ class CheckConvergence(ConvergenceController):
                 buff = np.empty(1, dtype=bool)
                 self.Recv(comm, source=S.status.slot - 1, buffer=[buff, self.MPI_BOOL])
                 S.status.prev_done = buff[0]
-                # S.status.prev_done = self.recv(comm, source=S.status.slot - 1)
                 S.status.done = S.status.done and S.status.prev_done
 
             # send status forward
@@ -154,7 +153,6 @@ class CheckConvergence(ConvergenceController):
                 buff = np.empty(1, dtype=bool)
                 buff[0] = S.status.done
                 self.Send(comm, dest=S.status.slot + 1, buffer=[buff, self.MPI_BOOL])
-                # self.send(comm, dest=S.status.slot + 1, data=S.status.done)
 
             for hook in controller.hooks:
                 hook.post_comm(step=S, level_number=0, add_to_stats=True)

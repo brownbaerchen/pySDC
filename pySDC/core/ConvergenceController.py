@@ -410,7 +410,7 @@ class ConvergenceController(object):
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} receives from step {source} with tag {kwargs["tag"]}')
+        self.logger.debug(f'Step {comm.rank} Receives from step {source} with tag {kwargs["tag"]}')
 
         data = comm.Recv(buffer, source=source, **kwargs)
 
