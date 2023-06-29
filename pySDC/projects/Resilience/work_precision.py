@@ -15,7 +15,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 10
 
 MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
@@ -1024,8 +1024,8 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
-        'runs': 5,
+        'record': True,
+        'runs': 2,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
