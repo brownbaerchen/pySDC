@@ -484,15 +484,15 @@ def get_configs(mode, problem):
 
         configurations[1] = {
             'custom_description': {},
-            'handle': 'regular',
-            'plotting_params': {'label': 'adaptivity'},
-            'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
-        }
-        configurations[2] = {
-            'custom_description': {},
             'handle': 'dynamic restarts',
             'plotting_params': {'label': 'adaptivity (dynamic restarts)', 'ls': '-.'},
             'strategies': [AdaptivityStrategy(useMPI=True)],
+        }
+        configurations[2] = {
+            'custom_description': {},
+            'handle': 'regular',
+            'plotting_params': {'label': 'adaptivity'},
+            'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
         }
     elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy

@@ -278,7 +278,7 @@ on...",
         elif not S.status.prev_done and not self.params.restart_from_first_step:
             # receive information about restarts from earlier ranks
             buff = np.empty(2, dtype=bool)
-            self.Recv(source=S.status.slot - 1, buffer=[buff, self.MPI_BOOL])
+            self.Recv(comm=comm, source=S.status.slot - 1, buffer=[buff, self.MPI_BOOL])
             self.buffers.restart_earlier = buff[0]
             self.buffers.max_restart_reached = buff[1]
             # self.buffers.restart_earlier, self.buffers.max_restart_reached = self.recv(comm, source=S.status.slot - 1)
