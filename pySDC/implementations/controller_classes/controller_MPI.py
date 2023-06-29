@@ -308,8 +308,6 @@ class controller_MPI(controller):
                 tag=level * 100 + self.S.status.iter + TAGS.get(self.S.status.stage, 0),
                 comm=comm,
             )
-        else:
-            self.logger.debug(f'Skipping receive: First: {self.S.status.first}, prev_done: {self.S.status.prev_done}')
 
         for hook in self.hooks:
             hook.post_comm(step=self.S, level_number=level, add_to_stats=add_to_stats)

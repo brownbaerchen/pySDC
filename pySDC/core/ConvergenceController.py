@@ -48,6 +48,19 @@ class ConvergenceController(object):
         self.dependencies(controller, description)
         self.logger = logging.getLogger(f"{type(self).__name__}")
 
+        if self.params.useMPI:
+            self.prepare_MPI_datatypes()
+
+    def prepare_MPI_datatypes(self):
+        """
+        Prepare MPI datatypes so we don't need to import mpi4py all the time
+        """
+        from mpi4py import MPI
+
+        self.MPI_INT = MPI.INT
+        self.MPI_DOUBLE = MPI.DOUBLE
+        self.MPI_BOOL = MPI.BOOL
+
     def log(self, msg, S, level=15, **kwargs):
         """
         Shortcut that has a default level for the logger. 15 is above debug but below info.
@@ -329,15 +342,12 @@ class ConvergenceController(object):
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates send to step {dest} with tag {kwargs["tag"]}')
+        self.logger.debug(f'Step {comm.rank} {"" if blocking else "i"}sends to step {dest} with tag {kwargs["tag"]}')
 
         if blocking:
             req = comm.send(data, dest=dest, **kwargs)
         else:
             req = comm.isend(data, dest=dest, **kwargs)
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves send to step {dest} with tag {kwargs["tag"]}')
 
         return req
 
@@ -355,12 +365,9 @@ class ConvergenceController(object):
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates receive from step {source} with tag {kwargs["tag"]}')
+        self.logger.debug(f'Step {comm.rank} receives from step {source} with tag {kwargs["tag"]}')
 
         data = comm.recv(source=source, **kwargs)
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves receive from step {source} with tag {kwargs["tag"]}')
 
         return data
 

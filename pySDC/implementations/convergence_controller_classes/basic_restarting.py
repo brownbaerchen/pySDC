@@ -243,7 +243,6 @@ class BasicRestartingMPI(BasicRestarting):
         from mpi4py import MPI
 
         self.OR = MPI.LOR
-        self.INT = MPI.INT
 
         super().__init__(controller, params, description)
         self.buffers = Pars({"restart": False, "max_restart_reached": False, 'restart_earlier': False})
@@ -318,14 +317,14 @@ on...",
             self.Send(
                 comm,
                 dest=S.status.slot - restart_from,
-                buffer=[buff, self.INT],
+                buffer=[buff, self.MPI_INT],
                 blocking=False,
             )
 
         # receive new number of restarts in a row
         if S.status.slot + restart_from < size:
             buff = np.empty(1, dtype=int)
-            self.Recv(comm, source=(S.status.slot + restart_from), buffer=[buff, self.INT])
+            self.Recv(comm, source=(S.status.slot + restart_from), buffer=[buff, self.MPI_INT])
             S.status.restarts_in_a_row = buff[0]
         else:
             S.status.restarts_in_a_row = 0
