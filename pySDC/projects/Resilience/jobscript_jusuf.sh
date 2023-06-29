@@ -12,8 +12,9 @@
 
 module --force purge
 module load Stages/2023
-module load Intel/2022.1.0
-module load ParaStationMPI/5.8.0-1
+module load GCC/11.3.0
+module load OpenMPI/4.1.4
+module load mpi4py/3.1.4
 
 cd /p/project/ccstma/baumann7/pySDC/pySDC/projects/Resilience
 
