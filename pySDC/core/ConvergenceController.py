@@ -387,15 +387,12 @@ class ConvergenceController(object):
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates Send to step {dest} with tag {kwargs["tag"]}')
+        self.logger.debug(f'Step {comm.rank} {"" if blocking else "i"}Sends to step {dest} with tag {kwargs["tag"]}')
 
         if blocking:
             req = comm.Send(buffer, dest=dest, **kwargs)
         else:
             req = comm.Isend(buffer, dest=dest, **kwargs)
-
-        # log what's, buffer] happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves Send to step {dest} with tag {kwargs["tag"]}')
 
         return req
 
@@ -413,12 +410,9 @@ class ConvergenceController(object):
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
         # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} initiates Receive from step {source} with tag {kwargs["tag"]}')
+        self.logger.debug(f'Step {comm.rank} receives from step {source} with tag {kwargs["tag"]}')
 
         data = comm.Recv(buffer, source=source, **kwargs)
-
-        # log what's happening for debug purposes
-        self.logger.debug(f'Step {comm.rank} leaves Receive from step {source} with tag {kwargs["tag"]}')
 
         return data
 
