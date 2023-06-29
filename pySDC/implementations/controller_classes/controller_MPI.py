@@ -6,6 +6,12 @@ from pySDC.core.Errors import ControllerError
 from pySDC.core.Step import step
 from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
+TAGS = {
+    'IT_CHECK': 1,
+    'IT_FINE': 2,
+    'IT_COARSE': 3,
+}
+
 
 class controller_MPI(controller):
     """
@@ -257,12 +263,12 @@ class controller_MPI(controller):
                     self.S.status.stage,
                     self.S.time,
                     self.S.next,
-                    level * 100 + self.S.status.iter,
+                    level * 100 + self.S.status.iter + TAGS.get(self.S.status.stage, 0),
                     self.S.status.iter,
                 )
             )
             self.req_send[level] = self.S.levels[level].uend.isend(
-                dest=self.S.next, tag=level * 100 + self.S.status.iter, comm=comm
+                dest=self.S.next, tag=level * 100 + self.S.status.iter + TAGS.get(self.S.status.stage, 0), comm=comm
             )
             if blocking:
                 self.wait_with_interrupt(request=self.req_send[level])
@@ -292,11 +298,16 @@ class controller_MPI(controller):
                     self.S.status.stage,
                     self.S.time,
                     self.S.prev,
-                    level * 100 + self.S.status.iter,
+                    level * 100 + self.S.status.iter + TAGS.get(self.S.status.stage, 0),
                     self.S.status.iter,
                 )
             )
-            self.recv(target=self.S.levels[level], source=self.S.prev, tag=level * 100 + self.S.status.iter, comm=comm)
+            self.recv(
+                target=self.S.levels[level],
+                source=self.S.prev,
+                tag=level * 100 + self.S.status.iter + TAGS.get(self.S.status.stage, 0),
+                comm=comm,
+            )
         else:
             self.logger.debug(f'Skipping receive: First: {self.S.status.first}, prev_done: {self.S.status.prev_done}')
 

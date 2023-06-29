@@ -300,7 +300,7 @@ def plot_work_precision(
     for key in [work_key, precision_key]:
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in keys]
         if not all(me < 1e-1 or not np.isfinite(me) for me in rel_variance):
-            logger.watning(
+            logger.warning(
                 f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
             )
 

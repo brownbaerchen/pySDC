@@ -54,7 +54,7 @@ class CheckConvergence(ConvergenceController):
         return None
 
     @staticmethod
-    def check_convergence(S):
+    def check_convergence(S, self=None):
         """
         Check the convergence of a single step.
         Test the residual and max. number of iterations as well as allowing overrides to both stop and continue.
@@ -81,6 +81,13 @@ class CheckConvergence(ConvergenceController):
         ) and not S.status.force_continue
         if converged is None:
             converged = False
+
+        # print information for debugging
+        if converged and self:
+            self.debug(
+                f'Declared convergence: maxiter reached[{"x" if iter_converged else " "}] restol reached[{"x" if res_converged else " "}] e_tol reached[{"x" if e_tol_converged else " "}]',
+                S,
+            )
         return converged
 
     def check_iteration_status(self, controller, S, **kwargs):
@@ -94,7 +101,7 @@ class CheckConvergence(ConvergenceController):
         Returns:
             None
         """
-        S.status.done = self.check_convergence(S)
+        S.status.done = self.check_convergence(S, self)
 
         if "comm" in kwargs.keys():
             self.communicate_convergence(controller, S, **kwargs)
