@@ -37,6 +37,21 @@ logger = logging.getLogger('WorkPrecision')
 logger.setLevel(LOGGER_LEVEL)
 
 
+def get_forbidden_combinations(problem, strategy, **kwargs):
+    """
+    Check if the combination of strategy and problem is forbidden
+
+    Args:
+        problem (function): A problem to run
+        strategy (Strategy): SDC strategy
+    """
+    if problem.__name__ == 'run_quench':
+        if strategy.name in ['ERK']:
+            return True
+
+    return False
+
+
 def single_run(problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None):
     """
     Make a single run of a particular problem with a certain strategy.
@@ -177,6 +192,9 @@ def record_work_precision(
     Returns:
         None
     """
+    if get_forbidden_combinations(problem, strategy):
+        return None
+
     data = {}
 
     # prepare precision parameters
@@ -286,7 +304,7 @@ def plot_work_precision(
     Returns:
         None
     """
-    if comm_world.rank > 0:
+    if comm_world.rank > 0 or get_forbidden_combinations(problem, strategy):
         return None
 
     with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
