@@ -15,7 +15,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 10
+LOGGER_LEVEL = 25
 
 MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
@@ -482,18 +482,44 @@ def get_configs(mode, problem):
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
 
-        configurations[1] = {
-            'custom_description': {},
-            'handle': 'dynamic restarts',
-            'plotting_params': {'label': 'adaptivity (dynamic restarts)', 'ls': '-.'},
-            'strategies': [AdaptivityStrategy(useMPI=True)],
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+        desc['step_params'] = {'maxiter': 5}
+
+        # configurations[1] = {
+        #    'custom_description': {},
+        #    'handle': 'dynamic restarts',
+        #    'plotting_params': {'label': 'adaptivity (dynamic restarts)', 'ls': '-.'},
+        #    'strategies': [AdaptivityStrategy(useMPI=True)],
+        # }
+        # configurations[2] = {
+        #    'custom_description': {},
+        #    'handle': 'regular',
+        #    'plotting_params': {'label': 'adaptivity'},
+        #    'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
+        # }
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
         }
-        configurations[2] = {
-            'custom_description': {},
-            'handle': 'regular',
-            'plotting_params': {'label': 'adaptivity'},
-            'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
+
+        configurations[-1] = {
+            'strategies': [AdaptivityStrategy(useMPI=False)],
+            'num_procs': 1,
         }
+
+        for num_procs in [4, 2]:
+            plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(True), AdaptivityRestartFirstStep(True)],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
+
     elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
@@ -543,6 +569,7 @@ def get_configs(mode, problem):
         # }
         configurations[0] = {
             'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
+            'num_procs': 1,
         }
         configurations[1] = {
             'custom_description': {'step_params': {'maxiter': 5}},
@@ -574,9 +601,10 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        # configurations[-1] = {
-        #         'strategies': [ERKStrategy(useMPI=False)], 'num_procs':1,
-        # }
+        configurations[-1] = {
+            'strategies': [ERKStrategy(useMPI=False)],
+            'num_procs': 1,
+        }
 
         for num_procs in [4, 2, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
@@ -1024,8 +1052,8 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
-        'runs': 2,
+        'record': True,
+        'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
