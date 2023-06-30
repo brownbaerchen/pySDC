@@ -507,14 +507,14 @@ def get_configs(mode, problem):
         }
 
         configurations[-1] = {
-            'strategies': [AdaptivityStrategy(useMPI=False)],
+            'strategies': [AdaptivityStrategy(useMPI=True)],
             'num_procs': 1,
         }
 
         for num_procs in [4, 2]:
             plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
             configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True), AdaptivityRestartFirstStep(True)],
+                'strategies': [AdaptivityStrategy(useMPI=True), AdaptivityRestartFirstStep(useMPI=True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
@@ -1035,16 +1035,16 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'dynamic_restarts',
-        'runs': 1,
+        'runs': 5,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
     record = True
-    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
