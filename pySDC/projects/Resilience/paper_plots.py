@@ -691,7 +691,7 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_adaptivity_stuff()
     for i in [1, 4]:
         compare_recovery_rate_problems(i)
-    # work_precision()
+    work_precision()
 
 
 def make_plots_for_notes():  # pragma: no cover

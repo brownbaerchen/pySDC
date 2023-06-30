@@ -301,7 +301,7 @@ def plot_work_precision(
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in keys]
         if not all(me < 1e-1 or not np.isfinite(me) for me in rel_variance):
             logger.warning(
-                f"WARNING: Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
+                f"Variance in \"{key}\" for {get_path(problem, strategy, num_procs, handle)} too large! Got {rel_variance}"
             )
 
     style = merge_descriptions(
@@ -1024,7 +1024,7 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 2,
         'work_key': 't',
         'precision_key': 'e_global_rel',

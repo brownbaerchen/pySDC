@@ -28,6 +28,10 @@ plot_helper.setup_mpl(reset=True)
 
 LOGGER_LEVEL = 30
 
+RECOVERY_THRESH_ABS = {
+    run_quench: 5e-3,
+}
+
 
 class FaultStats:
     '''
@@ -92,7 +96,7 @@ class FaultStats:
                 continue
             item = [str(me) for me in val] if type(val) == list else str(val)
             msg += '\n\t' f'{key}: {item}'
-        self.logger.log(30, msg)
+        self.logger.log(25, msg)
 
     def get_Tend(self):
         '''
@@ -1505,6 +1509,7 @@ def check_local_error():  # pragma: no cover
             faults=[False],
             reload=True,
             recovery_thresh=1.1,
+            recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problems[i], 0),
             num_procs=1,
             mode='random',
         )
@@ -1512,16 +1517,10 @@ def check_local_error():  # pragma: no cover
     plt.show()
 
 
-def main():
+def parse_args():
     import sys
 
-    kwargs = {
-        'prob': run_Schroedinger,
-        'num_procs': 4,
-    }
-    runs = 5000
-    mode = 'default'
-    reload = True
+    kwargs = {}
 
     for i in range(len(sys.argv)):
         if 'prob' in sys.argv[i]:
@@ -1538,30 +1537,37 @@ def main():
         elif 'num_procs' in sys.argv[i]:
             kwargs['num_procs'] = int(sys.argv[i + 1])
         elif 'runs' in sys.argv[i]:
-            runs = int(sys.argv[i + 1])
+            kwargs['runs'] = int(sys.argv[i + 1])
         elif 'mode' in sys.argv[i]:
-            mode = str(sys.argv[i + 1])
+            kwargs['mode'] = str(sys.argv[i + 1])
         elif 'reload' in sys.argv[i]:
-            reload = False if sys.argv[i + 1] == 'False' else True
+            kwargs['reload'] = False if sys.argv[i + 1] == 'False' else True
 
+    return kwargs
+
+
+def main():
     from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
+
+    kwargs = {
+        'prob': run_Lorenz,
+        'num_procs': 4,
+        'mode': 'default',
+        'runs': 5000,
+        'reload': True,
+        **parse_args(),
+    }
 
     stats_analyser = FaultStats(
         strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep()],
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
         faults=[False, True],
-        reload=reload,
         recovery_thresh=1.1,
-        # recovery_thresh_abs=1e-5,
+        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
-        mode=mode,
         **kwargs,
     )
     # ################################################################################
-    # # stats_analyser.run_stats_generation(runs=runs)
-    # # stats_analyser.get_HR_tol()
-    # # return None
-    #
     # strategy = AdaptivityStrategy()
     # strategy = AdaptivityRestartFirstStep()
     # stats_analyser.get_recovered()
@@ -1570,13 +1576,15 @@ def main():
     # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
     # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
-    # adaptivity_not_rec = stats_analyser.get_mask(AdaptivityStrategy(), key='recovered', val=False)
-    # adaptivity_bla_not_rec = stats_analyser.get_mask(AdaptivityRestartFirstStep(), key='recovered', val=True, old_mask=adaptivity_not_rec)
-    # #stats_analyser.print_faults(mask=adaptivity_not_rec)
-    # #return None
+    # adaptivity_not_rec = stats_analyser.get_mask(AdaptivityStrategy(), key='recovered', val=True)
+    # adaptivity_bla_not_rec = stats_analyser.get_mask(
+    #     AdaptivityRestartFirstStep(), key='recovered', val=False, old_mask=adaptivity_not_rec
+    # )
+    # # stats_analyser.print_faults(mask=adaptivity_bla_not_rec)
+    # # return None
 
-    # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    # stats_analyser.scrutinize(strategy, run=3201, faults=True, logger_level=11)
+    # # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
+    # stats_analyser.scrutinize(strategy, run=4419, faults=True, logger_level=11)
     # return None
     # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # stats_analyser.plot_things_per_things(
@@ -1592,7 +1600,7 @@ def main():
     # plt.show()
     # return None
     # ###############################################################################
-    stats_analyser.run_stats_generation(runs=runs)
+    stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None
@@ -1667,18 +1675,25 @@ def compare_adaptivity_modes():
 
     fig, axs = plt.subplots(2, 2, sharey=True)
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_quench]
+    titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
 
     for i in range(len(problems)):
+        ax = axs.flatten()[i]
+
+        ax.set_title(titles[i])
+
         stats_analyser = FaultStats(
             prob=problems[i],
             strategies=[AdaptivityStrategy()],
             faults=[False, True],
             reload=True,
             recovery_thresh=1.1,
+            recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problems[i], 0),
             num_procs=1,
             mode='default',
             stats_path='data/stats-jusuf',
         )
+        stats_analyser.get_recovered()
 
         for strategy in stats_analyser.strategies:
             fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
@@ -1691,9 +1706,9 @@ def compare_adaptivity_modes():
                 mask=fixable,
                 args={'ylabel': 'recovery rate', 'label': 'bla'},
                 name='fixable_recovery',
-                ax=axs.flatten()[i],
+                ax=ax,
             )
-        single_proc = axs.flatten()[i].lines[-1]
+        single_proc = ax.lines[-1]
         single_proc.set_label('single process')
         single_proc.set_color('black')
 
@@ -1703,10 +1718,12 @@ def compare_adaptivity_modes():
             faults=[False, True],
             reload=True,
             recovery_thresh=1.1,
+            recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problems[i], 0),
             num_procs=4,
             mode='default',
             stats_path='data/stats-jusuf',
         )
+        stats_analyser.get_recovered()
 
         for strategy in stats_analyser.strategies:
             fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
@@ -1719,8 +1736,9 @@ def compare_adaptivity_modes():
                 mask=fixable,
                 args={'ylabel': 'recovery rate'},
                 name='fixable_recovery',
-                ax=axs.flatten()[i],
+                ax=ax,
             )
+    fig.suptitle('Comparison of restart modes with adaptivity with 4 ranks')
     fig.tight_layout()
     plt.show()
 
@@ -1728,4 +1746,4 @@ def compare_adaptivity_modes():
 if __name__ == "__main__":
     compare_adaptivity_modes()
     # check_local_error()
-    # main()
+    main()
