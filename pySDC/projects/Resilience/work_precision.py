@@ -602,7 +602,7 @@ def get_configs(mode, problem):
         }
 
         configurations[-1] = {
-            'strategies': [ERKStrategy(useMPI=False)],
+            'strategies': [ERKStrategy(useMPI=True)],
             'num_procs': 1,
         }
 
@@ -892,6 +892,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
 
     problems = [run_vdp, run_Lorenz, run_Schroedinger, run_quench]
 
+    logger.log(26, f"Doing for all problems {mode}")
     for i in range(len(problems)):
         execute_configurations(
             **shared_params,
@@ -980,6 +981,7 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):  #
         **kwargs,
     }
 
+    logger.log(26, f"Doing single problem {mode}")
     execute_configurations(**params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem))
 
     if plotting:
@@ -1034,7 +1036,7 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'dynamic_restarts',
+        'mode': 'parallel_efficiency',
         'runs': 5,
         'num_procs': min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1052,7 +1054,7 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1060,9 +1062,9 @@ if __name__ == "__main__":
         'num_procs': 4,
     }
 
-    for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
-        all_problems(**all_params, mode=mode)
-        comm_world.Barrier()
+    # for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
+    #     all_problems(**all_params, mode=mode)
+    #     comm_world.Barrier()
 
     if comm_world.rank == 0:
         # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')
