@@ -1,6 +1,7 @@
 import pytest
 
 
+@pytest.mark.slow
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('num_procs', [1, 2, 5, 8])
 @pytest.mark.parametrize('test_name', ['mpi_vs_nonMPI', 'check_step_size_limiter'])

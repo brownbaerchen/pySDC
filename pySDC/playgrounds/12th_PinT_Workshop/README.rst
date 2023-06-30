@@ -26,7 +26,7 @@ You can also clone the main repository, but this will not accept your pushes.
 Downloading `pySDC` as a tarball is the easiest, but also the least favorable solution.
 Finally, the code can also be obtained using ``pip install``, but then sources are not that easily accessible.
 
-So, please go ahead and clone from Github:
+So, please go ahead and clone from your fork on Github:
 
 .. code-block:: bash
 
@@ -51,7 +51,7 @@ Change to `pySDC`'s root directory and run
 
 .. code-block:: bash
 
-    pytest pySDC/tests -m mpi4py
+    pytest pySDC/tests -m "mpi4py and not slow"
 
 This will check if "all" went well with the installation you just created.
 If it does, you are now ready to play with `pySDC`.
@@ -71,9 +71,10 @@ Then, if you want to run stuff in parallel (but locally), start an ``ipcluster``
 
     ipcluster start --engines=MPI -n 4
 
-Fire up a new shell, remember to augment the `PYTHONPATH` as before and start a jupyter notebook via
+Fire up a new shell and start a jupyter notebook via
 
 .. code-block:: bash
 
     jupyter notebook
 
+and navigate to the `playground.ipynb` notebook.
