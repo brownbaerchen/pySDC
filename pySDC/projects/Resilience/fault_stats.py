@@ -238,7 +238,7 @@ class FaultStats:
 
         # prepare a message
         involved_ranks = comm.gather(MPI.COMM_WORLD.rank, root=0)
-        msg = f'{comm.size} rank(s) ({involved_ranks}) doing {strategy.name}{" with faults" if faults else ""} for {self.prob.__name__} from {already_completed["runs"]} to {runs}'
+        msg = f'{comm.size} rank(s) ({involved_ranks}) doing {strategy.name}{" with faults" if faults else ""} with {self.num_procs} ranks for {self.prob.__name__} from {already_completed["runs"]} to {runs}'
         if comm.rank == 0 and already_completed['runs'] < runs:
             print(msg, flush=True)
 
@@ -673,6 +673,7 @@ class FaultStats:
             with open(self.get_path(**kwargs), 'rb') as f:
                 dat = pickle.load(f)
         except FileNotFoundError:
+            self.logger.debug(f'File \"{self.get_path(**kwargs)}\" not found!')
             return {'runs': 0}
         return dat
 
@@ -1661,6 +1662,70 @@ def main():
     stats_analyser.plot_recovery_thresholds()
 
 
+def compare_adaptivity_modes():
+    from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
+
+    fig, axs = plt.subplots(2, 2, sharey=True)
+    problems = [run_vdp, run_Lorenz, run_Schroedinger, run_quench]
+
+    for i in range(len(problems)):
+        stats_analyser = FaultStats(
+            prob=problems[i],
+            strategies=[AdaptivityStrategy()],
+            faults=[False, True],
+            reload=True,
+            recovery_thresh=1.1,
+            num_procs=1,
+            mode='default',
+            stats_path='data/stats-jusuf',
+        )
+
+        for strategy in stats_analyser.strategies:
+            fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
+            stats_analyser.plot_things_per_things(
+                'recovered',
+                'bit',
+                False,
+                strategies=[strategy],
+                op=stats_analyser.rec_rate,
+                mask=fixable,
+                args={'ylabel': 'recovery rate', 'label': 'bla'},
+                name='fixable_recovery',
+                ax=axs.flatten()[i],
+            )
+        single_proc = axs.flatten()[i].lines[-1]
+        single_proc.set_label('single process')
+        single_proc.set_color('black')
+
+        stats_analyser = FaultStats(
+            prob=problems[i],
+            strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep()],
+            faults=[False, True],
+            reload=True,
+            recovery_thresh=1.1,
+            num_procs=4,
+            mode='default',
+            stats_path='data/stats-jusuf',
+        )
+
+        for strategy in stats_analyser.strategies:
+            fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
+            stats_analyser.plot_things_per_things(
+                'recovered',
+                'bit',
+                False,
+                strategies=[strategy],
+                op=stats_analyser.rec_rate,
+                mask=fixable,
+                args={'ylabel': 'recovery rate'},
+                name='fixable_recovery',
+                ax=axs.flatten()[i],
+            )
+    fig.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
+    compare_adaptivity_modes()
     # check_local_error()
-    main()
+    # main()

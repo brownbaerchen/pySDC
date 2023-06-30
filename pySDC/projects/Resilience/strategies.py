@@ -407,7 +407,7 @@ class AdaptivityRestartFirstStep(AdaptivityStrategy):
 
     @property
     def label(self):
-        return 'bla'
+        return f'{super().label} restart from first step'
 
 
 class AdaptiveHotRodStrategy(Strategy):
