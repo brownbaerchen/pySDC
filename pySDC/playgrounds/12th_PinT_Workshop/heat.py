@@ -42,6 +42,7 @@ class HeatEquation(ptype):
 
         # make the attributes accessible outside this function
         self.xvalues = xvalues
+        self.dx = dx
         self.Id = sp.eye(np.power(nvars, ndim), format='csc')
         self._makeAttributeAndRegister(
             'nvars', 'stencil_type', 'space_order', 'ndim', 'nu', 'freq', localVars=locals(), readOnly=True
@@ -104,31 +105,67 @@ class HeatEquation(ptype):
         ndim, freq, nu, dx, sol = self.ndim, self.freq, self.nu, self.dx, self.u_init
 
         if ndim == 1:
-            x = self.grids
-            rho = (2.0 - 2.0 * np.cos(np.pi * freq[0] * dx)) / dx**2
-            if freq[0] > 0:
-                sol[:] = np.sin(np.pi * freq[0] * x) * np.exp(-t * nu * rho)
+            x = self.xvalues
+            rho = (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
+            if freq > 0:
+                sol[:] = np.sin(np.pi * freq * x) * np.exp(-t * nu * rho)
         elif ndim == 2:
-            rho = (2.0 - 2.0 * np.cos(np.pi * freq[0] * dx)) / dx**2 + (
-                2.0 - 2.0 * np.cos(np.pi * freq[1] * dx)
-            ) / dx**2
-            x, y = self.grids
-            sol[:] = np.sin(np.pi * freq[0] * x) * np.sin(np.pi * freq[1] * y) * np.exp(-t * nu * rho)
+            rho = (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2 + (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
+            x, y = self.xvalues[None, :], self.xvalues[:, None]
+            sol[:] = np.sin(np.pi * freq * x) * np.sin(np.pi * freq * y) * np.exp(-t * nu * rho)
         elif ndim == 3:
             rho = (
-                (2.0 - 2.0 * np.cos(np.pi * freq[0] * dx)) / dx**2
-                + (2.0 - 2.0 * np.cos(np.pi * freq[1] * dx))
-                + (2.0 - 2.0 * np.cos(np.pi * freq[2] * dx)) / dx**2
+                (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
+                + (2.0 - 2.0 * np.cos(np.pi * freq * dx))
+                + (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
             )
-            x, y, z = self.grids
+            x, y, z = self.xvalues[None, :, None], self.xvalues[:, None, None], self.xvalues[None, None, :]
             sol[:] = (
-                np.sin(np.pi * freq[0] * x)
-                * np.sin(np.pi * freq[1] * y)
-                * np.sin(np.pi * freq[2] * z)
-                * np.exp(-t * nu * rho)
+                np.sin(np.pi * freq * x) * np.sin(np.pi * freq * y) * np.sin(np.pi * freq * z) * np.exp(-t * nu * rho)
             )
 
         return sol
 
 
 ##########################################################################################################
+from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+
+level_params = {}
+level_params['dt'] = 0.1
+level_params['restol'] = -1
+
+step_params = {}
+step_params['maxiter'] = 5
+
+sweeper_params = {}
+sweeper_params['QI'] = 'LU'
+sweeper_params['num_nodes'] = 3
+sweeper_params['quad_type'] = 'RADAU-RIGHT'
+sweeper_params['initial_guess'] = 'spread'
+
+problem_params = {}
+problem_params['nvars'] = 128
+problem_params['ndim'] = 1
+problem_params['stencil_type'] = 'center'
+problem_params['space_order'] = 4
+problem_params['nu'] = 1.0
+problem_params['freq'] = 2
+
+controller_params = {}
+controller_params['logger_level'] = 20
+
+description = {}
+description['level_params'] = level_params
+description['step_params'] = step_params
+description['sweeper_params'] = sweeper_params
+description['sweeper_class'] = generic_implicit
+description['problem_params'] = problem_params
+description['problem_class'] = HeatEquation
+
+controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+
+prob = controller.MS[0].levels[0].prob
+u_init = prob.u_exact(t=0)
+
+controller.run(u0=u_init, t0=0, Tend=1.0)
