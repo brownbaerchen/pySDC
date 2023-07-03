@@ -683,6 +683,7 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
+    work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
@@ -691,7 +692,6 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_adaptivity_stuff()
     for i in [1, 4]:
         compare_recovery_rate_problems(i)
-    work_precision()
 
 
 def make_plots_for_notes():  # pragma: no cover

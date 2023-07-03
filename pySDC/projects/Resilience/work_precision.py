@@ -880,7 +880,7 @@ def save_fig(
 
     path = f'{base_path}/wp-{name}-{work_key}-{precision_key}.{format}'
     fig.savefig(path, bbox_inches='tight', **kwargs)
-    logger.info(f'Stored figure \"{path}\"')
+    print(f'Stored figure \"{path}\"')
 
 
 def all_problems(mode='compare_strategies', plotting=True, base_path='data', **kwargs):  # pragma: no cover
