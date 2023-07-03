@@ -20,7 +20,7 @@ class heatNd_unforced(GenericNDimFinDiff):
     ):
         super().__init__(nvars, nu, 2, freq, stencil_type, order, lintol, liniter, solver_type, bc)
         if solver_type == 'GMRES':
-            self.logger.warn('GMRES is not usually used for heat equation')
+            self.logger.warning('GMRES is not usually used for heat equation')
         self._makeAttributeAndRegister('nu', localVars=locals(), readOnly=True)
         self._makeAttributeAndRegister('sigma', localVars=locals())
 
