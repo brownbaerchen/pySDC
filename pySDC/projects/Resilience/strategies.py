@@ -615,7 +615,7 @@ class HotRodStrategy(Strategy):
             if num_procs == 5:
                 HotRod_tol = 9.539348e-06
             elif num_procs == 4:
-                HotRod_tol = 6.401542e-06
+                HotRod_tol = 3.201e-6
             else:
                 HotRod_tol = 7.720589e-07  # 4e-7
             maxiter = 6

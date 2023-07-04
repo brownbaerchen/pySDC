@@ -30,6 +30,7 @@ LOGGER_LEVEL = 30
 
 RECOVERY_THRESH_ABS = {
     run_quench: 5e-3,
+    # run_Schroedinger: 1.7e-6,
 }
 
 
@@ -447,7 +448,7 @@ class FaultStats:
             plot_restarts (bool): Make vertical lines wherever restarts happened
 
         Returns:
-            None
+            dict: Stats from the run
         '''
         if ax is None:
             fig, ax = plt.subplots(1, 1)
@@ -565,7 +566,7 @@ class FaultStats:
         restarts = [me[1] for me in get_sorted(stats, type='restart')]
         print(f'restarts: {sum(restarts)}, without faults: {no_faults["restarts"][0]}')
 
-        return None
+        return stats
 
     def convert_faults(self, faults):
         '''
@@ -692,7 +693,7 @@ class FaultStats:
         assert (
             fault_free['error'].std() / fault_free['error'].mean() < 1e-5
         ), f'Got too large variation of errors in {strategy} strategy!'
-        return self.recovery_thresh_abs + self.recovery_thresh * fault_free["error"].mean()
+        return max([self.recovery_thresh_abs, self.recovery_thresh * fault_free["error"].mean()])
 
     def get_recovered(self, **kwargs):
         '''
@@ -1547,59 +1548,58 @@ def parse_args():
 
 
 def main():
-    from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
-
     kwargs = {
         'prob': run_Lorenz,
         'num_procs': 4,
         'mode': 'default',
         'runs': 5000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
     stats_analyser = FaultStats(
-        strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep()],
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        strategies=[HotRodStrategy()],
         faults=[False, True],
         recovery_thresh=1.1,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # ################################################################################
-    # strategy = AdaptivityStrategy()
-    # strategy = AdaptivityRestartFirstStep()
+    #################################################################################
     # stats_analyser.get_recovered()
+    # strategy = HotRodStrategy()
+    #
     # fixable = stats_analyser.get_fixable_faults_only(strategy)
     # not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
     # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
     # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
 
-    # adaptivity_not_rec = stats_analyser.get_mask(AdaptivityStrategy(), key='recovered', val=True)
-    # adaptivity_bla_not_rec = stats_analyser.get_mask(
-    #     AdaptivityRestartFirstStep(), key='recovered', val=False, old_mask=adaptivity_not_rec
-    # )
-    # # stats_analyser.print_faults(mask=adaptivity_bla_not_rec)
-    # # return None
+    # recoverable = stats_analyser.get_fixable_faults_only(strategy)
+    ## stats_analyser.print_faults(mask=not_recovered)
+    # stats_analyser.scrutinize(strategy, run=4374, faults=False, logger_level=11)
+    ## stats_analyser.get_HR_tol(verbose=True)
+    # return None
 
-    # # stats_analyser.print_faults(mask=not_recovered, strategy=strategy)
-    # stats_analyser.scrutinize(strategy, run=4419, faults=True, logger_level=11)
+    # stats_analyser.scrutinize(strategy, run=4708, faults=False, logger_level=11)
+    # ax = plt.subplot()
+    # stats_analyser.plot_thingA_per_thingB(AdaptivityStrategy(), 'recovered', 'rank', op=stats_analyser.rec_rate, ax=ax, mask=recoverable)
+    ##plt.show()
     # return None
     # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
     # stats_analyser.plot_things_per_things(
-    #     'recovered',
-    #     'bit',
-    #     False,
-    #     op=stats_analyser.rec_rate,
-    #     mask=fixable,
-    #     args={'ylabel': 'recovery rate'},
-    #     store=False,
-    #     strategies=[BaseStrategy(), strategy],
+    #    'recovered',
+    #    'bit',
+    #    False,
+    #    op=stats_analyser.rec_rate,
+    #    mask=fixable,
+    #    args={'ylabel': 'recovery rate'},
+    #    store=False,
+    #    strategies=[BaseStrategy(), strategy],
     # )
     # plt.show()
     # return None
-    # ###############################################################################
+    ################################################################################
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
@@ -1717,7 +1717,7 @@ def compare_adaptivity_modes():
             strategies=[AdaptivityStrategy(), AdaptivityRestartFirstStep()],
             faults=[False, True],
             reload=True,
-            recovery_thresh=1.1,
+            recovery_thresh=1.5,
             recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problems[i], 0),
             num_procs=4,
             mode='default',
@@ -1744,6 +1744,6 @@ def compare_adaptivity_modes():
 
 
 if __name__ == "__main__":
-    compare_adaptivity_modes()
-    # check_local_error()
     main()
+    # compare_adaptivity_modes()
+    # check_local_error()

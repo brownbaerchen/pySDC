@@ -480,13 +480,13 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy
 
         configurations[0] = {
-            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': 25}}},
+            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': 25.0}}},
             'handle': 'step limiter',
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'plotting_params': {'color': 'teal', 'marker': 'v'},
         }
         configurations[1] = {
-            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_slope_max': 2}}},
+            'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_slope_max': 2.0}}},
             'handle': 'slope limiter',
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'plotting_params': {'color': 'magenta', 'marker': 'x'},
@@ -1054,16 +1054,16 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'parallel_efficiency',
-        'runs': 5,
-        'num_procs': min(comm_world.size, 5),
+        'mode': 'step_size_limiting',
+        'runs': 1,
+        'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
         'problem': run_quench,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
@@ -1080,9 +1080,9 @@ if __name__ == "__main__":
         'num_procs': 4,
     }
 
-    # for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
-    #     all_problems(**all_params, mode=mode)
-    #     comm_world.Barrier()
+    for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
+        all_problems(**all_params, mode=mode)
+        comm_world.Barrier()
 
     if comm_world.rank == 0:
         # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')

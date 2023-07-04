@@ -12,6 +12,7 @@ from pySDC.projects.Resilience.fault_stats import (
     run_Schroedinger,
     run_vdp,
     run_quench,
+    RECOVERY_THRESH_ABS,
 )
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 from pySDC.helpers.stats_helper import get_sorted
@@ -40,10 +41,6 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1):
     else:
         mode = 'random'
 
-    recovery_thresh_abs = {
-        run_quench: 5e-3,
-    }
-
     strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
     if JOURNAL not in ['JSC_beamer']:
         strategies += [HotRodStrategy()]
@@ -53,8 +50,8 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1):
         strategies=strategies,
         faults=[False, True],
         reload=True,
-        recovery_thresh=1.1,
-        recovery_thresh_abs=recovery_thresh_abs.get(problem, 0),
+        recovery_thresh=1.5,
+        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problem, 0),
         mode=mode,
         stats_path=path,
         num_procs=num_procs,
@@ -683,7 +680,7 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
