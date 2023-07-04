@@ -896,6 +896,7 @@ class DIRKStrategy(AdaptivityStrategy):
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
         from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK34
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
         adaptivity_description = super().get_custom_description(problem, num_procs)
 
@@ -906,7 +907,10 @@ class DIRKStrategy(AdaptivityStrategy):
         rk_params = {
             'step_params': {'maxiter': 1},
             'sweeper_class': DIRK34,
-            'convergence_controllers': {AdaptivityRK: {'e_tol': e_tol}},
+            'convergence_controllers': {
+                AdaptivityRK: {'e_tol': e_tol},
+                BasicRestarting.get_implementation(useMPI=self.useMPI): {'max_restarts': 99},
+            },
         }
 
         custom_description = merge_descriptions(adaptivity_description, rk_params)

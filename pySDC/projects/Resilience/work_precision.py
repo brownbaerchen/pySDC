@@ -1051,7 +1051,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    # vdp_stiffness_plot(runs=5, record=True)
+    vdp_stiffness_plot(runs=5, record=True)
 
     params = {
         'mode': 'step_size_limiting',
