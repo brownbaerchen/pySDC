@@ -113,23 +113,18 @@ class HeatEquation(ptype):
             rho = (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2 + (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
             x, y = self.xvalues[None, :], self.xvalues[:, None]
             sol[:] = np.sin(np.pi * freq * x) * np.sin(np.pi * freq * y) * np.exp(-t * nu * rho)
-        elif ndim == 3:
-            rho = (
-                (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
-                + (2.0 - 2.0 * np.cos(np.pi * freq * dx))
-                + (2.0 - 2.0 * np.cos(np.pi * freq * dx)) / dx**2
-            )
-            x, y, z = self.xvalues[None, :, None], self.xvalues[:, None, None], self.xvalues[None, None, :]
-            sol[:] = (
-                np.sin(np.pi * freq * x) * np.sin(np.pi * freq * y) * np.sin(np.pi * freq * z) * np.exp(-t * nu * rho)
-            )
 
         return sol
 
 
 ##########################################################################################################
+import matplotlib.pyplot as plt
+
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+
+from pySDC.helpers.stats_helper import get_sorted
+from pySDC.implementations.hooks.log_solution import LogSolution
 
 level_params = {}
 level_params['dt'] = 0.1
@@ -145,15 +140,16 @@ sweeper_params['quad_type'] = 'RADAU-RIGHT'
 sweeper_params['initial_guess'] = 'spread'
 
 problem_params = {}
-problem_params['nvars'] = 128
-problem_params['ndim'] = 1
+problem_params['nvars'] = 32
+problem_params['ndim'] = 2
 problem_params['stencil_type'] = 'center'
 problem_params['space_order'] = 4
-problem_params['nu'] = 1.0
+problem_params['nu'] = 2e-1
 problem_params['freq'] = 2
 
 controller_params = {}
 controller_params['logger_level'] = 20
+controller_params['hook_class'] = LogSolution
 
 description = {}
 description['level_params'] = level_params
@@ -168,4 +164,28 @@ controller = controller_nonMPI(num_procs=1, controller_params=controller_params,
 prob = controller.MS[0].levels[0].prob
 u_init = prob.u_exact(t=0)
 
-controller.run(u0=u_init, t0=0, Tend=1.0)
+u_end, stats = controller.run(u0=u_init, t0=0, Tend=0.3)
+u = get_sorted(stats, type='u')
+
+# plot the results
+if problem_params['ndim'] == 1:
+    ax = plt.subplot()
+    x = prob.xvalues
+    ax.plot(x, u_init, label=r'$u_0$', ls='--')
+
+    for me in u:
+        ax.plot(x, me[1], label=rf'$u(t={{{me[0]:.1f}}})$')
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$x$')
+elif problem_params['ndim'] == 2:
+    fig, axs = plt.subplots(2, 2)
+
+    axs[0, 0].imshow(u_init, vmin=0.0, vmax=0.8)
+
+    for i in range(3):
+        axs.flatten()[i + 1].set_title(fr'$t={{{u[i][0]:.1f}}}$')
+        axs.flatten()[i + 1].imshow(u[i][1], vmin=0.0, vmax=0.8)
+
+    fig.tight_layout()
+
+plt.show()
