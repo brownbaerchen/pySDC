@@ -220,7 +220,7 @@ class RungeKutta(sweeper):
             return f.impl + f.expl
         elif f is None:
             prob = self.level.prob
-            return prob.dtype_f(prob.init, val=0)
+            return self.get_full_f(prob.dtype_f(prob.init, val=0))
         else:
             raise NotImplementedError(f'Type \"{type(f)}\" not implemented in Runge-Kutta sweeper')
 
