@@ -160,6 +160,9 @@ el multistep mode!",
             self.prev.f[oldest_val] = f.impl + f.expl
         elif type(f) == mesh:
             self.prev.f[oldest_val] = f
+        elif f is None:
+            prob = S.levels[0].prob
+            self.prev.f[oldest_val] = prob.dtype_f(prob.init, val=0.0)
         else:
             raise DataError(
                 f"Unable to store f from datatype {type(f)}, extrapolation based error estimate only\
@@ -483,11 +486,14 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         # TODO: Maybe this can be reused
         self.get_extrapolation_coefficients(nodes, dts, t_eval)
 
+        prob = S.levels[0].prob
+        _f = [prob.dtype_f(prob.init, val=0.0) if me is None else me for me in lvl.f]
+
         # compute the extrapolated solution
-        if type(lvl.f[0]) == imex_mesh:
-            f = [me.impl + me.expl for me in lvl.f]
-        elif type(lvl.f[0]) == mesh:
-            f = lvl.f
+        if type(_f[0]) == imex_mesh:
+            f = [me.impl + me.expl for me in _f]
+        elif type(_f[0]) == mesh:
+            f = _f
         else:
             raise DataError(
                 f"Unable to store f from datatype {type(lvl.f[0])}, extrapolation based error estimate only\
