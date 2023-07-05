@@ -1321,7 +1321,7 @@ class FaultStats:
             (0, faultHook.rnd_params['node'] + 1),
             (1, faultHook.rnd_params['iteration'] + 1),
             (0, faultHook.rnd_params['bit']),
-            (0, faultHook.rnd_params['rank'] + 1),
+            (0, faultHook.rnd_params['rank']),
         ]
         ranges += [(0, i) for i in faultHook.rnd_params['problem_pos']]
         return np.prod([me[1] - me[0] for me in ranges], dtype=int)

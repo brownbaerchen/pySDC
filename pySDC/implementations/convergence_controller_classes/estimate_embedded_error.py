@@ -205,7 +205,6 @@ level"
             )
 
         if S.status.iter > 0 or self.params.sweeper_type == "RK":
-
             if self.params.averaged:
                 averaging = float(S.status.slot + 1)
             else:
