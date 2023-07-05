@@ -602,7 +602,13 @@ def get_configs(mode, problem):
             'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
     elif mode == 'parallel_efficiency':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy, ERKStrategy
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            BaseStrategy,
+            IterateStrategy,
+            ERKStrategy,
+            DIRKStrategy,
+        )
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
@@ -620,7 +626,7 @@ def get_configs(mode, problem):
         }
 
         configurations[-1] = {
-            'strategies': [ERKStrategy(useMPI=True)],
+            'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
             'num_procs': 1,
         }
 
@@ -1051,7 +1057,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(runs=5, record=True)
+    # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
         'mode': 'step_size_limiting',
@@ -1072,7 +1078,7 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1080,7 +1086,7 @@ if __name__ == "__main__":
         'num_procs': 4,
     }
 
-    for mode in ['dynamic_restarts']:  # ['parallel_efficiency', 'compare_strategies']:
+    for mode in ['parallel_efficiency']:  # ['parallel_efficiency', 'compare_strategies']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
