@@ -660,7 +660,7 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        for num_procs in [4, 1]:
+        for num_procs in [5, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': f'GSSDC {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
@@ -1029,7 +1029,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
             'comm_world': MPI.COMM_WORLD,
             **kwargs,
         }
-        params['num_procs'] = min(params['comm_world'].size, 4)
+        params['num_procs'] = min(params['comm_world'].size, 5)
         params['plotting'] = params['comm_world'].rank == 0
 
         configurations = get_configs(mode=f'vdp_stiffness-{mus[i]}', problem=run_vdp)
