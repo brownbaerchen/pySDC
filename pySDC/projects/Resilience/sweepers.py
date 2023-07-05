@@ -1,9 +1,48 @@
 import numpy as np
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+from pySDC.core.Sweeper import sweeper, ParameterError
 
 
-class generic_implicit_efficient(generic_implicit):
+class EfficientSweeper(sweeper):
+    """
+    Remove the evaluation of the right hand side from the initial conditions in the predict step.
+    """
+
+    def predict(self):
+        """
+        Predictor to fill values at nodes before first sweep
+
+        Default prediction for the sweepers, only copies the values to all collocation nodes
+        and evaluates the RHS of the ODE there
+        """
+
+        # get current level and problem
+        L = self.level
+        P = L.prob
+
+        for m in range(1, self.coll.num_nodes + 1):
+            # copy u[0] to all collocation nodes, evaluate RHS
+            if self.params.initial_guess == 'spread':
+                L.u[m] = P.dtype_u(L.u[0])
+                L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
+            # start with zero everywhere
+            elif self.params.initial_guess == 'zero':
+                L.u[m] = P.dtype_u(init=P.init, val=0.0)
+                L.f[m] = P.dtype_f(init=P.init, val=0.0)
+            # start with random initial guess
+            elif self.params.initial_guess == 'random':
+                L.u[m] = P.dtype_u(init=P.init, val=self.rng.rand(1)[0])
+                L.f[m] = P.dtype_f(init=P.init, val=self.rng.rand(1)[0])
+            else:
+                raise ParameterError(f'initial_guess option {self.params.initial_guess} not implemented')
+
+        # indicate that this level is now ready for sweeps
+        L.status.unlocked = True
+        L.status.updated = True
+
+
+class generic_implicit_efficient(EfficientSweeper, generic_implicit):
     """
     This sweeper has the same functionality of the `generic_implicit` sweeper, but saves a few operations at the expense
     of readability.
@@ -21,7 +60,7 @@ class generic_implicit_efficient(generic_implicit):
             list of dtype_u: containing the integral as values
         """
 
-        # get current level and problem description
+        # get current level and problem
         L = self.level
         P = L.prob
 
@@ -46,7 +85,7 @@ class generic_implicit_efficient(generic_implicit):
             None
         """
 
-        # get current level and problem description
+        # get current level and problem
         L = self.level
         P = L.prob
 
@@ -88,7 +127,7 @@ class generic_implicit_efficient(generic_implicit):
         return None
 
 
-class imex_1st_order_efficient(imex_1st_order):
+class imex_1st_order_efficient(EfficientSweeper, imex_1st_order):
     """
     Duplicate of `imex_1st_order` sweeper which is slightly more efficient at the cost of code readability.
     """
@@ -110,7 +149,7 @@ class imex_1st_order_efficient(imex_1st_order):
         QI = np.zeros_like(Q) if QI is None else QI
         QE = np.zeros_like(Q) if QE is None else QE
 
-        # get current level and problem description
+        # get current level and problem
         L = self.level
 
         me = []
@@ -132,7 +171,7 @@ class imex_1st_order_efficient(imex_1st_order):
             None
         """
 
-        # get current level and problem description
+        # get current level and problem
         L = self.level
         P = L.prob
 
