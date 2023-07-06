@@ -6,7 +6,7 @@ pySDC Tutorial at 12th PinT Workshop
 
 Installation
 ------------
-In order to start playing, install `pySDC` and it's dependencies, ideally in developer mode.
+In order to start playing, install `pySDC` and its dependencies, ideally in developer mode.
 First, we need to download the repository.
 There are multiple ways to do that, but if you plan to work with pySDC directly, the best way is to
 (1) `fork <https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks>`_
