@@ -14,4 +14,3 @@ dependencies:
   - jupyter
   - ipyparallel
   - pip
-  - jdc
