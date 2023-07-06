@@ -49,6 +49,10 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
         if strategy.name in ['ERK']:
             return True
 
+    if problem.__name__ == 'run_Schroedinger':
+        if strategy.name in ['ERK']:
+            return True
+
     return False
 
 
