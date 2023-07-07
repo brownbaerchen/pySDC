@@ -45,6 +45,7 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
         problem (function): A problem to run
         strategy (Strategy): SDC strategy
     """
+    return False
     if problem.__name__ == 'run_quench':
         if strategy.name in ['ERK']:
             return True
@@ -263,7 +264,7 @@ def record_work_precision(
             if comm_world.rank == 0:
                 logger.log(
                     25,
-                    f'{problem.__name__} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
+                    f'{problem.__name__}: {strategy} {handle} {num_procs} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
                 )
 
     if comm_world.rank == 0:
@@ -1064,16 +1065,16 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'step_size_limiting',
+        'mode': 'parallel_efficiency',
         'runs': 1,
         'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Schroedinger,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 

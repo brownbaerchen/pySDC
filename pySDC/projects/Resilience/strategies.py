@@ -36,6 +36,7 @@ class Strategy:
         Initialization routine
         '''
         self.useMPI = useMPI
+        self.max_steps = 1e4
 
         # set default values for plotting
         self.linestyle = '-'
@@ -176,6 +177,8 @@ class Strategy:
         Returns:
             dict: Custom description
         '''
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
+
         custom_description = {}
         if problem.__name__ == "run_vdp":
             custom_description['step_params'] = {'maxiter': 3}
@@ -197,6 +200,10 @@ class Strategy:
             custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-11}
+
+        custom_description['convergence_controllers'] = {
+            StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
+        }
         return merge_descriptions(custom_description, self.custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -909,7 +916,10 @@ class DIRKStrategy(AdaptivityStrategy):
             'sweeper_class': DIRK34,
             'convergence_controllers': {
                 AdaptivityRK: {'e_tol': e_tol},
-                BasicRestarting.get_implementation(useMPI=self.useMPI): {'max_restarts': 99},
+                BasicRestarting.get_implementation(useMPI=self.useMPI): {
+                    'max_restarts': 49,
+                    'crash_after_max_restarts': False,
+                },
             },
         }
 
