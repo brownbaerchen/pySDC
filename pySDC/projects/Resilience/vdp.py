@@ -179,10 +179,7 @@ def run_vdp(
     if fault_stuff is not None:
         from pySDC.projects.Resilience.fault_injection import prepare_controller_for_faults
 
-        rnd_args = {'iteration': 3, 'rank': (comm.size if use_MPI else num_procs)}
-        # args = {'time': 0.9, 'target': 0}
-        args = {'time': 5.25, 'target': 0}
-        prepare_controller_for_faults(controller, fault_stuff, rnd_args, args)
+        prepare_controller_for_faults(controller, fault_stuff, {}, {})
 
     # call main function to get things done...
     try:

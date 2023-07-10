@@ -166,9 +166,7 @@ def run_quench(
     if fault_stuff is not None:
         from pySDC.projects.Resilience.fault_injection import prepare_controller_for_faults
 
-        rnd_args = {'iteration': 1, 'min_node': 1}
-        args = {'time': 31.0, 'target': 0}
-        prepare_controller_for_faults(controller, fault_stuff, rnd_args, args)
+        prepare_controller_for_faults(controller, fault_stuff)
 
     # call main function to get things done...
     try:

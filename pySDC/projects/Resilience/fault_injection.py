@@ -520,7 +520,7 @@ class FaultInjector(hooks):
         return cls.to_float(f'{binary[:bit]}{int(binary[bit]) ^ 1}{binary[bit+1:]}')
 
 
-def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
+def prepare_controller_for_faults(controller, fault_stuff, rnd_args=None, args=None):
     """
     Prepare the controller for a run with faults. That means the fault injection hook is added and supplied with the
     relevant parameters.
@@ -534,6 +534,9 @@ def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
     Returns:
         None
     """
+    args = {} if args is None else args
+    rnd_args = {} if rnd_args is None else rnd_args
+
     faultHook = get_fault_injector_hook(controller)
     faultHook.random_generator = fault_stuff['rng']
 
@@ -541,14 +544,15 @@ def prepare_controller_for_faults(controller, fault_stuff, rnd_args, args):
         if key in fault_stuff.keys():
             faultHook.__dict__[key] = fault_stuff[key]
 
-    for key, val in fault_stuff.get('rnd_params', {}).items():
-        faultHook.rnd_params[key] = val
-
     if not len(faultHook.rnd_params.keys()) > 0:
         faultHook.add_fault(
             rnd_args={**rnd_args, **fault_stuff.get('rnd_params', {})},
             args={**args, **fault_stuff.get('args', {})},
         )
+
+    for key, val in fault_stuff.get('rnd_params', {}).items():
+        faultHook.rnd_params[key] = val
+
     faultHook.rnd_params['rank'] = {'rank': len(controller.MS), **rnd_args, **fault_stuff.get('rnd_params', {})}.get(
         'rank', 1
     )

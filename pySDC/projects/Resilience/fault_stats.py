@@ -370,7 +370,7 @@ class FaultStats:
             fault_stuff = {
                 'rng': None,
                 'args': strategy.get_fault_args(self.prob, self.num_procs),
-                'rnd_params': strategy.get_fault_args(self.prob, self.num_procs),
+                'rnd_params': strategy.get_random_params(self.prob, self.num_procs),
             }
 
             # make parameters for faults:
@@ -1303,22 +1303,24 @@ class FaultStats:
 
         return occurrences, bins
 
-    def get_max_combinations(self, dat=None):
+    def get_max_combinations(self, dat=None, strategy=None):
         '''
         Count how many combinations of parameters for faults are possible
 
         Args:
             dat (dict): The recorded statistics
             keys (list): The keys in dat that you want to know the combinations of
+            strategy (Strategy): The resilience strategy
 
         Returns:
             int: Number of possible combinations
         '''
-        stats, controller, Tend = self.single_run(strategy=self.strategies[0], run=0, faults=True)
+        strategy = self.strategies[0] if strategy is None else strategy
+        stats, controller, Tend = self.single_run(strategy=strategy, run=0, faults=True)
         faultHook = get_fault_injector_hook(controller)
         ranges = [
             (0, faultHook.rnd_params['level_number']),
-            (0, faultHook.rnd_params['node'] + 1),
+            (faultHook.rnd_params.get('min_node', 0), faultHook.rnd_params['node'] + 1),
             (1, faultHook.rnd_params['iteration'] + 1),
             (0, faultHook.rnd_params['bit']),
             (0, faultHook.rnd_params['rank']),
@@ -1550,16 +1552,17 @@ def parse_args():
 def main():
     kwargs = {
         'prob': run_Lorenz,
-        'num_procs': 4,
+        'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': False,
+        'reload': True,
         **parse_args(),
     }
+    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy
 
     stats_analyser = FaultStats(
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        strategies=[HotRodStrategy()],
+        strategies=[DIRKStrategy(), ERKStrategy()],
         faults=[False, True],
         recovery_thresh=1.1,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
@@ -1567,38 +1570,24 @@ def main():
         **kwargs,
     )
     #################################################################################
-    # stats_analyser.get_recovered()
-    # strategy = HotRodStrategy()
-    #
+    stats_analyser = FaultStats(
+        strategies=[DIRKStrategy(), ERKStrategy()],
+        faults=[False, True],
+        recovery_thresh=1.1,
+        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
+        stats_path='data/stats-jusuf',
+        **kwargs,
+    )
+    strategy = DIRKStrategy()
+
+    # print(stats_analyser.get_max_combinations(strategy=DIRKStrategy()))
+    stats_analyser.run_stats_generation(runs=kwargs['runs'])
+    # stats_analyser.scrutinize(strategy, faults=True, run=182)
+
     # fixable = stats_analyser.get_fixable_faults_only(strategy)
-    # not_crashed = stats_analyser.get_mask(strategy=strategy, key='error', op='isfinite', old_mask=fixable)
-    # not_recovered = stats_analyser.get_mask(strategy, key='recovered', val=False, old_mask=fixable)
-    # exponent_bits = stats_analyser.get_mask(strategy, key='bit', val=8, op='lt', old_mask=not_recovered)
-
-    # recoverable = stats_analyser.get_fixable_faults_only(strategy)
-    ## stats_analyser.print_faults(mask=not_recovered)
-    # stats_analyser.scrutinize(strategy, run=4374, faults=False, logger_level=11)
-    ## stats_analyser.get_HR_tol(verbose=True)
-    # return None
-
-    # stats_analyser.scrutinize(strategy, run=4708, faults=False, logger_level=11)
-    # ax = plt.subplot()
-    # stats_analyser.plot_thingA_per_thingB(AdaptivityStrategy(), 'recovered', 'rank', op=stats_analyser.rec_rate, ax=ax, mask=recoverable)
-    ##plt.show()
-    # return None
-    # stats_analyser.plot_recovery_thresholds(strategies=[strategy], thresh_range=np.linspace(0.9, 1.4, 100))
-    # stats_analyser.plot_things_per_things(
-    #    'recovered',
-    #    'bit',
-    #    False,
-    #    op=stats_analyser.rec_rate,
-    #    mask=fixable,
-    #    args={'ylabel': 'recovery rate'},
-    #    store=False,
-    #    strategies=[BaseStrategy(), strategy],
-    # )
-    # plt.show()
-    # return None
+    # not_recovered = stats_analyser.get_mask(strategy=strategy, key='recovered', val=False, op='eq', old_mask=fixable)
+    # stats_analyser.print_faults(not_recovered, strategy=strategy)
+    return None
     ################################################################################
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 

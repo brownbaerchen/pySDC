@@ -1074,7 +1074,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
@@ -1083,7 +1083,7 @@ if __name__ == "__main__":
     # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',

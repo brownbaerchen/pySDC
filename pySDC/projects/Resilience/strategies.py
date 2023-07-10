@@ -101,8 +101,19 @@ class Strategy:
         Returns:
             dict: Arguments for the faults that are exempt from randomization
         '''
+        args = {}
+        args['target'] = 0
 
-        return {}
+        if problem.__name__ == "run_vdp":
+            args['time'] = 5.25
+        elif problem.__name__ == "run_Schroedinger":
+            args['time'] = 0.3
+        elif problem.__name__ == "run_quench":
+            args['time'] = 31.0
+        elif problem.__name__ == "run_Lorenz":
+            args['time'] = 0.3
+
+        return args
 
     def get_random_params(self, problem, num_procs):
         '''
@@ -115,8 +126,18 @@ class Strategy:
         Returns:
             dict: Randomization parameters
         '''
+        base_params = self.get_base_parameters(problem, num_procs)
 
-        return {}
+        rnd_params = {}
+        rnd_params['iteration'] = base_params['step_params']['maxiter']
+        rnd_params['rank'] = num_procs
+
+        if problem.__name__ in ['run_Schroedinger', 'run_quench']:
+            rnd_params['min_node'] = 1
+
+        if problem.__name__ == "run_quench":
+            rnd_params['iteration'] = 1
+        return rnd_params
 
     @property
     def style(self):
@@ -141,7 +162,8 @@ class Strategy:
         """
         return self.name
 
-    def get_Tend(self, problem, num_procs=1):
+    @classmethod
+    def get_Tend(cls, problem, num_procs=1):
         '''
         Get the final time of runs for fault stats based on the problem
 
@@ -166,9 +188,9 @@ class Strategy:
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
-    def get_custom_description(self, problem, num_procs=1):
+    def get_base_parameters(self, problem, num_procs=1):
         '''
-        Get a custom description based on the problem
+        Get a base parameters for the problems independent of the strategy.
 
         Args:
             problem (function): A problem to run
@@ -204,6 +226,20 @@ class Strategy:
         custom_description['convergence_controllers'] = {
             StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
         }
+        return custom_description
+
+    def get_custom_description(self, problem, num_procs=1):
+        '''
+        Get a custom description based on the problem
+
+        Args:
+            problem (function): A problem to run
+            num_procs (int): Number of processes
+
+        Returns:
+            dict: Custom description
+        '''
+        custom_description = self.get_base_parameters(problem, num_procs)
         return merge_descriptions(custom_description, self.custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -948,6 +984,26 @@ class DIRKStrategy(AdaptivityStrategy):
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
+    def get_random_params(self, problem, num_procs):
+        '''
+        Routine to get parameters for the randomization of faults
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            dict: Randomization parameters
+        '''
+        rnd_params = super().get_random_params(problem, num_procs)
+        rnd_params['iteration'] = 1
+        rnd_params['min_node'] = 5
+
+        return rnd_params
+
+    def get_fixable_params(self, **kwargs):
+        return self.fixable
+
 
 class ERKStrategy(DIRKStrategy):
     """
@@ -968,9 +1024,21 @@ class ERKStrategy(DIRKStrategy):
     def label(self):
         return 'CP5(4)'
 
-    """
-    Explicit Cash-Karp's method
-    """
+    def get_random_params(self, problem, num_procs):
+        '''
+        Routine to get parameters for the randomization of faults
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            dict: Randomization parameters
+        '''
+        rnd_params = super().get_random_params(problem, num_procs)
+        rnd_params['min_node'] = 7
+
+        return rnd_params
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.sweeper_classes.Runge_Kutta import Cash_Karp
