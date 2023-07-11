@@ -4,15 +4,19 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from pySDC.projects.Resilience.fault_stats import (
     FaultStats,
-    BaseStrategy,
-    AdaptivityStrategy,
-    IterateStrategy,
-    HotRodStrategy,
     run_Lorenz,
     run_Schroedinger,
     run_vdp,
     run_quench,
     RECOVERY_THRESH_ABS,
+)
+from pySDC.projects.Resilience.strategies import (
+    BaseStrategy,
+    AdaptivityStrategy,
+    IterateStrategy,
+    HotRodStrategy,
+    DIRKStrategy,
+    ERKStrategy,
 )
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 from pySDC.helpers.stats_helper import get_sorted
@@ -24,7 +28,7 @@ JOURNAL = 'Springer_Numerical_Algorithms'
 BASE_PATH = 'data/paper'
 
 
-def get_stats(problem, path='data/stats-jusuf', num_procs=1):
+def get_stats(problem, path='data/stats-jusuf', num_procs=1, strategy_type='SDC'):
     """
     Create a FaultStats object for a given problem to use for the plots.
     Note that the statistics need to be already generated somewhere else, this function will only load them.
@@ -36,14 +40,14 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1):
     Returns:
         FaultStats: Object to analyse resilience statistics from
     """
-    if problem in [run_Lorenz, run_vdp]:
-        mode = 'combination'
-    else:
-        mode = 'random'
-
-    strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
-    if JOURNAL not in ['JSC_beamer']:
-        strategies += [HotRodStrategy()]
+    if strategy_type == 'SDC':
+        strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
+        if JOURNAL not in ['JSC_beamer']:
+            strategies += [HotRodStrategy()]
+    elif strategy_type == 'RK':
+        strategies = [DIRKStrategy()]
+        if problem.__name__ in ['run_Lorenz', 'run_vdp']:
+            strategies += [ERKStrategy()]
 
     stats_analyser = FaultStats(
         prob=problem,
@@ -52,7 +56,7 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1):
         reload=True,
         recovery_thresh=1.5,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problem, 0),
-        mode=mode,
+        mode='default',
         stats_path=path,
         num_procs=num_procs,
     )
@@ -179,7 +183,7 @@ def plot_recovery_rate_recoverable_only(stats_analyser, fig, ax, **kwargs):  # p
         )
 
 
-def compare_recovery_rate_problems(num_procs=1):  # pragma: no cover
+def compare_recovery_rate_problems(**kwargs):  # pragma: no cover
     """
     Compare the recovery rate for vdP, Lorenz and Schroedinger problems.
     Only faults that can be recovered are shown.
@@ -188,10 +192,10 @@ def compare_recovery_rate_problems(num_procs=1):  # pragma: no cover
         None
     """
     stats = [
-        get_stats(run_vdp, num_procs=num_procs),
-        get_stats(run_Lorenz, num_procs=num_procs),
-        get_stats(run_Schroedinger, num_procs=num_procs),
-        get_stats(run_quench, num_procs=num_procs),
+        get_stats(run_vdp, **kwargs),
+        get_stats(run_Lorenz, **kwargs),
+        get_stats(run_Schroedinger, **kwargs),
+        get_stats(run_quench, **kwargs),
     ]
     titles = ['Van der Pol', 'Lorenz attractor', r'Schr\"odinger', 'Quench']
 
@@ -205,11 +209,20 @@ def compare_recovery_rate_problems(num_procs=1):  # pragma: no cover
     for ax in axs.flatten():
         ax.get_legend().remove()
 
-    axs[1, 1].legend(frameon=False)
+    axs[0, 0].set_ylim((0, 1))
+
+    if kwargs.get('strategy_type', 'SDC') == 'SDC':
+        axs[1, 1].legend(frameon=False)
+    else:
+        axs[0, 1].legend(frameon=False)
     axs[1, 0].set_ylabel('recovery rate')
     axs[0, 0].set_ylabel('recovery rate')
 
-    savefig(fig, f'compare_equations{f"-{num_procs}procs" if num_procs > 1 else ""}')
+    name = ''
+    for key, val in kwargs.items():
+        name = f'{name}_{key}-{val}'
+
+    savefig(fig, f'compare_equations{name}.pdf')
 
 
 def plot_recovery_thresholds(problem, num_procs_list=None):
@@ -680,15 +693,16 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
     # plot_adaptivity_stuff()
+    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
     for i in [1, 4]:
-        compare_recovery_rate_problems(i)
+        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover

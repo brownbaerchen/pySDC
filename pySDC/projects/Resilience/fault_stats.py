@@ -26,7 +26,7 @@ import logging
 
 plot_helper.setup_mpl(reset=True)
 
-LOGGER_LEVEL = 30
+LOGGER_LEVEL = 40
 
 RECOVERY_THRESH_ABS = {
     run_quench: 5e-3,
@@ -1549,116 +1549,6 @@ def parse_args():
     return kwargs
 
 
-def main():
-    kwargs = {
-        'prob': run_Lorenz,
-        'num_procs': 1,
-        'mode': 'default',
-        'runs': 5000,
-        'reload': True,
-        **parse_args(),
-    }
-    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy
-
-    stats_analyser = FaultStats(
-        # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        strategies=[DIRKStrategy(), ERKStrategy()],
-        faults=[False, True],
-        recovery_thresh=1.1,
-        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
-        stats_path='data/stats-jusuf',
-        **kwargs,
-    )
-    #################################################################################
-    stats_analyser = FaultStats(
-        strategies=[DIRKStrategy(), ERKStrategy()],
-        faults=[False, True],
-        recovery_thresh=1.1,
-        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
-        stats_path='data/stats-jusuf',
-        **kwargs,
-    )
-    strategy = DIRKStrategy()
-
-    # print(stats_analyser.get_max_combinations(strategy=DIRKStrategy()))
-    stats_analyser.run_stats_generation(runs=kwargs['runs'])
-    # stats_analyser.scrutinize(strategy, faults=True, run=182)
-
-    # fixable = stats_analyser.get_fixable_faults_only(strategy)
-    # not_recovered = stats_analyser.get_mask(strategy=strategy, key='recovered', val=False, op='eq', old_mask=fixable)
-    # stats_analyser.print_faults(not_recovered, strategy=strategy)
-    return None
-    ################################################################################
-    stats_analyser.run_stats_generation(runs=kwargs['runs'])
-
-    if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
-        return None
-
-    stats_analyser.get_recovered()
-    mask = None
-
-    # stats_analyser.compare_strategies()
-    stats_analyser.plot_things_per_things(
-        'recovered', 'node', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
-    )
-    stats_analyser.plot_things_per_things(
-        'recovered', 'iteration', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
-    )
-
-    stats_analyser.plot_things_per_things(
-        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
-    )
-
-    # make a plot for only the faults that can be recovered
-    fig, ax = plt.subplots(1, 1)
-    for strategy in stats_analyser.strategies:
-        fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
-        stats_analyser.plot_things_per_things(
-            'recovered',
-            'bit',
-            False,
-            strategies=[strategy],
-            op=stats_analyser.rec_rate,
-            mask=fixable,
-            args={'ylabel': 'recovery rate'},
-            name='fixable_recovery',
-            ax=ax,
-        )
-    fig.tight_layout()
-    fig.savefig(f'data/{stats_analyser.get_name()}-recoverable.pdf', transparent=True)
-
-    fig, ax = plt.subplots(1, 1, figsize=(13, 4))
-    stats_analyser.plot_recovery_thresholds(ax=ax, thresh_range=np.logspace(-1, 1, 1000))
-    ax.axvline(stats_analyser.get_thresh(BaseStrategy()), color='grey', ls=':', label='recovery threshold')
-    ax.set_xscale('log')
-    ax.legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(f'data/{stats_analyser.get_name()}-threshold.pdf', transparent=True)
-
-    stats_analyser.plot_things_per_things(
-        'total_iteration',
-        'bit',
-        True,
-        op=stats_analyser.mean,
-        mask=mask,
-        args={'yscale': 'log', 'ylabel': 'total iterations'},
-    )
-    stats_analyser.plot_things_per_things(
-        'total_iteration',
-        'bit',
-        True,
-        op=stats_analyser.extra_mean,
-        mask=mask,
-        args={'yscale': 'linear', 'ylabel': 'extra iterations'},
-        name='extra_iter',
-    )
-    stats_analyser.plot_things_per_things(
-        'error', 'bit', True, op=stats_analyser.mean, mask=mask, args={'yscale': 'log'}
-    )
-
-    stats_analyser.plot_recovery_thresholds()
-
-
 def compare_adaptivity_modes():
     from pySDC.projects.Resilience.strategies import AdaptivityRestartFirstStep
 
@@ -1730,6 +1620,96 @@ def compare_adaptivity_modes():
     fig.suptitle('Comparison of restart modes with adaptivity with 4 ranks')
     fig.tight_layout()
     plt.show()
+
+
+def main():
+    kwargs = {
+        'prob': run_quench,
+        'num_procs': 1,
+        'mode': 'default',
+        'runs': 5000,
+        'reload': True,
+        **parse_args(),
+    }
+    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy
+
+    stats_analyser = FaultStats(
+        # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
+        strategies=[DIRKStrategy(), ERKStrategy()],
+        faults=[False, True],
+        recovery_thresh=1.5,
+        recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
+        stats_path='data/stats-jusuf',
+        **kwargs,
+    )
+    stats_analyser.run_stats_generation(runs=kwargs['runs'])
+
+    if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
+        return None
+
+    stats_analyser.get_recovered()
+    mask = None
+
+    # stats_analyser.compare_strategies()
+    stats_analyser.plot_things_per_things(
+        'recovered', 'node', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
+    )
+    stats_analyser.plot_things_per_things(
+        'recovered', 'iteration', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
+    )
+
+    stats_analyser.plot_things_per_things(
+        'recovered', 'bit', False, op=stats_analyser.rec_rate, mask=mask, args={'ylabel': 'recovery rate'}
+    )
+
+    # make a plot for only the faults that can be recovered
+    fig, ax = plt.subplots(1, 1)
+    for strategy in stats_analyser.strategies:
+        fixable = stats_analyser.get_fixable_faults_only(strategy=strategy)
+        stats_analyser.plot_things_per_things(
+            'recovered',
+            'bit',
+            False,
+            strategies=[strategy],
+            op=stats_analyser.rec_rate,
+            mask=fixable,
+            args={'ylabel': 'recovery rate'},
+            name='fixable_recovery',
+            ax=ax,
+        )
+    fig.tight_layout()
+    fig.savefig(f'data/{stats_analyser.get_name()}-recoverable.pdf', transparent=True)
+
+    fig, ax = plt.subplots(1, 1, figsize=(13, 4))
+    stats_analyser.plot_recovery_thresholds(ax=ax, thresh_range=np.logspace(-1, 1, 1000))
+    ax.axvline(stats_analyser.get_thresh(BaseStrategy()), color='grey', ls=':', label='recovery threshold')
+    ax.set_xscale('log')
+    ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(f'data/{stats_analyser.get_name()}-threshold.pdf', transparent=True)
+
+    stats_analyser.plot_things_per_things(
+        'total_iteration',
+        'bit',
+        True,
+        op=stats_analyser.mean,
+        mask=mask,
+        args={'yscale': 'log', 'ylabel': 'total iterations'},
+    )
+    stats_analyser.plot_things_per_things(
+        'total_iteration',
+        'bit',
+        True,
+        op=stats_analyser.extra_mean,
+        mask=mask,
+        args={'yscale': 'linear', 'ylabel': 'extra iterations'},
+        name='extra_iter',
+    )
+    stats_analyser.plot_things_per_things(
+        'error', 'bit', True, op=stats_analyser.mean, mask=mask, args={'yscale': 'log'}
+    )
+
+    stats_analyser.plot_recovery_thresholds()
 
 
 if __name__ == "__main__":
