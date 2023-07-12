@@ -637,11 +637,13 @@ def work_precision():  # pragma: no cover
     axs[2].set_yscale('linear')
     axs[2].set_xscale('linear')
     axs[1].set_xlabel(r'$e_\mathrm{tol}$')
+    axs[0].set_xticks([1e0, 3e0], minor=True)
 
     for ax in axs:
         ax.set_title(ax.get_ylabel())
         ax.set_ylabel('')
     fig.suptitle('Quench')
+
     save_fig(
         fig=fig,
         name=f'{run_quench.__name__}',

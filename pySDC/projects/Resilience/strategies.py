@@ -1324,6 +1324,15 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
  strategy'
             )
 
+        if problem.__name__ in ['run_Schroedinger', 'run_quench']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+
+            sweeper_class = imex_1st_order
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+
+            sweeper_class = generic_implicit
+
         custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityExtrapolationWithinQ: {
@@ -1332,6 +1341,7 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
                 'dt_max': dt_max,
             }
         }
+        custom_description['sweeper_class'] = sweeper_class
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):

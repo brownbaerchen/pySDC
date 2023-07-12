@@ -1,6 +1,7 @@
 import numpy as np
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+from pySDC.core.Errors import ParameterError
 
 
 class generic_implicit_efficient(generic_implicit):
@@ -80,12 +81,51 @@ class generic_implicit_efficient(generic_implicit):
                 rhs, L.dt * self.QI[m + 1, m + 1], L.u[m + 1], L.time + L.dt * self.coll.nodes[m]
             )
             # update function values
-            L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
+            if m < M - 1:
+                L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         # indicate presence of new values at this level
         L.status.updated = True
 
         return None
+
+    def predict(self):
+        """
+        Predictor to fill values at nodes before first sweep. Skip evaluation of RHS on initial conditions.
+
+        Default prediction for the sweepers, only copies the values to all collocation nodes
+        and evaluates the RHS of the ODE there
+        """
+
+        # get current level and problem description
+        L = self.level
+        P = L.prob
+
+        for m in range(1, self.coll.num_nodes + 1):
+            # copy u[0] to all collocation nodes, evaluate RHS
+            if self.params.initial_guess == 'spread':
+                L.u[m] = P.dtype_u(L.u[0])
+                L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
+            # start with zero everywhere
+            elif self.params.initial_guess == 'zero':
+                L.u[m] = P.dtype_u(init=P.init, val=0.0)
+                L.f[m] = P.dtype_f(init=P.init, val=0.0)
+            # start with random initial guess
+            elif self.params.initial_guess == 'random':
+                L.u[m] = P.dtype_u(init=P.init, val=self.rng.rand(1)[0])
+                L.f[m] = P.dtype_f(init=P.init, val=self.rng.rand(1)[0])
+            else:
+                raise ParameterError(f'initial_guess option {self.params.initial_guess} not implemented')
+
+        # indicate that this level is now ready for sweeps
+        L.status.unlocked = True
+        L.status.updated = True
+
+    def compute_residual(self, stage=''):
+        if stage not in self.params.skip_residual_computation:
+            lvl = self.level
+            lvl.f[-1] = lvl.prob.eval_f(lvl.u[-1], lvl.time + lvl.dt * self.coll.nodes[-1])
+        super().compute_residual(stage)
 
 
 class imex_1st_order_efficient(imex_1st_order):
@@ -173,3 +213,35 @@ class imex_1st_order_efficient(imex_1st_order):
         L.status.updated = True
 
         return None
+
+    def predict(self):
+        """
+        Predictor to fill values at nodes before first sweep. Skip evaluation of RHS on initial conditions.
+
+        Default prediction for the sweepers, only copies the values to all collocation nodes
+        and evaluates the RHS of the ODE there
+        """
+
+        # get current level and problem description
+        L = self.level
+        P = L.prob
+
+        for m in range(1, self.coll.num_nodes + 1):
+            # copy u[0] to all collocation nodes, evaluate RHS
+            if self.params.initial_guess == 'spread':
+                L.u[m] = P.dtype_u(L.u[0])
+                L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
+            # start with zero everywhere
+            elif self.params.initial_guess == 'zero':
+                L.u[m] = P.dtype_u(init=P.init, val=0.0)
+                L.f[m] = P.dtype_f(init=P.init, val=0.0)
+            # start with random initial guess
+            elif self.params.initial_guess == 'random':
+                L.u[m] = P.dtype_u(init=P.init, val=self.rng.rand(1)[0])
+                L.f[m] = P.dtype_f(init=P.init, val=self.rng.rand(1)[0])
+            else:
+                raise ParameterError(f'initial_guess option {self.params.initial_guess} not implemented')
+
+        # indicate that this level is now ready for sweeps
+        L.status.unlocked = True
+        L.status.updated = True
