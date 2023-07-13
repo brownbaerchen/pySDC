@@ -938,8 +938,8 @@ class DIRKStrategy(AdaptivityStrategy):
             The custom descriptions you can supply to the problem when running it
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
-        from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK34
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK43
 
         adaptivity_description = super().get_custom_description(problem, num_procs)
 
