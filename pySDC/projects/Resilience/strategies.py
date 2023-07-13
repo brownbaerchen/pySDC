@@ -949,7 +949,7 @@ class DIRKStrategy(AdaptivityStrategy):
 
         rk_params = {
             'step_params': {'maxiter': 1},
-            'sweeper_class': DIRK34,
+            'sweeper_class': DIRK43,
             'convergence_controllers': {
                 AdaptivityRK: {'e_tol': e_tol},
                 BasicRestarting.get_implementation(useMPI=self.useMPI): {
