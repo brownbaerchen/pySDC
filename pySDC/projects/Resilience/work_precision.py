@@ -1079,7 +1079,7 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'step_size_limiting',
-        'runs': 1,
+        'runs': 5,
         'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
