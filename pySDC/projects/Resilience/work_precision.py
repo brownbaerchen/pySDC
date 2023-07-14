@@ -631,7 +631,10 @@ def get_configs(mode, problem):
         }
 
         configurations[-1] = {
-            'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
+            'strategies': [
+                DIRKStrategy(useMPI=True),
+                ERKStrategy(useMPI=True),
+            ],
             'num_procs': 1,
         }
 
@@ -643,16 +646,16 @@ def get_configs(mode, problem):
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
-            plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
-            configurations[num_procs + 100] = {
-                'strategies': [IterateStrategy(True)],
-                'custom_description': descIterate,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-            }
+            # plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
+            # configurations[num_procs + 100] = {
+            #    'strategies': [IterateStrategy(True)],
+            #    'custom_description': descIterate,
+            #    'num_procs': num_procs,
+            #    'plotting_params': plotting_params,
+            # }
 
     elif mode[:13] == 'vdp_stiffness':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
 
         mu = float(mode[14:])
 
@@ -694,6 +697,13 @@ def get_configs(mode, problem):
             'num_procs': 1,
             'handle': mode,
             'plotting_params': {'label': 'DIRK4(3)'},
+            'custom_description': problem_desc,
+        }
+        configurations[4] = {
+            'strategies': [ESDIRKStrategy(useMPI=True)],
+            'num_procs': 1,
+            'handle': mode,
+            'plotting_params': {'label': 'ESDIRK5(3)'},
             'custom_description': problem_desc,
         }
 
@@ -1062,19 +1072,19 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    # vdp_stiffness_plot(runs=5, record=True)
+    vdp_stiffness_plot(runs=5, record=True)
 
     params = {
-        'mode': 'step_size_limiting',
-        'runs': 5,
+        'mode': 'parallel_efficiency',
+        'runs': 1,
         'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 

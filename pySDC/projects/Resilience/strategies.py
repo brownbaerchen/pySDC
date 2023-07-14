@@ -921,6 +921,7 @@ class DIRKStrategy(AdaptivityStrategy):
         self.bar_plot_x_label = 'DIRK4(3)'
         self.precision_parameter = 'e_tol'
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityRK, 'e_tol']
+        self.max_steps = 1e5
 
     @property
     def label(self):
@@ -1001,8 +1002,105 @@ class DIRKStrategy(AdaptivityStrategy):
 
         return rnd_params
 
-    def get_fixable_params(self, **kwargs):
-        return self.fixable
+
+class ESDIRKStrategy(AdaptivityStrategy):
+    '''
+    ESDIRK5(3)
+    '''
+
+    def __init__(self, useMPI=False, skip_residual_computation='all'):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+
+        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        self.color = 'violet'
+        self.marker = '^'
+        self.name = 'ESDIRK'
+        self.bar_plot_x_label = 'ESDIRK5(3)'
+        self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityRK, 'e_tol']
+        self.max_steps = 1e5
+
+    @property
+    def label(self):
+        return 'ESDIRK5(3)'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ESDIRK53
+
+        adaptivity_description = super().get_custom_description(problem, num_procs)
+
+        e_tol = adaptivity_description['convergence_controllers'][Adaptivity]['e_tol']
+        adaptivity_description['convergence_controllers'].pop(Adaptivity, None)
+        adaptivity_description.pop('sweeper_params', None)
+
+        rk_params = {
+            'step_params': {'maxiter': 1},
+            'sweeper_class': ESDIRK53,
+            'convergence_controllers': {
+                AdaptivityRK: {'e_tol': e_tol},
+                BasicRestarting.get_implementation(useMPI=self.useMPI): {
+                    'max_restarts': 49,
+                    'crash_after_max_restarts': False,
+                },
+            },
+        }
+
+        custom_description = merge_descriptions(adaptivity_description, rk_params)
+
+        return custom_description
+
+    def get_reference_value(self, problem, key, op, num_procs=1):
+        """
+        Get a reference value for a given problem for testing in CI.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            key (str): The name of the variable you want to compare
+            op (function): The operation you want to apply to the data
+            num_procs (int): Number of processes
+
+        Returns:
+            The reference value
+        """
+        if problem.__name__ == "run_vdp":
+            if key == 'work_newton' and op == sum:
+                return 1518
+            elif key == 'e_global_post_run' and op == max:
+                return 3.6982949243591356e-06
+
+        raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+    def get_random_params(self, problem, num_procs):
+        '''
+        Routine to get parameters for the randomization of faults
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            dict: Randomization parameters
+        '''
+        rnd_params = super().get_random_params(problem, num_procs)
+        rnd_params['iteration'] = 1
+        rnd_params['min_node'] = 6
+
+        return rnd_params
 
 
 class ERKStrategy(DIRKStrategy):
