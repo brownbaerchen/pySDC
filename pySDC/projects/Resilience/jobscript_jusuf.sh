@@ -8,7 +8,7 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --mail-user=t.baumann@fz-juelich.de
 #SBATCH -p batch
-#SBATCH -J red_wedding
+#SBATCH -J MarsDirect2023
 
 module --force purge
 module load Stages/2023
