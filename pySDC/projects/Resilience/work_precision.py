@@ -834,7 +834,6 @@ def get_configs(mode, problem):
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
-                DIRKStrategy(useMPI=True),
                 ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
