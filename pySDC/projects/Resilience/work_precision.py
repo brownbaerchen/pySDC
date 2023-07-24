@@ -1182,7 +1182,7 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Schroedinger,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
