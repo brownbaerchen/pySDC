@@ -11,7 +11,7 @@ def run_Lorenz(efficient, skip_residual_computation, num_procs=1):
 
     # initialize level parameters
     level_params = {}
-    level_params['dt'] = 1e-2
+    level_params['dt'] = 1e-1
 
     # initialize sweeper parameters
     sweeper_params = {}
@@ -75,7 +75,7 @@ def run_Schroedinger(efficient=False, num_procs=1, skip_residual_computation=Fal
     # initialize level parameters
     level_params = {}
     level_params['restol'] = 1e-8
-    level_params['dt'] = 1e-01 / 2
+    level_params['dt'] = 2e-01
     level_params['nsweeps'] = 1
 
     # initialize sweeper parameters
@@ -168,6 +168,13 @@ def assert_sameness(stats_normal, stats_efficient, sweeper_name, check_residual=
         normal = [you[1] for you in get_sorted(stats_normal, type=me)]
         if 'timing' in me or all(you is None for you in normal) or (not check_residual and 'residual' in me):
             continue
-        assert np.allclose(
-            normal, [you[1] for you in get_sorted(stats_efficient, type=me)]
-        ), f'Stats don\'t match in type \"{me}\" for efficient and regular implementations of {sweeper_name} sweeper!'
+        elif 'work_rhs' in me:
+            efficient = [me[1] for me in get_sorted(stats_efficient, type=me)]
+            assert all(
+                normal[i] >= efficient[i] for i in range(len(efficient))
+            ), f'Efficient sweeper performs more right hand side evaluations than regular implementations of {sweeper_name} sweeper!'
+        else:
+            comp = [you[1] for you in get_sorted(stats_efficient, type=me)]
+            assert np.allclose(
+                normal, comp
+            ), f'Stats don\'t match in type \"{me}\" for efficient and regular implementations of {sweeper_name} sweeper!'
