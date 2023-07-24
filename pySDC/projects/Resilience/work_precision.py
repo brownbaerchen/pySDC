@@ -15,7 +15,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 15
+LOGGER_LEVEL = 25
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -1175,17 +1175,17 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'parallel_efficiency',
-        'runs': 1,
+        'mode': 'RK_comp',
+        'runs': 5,
         'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
-    record = False
-    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = True
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
