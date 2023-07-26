@@ -15,7 +15,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 10
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -287,6 +287,48 @@ def record_work_precision(
             pickle.dump(data, f)
 
 
+def load(**kwargs):
+    """
+    Load stored data. Arguments are passed on to `get_path`
+
+    Returns:
+        dict: The data
+    """
+    path = get_path(**kwargs)
+    with open(path, 'rb') as f:
+        logger.debug(f'Loading file \"{path}\"')
+        data = pickle.load(f)
+    return data
+
+
+def extract_data(data, work_key, precision_key):
+    """
+    Get the work and precision from a data object.
+
+    Args:
+        data (dict): Data from work-precision measurements
+        work_key (str): Name of variable on x-axis
+        precision_key (str): Name of variable on y-axis
+
+    Returns:
+        list: Work
+        list: Precision
+    """
+    keys = [key for key in data.keys() if key not in ['meta']]
+    work = [np.nanmean(data[key][work_key]) for key in keys]
+    precision = [np.nanmean(data[key][precision_key]) for key in keys]
+    return work, precision
+
+
+def get_order(work_key='e_global', precision_key='param', strategy=None, handle=None, **kwargs):
+    data = load(**kwargs, strategy=strategy, handle=handle)
+    work, precision = extract_data(data, work_key, precision_key)
+
+    order = [np.log(precision[i + 1] / precision[i]) / np.log(work[i + 1] / work[i]) for i in range(len(work) - 1)]
+
+    print(f'Order for {strategy} {handle}: {np.mean(order):.2f}')
+
+
 def plot_work_precision(
     problem,
     strategy,
@@ -318,13 +360,10 @@ def plot_work_precision(
     if comm_world.rank > 0 or get_forbidden_combinations(problem, strategy):
         return None
 
-    with open(get_path(problem, strategy, num_procs, handle=handle), 'rb') as f:
-        logger.debug(f'Loading file \"{get_path(problem, strategy, num_procs, handle=handle)}\"')
-        data = pickle.load(f)
+    data = load(problem=problem, strategy=strategy, num_procs=num_procs, handle=handle)
 
+    work, precision = extract_data(data, work_key, precision_key)
     keys = [key for key in data.keys() if key not in ['meta']]
-    work = [np.nanmean(data[key][work_key]) for key in keys]
-    precision = [np.nanmean(data[key][precision_key]) for key in keys]
 
     for key in [work_key, precision_key]:
         rel_variance = [np.std(data[me][key]) / max([np.nanmean(data[me][key]), 1.0]) for me in keys]
@@ -339,6 +378,15 @@ def plot_work_precision(
     )
 
     ax.loglog(work, precision, **style)
+
+    get_order(
+        problem=problem,
+        strategy=strategy,
+        num_procs=num_procs,
+        handle=handle,
+        work_key=work_key,
+        precision_key=precision_key,
+    )
 
     if 't' in [work_key, precision_key]:
         meta = data.get('meta', {})
@@ -1172,20 +1220,20 @@ def ERK_stiff_weirdness():
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     # vdp_stiffness_plot(runs=5, record=False)
-    # ERK_stiff_weirdness()
+    ERK_stiff_weirdness()
 
     params = {
         'mode': 'RK_comp',
-        'runs': 5,
+        'runs': 1,
         'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_quench,
     }
-    record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = False
+    single_problem(**params_single, work_key='dt_mean', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
@@ -1202,7 +1250,7 @@ if __name__ == "__main__":
     }
 
     for mode in ['RK_comp']:  # ['parallel_efficiency', 'compare_strategies']:
-        all_problems(**all_params, mode=mode)
+        # all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
     if comm_world.rank == 0:

@@ -615,7 +615,7 @@ def work_precision():  # pragma: no cover
         'base_path': 'data/paper',
     }
 
-    for mode in ['compare_strategies', 'parallel_efficiency']:
+    for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
         all_problems(**all_params, mode=mode)
 
     # Quench stuff
