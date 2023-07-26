@@ -60,7 +60,7 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
 
 
 def single_run(
-    problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None, hooks=None
+    problem, strategy, data, custom_description, num_procs=1, comm_world=None, problem_args=None, hooks=None, Tend=None
 ):
     """
     Make a single run of a particular problem with a certain strategy.
@@ -98,7 +98,7 @@ def single_run(
 
     stats, controller, _ = problem(
         custom_description=description,
-        Tend=strategy.get_Tend(problem, num_procs),
+        Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
         hook_class=[LogData, LogWork, LogGlobalErrorPostRun] + hooks,
         custom_controller_params=controller_params,
         use_MPI=True,
@@ -188,6 +188,7 @@ def record_work_precision(
     comm_world=None,
     problem_args=None,
     param_range=None,
+    Tend=None,
 ):
     """
     Run problem with strategy and record the cost parameters.
@@ -263,6 +264,7 @@ def record_work_precision(
                 comm_world=comm_world,
                 problem_args=problem_args,
                 num_procs=num_procs,
+                Tend=Tend,
             )
 
             comm_world.Barrier()
@@ -379,14 +381,14 @@ def plot_work_precision(
 
     ax.loglog(work, precision, **style)
 
-    get_order(
-        problem=problem,
-        strategy=strategy,
-        num_procs=num_procs,
-        handle=handle,
-        work_key=work_key,
-        precision_key=precision_key,
-    )
+    # get_order(
+    #     problem=problem,
+    #     strategy=strategy,
+    #     num_procs=num_procs,
+    #     handle=handle,
+    #     work_key=work_key,
+    #     precision_key=precision_key,
+    # )
 
     if 't' in [work_key, precision_key]:
         meta = data.get('meta', {})
@@ -454,6 +456,7 @@ def execute_configurations(
     runs,
     comm_world,
     plotting,
+    Tend=None,
 ):
     """
     Run for multiple configurations.
@@ -491,6 +494,7 @@ def execute_configurations(
                     comm_world=comm_world,
                     problem_args=config.get('problem_args', {}),
                     param_range=config.get('param_range', None),
+                    Tend=Tend,
                 )
             if plotting and comm_world.rank == 0:
                 logger.debug('Plotting')
@@ -733,7 +737,7 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        for num_procs in [5, 1]:
+        for num_procs in [5]:
             plotting_params = {'ls': ls[num_procs], 'label': f'GSSDC {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
@@ -742,6 +746,15 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
                 'handle': mode,
             }
+
+        plotting_params = {'ls': ls[1], 'label': f'SDC'}
+        configurations[1] = {
+            'strategies': [AdaptivityStrategy(True)],
+            'custom_description': desc,
+            'num_procs': 1,
+            'plotting_params': plotting_params,
+            'handle': mode,
+        }
 
         configurations[2] = {
             'strategies': [ERKStrategy(useMPI=True)],
@@ -1135,7 +1148,7 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):  #
 
 
 def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no cover
-    fig, axs = get_fig(2, 2, sharex=True)
+    fig, axs = get_fig(2, 2, sharex=True, sharey=True)
 
     # mus = [0, 5, 10, 15]
     mus = [0, 10, 20, 40]
@@ -1146,7 +1159,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
             'problem': run_vdp,
             'record': False,
             'work_key': 't',
-            'precision_key': 'e_global_rel',
+            'precision_key': 'e_global',
             'comm_world': MPI.COMM_WORLD,
             **kwargs,
         }
@@ -1154,7 +1167,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
         params['plotting'] = params['comm_world'].rank == 0
 
         configurations = get_configs(mode=f'vdp_stiffness-{mus[i]}', problem=run_vdp)
-        execute_configurations(**params, ax=axs.flatten()[i], decorate=True, configurations=configurations)
+        execute_configurations(**params, ax=axs.flatten()[i], decorate=True, configurations=configurations, Tend=100)
         axs.flatten()[i].set_title(rf'$\mu={{{mus[i]}}}$')
 
     fig.suptitle('Van der Pol')
