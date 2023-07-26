@@ -15,7 +15,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 10
+LOGGER_LEVEL = 30
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -751,13 +751,13 @@ def get_configs(mode, problem):
             'custom_description': problem_desc,
             #'param_range': [1e-2],
         }
-        configurations[3] = {
-            'strategies': [DIRKStrategy(useMPI=True)],
-            'num_procs': 1,
-            'handle': mode,
-            'plotting_params': {'label': 'DIRK4(3)'},
-            'custom_description': problem_desc,
-        }
+        # configurations[3] = {
+        #     'strategies': [DIRKStrategy(useMPI=True)],
+        #     'num_procs': 1,
+        #     'handle': mode,
+        #     'plotting_params': {'label': 'DIRK4(3)'},
+        #     'custom_description': problem_desc,
+        # }
         configurations[4] = {
             'strategies': [ESDIRKStrategy(useMPI=True)],
             'num_procs': 1,
@@ -1138,7 +1138,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
     fig, axs = get_fig(2, 2, sharex=True)
 
     # mus = [0, 5, 10, 15]
-    mus = [0, 10, 20, 30]
+    mus = [0, 10, 20, 40]
 
     for i in range(len(mus)):
         params = {
@@ -1219,8 +1219,8 @@ def ERK_stiff_weirdness():
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    # vdp_stiffness_plot(runs=5, record=False)
-    ERK_stiff_weirdness()
+    vdp_stiffness_plot(runs=5, record=True)
+    # ERK_stiff_weirdness()
 
     params = {
         'mode': 'RK_comp',
