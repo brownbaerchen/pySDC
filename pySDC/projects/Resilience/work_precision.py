@@ -672,9 +672,6 @@ def get_configs(mode, problem):
             AdaptivityStrategy,
             BaseStrategy,
             IterateStrategy,
-            ERKStrategy,
-            DIRKStrategy,
-            ESDIRKStrategy,
         )
 
         desc = {}
@@ -692,30 +689,21 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        configurations[-1] = {
-            'strategies': [
-                ERKStrategy(useMPI=True),
-                DIRKStrategy(useMPI=True),
-                ESDIRKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-        }
-
         for num_procs in [4, 2, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
+            plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
-            # plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
-            # configurations[num_procs + 100] = {
-            #    'strategies': [IterateStrategy(True)],
-            #    'custom_description': descIterate,
-            #    'num_procs': num_procs,
-            #    'plotting_params': plotting_params,
-            # }
+            plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
+            configurations[num_procs + 100] = {
+                'strategies': [IterateStrategy(True)],
+                'custom_description': descIterate,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
 
     elif mode[:13] == 'vdp_stiffness':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
@@ -1151,7 +1139,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
     fig, axs = get_fig(2, 2, sharex=True, sharey=True)
 
     # mus = [0, 5, 10, 15]
-    mus = [0, 10, 20, 40]
+    mus = [20, 40]
 
     for i in range(len(mus)):
         params = {
@@ -1232,7 +1220,7 @@ def ERK_stiff_weirdness():
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(runs=5, record=True)
+    vdp_stiffness_plot(runs=1, record=True)
     # ERK_stiff_weirdness()
 
     params = {

@@ -259,7 +259,7 @@ class BasicRestartingMPI(BasicRestarting):
         Returns:
             None
         """
-        assert S.status.slot == comm.rank
+        crash_now = False
 
         if S.status.first:
             # check if we performed too many restarts
@@ -268,7 +268,7 @@ class BasicRestartingMPI(BasicRestarting):
 
             if self.buffers.max_restart_reached and S.status.restart:
                 if self.params.crash_after_max_restarts:
-                    raise ConvergenceError(f"Restarted {S.status.restarts_in_a_row} time(s) already, surrendering now.")
+                    crash_now = True
                 self.log(
                     f"Step(s) restarted {S.status.restarts_in_a_row} time(s) already, maximum reached, moving \
 on...",
@@ -276,24 +276,29 @@ on...",
                 )
         elif not S.status.prev_done and not self.params.restart_from_first_step:
             # receive information about restarts from earlier ranks
-            buff = np.empty(2, dtype=bool)
+            buff = np.empty(3, dtype=bool)
             self.Recv(comm=comm, source=S.status.slot - 1, buffer=[buff, self.MPI_BOOL])
             self.buffers.restart_earlier = buff[0]
             self.buffers.max_restart_reached = buff[1]
+            crash_now = buff[2]
 
         # decide whether to restart
         S.status.restart = (S.status.restart or self.buffers.restart_earlier) and not self.buffers.max_restart_reached
 
         # send information about restarts forward
         if not S.status.last and not self.params.restart_from_first_step:
-            buff = np.empty(2, dtype=bool)
+            buff = np.empty(3, dtype=bool)
             buff[0] = S.status.restart
             buff[1] = self.buffers.max_restart_reached
+            buff[2] = crash_now
             self.Send(comm, dest=S.status.slot + 1, buffer=[buff, self.MPI_BOOL])
 
         if self.params.restart_from_first_step:
             max_restart_reached = comm.bcast(S.status.restarts_in_a_row > self.params.max_restarts, root=0)
             S.status.restart = comm.allreduce(S.status.restart, op=self.OR) and not max_restart_reached
+
+        if crash_now:
+            raise ConvergenceError("Surrendering because of too many restarts...")
 
         return None
 
