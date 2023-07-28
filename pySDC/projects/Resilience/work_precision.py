@@ -540,12 +540,24 @@ def get_configs(mode, problem):
         }
     elif mode == 'step_size_limiting':
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
         limits = [25.0, 50.0]
         colors = ['teal', 'magenta']
         markers = ['v', 'x']
         for i in range(len(limits)):
+            configurations[i] = {
+                'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': limits[i]}}},
+                'handle': f'steplimiter{limits[i]:.0f}',
+                'strategies': [AdaptivityStrategy(useMPI=True), ESDIRKStrategy(useMPI=True)],
+                'plotting_params': {
+                    'color': colors[i],
+                    'marker': markers[i],
+                    'label': rf'$\Delta t \leq {{{limits[i]:.0f}}}$',
+                    'ls': '',
+                },
+                'num_procs': 1,
+            }
             configurations[i] = {
                 'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': limits[i]}}},
                 'handle': f'steplimiter{limits[i]:.0f}',
@@ -556,12 +568,14 @@ def get_configs(mode, problem):
                     'label': rf'$\Delta t \leq {{{limits[i]:.0f}}}$',
                     'ls': '',
                 },
+                'num_procs': 5,
             }
         configurations[99] = {
             'custom_description': {},
             'handle': 'no limits',
             'plotting_params': {'label': 'no limiter', 'ls': ''},
             'strategies': [AdaptivityStrategy(useMPI=True)],
+            'num_procs': 1,
         }
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
@@ -735,7 +749,7 @@ def get_configs(mode, problem):
                 'handle': mode,
             }
 
-        plotting_params = {'ls': ls[1], 'label': f'SDC'}
+        plotting_params = {'ls': ls[1], 'label': 'SDC'}
         configurations[1] = {
             'strategies': [AdaptivityStrategy(True)],
             'custom_description': desc,
@@ -1139,7 +1153,7 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
     fig, axs = get_fig(2, 2, sharex=True, sharey=True)
 
     # mus = [0, 5, 10, 15]
-    mus = [20, 40]
+    mus = [0, 10, 20, 40]
 
     for i in range(len(mus)):
         params = {
@@ -1220,21 +1234,21 @@ def ERK_stiff_weirdness():
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(runs=1, record=True)
+    vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
+        'mode': 'step_size_limiting',
         'runs': 1,
-        'num_procs': 1,  # min(comm_world.size, 5),
+        #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
         'problem': run_quench,
     }
-    record = False
-    single_problem(**params_single, work_key='dt_mean', precision_key='e_global', record=record)
+    record = True
+    single_problem(**params_single, work_key='e_global', precision_key='dt_mean', record=record)
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
 
     # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
@@ -1251,7 +1265,8 @@ if __name__ == "__main__":
     }
 
     for mode in ['RK_comp']:  # ['parallel_efficiency', 'compare_strategies']:
-        # all_problems(**all_params, mode=mode)
+        break
+        all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
     if comm_world.rank == 0:
