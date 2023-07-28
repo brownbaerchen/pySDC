@@ -545,20 +545,9 @@ def get_configs(mode, problem):
         limits = [25.0, 50.0]
         colors = ['teal', 'magenta']
         markers = ['v', 'x']
+        markersize = 9
         for i in range(len(limits)):
             configurations[i] = {
-                'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': limits[i]}}},
-                'handle': f'steplimiter{limits[i]:.0f}',
-                'strategies': [AdaptivityStrategy(useMPI=True), ESDIRKStrategy(useMPI=True)],
-                'plotting_params': {
-                    'color': colors[i],
-                    'marker': markers[i],
-                    'label': rf'$\Delta t \leq {{{limits[i]:.0f}}}$',
-                    'ls': '',
-                },
-                'num_procs': 1,
-            }
-            configurations[i + 100000] = {
                 'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': limits[i]}}},
                 'handle': f'steplimiter{limits[i]:.0f}',
                 'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -567,13 +556,18 @@ def get_configs(mode, problem):
                     'marker': markers[i],
                     'label': rf'$\Delta t \leq {{{limits[i]:.0f}}}$',
                     'ls': '',
+                    'markersize': markersize,
                 },
-                'num_procs': 5,
+                'num_procs': 1,
             }
         configurations[99] = {
             'custom_description': {},
             'handle': 'no limits',
-            'plotting_params': {'label': 'no limiter', 'ls': ''},
+            'plotting_params': {
+                'label': 'no limiter',
+                'ls': '',
+                'markersize': markersize,
+            },
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'num_procs': 1,
         }
@@ -1239,7 +1233,7 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'step_size_limiting',
-        'runs': 1,
+        'runs': 5,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
