@@ -558,7 +558,7 @@ def get_configs(mode, problem):
                 },
                 'num_procs': 1,
             }
-            configurations[i] = {
+            configurations[i + 100000] = {
                 'custom_description': {'convergence_controllers': {StepSizeLimiter: {'dt_max': limits[i]}}},
                 'handle': f'steplimiter{limits[i]:.0f}',
                 'strategies': [AdaptivityStrategy(useMPI=True)],
