@@ -4,7 +4,7 @@ from pySDC.implementations.datatype_classes.mesh import mesh
 
 
 class LorenzAttractor(ptype):
-    """
+    r"""
     Simple script to run a Lorenz attractor problem.
 
     The Lorenz attractor is a system of three ordinary differential equations (ODEs) that exhibits some chaotic behaviour.
@@ -192,6 +192,7 @@ class LorenzAttractor(ptype):
         me : dtype_u
             The approximated exact solution.
         """
+
         me = self.dtype_u(self.init)
 
         if t > 0:
