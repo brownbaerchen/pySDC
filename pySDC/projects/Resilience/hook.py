@@ -86,7 +86,7 @@ class LogUAllIter(hooks):
     """
 
     def post_iteration(self, step, level_number):
-        super(LogUAllIter, self).post_iteration(step, level_number)
+        super().post_iteration(step, level_number)
 
         L = step.levels[level_number]
         L.sweep.compute_end_point()
@@ -118,3 +118,35 @@ class LogUAllIter(hooks):
             type='error_extrapolation_estimate',
             value=L.status.get('error_extrapolation_estimate'),
         )
+
+
+class LogU0Increment(hooks):
+    """
+    Log the increment in the initial conditions between iterations. I want to use this to analyse GSSDC a bit.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._u0_last = [None]
+
+    def post_iteration(self, step, level_number):
+        super().post_iteration(step, level_number)
+
+        lvl = step.levels[level_number]
+
+        if None not in self._u0_last:
+            self.add_to_stats(
+                process=step.status.slot,
+                time=lvl.time,
+                level=lvl.level_index,
+                iter=step.status.iter,
+                sweep=lvl.status.sweep,
+                type='u0_increment',
+                value=abs(lvl.u[0] - self._u0_last) / abs(lvl.u[0]),
+            )
+
+        self._u0_last = lvl.u[0] * 1.0
+
+    def post_step(self, step, level_number):
+        super().post_step(step, level_number)
+        self._u0_last = [None]

@@ -33,6 +33,10 @@ MAPPINGS = {
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
     'e_embedded_max': ('error_embedded_estimate', max, False),
+    'u0_increment_max': ('u0_increment', max, None),
+    'u0_increment_mean': ('u0_increment', np.mean, None),
+    'u0_increment_max_no_restart': ('u0_increment', max, False),
+    'u0_increment_mean_no_restart': ('u0_increment', np.mean, False),
 }
 
 logger = logging.getLogger('WorkPrecision')
@@ -189,6 +193,7 @@ def record_work_precision(
     problem_args=None,
     param_range=None,
     Tend=None,
+    hooks=None,
 ):
     """
     Run problem with strategy and record the cost parameters.
@@ -264,6 +269,7 @@ def record_work_precision(
                 comm_world=comm_world,
                 problem_args=problem_args,
                 num_procs=num_procs,
+                hooks=hooks,
                 Tend=Tend,
             )
 
@@ -428,6 +434,10 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'dt_max': r'$\Delta t_\mathrm{max}$',
         'dt_mean': r'$\bar{\Delta t}$',
         'param': 'parameter',
+        'u0_increment_max': r'$\| \Delta u_0 \|_{\infty} $',
+        'u0_increment_mean': r'$\bar{\Delta u_0}$',
+        'u0_increment_max_no_restart': r'$\| \Delta u_0 \|_{\infty} $ (restarts excluded)',
+        'u0_increment_mean_no_restart': r'$\bar{\Delta u_0}$ (restarts excluded)',
     }
 
     if not title_only:
@@ -494,6 +504,7 @@ def execute_configurations(
                     comm_world=comm_world,
                     problem_args=config.get('problem_args', {}),
                     param_range=config.get('param_range', None),
+                    hooks=config.get('hooks', None),
                     Tend=Tend,
                 )
             if plotting and comm_world.rank == 0:
@@ -696,6 +707,7 @@ def get_configs(mode, problem):
             4: ':',
             5: ':',
         }
+        from hook import LogU0Increment
 
         for num_procs in [4, 2, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
@@ -704,6 +716,7 @@ def get_configs(mode, problem):
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
+                'hooks': [LogU0Increment],
             }
             plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
             configurations[num_procs + 100] = {
@@ -711,6 +724,15 @@ def get_configs(mode, problem):
                 'custom_description': descIterate,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
+                'hooks': [LogU0Increment],
+            }
+            plotting_params = {'ls': ls[num_procs], 'label': fr'fixed {num_procs} procs'}
+            configurations[num_procs + 999] = {
+                'strategies': [BaseStrategy(True)],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+                'hooks': [LogU0Increment],
             }
 
     elif mode[:13] == 'vdp_stiffness':
@@ -1228,26 +1250,22 @@ def ERK_stiff_weirdness():
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    vdp_stiffness_plot(runs=1, record=False)
+    # vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'step_size_limiting',
-        'runs': 5,
+        'mode': 'compare_strategies',
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Schroedinger,
     }
     record = True
-    single_problem(**params_single, work_key='e_global', precision_key='dt_mean', record=record)
-    # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='k_Newton', record=record)
-
-    # single_problem(**params_single, work_key='k_Newton_no_restart', precision_key='e_global_rel', record=False)
-    # single_problem(**params_single, work_key='param', precision_key='e_global_rel', record=False)
-    # ODEs(**params, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params_single, work_key='t', precision_key='u0_increment_mean', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {
         'record': False,
