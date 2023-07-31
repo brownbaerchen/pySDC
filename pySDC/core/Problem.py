@@ -31,6 +31,28 @@ class WorkCounter(object):
     def __call__(self, *args, **kwargs):
         # *args and **kwargs are necessary for gmres
         self.niter += 1
+        return 0
+
+class WorkCounter2(object):
+    """
+    Utility class for counting iterations.
+
+    Contains one attribute `niter` initialized to zero during
+    instantiation, which can be incremented by calling object as
+    a function, e.g
+
+    >>> count = WorkCounter()  # => niter = 0
+    >>> count()                # => niter = 1
+    >>> count()                # => niter = 2
+    """
+
+    def __init__(self):
+        self.niter = 0
+
+    def __call__(self, *args, **kwargs):
+        # *args and **kwargs are necessary for gmres
+        self.niter += 1
+        return 0
 
 
 class ptype(RegisterParams):
@@ -112,6 +134,8 @@ class ptype(RegisterParams):
         Returns:
             numpy.ndarray: Reference solution
         """
+        counter = WorkCounter2()
+
         import numpy as np
         from scipy.integrate import solve_ivp
 
@@ -120,6 +144,8 @@ class ptype(RegisterParams):
         t_init = 0 if t_init is None else t_init
 
         u_shape = u_init.shape
+        sol = solve_ivp(eval_rhs, (t_init, t), u_init.flatten(), rtol=tol, atol=tol, events=counter, **kwargs)
+        print(counter.niter)
         return (
-            solve_ivp(eval_rhs, (t_init, t), u_init.flatten(), rtol=tol, atol=tol, **kwargs).y[:, -1].reshape(u_shape)
+            sol.y[:, -1].reshape(u_shape)
         )
