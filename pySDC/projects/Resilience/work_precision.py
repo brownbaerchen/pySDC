@@ -16,7 +16,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 15
+LOGGER_LEVEL = 25
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -225,7 +225,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-3, -2, -1, 0, 1, 2, 3]
+        exponents = [-3, -2, -1, 0, 1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -976,6 +976,7 @@ def get_configs(mode, problem):
                 'custom_description': copy.deepcopy(desc),
                 'num_procs': 1,
                 'plotting_params': plotting_params,
+                'handle': label,
             }
             i += 1
     elif mode == 'newton_tol':
@@ -1261,14 +1262,13 @@ def ERK_stiff_weirdness():
     fig, axs = plt.subplots(1, 3)
 
     strategy = ERKStrategy(True)
-    problem = run_Schroedinger
-    # epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
-    epsilons = [1e-3, 1e-5, 1e-7]
+    problem = run_vdp
+    epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
 
     data = {}
     desc = strategy.get_custom_description(problem, 1)
     where = strategy.precision_parameter_loc
-    # desc['problem_params'] = {'mu': 30}
+    desc['problem_params'] = {'mu': 30}
     desc['level_params'] = {'dt': 1e-4}
 
     for eps in epsilons:
@@ -1282,7 +1282,6 @@ def ERK_stiff_weirdness():
             custom_description=desc,
             num_procs=1,
             comm_world=MPI.COMM_WORLD,
-            Tend=0.1,
         )
         stats = data[eps]['stats']
         #        e = get_sorted(stats, type='e_global_post_step', recomputed=False)
@@ -1290,16 +1289,12 @@ def ERK_stiff_weirdness():
         #
         e = get_sorted(stats, type='e_local_post_step', recomputed=False)
         axs[0].plot([me[0] for me in e], [me[1] for me in e], ls='-')
-        axs[0].set_title('local error post step')
 
         e = get_sorted(stats, type='dt', recomputed=False)
         axs[1].plot([me[0] for me in e], [me[1] for me in e], ls='-')
-        axs[1].set_title('step size')
-        axs[1].set_yscale('log')
 
         e = get_sorted(stats, type='work_rhs', recomputed=None)
         axs[2].plot([me[0] for me in e], np.cumsum([me[1] for me in e]), ls='-')
-        axs[2].set_title('rhs evals')
 
     axs[0].set_yscale('log')
     print([(eps, data[eps]['t']) for eps in epsilons])
@@ -1313,7 +1308,7 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'imex',
-        'runs': 5,
+        'runs': 3,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
@@ -1321,7 +1316,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
