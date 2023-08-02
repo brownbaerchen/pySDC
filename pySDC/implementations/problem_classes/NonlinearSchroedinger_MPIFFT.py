@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import newton_krylov
 from scipy.sparse.linalg import spsolve, gmres, inv
+from scipy.optimize.nonlin import NoConvergence
 import scipy.sparse as sp
 from mpi4py import MPI
 from mpi4py_fft import PFFT
@@ -231,7 +232,7 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
         self.work_counters['rhs']()
         return f
 
-    def solve_system_GARBAGE(self, rhs, factor, u0, t):
+    def solve_system_plonk(self, rhs, factor, u0, t):
         """
         Solve the nonlinear system `(1 - factor * f)(u) = rhs` using a scipy Newton-Krylov solver.
         See this page for details on the solver: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton_krylov.html
@@ -258,32 +259,97 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
 
         i = 0
 
-        x = u0.real.flatten()
-        y = u0.imag.flatten()
+        x = u0.real
+        y = u0.imag
 
-        Id = np.ones_like(x)  # sp.eye(x.shape[0]).toarray().flatten()
+        Id = sp.eye(x.shape[0]).toarray()
         K2 = self.K2.flatten()
+
+        while i < self.liniter:
+            G = (
+                2 * factor * self.ndim * self.c * (x**2 * y + y**3)
+                + (Id + factor * self.K2) * x
+                - rhs.real
+                - 1j
+                * (2 * factor * self.ndim * self.c * (y**2 * x + x**3) - (Id + factor * self.K2) * y - rhs.imag)
+            ).flatten()
+
+            J = np.array(
+                [
+                    [
+                        4 * factor * self.ndim * self.c * x * y + Id + factor * self.K2,
+                        2 * factor * self.ndim * self.c * (x**2 + 3 * y**2),
+                    ],
+                    [
+                        -2 * factor * self.ndim * self.c * (2 * y**2 + 3 * x**2),
+                        -(4 * factor * self.ndim * self.c * y * x - Id - factor * (self.K2)),
+                    ],
+                ]
+            )
+
+            breakpoint()
+            delta = np.linalg.solve(J, G)
+
+            # update solution
+            x = x - delta[0]
+            y = y - delta[1]
+
+            self.work_counters['Newton']()
+            if abs(delta) < self.lintol:
+                break
+
+        me[:] = (x + i * y).reshape(self.init[0])
+        return me
+
+    def solve_system_my_add(self, rhs, factor, u0, t):
+        """
+        Solve the nonlinear system `(1 - factor * f)(u) = rhs` using a scipy Newton-Krylov solver.
+        See this page for details on the solver: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton_krylov.html
+
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the linear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time (e.g. for time-dependent BCs).
+
+        Returns
+        -------
+        me : dtype_u
+            The solution as mesh.
+        """
+        assert self.spectral, 'Not implemented'
+
+        me = self.dtype_u(self.init)
+
+        i = 0
+
+        x = u0.real
+        y = u0.imag
+
+        Id = sp.eye(x.shape[0]).toarray()
 
         while i < self.liniter:
             G = np.array(
                 [
-                    2 * factor * self.ndim * self.c * (x**2 * y + y**3)
-                    + (Id + factor * K2) * x
-                    - rhs.real.flatten(),
-                    -(2 * factor * self.ndim * self.c * (y**2 * x + x**3) - (Id + factor * K2) * y)
-                    + rhs.imag.flatten(),
+                    2 * factor * self.ndim * self.c * (x**2 * y + y**3) + (Id + factor * self.K2) * x - rhs.real,
+                    -(2 * factor * self.ndim * self.c * (y**2 * x + x**3) - (Id + factor * self.K2) * y) + rhs.imag,
                 ]
             )
 
             J = np.array(
                 [
                     [
-                        4 * factor * self.ndim * self.c * x * y + Id + factor * K2,
+                        4 * factor * self.ndim * self.c * x * y + Id + factor * self.K2,
                         2 * factor * self.ndim * self.c * (x**2 + 3 * y**2),
                     ],
                     [
                         -2 * factor * self.ndim * self.c * (2 * y**2 + 3 * x**2),
-                        -(4 * factor * self.ndim * self.c * y * x - Id - factor * (K2)),
+                        -(4 * factor * self.ndim * self.c * y * x - Id - factor * (self.K2)),
                     ],
                 ]
             )
@@ -336,9 +402,12 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
             """
             return x - factor * self.eval_f(u=x, t=t) - rhs
 
-        sol = newton_krylov(
-            F=F, xin=u0.copy(), maxiter=self.liniter, x_tol=self.lintol, callback=self.work_counters['Newton']
-        )
+        try:
+            sol = newton_krylov(
+                F=F, xin=u0.copy(), maxiter=self.liniter, x_tol=self.lintol, callback=self.work_counters['Newton']
+            )
+        except NoConvergence as e:
+            sol = e.args[0]
 
         me[:] = sol
         return me
