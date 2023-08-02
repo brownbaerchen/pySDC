@@ -209,7 +209,7 @@ def compare_recovery_rate_problems(**kwargs):  # pragma: no cover
     for ax in axs.flatten():
         ax.get_legend().remove()
 
-    axs[0, 0].set_ylim((0, 1))
+    # axs[0, 0].set_ylim((0, 1))
 
     if kwargs.get('strategy_type', 'SDC') == 'SDC':
         axs[1, 1].legend(frameon=False)
@@ -615,8 +615,8 @@ def work_precision():  # pragma: no cover
         'base_path': 'data/paper',
     }
 
-    for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
-        all_problems(**all_params, mode=mode)
+    # for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
+    #    all_problems(**all_params, mode=mode)
 
     # Quench stuff
     fig, axs = get_fig(x=3, y=1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.47))
@@ -696,17 +696,17 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
-    # plot_vdp_solution()
-    # plot_quench_solution()
-    # plot_recovery_rate(get_stats(run_vdp))
-    # plot_fault_vdp(0)
-    # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
+    # work_precision()
+    plot_vdp_solution()
+    plot_quench_solution()
+    plot_recovery_rate(get_stats(run_vdp))
+    plot_fault_vdp(0)
+    plot_fault_vdp(13)
+    plot_adaptivity_stuff()
 
-    # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
-    # for i in [1, 4]:
-    #     compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
+    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
+    for i in [1, 4]:
+        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover

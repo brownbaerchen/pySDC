@@ -14,7 +14,7 @@ def get_random_float():
     """
     rand = 0.0
     while np.isclose(rand, 0.0, atol=1e-12):
-        rand = np.random.uniform(low=-1.797693134862315e307, high=1.797693134862315e307, size=1)[0]
+        rand = np.random.uniform(low=np.finfo(float).min / 1e1, high=np.finfo(float).max / 1e1, size=1)[0]
     return rand
 
 

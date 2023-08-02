@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import pickle
 import logging
 from time import perf_counter
+import copy
 
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
@@ -15,7 +16,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 15
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -765,12 +766,11 @@ def get_configs(mode, problem):
                 'handle': mode,
             }
 
-        plotting_params = {'ls': ls[1], 'label': 'SDC'}
         configurations[1] = {
             'strategies': [AdaptivityStrategy(True)],
             'custom_description': desc,
             'num_procs': 1,
-            'plotting_params': plotting_params,
+            'plotting_params': {'ls': ls[1], 'label': 'SDC'},
             'handle': mode,
         }
 
@@ -871,19 +871,38 @@ def get_configs(mode, problem):
             'plotting_params': {'ls': '-.'},
         }
     elif mode == 'preconditioners':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, IterateStrategy, BaseStrategy
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            IterateStrategy,
+            BaseStrategy,
+            ESDIRKStrategy,
+            ERKStrategy,
+        )
 
-        strategies = [AdaptivityStrategy(useMPI=True), IterateStrategy(useMPI=True), BaseStrategy(useMPI=True)]
+        strategies = [AdaptivityStrategy(useMPI=True)]
 
-        precons = ['IE', 'LU', 'MIN']
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+        desc['step_params'] = {'maxiter': 5}
+
+        precons = ['IE', 'LU']
         ls = ['-', '--', '-.', ':']
         for i in range(len(precons)):
+            desc['sweeper_params']['QI'] = precons[i]
             configurations[i] = {
                 'strategies': strategies,
-                'custom_description': {'sweeper_params': {'QI': precons[i]}},
+                'custom_description': copy.deepcopy(desc),
                 'handle': precons[i],
                 'plotting_params': {'ls': ls[i]},
             }
+
+        configurations[-1] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+                ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+        }
 
     elif mode == 'RK_comp':
         from pySDC.projects.Resilience.strategies import (
@@ -910,12 +929,17 @@ def get_configs(mode, problem):
             5: ':',
         }
 
+        desc_RK = {}
+        if problem.__name__ in ['run_Schroedinger']:
+            desc_RK['problem_params'] = {'imex': False}
+
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
                 ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
+            'custom_description': desc_RK,
         }
 
         for num_procs in [4, 1]:
@@ -1254,7 +1278,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_strategies',
+        'mode': 'RK_comp',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1264,7 +1288,7 @@ if __name__ == "__main__":
         'problem': run_Schroedinger,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='u0_increment_mean', record=record)
+    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {

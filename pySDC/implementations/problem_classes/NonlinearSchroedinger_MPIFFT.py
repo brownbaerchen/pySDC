@@ -1,4 +1,7 @@
 import numpy as np
+from scipy.optimize import newton_krylov
+from scipy.sparse.linalg import spsolve, gmres, inv
+import scipy.sparse as sp
 from mpi4py import MPI
 from mpi4py_fft import PFFT
 
@@ -29,7 +32,7 @@ class nonlinearschroedinger_imex(ptype):
         """Initialization routine"""
 
         if nvars is None:
-            nvars = [(128, 128)]
+            nvars = (128, 128)
 
         if not L == 2.0 * np.pi:
             raise ProblemError(f'Setup not implemented, L has to be 2pi, got {L}')
@@ -183,4 +186,159 @@ class nonlinearschroedinger_imex(ptype):
         else:
             me[:] = nls_exact_1D(self.ndim * t, sum(self.X), self.c)
 
+        return me
+
+
+class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
+    dtype_u = mesh
+    dtype_f = mesh
+
+    def __init__(self, lintol=1e-9, liniter=99, **kwargs):
+        super().__init__(**kwargs)
+        self._makeAttributeAndRegister('liniter', 'lintol', localVars=locals(), readOnly=False)
+
+        self.work_counters['Newton'] = WorkCounter()
+
+    def eval_f(self, u, t):
+        """
+        Routine to evaluate the right-hand side of the problem.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
+
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side of the problem.
+        """
+
+        f = self.dtype_f(self.init)
+
+        if self.spectral:
+            tmp = self.fft.backward(u)
+            tmpf = self.ndim * self.c * 2j * np.absolute(tmp) ** 2 * tmp
+            f[:] = -self.K2 * 1j * u + self.fft.forward(tmpf)
+
+        else:
+            u_hat = self.fft.forward(u)
+            lap_u_hat = -self.K2 * 1j * u_hat
+            f[:] = self.fft.backward(lap_u_hat) + self.ndim * self.c * 2j * np.absolute(u) ** 2 * u
+
+        self.work_counters['rhs']()
+        return f
+
+    def solve_system_GARBAGE(self, rhs, factor, u0, t):
+        """
+        Solve the nonlinear system `(1 - factor * f)(u) = rhs` using a scipy Newton-Krylov solver.
+        See this page for details on the solver: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton_krylov.html
+
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the linear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time (e.g. for time-dependent BCs).
+
+        Returns
+        -------
+        me : dtype_u
+            The solution as mesh.
+        """
+        assert self.spectral, 'Not implemented'
+
+        me = self.dtype_u(self.init)
+
+        i = 0
+
+        x = u0.real.flatten()
+        y = u0.imag.flatten()
+
+        Id = np.ones_like(x)  # sp.eye(x.shape[0]).toarray().flatten()
+        K2 = self.K2.flatten()
+
+        while i < self.liniter:
+            G = np.array(
+                [
+                    2 * factor * self.ndim * self.c * (x**2 * y + y**3)
+                    + (Id + factor * K2) * x
+                    - rhs.real.flatten(),
+                    -(2 * factor * self.ndim * self.c * (y**2 * x + x**3) - (Id + factor * K2) * y)
+                    + rhs.imag.flatten(),
+                ]
+            )
+
+            J = np.array(
+                [
+                    [
+                        4 * factor * self.ndim * self.c * x * y + Id + factor * K2,
+                        2 * factor * self.ndim * self.c * (x**2 + 3 * y**2),
+                    ],
+                    [
+                        -2 * factor * self.ndim * self.c * (2 * y**2 + 3 * x**2),
+                        -(4 * factor * self.ndim * self.c * y * x - Id - factor * (K2)),
+                    ],
+                ]
+            )
+
+            breakpoint()
+            delta = np.linalg.solve(J, G)
+
+            # update solution
+            x = x - delta[0]
+            y = y - delta[1]
+
+            self.work_counters['Newton']()
+            if abs(delta) < self.lintol:
+                break
+
+        me[:] = (x + i * y).reshape(self.init[0])
+        return me
+
+    def solve_system(self, rhs, factor, u0, t):
+        """
+        Solve the nonlinear system `(1 - factor * f)(u) = rhs` using a scipy Newton-Krylov solver.
+        See this page for details on the solver: https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.newton_krylov.html
+
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the linear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time (e.g. for time-dependent BCs).
+
+        Returns
+        -------
+        me : dtype_u
+            The solution as mesh.
+        """
+        me = self.dtype_u(self.init)
+
+        # assemble the nonlinear function F for the solver
+        def F(x):
+            """
+            Nonlinear function for the scipy solver.
+
+            Args:
+                x : dtype_u
+                    Current solution
+            """
+            return x - factor * self.eval_f(u=x, t=t) - rhs
+
+        sol = newton_krylov(
+            F=F, xin=u0.copy(), maxiter=self.liniter, x_tol=self.lintol, callback=self.work_counters['Newton']
+        )
+
+        me[:] = sol
         return me
