@@ -47,6 +47,47 @@ def test_imex_vs_fully_implicit(spectral):
     assert e_imex < 7e-2, 'Error unexpectedly large in IMEX nonlinear Schroedinger problem'
     assert e_full < 2e-5, 'Error unexpectedly large in fully implicit Schroedinger problem'
 
+    # check number of right hand side evaluations
+    assert (
+        imex.work_counters['rhs'].niter == full.work_counters['rhs'].niter
+    ), 'Did not log the same number of right hand side evaluations'
+
+
+@pytest.mark.mpi4py
+def test_preconditioner():
+    import numpy as np
+    from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import (
+        nonlinearschroedinger_fully_implicit,
+        nonlinearschroedinger_imex,
+    )
+
+    params = {
+        'spectral': True,
+        'nvars': (32, 32),
+    }
+    t = 0
+
+    prec = nonlinearschroedinger_fully_implicit(**params, use_preconditioner=True)
+    base = nonlinearschroedinger_fully_implicit(**params, use_preconditioner=False)
+
+    # check solver with one step of implicit Euler
+    dt = 1e-2
+    u0 = prec.u_exact(t)
+    args = {
+        'rhs': u0.copy(),
+        'factor': dt,
+        'u0': u0.copy(),
+        't': t,
+    }
+    u_prec = prec.solve_system(**args)
+    u_base = base.solve_system(**args)
+    u_exact = prec.u_exact(t + dt)
+
+    work_prec = prec.work_counters['newton'].niter
+    work_base = base.work_counters['newton'].niter
+    print(work_prec, work_base)
+    print(abs(u_prec - u_base))
+
 
 if __name__ == '__main__':
-    test_imex_vs_fully_implicit(True)
+    test_preconditioner()

@@ -951,9 +951,7 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
             }
     elif mode == 'imex':
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityStrategy,
-        )
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
@@ -967,10 +965,19 @@ def get_configs(mode, problem):
             5: ':',
         }
 
+        desc_RK = {}
+        desc_RK['problem_params'] = {'imex': False}
+        configurations[-1] = {
+            'strategies': [
+                ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            'custom_description': desc_RK,
+        }
         i = 10
         for imex, label, ls in zip([True, False], ['IMEX', 'fully implicit'], ['-', ':']):
             desc['problem_params'] = {'imex': imex}
-            plotting_params = {'ls': ls, 'label': label}
+            plotting_params = {'ls': ls, 'label': f'{label} SDC'}
             configurations[i] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': copy.deepcopy(desc),
@@ -1316,7 +1323,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 

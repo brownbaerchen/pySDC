@@ -194,11 +194,11 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, lintol=1e-9, liniter=99, **kwargs):
+    def __init__(self, lintol=1e-9, liniter=99, use_preconditioner=False, **kwargs):
         super().__init__(**kwargs)
-        self._makeAttributeAndRegister('liniter', 'lintol', localVars=locals(), readOnly=False)
+        self._makeAttributeAndRegister('liniter', 'lintol', 'use_preconditioner', localVars=locals(), readOnly=False)
 
-        self.work_counters['Newton'] = WorkCounter()
+        self.work_counters['newton'] = WorkCounter()
 
     def eval_f(self, u, t):
         """
@@ -294,7 +294,7 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
             x = x - delta[0]
             y = y - delta[1]
 
-            self.work_counters['Newton']()
+            self.work_counters['newton']()
             if abs(delta) < self.lintol:
                 break
 
@@ -361,7 +361,7 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
             x = x - delta[0]
             y = y - delta[1]
 
-            self.work_counters['Newton']()
+            self.work_counters['newton']()
             if abs(delta) < self.lintol:
                 break
 
@@ -400,11 +400,22 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
                 x : dtype_u
                     Current solution
             """
+            self.work_counters['rhs'].decrement()
             return x - factor * self.eval_f(u=x, t=t) - rhs
+
+        if self.spectral and self.use_preconditioner:
+            M = sp.diags((rhs / (1.0 + factor * self.K2 * 1j)).reshape(1024))
+        else:
+            M = None
 
         try:
             sol = newton_krylov(
-                F=F, xin=u0.copy(), maxiter=self.liniter, x_tol=self.lintol, callback=self.work_counters['Newton']
+                F=F,
+                xin=u0.copy(),
+                maxiter=self.liniter,
+                x_tol=self.lintol,
+                callback=self.work_counters['newton'],
+                inner_M=M,
             )
         except NoConvergence as e:
             sol = e.args[0]
