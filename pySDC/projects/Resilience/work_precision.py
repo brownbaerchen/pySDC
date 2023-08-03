@@ -260,8 +260,8 @@ def record_work_precision(
 
         if problem.__name__ == 'run_Schroedinger' and strategy.name == 'ESDIRK':
             problem_params = custom_description['problem_params']
-            if problem_params.get('imex', False):
-                problem_params['lintol'] = param_range[i]
+            if not problem_params.get('imex', True):
+                description["problem_params"]['lintol'] = param_range[i]
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
