@@ -258,6 +258,11 @@ def record_work_precision(
         if strategy.name == 'adaptivity_coll':
             set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
 
+        if problem.__name__ == 'run_Schroedinger' and strategy.name == 'ESDIRK':
+            problem_params = custom_description['problem_params']
+            if problem_params.get('imex', False):
+                problem_params['lintol'] = param_range[i]
+
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
         data[param_range[i]][param] = [param_range[i]]
@@ -1323,7 +1328,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 

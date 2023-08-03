@@ -71,7 +71,7 @@ def test_preconditioner():
     base = nonlinearschroedinger_fully_implicit(**params, use_preconditioner=False)
 
     # check solver with one step of implicit Euler
-    dt = 1e-2
+    dt = 3e-2
     u0 = prec.u_exact(t)
     args = {
         'rhs': u0.copy(),

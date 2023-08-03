@@ -404,7 +404,7 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
             return x - factor * self.eval_f(u=x, t=t) - rhs
 
         if self.spectral and self.use_preconditioner:
-            M = sp.diags((rhs / (1.0 + factor * self.K2 * 1j)).reshape(1024))
+            M = sp.diags((1.0 / (-factor * self.K2 * 1j)).reshape(1024))
         else:
             M = None
 
