@@ -135,20 +135,11 @@ class controller_nonMPI(controller):
             while not done:
                 done = self.pfasst(MS_active)
 
-            restarts = [S.status.restart for S in MS_active]
-            restart_at = np.where(restarts)[0][0] if True in restarts else len(MS_active)
-            if True in restarts:  # restart part of the block
-                # initial condition to next block is initial condition of step that needs restarting
-                uend = self.MS[restart_at].levels[0].u[0]
-                time[active_slots[0]] = time[restart_at]
-                self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
+            # get the initial conditions and times for the next block
+            for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
+                uend, tend = C.get_uend(controller, uend, time, MS=self.MS, active_slots=active_slots)
 
-            else:  # move on to next block
-                # initial condition for next block is last solution of current block
-                uend = self.MS[active_slots[-1]].levels[0].uend
-                time[active_slots[0]] = time[active_slots[-1]] + self.MS[active_slots[-1]].dt
-
-            for S in MS_active[:restart_at]:
+            for S in MS_active:
                 for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                     C.post_step_processing(self, S, MS=MS_active)
 

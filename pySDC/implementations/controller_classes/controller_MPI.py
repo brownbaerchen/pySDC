@@ -131,9 +131,8 @@ class controller_MPI(controller):
                 tend = comm_active.bcast(self.S.time + self.S.dt, root=comm_active.size - 1)
 
             # do convergence controller stuff
-            if not self.S.status.restart:
-                for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
-                    C.post_step_processing(self, self.S, comm=comm_active)
+            for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
+                C.post_step_processing(self, self.S, comm=comm_active)
 
             for C in [self.convergence_controllers[i] for i in self.convergence_controller_order]:
                 C.prepare_next_block(self, self.S, self.S.status.time_size, tend, Tend, comm=comm_active)

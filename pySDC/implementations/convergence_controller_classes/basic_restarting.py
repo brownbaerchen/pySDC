@@ -224,6 +224,37 @@ on...",
 
         return None
 
+    def get_uend(self, controller, uend, time, MS, active_slots, **kwargs):
+        """
+        Restart at the first step that wants to be restarted.
+
+        Args:
+            controller (pySDC.Controller): The controller
+            uend (dtype_u): Initial conditions for next step
+            time (list): Times of the next step
+            MS (list): List of steps
+            active_slots (list): Indices of active steps
+
+        Returns:
+            dtype_u: Initial conditions for the next block
+            list: Initial time for the next block
+        """
+        restarts = [MS[i].status.restart for i in range(len(MS)) if i in active_slots]
+        restart_at = np.where(restarts)[0][0] if True in restarts else len(restarts)
+
+        if True in restarts:  # restart part of the block
+            # initial condition to next block is initial condition of step that needs restarting
+            uend = MS[restart_at].levels[0].u[0]
+            time[active_slots[0]] = time[restart_at]
+            self.logger.info(f'Starting next block with initial conditions from step {restart_at}')
+
+        else:  # move on to next block
+            # initial condition for next block is last solution of current block
+            uend = MS[active_slots[-1]].levels[0].uend
+            time[active_slots[0]] = time[active_slots[-1]] + MS[active_slots[-1]].dt
+
+        return uend, time
+
 
 class BasicRestartingMPI(BasicRestarting):
     """

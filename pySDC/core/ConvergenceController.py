@@ -313,6 +313,22 @@ class ConvergenceController(object):
         """
         pass
 
+    def get_uend(self, controller, uend, time, **kwargs):
+        """
+        Generate or modify the initial conditions of the next block from the steps in the current block.
+        The time is float or list depending on the controller implementation.
+
+        Args:
+            controller (pySDC.Controller): The controller
+            uend (dtype_u): The initial conditions for the next block
+            time (float or list): Initial time for the next block
+
+        Returns:
+            dtype_u: Initial conditions
+            float or list: Initial time
+        """
+        return uend, time
+
     def send(self, comm, dest, data, blocking=False, **kwargs):
         """
         Send data to a different rank
