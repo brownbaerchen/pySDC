@@ -194,9 +194,9 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, lintol=1e-9, liniter=99, use_preconditioner=False, **kwargs):
+    def __init__(self, lintol=1e-9, liniter=99, **kwargs):
         super().__init__(**kwargs)
-        self._makeAttributeAndRegister('liniter', 'lintol', 'use_preconditioner', localVars=locals(), readOnly=False)
+        self._makeAttributeAndRegister('liniter', 'lintol', localVars=locals(), readOnly=False)
 
         self.work_counters['newton'] = WorkCounter()
 
@@ -403,11 +403,6 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
             self.work_counters['rhs'].decrement()
             return x - factor * self.eval_f(u=x, t=t) - rhs
 
-        if self.spectral and self.use_preconditioner:
-            M = sp.diags((1.0 / (-factor * self.K2 * 1j)).reshape(1024))
-        else:
-            M = None
-
         try:
             sol = newton_krylov(
                 F=F,
@@ -415,7 +410,7 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
                 maxiter=self.liniter,
                 x_tol=self.lintol,
                 callback=self.work_counters['newton'],
-                inner_M=M,
+                method='bicgstab',
             )
         except NoConvergence as e:
             sol = e.args[0]
