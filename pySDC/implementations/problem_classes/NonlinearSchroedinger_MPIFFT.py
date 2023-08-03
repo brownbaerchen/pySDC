@@ -1,6 +1,5 @@
 import numpy as np
-from scipy.optimize import newton_krylov
-from scipy.sparse.linalg import spsolve, gmres, inv
+from scipy.optimize import newton_krylov, root
 from scipy.optimize.nonlin import NoConvergence
 import scipy.sparse as sp
 from mpi4py import MPI
@@ -265,8 +264,9 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
                     Current solution
             """
             self.work_counters['rhs'].decrement()
-            return x - factor * self.eval_f(u=x, t=t) - rhs
+            return x - factor * self.eval_f(u=x.reshape(self.init[0]), t=t).reshape(x.shape) - rhs.reshape(x.shape)
 
+        # breakpoint()
         try:
             sol = newton_krylov(
                 F=F,
@@ -276,6 +276,14 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
                 callback=self.work_counters['newton'],
                 method='gmres',
             )
+            # sol_ = root(
+            #    fun=F,
+            #    x0=u0.copy(),
+            #    #maxiter=self.liniter,
+            #    tol=self.lintol,
+            #    method='df-sane',
+            # )
+            # sol = sol_.x.reshape(self.init[0])
         except NoConvergence as e:
             sol = e.args[0]
 
