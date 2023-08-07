@@ -162,7 +162,6 @@ def test_order(sweeper_name):
     except NotImplementedError:
         update_order = None
 
-    print(order)
     if update_order:
         assert np.isclose(
             np.mean(order_embedded), update_order, atol=0.2

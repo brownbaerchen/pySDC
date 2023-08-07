@@ -16,7 +16,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 15
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -258,7 +258,7 @@ def record_work_precision(
         if strategy.name == 'adaptivity_coll':
             set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
 
-        if problem.__name__ == 'run_Schroedinger' and strategy.name == 'ESDIRK':
+        if problem.__name__ == 'run_Schroedinger' and strategy.name in ['ESDIRK', 'ERK']:
             problem_params = custom_description['problem_params']
             if not problem_params.get('imex', True):
                 description["problem_params"]['lintol'] = param_range[i]
@@ -1268,20 +1268,24 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 
 def ERK_stiff_weirdness():
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostStep, LogLocalErrorPostStep
-    from pySDC.projects.Resilience.strategies import ERKStrategy
+    from pySDC.projects.Resilience.strategies import ERKStrategy, AdaptivityStrategy
     import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(1, 3)
+    fig, axs = plt.subplots(3, 1, sharex=True)
 
-    strategy = ERKStrategy(True)
-    problem = run_vdp
-    epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
+    strategy = AdaptivityStrategy(True)
+    # strategy = ERKStrategy(True)
+    problem = run_Schroedinger
+    # epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
+    epsilons = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    Tend = 0.1
 
     data = {}
     desc = strategy.get_custom_description(problem, 1)
     where = strategy.precision_parameter_loc
-    desc['problem_params'] = {'mu': 30}
-    desc['level_params'] = {'dt': 1e-4}
+    # desc['problem_params'] = {'mu': 30}
+    desc['level_params'] = {'dt': Tend * 1e-3}
+    # desc['sweeper_params']['QI'] = 'EE'
 
     for eps in epsilons:
         set_parameter(desc, where, eps)
@@ -1294,21 +1298,31 @@ def ERK_stiff_weirdness():
             custom_description=desc,
             num_procs=1,
             comm_world=MPI.COMM_WORLD,
+            Tend=Tend,
         )
         stats = data[eps]['stats']
         #        e = get_sorted(stats, type='e_global_post_step', recomputed=False)
         #        axs[0].plot([me[0] for me in e], [me[1] for me in e])
         #
         e = get_sorted(stats, type='e_local_post_step', recomputed=False)
-        axs[0].plot([me[0] for me in e], [me[1] for me in e], ls='-')
+        axs[0].plot(
+            [me[0] for me in e], [me[1] for me in e], ls='-', label=rf'$\epsilon_\mathrm{{TOL}} = {{{eps:.0e}}}$'
+        )
+        axs[0].set_ylabel('local error')
 
-        e = get_sorted(stats, type='dt', recomputed=False)
-        axs[1].plot([me[0] for me in e], [me[1] for me in e], ls='-')
+        dt = get_sorted(stats, type='dt', recomputed=False)
+        axs[1].plot([me[0] for me in dt], [me[1] for me in dt], ls='-')
+        axs[1].set_ylabel('dt')
+        axs[1].set_yscale('log')
 
-        e = get_sorted(stats, type='work_rhs', recomputed=None)
-        axs[2].plot([me[0] for me in e], np.cumsum([me[1] for me in e]), ls='-')
+        rhs = get_sorted(stats, type='work_rhs', recomputed=None)
+
+        axs[2].plot([me[0] for me in rhs], np.cumsum([me[1] for me in rhs]), ls='-')
+        axs[2].set_ylabel('rhs evaluations')
 
     axs[0].set_yscale('log')
+    axs[2].set_yscale('log')
+    axs[0].legend(frameon=False)
     print([(eps, data[eps]['t']) for eps in epsilons])
     plt.show()
 
@@ -1316,7 +1330,7 @@ def ERK_stiff_weirdness():
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     # vdp_stiffness_plot(runs=1, record=False)
-    # ERK_stiff_weirdness()
+    ERK_stiff_weirdness()
 
     params = {
         'mode': 'imex',
@@ -1328,7 +1342,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
