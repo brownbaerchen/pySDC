@@ -296,11 +296,13 @@ class sweeper(object):
             self.parallelizable = True
 
         else:
+            # see if an explicit preconditioner with this name is available
             try:
                 QDmat = self.get_Qdelta_explicit(coll, qd_type)
                 self.logger.warn(f'Using explicit preconditioner \"{qd_type}\" on the left hand side!')
             except NotImplementedError:
                 raise NotImplementedError(f'qd_type implicit "{qd_type}" not implemented')
+
         # check if we got not more than a lower triangular matrix
         np.testing.assert_array_equal(
             np.triu(QDmat, k=1), np.zeros(QDmat.shape), err_msg='Lower triangular matrix expected!'
