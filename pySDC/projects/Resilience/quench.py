@@ -100,6 +100,11 @@ def run_quench(
         controller: The controller
         Tend: The time that was supposed to be integrated to
     """
+    if custom_description is not None:
+        problem_params = custom_description.get('problem_params', {})
+        if 'imex' in problem_params.keys():
+            imex = problem_params['imex']
+            problem_params.pop('imex', None)
 
     # initialize level parameters
     level_params = {}

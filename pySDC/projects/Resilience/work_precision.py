@@ -731,14 +731,14 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
                 'hooks': [LogU0Increment],
             }
-            plotting_params = {'ls': ls[num_procs], 'label': fr'fixed {num_procs} procs'}
-            configurations[num_procs + 999] = {
-                'strategies': [BaseStrategy(True)],
-                'custom_description': desc,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-                'hooks': [LogU0Increment],
-            }
+            # plotting_params = {'ls': ls[num_procs], 'label': fr'fixed {num_procs} procs'}
+            # configurations[num_procs + 999] = {
+            #     'strategies': [BaseStrategy(True)],
+            #     'custom_description': desc,
+            #     'num_procs': num_procs,
+            #     'plotting_params': plotting_params,
+            #     'hooks': [LogU0Increment],
+            # }
 
     elif mode[:13] == 'vdp_stiffness':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
@@ -1352,16 +1352,16 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
-        'runs': 5,
+        'mode': 'imex',
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_quench,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
