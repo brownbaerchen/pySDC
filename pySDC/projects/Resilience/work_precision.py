@@ -16,7 +16,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 15
+LOGGER_LEVEL = 25
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -52,7 +52,6 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
         problem (function): A problem to run
         strategy (Strategy): SDC strategy
     """
-    return False
     if problem.__name__ == 'run_quench':
         if strategy.name in ['ERK']:
             return True
@@ -225,7 +224,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-3, -2, -1, 0, 1]
+        exponents = [-3, -2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -1269,31 +1268,42 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
 def ERK_stiff_weirdness():
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostStep, LogLocalErrorPostStep
     from pySDC.projects.Resilience.strategies import ERKStrategy, AdaptivityStrategy
+    from pySDC.implementations.convergence_controller_classes.step_size_limiter import (
+        StepSizeLimiter,
+        StepSizeSlopeLimiter,
+    )
     import matplotlib.pyplot as plt
+    from pySDC.projects.Resilience.Schroedinger import live_plotting, log_number_of_waves
 
-    fig, axs = plt.subplots(3, 1, sharex=True)
+    fig, axs = plt.subplots(4, 1, sharex=True)
 
     strategy = AdaptivityStrategy(True)
     # strategy = ERKStrategy(True)
+
     problem = run_Schroedinger
     # epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
     epsilons = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    # epsilons = [1e-2, 1e-8]
     Tend = 0.1
 
     data = {}
     desc = strategy.get_custom_description(problem, 1)
     where = strategy.precision_parameter_loc
     # desc['problem_params'] = {'mu': 30}
+    # desc['problem_params'] = {'imex': False}
     desc['level_params'] = {'dt': Tend * 1e-3}
-    # desc['sweeper_params']['QI'] = 'EE'
+    desc['sweeper_params']['QI'] = 'EE'
+    # desc['convergence_controllers'][StepSizeLimiter]= {'dt_slope_max': 10., 'dt_max': 5e-4}
 
-    for eps in epsilons:
+    from pySDC.projects.Resilience.strategies import cmap
+
+    for eps, color in zip(epsilons, list(cmap.values())):
         set_parameter(desc, where, eps)
         data[eps] = {key: [] for key in MAPPINGS.keys()}
         data[eps]['stats'] = single_run(
             strategy=strategy,
             data=data[eps],
-            hooks=[LogLocalErrorPostStep],
+            hooks=[LogLocalErrorPostStep, log_number_of_waves],
             problem=problem,
             custom_description=desc,
             num_procs=1,
@@ -1320,21 +1330,30 @@ def ERK_stiff_weirdness():
         axs[2].plot([me[0] for me in rhs], np.cumsum([me[1] for me in rhs]), ls='-')
         axs[2].set_ylabel('rhs evaluations')
 
+        nwaves = get_sorted(stats, type='fastest_wave', recomputed=False)
+        axs[3].plot([me[0] for me in nwaves], [me[1] for me in nwaves], ls='-', color=color)
+        slowest_wave = get_sorted(stats, type='slowest_wave', recomputed=False)
+        # print(slowest_wave)
+        axs[3].plot([me[0] for me in slowest_wave], [me[1] for me in slowest_wave], ls='--', color=color)
+        axs[3].set_ylabel('waves')
+        # axs[3].set_yscale('log')
+
     axs[0].set_yscale('log')
     axs[2].set_yscale('log')
+    axs[-1].set_xlabel('t')
     axs[0].legend(frameon=False)
-    print([(eps, data[eps]['t']) for eps in epsilons])
+    # print([(eps, data[eps]['t']) for eps in epsilons])
     plt.show()
 
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     # vdp_stiffness_plot(runs=1, record=False)
-    ERK_stiff_weirdness()
+    # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'imex',
-        'runs': 3,
+        'mode': 'RK_comp',
+        'runs': 5,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
@@ -1342,7 +1361,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 

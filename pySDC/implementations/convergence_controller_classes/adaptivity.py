@@ -328,8 +328,6 @@ class AdaptivityRK(Adaptivity):
                 self.params.beta, L.params.dt, self.params.e_tol, e_est, order
             )
             self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
-            print(f'e_est={e_est:.2e}, u-u0={abs(L.u[-1]-L.u[0]):.2e}, e_tol={self.params.e_tol:.2e}')
-            breakpoint()
 
         return None
 
