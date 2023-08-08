@@ -697,16 +697,16 @@ def make_plots_for_paper():  # pragma: no cover
     BASE_PATH = 'data/paper'
 
     work_precision()
-    plot_vdp_solution()
-    plot_quench_solution()
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    plot_adaptivity_stuff()
+    # plot_vdp_solution()
+    # plot_quench_solution()
+    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
+    # plot_adaptivity_stuff()
 
-    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
-    for i in [1, 4]:
-        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
+    # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
+    # for i in [1, 4]:
+    #    compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover
