@@ -712,7 +712,6 @@ def get_configs(mode, problem):
             4: ':',
             5: ':',
         }
-        from hook import LogU0Increment
 
         for num_procs in [4, 2, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
@@ -721,7 +720,6 @@ def get_configs(mode, problem):
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
-                'hooks': [LogU0Increment],
             }
             plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
             configurations[num_procs + 100] = {
@@ -729,15 +727,14 @@ def get_configs(mode, problem):
                 'custom_description': descIterate,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
-                'hooks': [LogU0Increment],
             }
+
             # plotting_params = {'ls': ls[num_procs], 'label': fr'fixed {num_procs} procs'}
             # configurations[num_procs + 999] = {
             #     'strategies': [BaseStrategy(True)],
             #     'custom_description': desc,
             #     'num_procs': num_procs,
             #     'plotting_params': plotting_params,
-            #     'hooks': [LogU0Increment],
             # }
 
     elif mode[:13] == 'vdp_stiffness':
@@ -946,7 +943,7 @@ def get_configs(mode, problem):
             'custom_description': desc_RK,
         }
 
-        for num_procs, label in zip([5, 1], ['GSSDC', 'SDC']):
+        for num_procs, label in zip([4, 1], ['GSSDC 4 procs', 'SDC']):
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
@@ -1351,8 +1348,8 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'imex',
-        'runs': 1,
+        'mode': 'RK_comp',
+        'runs': 5,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
@@ -1360,7 +1357,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_quench,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
@@ -1374,6 +1371,7 @@ if __name__ == "__main__":
     }
 
     for mode in ['RK_comp']:  # ['parallel_efficiency', 'compare_strategies']:
+        break
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
