@@ -946,13 +946,12 @@ def get_configs(mode, problem):
             'custom_description': desc_RK,
         }
 
-        for num_procs in [4, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'adaptivity {num_procs} procs'}
+        for num_procs, label in zip([5, 1], ['GSSDC', 'SDC']):
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
-                'plotting_params': plotting_params,
+                'plotting_params': {'ls': ls[num_procs], 'label': label},
             }
     elif mode == 'imex':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
@@ -1366,16 +1365,15 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
-        'num_procs': 4,
+        #'num_procs': 4,
     }
 
     for mode in ['RK_comp']:  # ['parallel_efficiency', 'compare_strategies']:
-        break
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

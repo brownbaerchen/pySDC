@@ -654,7 +654,7 @@ def work_precision():  # pragma: no cover
     )
     # End Quench stuff
 
-    vdp_stiffness_plot(base_path='data/paper')
+    # vdp_stiffness_plot(base_path='data/paper')
 
 
 def make_plots_for_TIME_X_website():  # pragma: no cover
