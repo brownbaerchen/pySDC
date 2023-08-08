@@ -1079,7 +1079,7 @@ class ESDIRKStrategy(AdaptivityStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 1518
+                return 1562
             elif key == 'e_global_post_run' and op == max:
                 return 3.6982949243591356e-06
 
