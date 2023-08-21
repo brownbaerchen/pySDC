@@ -353,6 +353,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
     """
     from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
     from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+    from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.projects.Resilience.hook import LogData
 
     stats_analyser = get_stats(run_vdp, 'data/stats')
@@ -377,19 +378,19 @@ def plot_adaptivity_stuff():  # pragma: no cover
         markevery = 40
         e = get_sorted(stats, type='e_local_post_step', recomputed=False)
         ax.plot([me[0] for me in e], [me[1] for me in e], markevery=markevery, **strategy.style, **kwargs)
-        k = get_sorted(stats, type='k')
+        k = get_sorted(stats, type='work_newton')
         iter_ax.plot(
             [me[0] for me in k], np.cumsum([me[1] for me in k]), **strategy.style, markevery=markevery, **kwargs
         )
         ax.set_yscale('log')
         ax.set_ylabel('local error')
-        iter_ax.set_ylabel(r'SDC iterations')
+        iter_ax.set_ylabel(r'Newton iterations')
 
     force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}}
     # force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
     for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy]:
         stats, _, _ = stats_analyser.single_run(
-            strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData]
+            strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData, LogWork]
         )
         plot_error(stats, axs[1], axs[2], strategy())
 
@@ -696,17 +697,17 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
+    plot_adaptivity_stuff()
 
-    # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
-    # for i in [1, 4]:
-    #    compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
+    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
+    for i in [1, 4]:
+        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover
