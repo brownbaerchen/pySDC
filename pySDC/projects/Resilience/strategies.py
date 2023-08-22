@@ -1403,19 +1403,19 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
         if problem.__name__ == "run_vdp":
             e_tol = 2e-5
             dt_min = 1e-3
-        # elif problem.__name__ == "run_piline":
-        #     e_tol = 1e-7
-        #     dt_min = 1e-2
-        # elif problem.__name__ == "run_Lorenz":
-        #     e_tol = 2e-5
-        #     dt_min = 1e-3
-        # elif problem.__name__ == "run_Schroedinger":
-        #     e_tol = 4e-6
-        #     dt_min = 1e-3
-        # elif problem.__name__ == "run_quench":
-        #     e_tol = 1e-5
-        #     dt_min = 1e-3
-        #     dt_max = 1e2
+        elif problem.__name__ == "run_piline":
+            e_tol = 1e-7
+            dt_min = 1e-2
+        elif problem.__name__ == "run_Lorenz":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        elif problem.__name__ == "run_Schroedinger":
+            e_tol = 4e-6
+            dt_min = 1e-3
+        elif problem.__name__ == "run_quench":
+            e_tol = 1e-5
+            dt_min = 1e-3
+            dt_max = 1e2
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
