@@ -1,8 +1,9 @@
 import sys
+from pathlib import Path
 
 from mpi4py import MPI
 
-from pySDC.helpers.stats_helper import filter_stats, sort_stats
+from pySDC.helpers.stats_helper import get_sorted
 from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
 from pySDC.tutorial.step_6.A_run_non_MPI_controller import set_parameters_ml
 
@@ -27,10 +28,7 @@ if __name__ == "__main__":
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
     # filter statistics by type (number of iterations)
-    filtered_stats = filter_stats(stats, type='niter')
-
-    # convert filtered statistics to list of iterations count, sorted by process
-    iter_counts = sort_stats(filtered_stats, sortby='time')
+    iter_counts = get_sorted(stats, type='niter', sortby='time')
 
     # combine statistics into list of statistics
     iter_counts_list = comm.gather(iter_counts, root=0)
@@ -39,14 +37,14 @@ if __name__ == "__main__":
     size = comm.Get_size()
 
     if rank == 0:
-
         # we'd need to deal with variable file names here (for testing purpose only)
         if len(sys.argv) == 2:
             fname = sys.argv[1]
         else:
             fname = 'step_6_B_out.txt'
 
-        f = open(fname, 'a')
+        Path("data").mkdir(parents=True, exist_ok=True)
+        f = open('data/' + fname, 'a')
         out = 'Working with %2i processes...' % size
         f.write(out + '\n')
         print(out)
@@ -72,4 +70,4 @@ if __name__ == "__main__":
         f.write('\n')
         print()
 
-        assert all([item[1] <= 8 for item in iter_counts]), "ERROR: weird iteration counts, got %s" % iter_counts
+        assert all(item[1] <= 8 for item in iter_counts), "ERROR: weird iteration counts, got %s" % iter_counts

@@ -1,19 +1,14 @@
 import logging
 
 import numpy as np
+import scipy as sp
 import scipy.linalg
 import scipy.optimize as opt
 
 from pySDC.core.Errors import ParameterError
 from pySDC.core.Level import level
+from pySDC.core.Collocation import CollBase
 from pySDC.helpers.pysdc_helper import FrozenClass
-from pySDC.implementations.collocation_classes.equidistant_right import (
-    EquidistantNoLeft,
-)
-from pySDC.implementations.collocation_classes.gauss_lobatto import CollGaussLobatto
-from pySDC.implementations.collocation_classes.gauss_radau_right import (
-    CollGaussRadau_Right,
-)
 from pySDC.helpers.preconditioner_helper import get_linear_multistep_method
 
 
@@ -21,7 +16,8 @@ from pySDC.helpers.preconditioner_helper import get_linear_multistep_method
 class _Pars(FrozenClass):
     def __init__(self, pars):
         self.do_coll_update = False
-        self.initial_guess = "spread"
+        self.initial_guess = 'spread'
+        self.skip_residual_computation = ()  # gain performance at the cost of correct residual output
 
         for k, v in pars.items():
             if k != "collocation_class":
@@ -52,7 +48,7 @@ class sweeper(object):
         # set up logger
         self.logger = logging.getLogger("sweeper")
 
-        essential_keys = ["collocation_class", "num_nodes"]
+        essential_keys = ['num_nodes']
         for key in essential_keys:
             if key not in params:
                 msg = "need %s to instantiate step, only got %s" % (
@@ -62,22 +58,26 @@ class sweeper(object):
                 self.logger.error(msg)
                 raise ParameterError(msg)
 
+        if 'collocation_class' not in params:
+            params['collocation_class'] = CollBase
+
+        # prepare random generator for initial guess
+        if params.get('initial_guess', 'spread') == 'random':
+            params['random_seed'] = params.get('random_seed', 1984)
+            self.rng = np.random.RandomState(params['random_seed'])
+
         self.params = _Pars(params)
 
-        coll = params["collocation_class"](params["num_nodes"], 0, 1)
+        self.coll = params['collocation_class'](**params)
 
-        if not coll.right_is_node and not self.params.do_coll_update:
+        if not self.coll.right_is_node and not self.params.do_coll_update:
             self.logger.warning(
-                "we need to do a collocation update here, since the right end point is not a node. "
-                "Changing this!"
+                'we need to do a collocation update here, since the right end point is not a node. Changing this!'
             )
             self.params.do_coll_update = True
 
         # This will be set as soon as the sweeper is instantiated at the level
         self.__level = None
-
-        # collocation object
-        self.coll = coll
 
         self.parallelizable = False
 
@@ -110,7 +110,7 @@ class sweeper(object):
         elif qd_type == "IE":
             for m in range(coll.num_nodes + 1):
                 QDmat[m, 1 : m + 1] = coll.delta_m[0:m]
-        elif qd_type == "IEpar":
+        elif qd_type == 'IEpar':
             for m in range(coll.num_nodes + 1):
                 QDmat[m, m] = np.sum(coll.delta_m[0:m])
             self.parallelizable = True
@@ -128,13 +128,17 @@ class sweeper(object):
             d = opt.minimize(rho, x0, method="Nelder-Mead")
             QDmat[1:, 1:] = np.linalg.inv(np.diag(d.x))
             self.parallelizable = True
-        elif qd_type == "MIN3":
+        elif qd_type in ['MIN_GT', 'MIN-SR-NS']:
+            m = QDmat.shape[0] - 1
+            QDmat[1:, 1:] = np.diag(coll.nodes) / m
+            self.parallelizable = True
+        elif qd_type == 'MIN3':
             m = QDmat.shape[0] - 1
             x = None
             # These values have been obtained using Indie Solver, a commercial solver for black-box optimization which
             # aggregates several state-of-the-art optimization methods (free academic subscription plan)
             # objective function: sum over 17^2 values of lamdt, real and imaginary (WORKS SURPRISINGLY WELL!)
-            if type(coll) == CollGaussLobatto:
+            if coll.node_type == 'LEGENDRE' and coll.quad_type == 'LOBATTO':
                 if m == 9:
                     # rho = 0.154786693955
                     x = [
@@ -184,10 +188,9 @@ class sweeper(object):
                     x = [0.0, 0.5]
                 else:
                     NotImplementedError(
-                        "This combination of preconditioner, node type and node number is not "
-                        "implemented"
+                        'This combination of preconditioner, node type and node number is not ' 'implemented'
                     )
-            elif type(coll) == CollGaussRadau_Right:
+            elif coll.node_type == 'LEGENDRE' and coll.quad_type == 'RADAU-RIGHT':
                 if m == 9:
                     # rho = 0.151784861385
                     x = [
@@ -236,11 +239,10 @@ class sweeper(object):
                     # rho = 0.0208560702294 (iteration 6690)
                     x = [0.2584092406077449, 0.6449261740461826]
                 else:
-                    NotImplementedError(
-                        "This combination of preconditioner, node type and node number is not "
-                        "implemented"
+                    raise NotImplementedError(
+                        'This combination of preconditioner, node type and node number is not implemented'
                     )
-            elif type(coll) == EquidistantNoLeft:
+            elif coll.node_type == 'EQUID' and coll.quad_type == 'RADAU-RIGHT':
                 if m == 9:
                     # rho = 0.251820022583 (iteration 32402)
                     x = [
@@ -400,13 +402,46 @@ class sweeper(object):
                 )
 
                 QDmat[i, 0 : i + 1] = f_coeff
+            QDmat[1:, 1:] = np.diag(x)
+            self.parallelizable = True
+
+        elif qd_type == "MIN-SR-S":
+            M = QDmat.shape[0] - 1
+            Q = coll.Qmat[1:, 1:]
+            nodes = coll.nodes
+
+            nCoeffs = M
+            if coll.quad_type in ['LOBATTO', 'RADAU-LEFT']:
+                nCoeffs -= 1
+                Q = Q[1:, 1:]
+                nodes = nodes[1:]
+
+            def func(coeffs):
+                coeffs = np.asarray(coeffs)
+                kMats = [(1 - z) * np.eye(nCoeffs) + z * np.diag(1 / coeffs) @ Q for z in nodes]
+                vals = [np.linalg.det(K) - 1 for K in kMats]
+                return np.array(vals)
+
+            coeffs = sp.optimize.fsolve(func, nodes / M, xtol=1e-13)
+
+            if coll.quad_type in ['LOBATTO', 'RADAU-LEFT']:
+                coeffs = [0] + list(coeffs)
+
+            QDmat[1:, 1:] = np.diag(coeffs)
+
+            self.parallelizable = True
+
         else:
-            raise NotImplementedError(f'qd_type implicit "{qd_type}" not implemented')
+            # see if an explicit preconditioner with this name is available
+            try:
+                QDmat = self.get_Qdelta_explicit(coll, qd_type)
+                self.logger.warn(f'Using explicit preconditioner \"{qd_type}\" on the left hand side!')
+            except NotImplementedError:
+                raise NotImplementedError(f'qd_type implicit "{qd_type}" not implemented')
+
         # check if we got not more than a lower triangular matrix
         np.testing.assert_array_equal(
-            np.triu(QDmat, k=1),
-            np.zeros(QDmat.shape),
-            err_msg="Lower triangular matrix expected!",
+            np.triu(QDmat, k=1), np.zeros(QDmat.shape), err_msg='Lower triangular matrix expected!'
         )
 
         return QDmat
@@ -425,9 +460,7 @@ class sweeper(object):
 
         # check if we got not more than a lower triangular matrix
         np.testing.assert_array_equal(
-            np.triu(QDmat, k=0),
-            np.zeros(QDmat.shape),
-            err_msg="Strictly lower triangular matrix expected!",
+            np.triu(QDmat, k=0), np.zeros(QDmat.shape), err_msg='Strictly lower triangular matrix expected!'
         )
 
         return QDmat
@@ -514,13 +547,22 @@ class sweeper(object):
         L.status.unlocked = True
         L.status.updated = True
 
-    def compute_residual(self):
+    def compute_residual(self, stage=''):
         """
         Computation of the residual using the collocation matrix Q
+
+        Args:
+            stage (str): The current stage of the step the level belongs to
         """
 
         # get current level and problem description
         L = self.level
+
+        # Check if we want to skip the residual computation to gain performance
+        # Keep in mind that skipping any residual computation is likely to give incorrect outputs of the residual!
+        if stage in self.params.skip_residual_computation:
+            L.status.residual = 0.0 if L.status.residual is None else L.status.residual
+            return None
 
         # check if there are new values (e.g. from a sweep)
         # assert L.status.updated
@@ -549,8 +591,8 @@ class sweeper(object):
             L.status.residual = res_norm[-1] / abs(L.u[0])
         else:
             raise ParameterError(
-                f"residual_type = {L.params.residual_type} not implemented, choose "
-                f"full_abs, last_abs, full_rel or last_rel instead"
+                f'residual_type = {L.params.residual_type} not implemented, choose '
+                f'full_abs, last_abs, full_rel or last_rel instead'
             )
 
         # indicate that the residual has seen the new values

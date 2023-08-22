@@ -1,7 +1,4 @@
 # script to run a simple advection problem
-from pySDC.implementations.collocation_classes.gauss_radau_right import (
-    CollGaussRadau_Right,
-)
 from pySDC.implementations.problem_classes.AdvectionEquation_1D_FD import advection1d
 from pySDC.implementations.problem_classes.HeatEquation_ND_FD_forced_periodic import (
     heatNd_periodic,
@@ -106,10 +103,10 @@ def run_heat(
 
     # initialize sweeper parameters
     sweeper_params = dict()
-    sweeper_params["collocation_class"] = CollGaussRadau_Right
     sweeper_params["num_nodes"] = 4
+    sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params["QI"] = "LMM"
-    sweeper_params["initial_guess"] = "LMM"
+    # sweeper_params["initial_guess"] = "LMM"
 
     problem_params = {
         "freq": (2,),

@@ -4,7 +4,7 @@ import scipy.sparse as sp
 
 from pySDC.core.Errors import UnlockError
 from pySDC.helpers.pysdc_helper import FrozenClass
-from pySDC.core import LagrangeApproximation
+from pySDC.core.Lagrange import LagrangeApproximation
 
 
 # short helper class to add params as attributes
@@ -60,8 +60,9 @@ class base_transfer(object):
             self.Rcoll = self.get_transfer_matrix_Q(coarse_grid, fine_grid)
 
         # set up spatial transfer
-        self.space_transfer = space_transfer_class(fine_prob=self.fine.prob, coarse_prob=self.coarse.prob,
-                                                   params=space_transfer_params)
+        self.space_transfer = space_transfer_class(
+            fine_prob=self.fine.prob, coarse_prob=self.coarse.prob, params=space_transfer_params
+        )
 
     @staticmethod
     def get_transfer_matrix_Q(f_nodes, c_nodes):
@@ -82,7 +83,7 @@ class base_transfer(object):
         """
         Space-time restriction routine
 
-        The routine applies the spatial restriction operator to teh fine values on the fine nodes, then reevaluates f
+        The routine applies the spatial restriction operator to the fine values on the fine nodes, then reevaluates f
         on the coarse level. This is used for the first part of the FAS correction tau via integration. The second part
         is the integral over the fine values, restricted to the coarse level. Finally, possible tau corrections on the
         fine level are restricted as well.

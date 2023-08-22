@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from pySDC.helpers.stats_helper import filter_stats, sort_stats
-from pySDC.implementations.collocation_classes.gauss_lobatto import CollGaussLobatto
+from pySDC.helpers.stats_helper import get_sorted
+
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.sweeper_classes.boris_2nd_order import boris_2nd_order
 from pySDC.playgrounds.Boris.spiraling_particle_HookClass import particles_output
@@ -13,19 +13,19 @@ def main(dt, Tend):
 
     # initialize level parameters
     level_params = dict()
-    level_params['restol'] = 1E-08
+    level_params['restol'] = 1e-08
     level_params['dt'] = dt
 
     # initialize sweeper parameters
     sweeper_params = dict()
-    sweeper_params['collocation_class'] = CollGaussLobatto
+    sweeper_params['quad_type'] = 'LOBATTO'
     sweeper_params['num_nodes'] = 3
 
     # initialize problem parameters for the Penning trap
     problem_params = dict()
     problem_params['delta'] = 1
     problem_params['a0'] = 0.07
-    problem_params['u0'] = np.array([[0, -1, 0], [0.05, 0.01, 0], [1], [1]])
+    problem_params['u0'] = np.array([[0, -1, 0], [0.05, 0.01, 0], [1], [1]], dtype=object)
 
     # initialize step parameters
     step_params = dict()
@@ -67,13 +67,12 @@ def main(dt, Tend):
 
 def plot_error_and_positions(uinit, stats, a0):
 
-    extract_stats = filter_stats(stats, type='energy')
-    sortedlist_stats = sort_stats(extract_stats, sortby='time')
+    sortedlist_stats = get_sorted(stats, type='energy', sortby='time')
 
     R0 = np.linalg.norm(uinit.pos[:])
     H0 = 1 / 2 * np.dot(uinit.vel[:].T, uinit.vel[:]) + a0 / R0
 
-    energy_err = [abs(entry[1] - H0) / H0 for entry in sortedlist_stats]
+    energy_err = np.ravel([abs(entry[1] - H0) / H0 for entry in sortedlist_stats])
 
     plt.figure()
     plt.plot(energy_err, 'bo--')
@@ -81,10 +80,9 @@ def plot_error_and_positions(uinit, stats, a0):
     plt.xlabel('Time')
     plt.ylabel('Error in hamiltonian')
 
-    plt.savefig('spiraling_particle_error_ham.png',  transparent=True, bbox_inches='tight')
+    plt.savefig('spiraling_particle_error_ham.png', transparent=True, bbox_inches='tight')
 
-    extract_stats = filter_stats(stats, type='position')
-    sortedlist_stats = sort_stats(extract_stats, sortby='time')
+    sortedlist_stats = get_sorted(stats, type='position', sortby='time')
 
     xpositions = [item[1][0] for item in sortedlist_stats]
     ypositions = [item[1][1] for item in sortedlist_stats]
@@ -96,7 +94,7 @@ def plot_error_and_positions(uinit, stats, a0):
     plt.ylabel('y')
 
     plt.scatter(xpositions, ypositions)
-    plt.savefig('spiraling_particle_positons.png',  transparent=True, bbox_inches='tight')
+    plt.savefig('spiraling_particle_positons.png', transparent=True, bbox_inches='tight')
 
     plt.show()
 

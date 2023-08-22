@@ -18,6 +18,12 @@ class _Pars(FrozenClass):
 
 # short helper class to bundle all status variables
 class _Status(FrozenClass):
+    """
+    This class carries the status of the step. All variables that the core SDC / PFASST functionality depend on are
+    initialized here, while the convergence controllers are allowed to add more variables in a controlled fashion
+    later on using the `add_variable` function.
+    """
+
     def __init__(self):
         self.iter = None
         self.stage = None
@@ -27,12 +33,11 @@ class _Status(FrozenClass):
         self.pred_cnt = None
         self.done = None
         self.force_done = None
+        self.force_continue = False
         self.prev_done = None
         self.time_size = None
         self.diff_old_loc = None
         self.diff_first_loc = None
-        self.restart = False  # do I want to be restarted now?
-        self.restarts_in_a_row = 0  # how many times was I restarted?
         # freeze class, no further attributes allowed from this point
         self._freeze()
 
@@ -91,11 +96,15 @@ class step(FrozenClass):
         """
 
         if 'dtype_u' in descr:
-            raise ParameterError('Deprecated parameter dtype_u, please remove from description dictionary and specify '
-                                 'directly in the problem class')
+            raise ParameterError(
+                'Deprecated parameter dtype_u, please remove from description dictionary and specify '
+                'directly in the problem class'
+            )
         if 'dtype_f' in descr:
-            raise ParameterError('Deprecated parameter dtype_f, please remove from description dictionary and specify '
-                                 'directly in the problem class')
+            raise ParameterError(
+                'Deprecated parameter dtype_f, please remove from description dictionary and specify '
+                'directly in the problem class'
+            )
 
         # assert the existence of all the keys we need to set up at least on level
         essential_keys = ['problem_class', 'sweeper_class', 'sweeper_params', 'level_params']
@@ -128,35 +137,39 @@ class step(FrozenClass):
         # generate list of dictionaries out of the description
         descr_list = self.__dict_to_list(descr_new)
 
-        # sanity check: is there a base_transfer class? is there one even if only a single level is specified?
+        # sanity check: is there a base_transfer class? Is there one even if only a single level is specified?
         if len(descr_list) > 1 and not descr_new['space_transfer_class']:
             msg = 'need %s to instantiate step, only got %s' % ('space_transfer_class', str(descr_new.keys()))
             self.logger.error(msg)
             raise ParameterError(msg)
 
-        if len(descr_list) == 1 and \
-                (descr_new['space_transfer_class'] or descr_new['base_transfer_class'] is not base_transfer):
+        if len(descr_list) == 1 and (
+            descr_new['space_transfer_class'] or descr_new['base_transfer_class'] is not base_transfer
+        ):
             self.logger.warning('you have specified transfer classes, but only a single level')
 
         # generate levels, register and connect if needed
         for l in range(len(descr_list)):
-
-            L = levclass.level(problem_class=descr_list[l]['problem_class'],
-                               problem_params=descr_list[l]['problem_params'],
-                               sweeper_class=descr_list[l]['sweeper_class'],
-                               sweeper_params=descr_list[l]['sweeper_params'],
-                               level_params=descr_list[l]['level_params'],
-                               level_index=l)
+            L = levclass.level(
+                problem_class=descr_list[l]['problem_class'],
+                problem_params=descr_list[l]['problem_params'],
+                sweeper_class=descr_list[l]['sweeper_class'],
+                sweeper_params=descr_list[l]['sweeper_params'],
+                level_params=descr_list[l]['level_params'],
+                level_index=l,
+            )
 
             self.levels.append(L)
 
             if l > 0:
-                self.connect_levels(base_transfer_class=descr_new['base_transfer_class'],
-                                    base_transfer_params=descr_list[l]['base_transfer_params'],
-                                    space_transfer_class=descr_list[l]['space_transfer_class'],
-                                    space_transfer_params=descr_list[l]['space_transfer_params'],
-                                    fine_level=self.levels[l - 1],
-                                    coarse_level=self.levels[l])
+                self.connect_levels(
+                    base_transfer_class=descr_new['base_transfer_class'],
+                    base_transfer_params=descr_list[l]['base_transfer_params'],
+                    space_transfer_class=descr_list[l]['space_transfer_class'],
+                    space_transfer_params=descr_list[l]['space_transfer_params'],
+                    fine_level=self.levels[l - 1],
+                    coarse_level=self.levels[l],
+                )
 
     @staticmethod
     def __dict_to_list(in_dict):
@@ -185,8 +198,15 @@ class step(FrozenClass):
                     ld[d][k] = v[min(d, len(v) - 1)]
         return ld
 
-    def connect_levels(self, base_transfer_class, base_transfer_params, space_transfer_class, space_transfer_params,
-                       fine_level, coarse_level):
+    def connect_levels(
+        self,
+        base_transfer_class,
+        base_transfer_params,
+        space_transfer_class,
+        space_transfer_params,
+        fine_level,
+        coarse_level,
+    ):
         """
         Routine to couple levels with base_transfer operators
 
@@ -200,8 +220,9 @@ class step(FrozenClass):
         """
 
         # create new instance of the specific base_transfer class
-        self.base_transfer = base_transfer_class(fine_level, coarse_level, base_transfer_params,
-                                                 space_transfer_class, space_transfer_params)
+        self.base_transfer = base_transfer_class(
+            fine_level, coarse_level, base_transfer_params, space_transfer_class, space_transfer_params
+        )
         # use base_transfer dictionary twice to set restrict and prolong operator
         self.__transfer_dict[(fine_level, coarse_level)] = self.base_transfer.restrict
 

@@ -9,91 +9,103 @@ from pySDC.implementations.datatype_classes.particles import particles, accelera
 class fermi_pasta_ulam_tsingou(ptype):
     """
     Example implementing the outer solar system problem
+
+    TODO : doku
     """
 
-    def __init__(self, problem_params, dtype_u=particles, dtype_f=acceleration):
-        """
-        Initialization routine
+    dtype_u = particles
+    dtype_f = acceleration
 
-        Args:
-            problem_params (dict): custom parameters for the example
-            dtype_u: particle data type (will be passed to parent class)
-            dtype_f: acceleration data type (will be passed to parent class)
-        """
+    def __init__(self, npart=2048, alpha=0.25, k=1.0, energy_modes=None):
+        """Initialization routine"""
 
-        # these parameters will be used later, so assert their existence
-        essential_keys = ['npart', 'alpha', 'k', 'energy_modes']
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
+        if energy_modes is None:
+            energy_modes = [1, 2, 3, 4]
 
-        # invoke super init, passing nparts, dtype_u and dtype_f
-        super(fermi_pasta_ulam_tsingou, self).__init__((problem_params['npart'], None, np.dtype('float64')),
-                                                       dtype_u, dtype_f, problem_params)
+        # invoke super init, passing nparts
+        super().__init__((npart, None, np.dtype('float64')))
+        self._makeAttributeAndRegister('npart', 'alpha', 'k', 'energy_modes', localVars=locals(), readOnly=True)
 
-        self.dx = (self.params.npart / 32) / (self.params.npart + 1)
-        self.xvalues = np.array([(i + 1) * self.dx for i in range(self.params.npart)])
-        self.ones = np.ones(self.params.npart - 2)
+        self.dx = (self.npart / 32) / (self.npart + 1)
+        self.xvalues = np.array([(i + 1) * self.dx for i in range(self.npart)])
+        self.ones = np.ones(self.npart - 2)
 
     def eval_f(self, u, t):
         """
-        Routine to compute the RHS
+        Routine to compute the right-hand side of the problem.
 
-        Args:
-            u (dtype_u): the particles
-            t (float): current time (not used here)
-        Returns:
-            dtype_f: RHS
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time of the numerical solution is computed.
+
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side of the problem.
         """
         me = self.dtype_f(self.init, val=0.0)
 
         # me[1:-1] = u.pos[:-2] - 2.0 * u.pos[1:-1] + u.pos[2:] + \
-        #     self.params.alpha * ((u.pos[2:] - u.pos[1:-1]) ** 2 -
+        #     self.alpha * ((u.pos[2:] - u.pos[1:-1]) ** 2 -
         #                          (u.pos[1:-1] - u.pos[:-2]) ** 2)
         # me[0] = -2.0 * u.pos[0] + u.pos[1] + \
-        #     self.params.alpha * ((u.pos[1] - u.pos[0]) ** 2 - (u.pos[0]) ** 2)
+        #     self.alpha * ((u.pos[1] - u.pos[0]) ** 2 - (u.pos[0]) ** 2)
         # me[-1] = u.pos[-2] - 2.0 * u.pos[-1] + \
-        #     self.params.alpha * ((u.pos[-1]) ** 2 - (u.pos[-1] - u.pos[-2]) ** 2)
-        me[1:-1] = (u.pos[:-2] - 2.0 * u.pos[1:-1] + u.pos[2:]) * \
-            (self.ones + self.params.alpha * (u.pos[2:] - u.pos[:-2]))
-        me[0] = (-2.0 * u.pos[0] + u.pos[1]) * (1 + self.params.alpha * (u.pos[1]))
-        me[-1] = (u.pos[-2] - 2.0 * u.pos[-1]) * (1 + self.params.alpha * (-u.pos[-2]))
+        #     self.alpha * ((u.pos[-1]) ** 2 - (u.pos[-1] - u.pos[-2]) ** 2)
+        me[1:-1] = (u.pos[:-2] - 2.0 * u.pos[1:-1] + u.pos[2:]) * (self.ones + self.alpha * (u.pos[2:] - u.pos[:-2]))
+        me[0] = (-2.0 * u.pos[0] + u.pos[1]) * (1 + self.alpha * (u.pos[1]))
+        me[-1] = (u.pos[-2] - 2.0 * u.pos[-1]) * (1 + self.alpha * (-u.pos[-2]))
 
         return me
 
     def u_exact(self, t):
         """
-        Routine to compute the exact/initial trajectory at time t
+        Routine to compute the exact/initial trajectory at time t.
 
-        Args:
-            t (float): current time
-        Returns:
-            dtype_u: exact/initial position and velocity
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
+
+        Returns
+        -------
+        me : dtype_u
+            The exact/initial position and velocity.
         """
         assert t == 0.0, 'error, u_exact only works for the initial time t0=0'
 
         me = self.dtype_u(self.init, val=0.0)
 
-        me.pos[:] = np.sin(self.params.k * np.pi * self.xvalues)
+        me.pos[:] = np.sin(self.k * np.pi * self.xvalues)
         me.vel[:] = 0.0
 
         return me
 
     def eval_hamiltonian(self, u):
         """
-        Routine to compute the Hamiltonian
+        Routine to compute the Hamiltonian.
 
-        Args:
-            u (dtype_u): the particles
-        Returns:
-            float: hamiltonian
+        Parameters
+        ----------
+        u : dtype_u
+            The particles.
+
+        Returns
+        -------
+        ham : float
+            The Hamiltonian.
         """
 
-        ham = sum(0.5 * u.vel[:-1] ** 2 + 0.5 * (u.pos[1:] - u.pos[:-1]) ** 2 +
-                  self.params.alpha / 3.0 * (u.pos[1:] - u.pos[:-1]) ** 3)
-        ham += 0.5 * u.vel[-1] ** 2 + 0.5 * (u.pos[-1]) ** 2 + self.params.alpha / 3.0 * (-u.pos[-1]) ** 3
-        ham += 0.5 * (u.pos[0]) ** 2 + self.params.alpha / 3.0 * (u.pos[0]) ** 3
+        ham = sum(
+            0.5 * u.vel[:-1] ** 2
+            + 0.5 * (u.pos[1:] - u.pos[:-1]) ** 2
+            + self.alpha / 3.0 * (u.pos[1:] - u.pos[:-1]) ** 3
+        )
+        ham += 0.5 * u.vel[-1] ** 2 + 0.5 * (u.pos[-1]) ** 2 + self.alpha / 3.0 * (-u.pos[-1]) ** 3
+        ham += 0.5 * (u.pos[0]) ** 2 + self.alpha / 3.0 * (u.pos[0]) ** 3
         return ham
 
     def eval_mode_energy(self, u):
@@ -101,23 +113,27 @@ class fermi_pasta_ulam_tsingou(ptype):
         Routine to compute the energy following
         http://www.scholarpedia.org/article/Fermi-Pasta-Ulam_nonlinear_lattice_oscillations
 
-        Args:
-            u (dtype_u): the particles
-        Returns:
-            dict: energies
+        Parameters
+        ----------
+        u : dtype_u
+            The particles.
+
+        Returns
+        -------
+        energy : dict
+            The energies.
         """
 
         energy = {}
 
-        for k in self.params.energy_modes:
-
-            # Qk = np.sqrt(2.0 / (self.params.npart + 1)) * np.dot(u.pos, np.sin(np.pi * k * self.xvalues))
+        for k in self.energy_modes:
+            # Qk = np.sqrt(2.0 / (self.npart + 1)) * np.dot(u.pos, np.sin(np.pi * k * self.xvalues))
             Qk = np.sqrt(2.0 * self.dx) * np.dot(u.pos, np.sin(np.pi * k * self.xvalues))
-            # Qkdot = np.sqrt(2.0 / (self.params.npart + 1)) * np.dot(u.vel, np.sin(np.pi * k * self.xvalues))
+            # Qkdot = np.sqrt(2.0 / (self.npart + 1)) * np.dot(u.vel, np.sin(np.pi * k * self.xvalues))
             Qkdot = np.sqrt(2.0 * self.dx) * np.dot(u.vel, np.sin(np.pi * k * self.xvalues))
 
-            # omegak2 = 4.0 * np.sin(k * np.pi / (2.0 * (self.params.npart + 1))) ** 2
+            # omegak2 = 4.0 * np.sin(k * np.pi / (2.0 * (self.npart + 1))) ** 2
             omegak2 = 4.0 * np.sin(k * np.pi * self.dx / 2.0) ** 2
-            energy[k] = 0.5 * (Qkdot ** 2 + omegak2 * Qk ** 2)
+            energy[k] = 0.5 * (Qkdot**2 + omegak2 * Qk**2)
 
         return energy

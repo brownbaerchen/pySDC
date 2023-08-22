@@ -1,6 +1,13 @@
-.. include:: ../../README.rst
 
-.. include:: ../../CHANGELOG.rst
+.. include:: README.rst
+
+Tests
+-----
+
+.. include:: ../../pySDC/tests/README.rst
+
+User Guide
+==========
 
 Tutorial
 --------
@@ -32,7 +39,6 @@ Projects
    :maxdepth: 1
 
    projects/parallelSDC.rst
-   projects/node_failure.rst
    projects/fwsw.rst
    projects/RDC.rst
    projects/asymp_conv.rst
@@ -42,13 +48,9 @@ Projects
    projects/AllenCahn_Bayreuth.rst
    projects/performance.rst
    projects/PinTSimE.rst
-   projects/Resilience.rst
-
-
-Tests
------
-
-.. include:: ../../pySDC/tests/README.rst
+   projects/Resilience.rst   
+   projects/DAE.rst
+   projects/compression.rst
 
 
 API documentation
@@ -64,11 +66,8 @@ API documentation
    pySDC/helpers.rst
 
 
-Indices and tables
-------------------
+Indices and tables :
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-
-

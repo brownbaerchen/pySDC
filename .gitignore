@@ -63,6 +63,7 @@ coverage.xml
 
 # Sphinx documentation
 docs/_build/
+docs/source/pySDC
 
 # PyBuilder
 target/
@@ -147,3 +148,11 @@ Temporary Items
 
 ### Spyder ###
 .spyproject
+
+*.xml
+
+# jupyter
+.ipynb_checkpoints
+
+# VSCode
+.vscode

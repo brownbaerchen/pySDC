@@ -22,7 +22,8 @@ def next_neighbors_periodic(p, ps, k):
     p_bar = p - np.floor(p / 1.0) * 1.0
     ps = ps - ps[0]
     distance_to_p = np.asarray(
-        list(map(lambda tk: min([np.abs(tk + 1 - p_bar), np.abs(tk - p_bar), np.abs(tk - 1 - p_bar)]), ps)))
+        list(map(lambda tk: min([np.abs(tk + 1 - p_bar), np.abs(tk - p_bar), np.abs(tk - 1 - p_bar)]), ps))
+    )
 
     # zip it
     value_index = []
@@ -78,7 +79,7 @@ def continue_periodic_array(arr, nn):
         return arr[nn]
     else:
         cont_arr = [arr[nn[0]]]
-        shift = 0.
+        shift = 0.0
         for n, d in zip(nn[1:], d_nn):
             if d != 1:
                 shift = -1
@@ -115,7 +116,8 @@ def restriction_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1):
             bary_pol = []
             for l in range(k):
                 bary_pol.append(BarycentricInterpolator(cont_arr, np.roll(circulating_one, l)))
-            M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+            with np.errstate(divide='ignore'):
+                M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
     else:
         M = np.zeros((coarse_grid.size, fine_grid.size + 2 * pad))
         for i, p in zip(range(n_g), coarse_grid):
@@ -126,7 +128,8 @@ def restriction_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1):
             bary_pol = []
             for l in range(k):
                 bary_pol.append(BarycentricInterpolator(padded_f_grid[nn], np.roll(circulating_one, l)))
-            M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+            with np.errstate(divide='ignore'):
+                M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
         if pad > 0:
             M = M[:, pad:-pad]
 
@@ -152,17 +155,13 @@ def interpolation_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1, 
     n_f = fine_grid.size
 
     if periodic:
-
         M = np.zeros((fine_grid.size, coarse_grid.size))
 
         if equidist_nested:
-
             for i, p in zip(range(n_f), fine_grid):
-
                 if i % 2 == 0:
                     M[i, int(i / 2)] = 1.0
                 else:
-
                     nn = []
                     cpos = int(i / 2)
                     offset = int(k / 2)
@@ -186,10 +185,10 @@ def interpolation_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1, 
                     bary_pol = []
                     for l in range(k):
                         bary_pol.append(BarycentricInterpolator(cont_arr, np.roll(circulating_one, l)))
-                    M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+                    with np.errstate(divide='ignore'):
+                        M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
 
         else:
-
             for i, p in zip(range(n_f), fine_grid):
                 nn = next_neighbors_periodic(p, coarse_grid, k)
                 circulating_one = np.asarray([1.0] + [0.0] * (k - 1))
@@ -201,17 +200,15 @@ def interpolation_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1, 
                 bary_pol = []
                 for l in range(k):
                     bary_pol.append(BarycentricInterpolator(cont_arr, np.roll(circulating_one, l)))
-                M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+                with np.errstate(divide='ignore'):
+                    M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
 
     else:
-
         M = np.zeros((fine_grid.size, coarse_grid.size + 2 * pad))
         padded_c_grid = border_padding(coarse_grid, pad, pad)
 
         if equidist_nested:
-
             for i, p in zip(range(n_f), fine_grid):
-
                 if i % 2 != 0:
                     M[i, int((i - 1) / 2) + 1] = 1.0
                 else:
@@ -230,10 +227,10 @@ def interpolation_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1, 
                     bary_pol = []
                     for l in range(k):
                         bary_pol.append(BarycentricInterpolator(padded_c_grid[nn], np.roll(circulating_one, l)))
-                    M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+                    with np.errstate(divide='ignore'):
+                        M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
 
         else:
-
             for i, p in zip(range(n_f), fine_grid):
                 nn = next_neighbors(p, padded_c_grid, k)
                 # construct the lagrange polynomials for the k neighbors
@@ -241,7 +238,8 @@ def interpolation_matrix_1d(fine_grid, coarse_grid, k=2, periodic=False, pad=1, 
                 bary_pol = []
                 for l in range(k):
                     bary_pol.append(BarycentricInterpolator(padded_c_grid[nn], np.roll(circulating_one, l)))
-                M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
+                with np.errstate(divide='ignore'):
+                    M[i, nn] = np.asarray(list(map(lambda x: x(p), bary_pol)))
 
         if pad > 0:
             M = M[:, pad:-pad]
@@ -271,5 +269,5 @@ def border_padding(grid, l, r, pad_type='mirror'):
             padded_arr[i] = 2 * grid[0] - grid[l - i]
         for j in range(r):
             padded_arr[-j - 1] = 2 * grid[-1] - grid[-r + j - 1]
-    padded_arr[l:l + grid.size] = grid
+    padded_arr[l : l + grid.size] = grid
     return padded_arr

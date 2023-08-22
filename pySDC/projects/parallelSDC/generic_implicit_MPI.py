@@ -45,11 +45,13 @@ class generic_implicit_MPI(sweeper):
         me = P.dtype_u(P.init, val=0.0)
         for m in range(self.coll.num_nodes):
             if m == self.rank:
-                self.params.comm.Reduce(L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1],
-                                        me, root=m, op=MPI.SUM)
+                self.params.comm.Reduce(
+                    L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], me, root=m, op=MPI.SUM
+                )
             else:
-                self.params.comm.Reduce(L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1],
-                                        None, root=m, op=MPI.SUM)
+                self.params.comm.Reduce(
+                    L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], None, root=m, op=MPI.SUM
+                )
 
         return me
 
@@ -87,8 +89,12 @@ class generic_implicit_MPI(sweeper):
         # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
 
         # implicit solve with prefactor stemming from the diagonal of Qd
-        L.u[self.rank + 1] = P.solve_system(rhs, L.dt * self.QI[self.rank + 1, self.rank + 1], L.u[self.rank + 1],
-                                            L.time + L.dt * self.coll.nodes[self.rank])
+        L.u[self.rank + 1] = P.solve_system(
+            rhs,
+            L.dt * self.QI[self.rank + 1, self.rank + 1],
+            L.u[self.rank + 1],
+            L.time + L.dt * self.coll.nodes[self.rank],
+        )
         # update function values
         L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
 
@@ -109,23 +115,34 @@ class generic_implicit_MPI(sweeper):
 
         # get current level and problem description
         L = self.level
+        P = L.prob
+        L.uend = P.dtype_u(P.init, val=0.0)
 
         # check if Mth node is equal to right point and do_coll_update is false, perform a simple copy
         if self.coll.right_is_node and not self.params.do_coll_update:
             # a copy is sufficient
-            L.uend = self.params.comm.bcast(L.u[self.rank + 1], root=self.params.comm.Get_size() - 1)
+            L.uend[:] = self.params.comm.bcast(L.u[self.rank + 1], root=self.params.comm.Get_size() - 1)
         else:
             raise NotImplementedError('require last node to be identical with right interval boundary')
 
         return None
 
-    def compute_residual(self):
+    def compute_residual(self, stage=None):
         """
         Computation of the residual using the collocation matrix Q
+
+        Args:
+            stage (str): The current stage of the step the level belongs to
         """
 
         # get current level and problem description
         L = self.level
+
+        # Check if we want to skip the residual computation to gain performance
+        # Keep in mind that skipping any residual computation is likely to give incorrect outputs of the residual!
+        if stage in self.params.skip_residual_computation:
+            L.status.residual = 0.0 if L.status.residual is None else L.status.residual
+            return None
 
         # check if there are new values (e.g. from a sweep)
         # assert L.status.updated

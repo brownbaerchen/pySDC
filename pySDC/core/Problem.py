@@ -1,100 +1,128 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Description
+-----------
+
+Module containing the base Problem class for pySDC
+"""
+
 import logging
-import numpy as np
-from scipy.special import factorial
 
-from pySDC.helpers.pysdc_helper import FrozenClass
+from pySDC.core.Common import RegisterParams
 
 
-# short helper class to add params as attributes
-class _Pars(FrozenClass):
-    def __init__(self, pars):
-
-        for k, v in pars.items():
-            setattr(self, k, v)
-
-        self._freeze()
-
-
-class ptype(object):
+class WorkCounter(object):
     """
-    Prototype class for problems, just defines the attributes essential to get started
+    Utility class for counting iterations.
 
-    Attributes:
-        logger: custom logger for problem-related logging
-        params (__Pars): parameter object containing the custom parameters passed by the user
-        init: number of degrees-of-freedom (whatever this may represent)
-        dtype_u: variable data type
-        dtype_f: RHS data type
+    Contains one attribute `niter` initialized to zero during
+    instantiation, which can be incremented by calling object as
+    a function, e.g
+
+    >>> count = WorkCounter()  # => niter = 0
+    >>> count()                # => niter = 1
+    >>> count()                # => niter = 2
     """
 
-    def __init__(self, init, dtype_u, dtype_f, params):
-        """
-        Initialization routine
+    def __init__(self):
+        self.niter = 0
 
-        Args:
-            init: number of degrees-of-freedom (whatever this may represent)
-            dtype_u: variable data type
-            dtype_f: RHS data type
-            params (dict): set or parameters
-        """
+    def __call__(self, *args, **kwargs):
+        # *args and **kwargs are necessary for gmres
+        self.niter += 1
 
-        self.params = _Pars(params)
+    def decrement(self):
+        self.niter -= 1
 
-        # set up logger
-        self.logger = logging.getLogger('problem')
 
-        # pass initialization parameter and data types
-        self.init = init
-        self.dtype_u = dtype_u
-        self.dtype_f = dtype_f
+class ptype(RegisterParams):
+    """
+    Prototype class for problems, just defines the attributes essential to get started.
+
+    Parameters
+    ----------
+    init : list of args
+        Argument(s) used to initialize data types.
+    dtype_u : type
+        Variable data type. Should generate a data variable using dtype_u(init).
+    dtype_f : type
+        RHS data type. Should generate a data variable using dtype_f(init).
+
+    Attributes
+    ----------
+    logger: logging.Logger
+        custom logger for problem-related logging.
+    """
+
+    logger = logging.getLogger('problem')
+    dtype_u = None
+    dtype_f = None
+
+    def __init__(self, init):
+        self.work_counters = {}  # Dictionary to store WorkCounter objects
+        self.init = init  # Initialization parameter to instantiate data types
+
+    @property
+    def u_init(self):
+        """Generate a data variable for u"""
+        return self.dtype_u(self.init)
+
+    @property
+    def f_init(self):
+        """Generate a data variable for RHS"""
+        return self.dtype_f(self.init)
 
     def eval_f(self, u, t):
         """
         Abstract interface to RHS computation of the ODE
+
+        Parameters
+        ----------
+        u : dtype_u
+            Current values.
+        t : float
+            Current time.
+
+        Returns
+        -------
+        f : dtype_f
+            The RHS values.
         """
         raise NotImplementedError('ERROR: problem has to implement eval_f(self, u, t)')
 
-    def apply_mass_matrix(self, u):
+    def apply_mass_matrix(self, u):  # pragma: no cover
+        """Default mass matrix : identity"""
+        return u
+
+    def generate_scipy_reference_solution(self, eval_rhs, t, u_init=None, t_init=None, **kwargs):
         """
-        Abstract interface to apply mass matrix (only needed for FEM)
+        Compute a reference solution using `scipy.solve_ivp` with very small tolerances.
+        Keep in mind that scipy needs the solution to be a one dimensional array. If you are solving something higher
+        dimensional, you need to make sure the function `eval_rhs` takes a flattened one-dimensional version as an input
+        and output, but reshapes to whatever the problem needs for evaluation.
+
+        The keyword arguments will be passed to `scipy.solve_ivp`. You should consider passing `method='BDF'` for stiff
+        problems and to accelerate that you can pass a function that evaluates the Jacobian with arguments `jac(t, u)`
+        as `jac=jac`.
+
+        Args:
+            eval_rhs (function): Function evaluate the full right hand side. Must have signature `eval_rhs(float: t, numpy.1darray: u)`
+            t (float): current time
+            u_init (pySDC.implementations.problem_classes.Lorenz.dtype_u): initial conditions for getting the exact solution
+            t_init (float): the starting time
+
+        Returns:
+            numpy.ndarray: Reference solution
         """
-        raise NotImplementedError('ERROR: if you want a mass matrix, implement apply_mass_matrix(u)')
+        import numpy as np
+        from scipy.integrate import solve_ivp
 
+        tol = 100 * np.finfo(float).eps
+        u_init = self.u_exact(t=0) if u_init is None else u_init * 1.0
+        t_init = 0 if t_init is None else t_init
 
-def get_finite_difference_stencil(derivative, order, type=None, steps=None):
-    """
-    Derive general finite difference stencils from Taylor expansions
-    """
-    if steps is not None:
-        n = len(steps)
-    elif type == 'center':
-        n = order + derivative - (derivative + 1) % 2 // 1
-        steps = np.arange(n) - (n) // 2
-    elif type == 'forward':
-        n = order + derivative
-        steps = np.arange(n)
-    elif type == 'backward':
-        n = order + derivative
-        steps = -np.arange(n)
-    else:
-        raise ValueError(f'Stencil must be of type "center", "forward" or "backward", not {type}. If you want something\
-else, you can also give specific steps.')
-
-    # the index of the position around which we Taylor expand
-    zero_pos = np.argmin(abs(steps)) + 1
-
-    # make a matrix that contains the Taylor coefficients
-    A = np.zeros((n, n))
-    idx = np.arange(n)
-    inv_facs = 1. / factorial(idx)
-    for i in range(0, n):
-        A[i, :] = steps**idx[i] * inv_facs[i]
-
-    # make a right hand side vector that is zero everywhere except at the postition of the desired derivative
-    sol = np.zeros(n)
-    sol[derivative] = 1.
-
-    # solve the linear system for the finite difference coefficients
-    coeff = np.linalg.solve(A, sol)
-
-    return coeff, zero_pos, steps
+        u_shape = u_init.shape
+        return (
+            solve_ivp(eval_rhs, (t_init, t), u_init.flatten(), rtol=tol, atol=tol, **kwargs).y[:, -1].reshape(u_shape)
+        )

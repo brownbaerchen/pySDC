@@ -1,10 +1,8 @@
-
 import logging
 
 import dolfin as df
 import numpy as np
 
-from pySDC.core.Errors import ParameterError
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.fenics_mesh import fenics_mesh, rhs_fenics_mesh
 
@@ -22,7 +20,10 @@ class fenics_heat(ptype):
         bc: boundary conditions
     """
 
-    def __init__(self, problem_params, dtype_u=fenics_mesh, dtype_f=rhs_fenics_mesh):
+    dtype_u = fenics_mesh
+    dtype_f = rhs_fenics_mesh
+
+    def __init__(self, c_nvars=128, t0=0.0, family='CG', order=4, refinements=1, nu=0.1):
         """
         Initialization routine
 
@@ -36,13 +37,6 @@ class fenics_heat(ptype):
         # def Boundary(x, on_boundary):
         #     return on_boundary
 
-        # these parameters will be used later, so assert their existence
-        essential_keys = ['c_nvars', 't0', 'family', 'order', 'refinements', 'nu']
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
-
         # set logger level for FFC and dolfin
         logging.getLogger('FFC').setLevel(logging.WARNING)
         logging.getLogger('UFL').setLevel(logging.WARNING)
@@ -53,22 +47,25 @@ class fenics_heat(ptype):
         df.parameters['allow_extrapolation'] = True
 
         # set mesh and refinement (for multilevel)
-        mesh = df.UnitIntervalMesh(problem_params['c_nvars'])
-        for _ in range(problem_params['refinements']):
+        mesh = df.UnitIntervalMesh(c_nvars)
+        for _ in range(refinements):
             mesh = df.refine(mesh)
 
         # define function space for future reference
-        self.V = df.FunctionSpace(mesh, problem_params['family'], problem_params['order'])
+        self.V = df.FunctionSpace(mesh, family, order)
         tmp = df.Function(self.V)
         print('DoFs on this level:', len(tmp.vector()[:]))
 
         # invoke super init, passing number of dofs, dtype_u and dtype_f
-        super(fenics_heat, self).__init__(self.V, dtype_u, dtype_f, problem_params)
+        super(fenics_heat, self).__init__(self.V)
+        self._makeAttributeAndRegister(
+            'c_nvars', 't0', 'family', 'order', 'refinements', 'nu', localVars=locals(), readOnly=True
+        )
 
         # Stiffness term (Laplace)
         u = df.TrialFunction(self.V)
         v = df.TestFunction(self.V)
-        a_K = -1.0 * df.inner(df.nabla_grad(u), self.params.nu * df.nabla_grad(v)) * df.dx
+        a_K = -1.0 * df.inner(df.nabla_grad(u), self.nu * df.nabla_grad(v)) * df.dx
 
         # Mass term
         a_M = u * v * df.dx
@@ -77,10 +74,15 @@ class fenics_heat(ptype):
         self.K = df.assemble(a_K)
 
         # set forcing term as expression
-        self.g = df.Expression('-cos(a*x[0]) * (sin(t) - b*a*a*cos(t))', a=np.pi, b=self.params.nu, t=self.params.t0,
-                               degree=self.params.order)
-        # self.g = df.Expression('0', a=np.pi, b=self.params.nu, t=self.params.t0,
-        #                        degree=self.params.order)
+        self.g = df.Expression(
+            '-cos(a*x[0]) * (sin(t) - b*a*a*cos(t))',
+            a=np.pi,
+            b=self.nu,
+            t=self.t0,
+            degree=self.order,
+        )
+        # self.g = df.Expression('0', a=np.pi, b=self.nu, t=self.t0,
+        #                        degree=self.order)
         # set boundary values
         # bc = df.DirichletBC(self.V, df.Constant(0.0), Boundary)
         #
@@ -88,17 +90,24 @@ class fenics_heat(ptype):
         # bc.apply(self.K)
 
     def solve_system(self, rhs, factor, u0, t):
-        """
-        Dolfin's linear solver for (M-dtA)u = rhs
+        r"""
+        Dolfin's linear solver for :math:`(M - factor A) \vec{u} = \vec{rhs}`.
 
-        Args:
-            rhs (dtype_f): right-hand side for the nonlinear system
-            factor (float): abbrev. for the node-to-node stepsize (or any other factor required)
-            u0 (dtype_u_: initial guess for the iterative solver (not used here so far)
-            t (float): current time
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the nonlinear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time.
 
-        Returns:
-            dtype_u: solution as mesh
+        Returns
+        -------
+        u : dtype_u
+            The solution as mesh.
         """
 
         b = self.apply_mass_matrix(rhs)
@@ -110,14 +119,19 @@ class fenics_heat(ptype):
 
     def __eval_fexpl(self, u, t):
         """
-        Helper routine to evaluate the explicit part of the RHS
+        Helper routine to evaluate the explicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values (not used here)
-            t (fliat): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution (not used here).
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            explicit part of RHS
+        Returns
+        -------
+        fexpl : dtype_u
+            Explicit part of the right-hand side.
         """
 
         self.g.t = t
@@ -127,14 +141,19 @@ class fenics_heat(ptype):
 
     def __eval_fimpl(self, u, t):
         """
-        Helper routine to evaluate the implicit part of the RHS
+        Helper routine to evaluate the implicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time (not used here)
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            implicit part of RHS
+        Returns
+        -------
+        fimpl : dtype_u
+            Explicit part of the right-hand side.
         """
 
         tmp = self.dtype_u(self.V)
@@ -145,14 +164,19 @@ class fenics_heat(ptype):
 
     def eval_f(self, u, t):
         """
-        Routine to evaluate both parts of the RHS
+        Routine to evaluate both parts of the right-hand side of the problem.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            dtype_f: the RHS divided into two parts
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side  divided into two parts.
         """
 
         f = self.dtype_f(self.V)
@@ -161,14 +185,18 @@ class fenics_heat(ptype):
         return f
 
     def apply_mass_matrix(self, u):
-        """
-        Routine to apply mass matrix
+        r"""
+        Routine to apply mass matrix.
 
-        Args:
-            u (dtype_u): current values
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
 
-        Returns:
-            dtype_u: M*u
+        Returns
+        -------
+        me : dtype_u
+            The product :math:`M \vec{u}`.
         """
 
         me = self.dtype_u(self.V)
@@ -177,14 +205,18 @@ class fenics_heat(ptype):
         return me
 
     def __invert_mass_matrix(self, u):
-        """
-        Helper routine to invert mass matrix
+        r"""
+        Helper routine to invert mass matrix.
 
-        Args:
-            u (dtype_u): current values
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
 
-        Returns:
-            dtype_u: inv(M)*u
+        Returns
+        -------
+        me : dtype_u
+            The product :math:`M^{-1} \vec{u}`.
         """
 
         me = self.dtype_u(self.V)
@@ -197,16 +229,20 @@ class fenics_heat(ptype):
 
     def u_exact(self, t):
         """
-        Routine to compute the exact solution at time t
+        Routine to compute the exact solution at time t.
 
-        Args:
-            t (float): current time
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
 
-        Returns:
-            dtype_u: exact solution
+        Returns
+        -------
+        me : dtype_u
+            The exact solution.
         """
 
-        u0 = df.Expression('cos(a*x[0]) * cos(t)', a=np.pi, t=t, degree=self.params.order)
+        u0 = df.Expression('cos(a*x[0]) * cos(t)', a=np.pi, t=t, degree=self.order)
         me = self.dtype_u(df.interpolate(u0, self.V))
 
         return me
@@ -220,17 +256,24 @@ class fenics_heat_mass(fenics_heat):
     """
 
     def solve_system(self, rhs, factor, u0, t):
-        """
-        Dolfin's linear solver for (M-dtA)u = rhs
+        r"""
+        Dolfin's linear solver for :math:`(M - factor A) \vec{u} = \vec{rhs}`.
 
-        Args:
-            rhs (dtype_f): right-hand side for the nonlinear system
-            factor (float): abbrev. for the node-to-node stepsize (or any other factor required)
-            u0 (dtype_u_: initial guess for the iterative solver (not used here so far)
-            t (float): current time
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the nonlinear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time.
 
-        Returns:
-            dtype_u: solution as mesh
+        Returns
+        -------
+        u : dtype_u
+            The solution as mesh.
         """
 
         u = self.dtype_u(u0)
@@ -240,14 +283,19 @@ class fenics_heat_mass(fenics_heat):
 
     def eval_f(self, u, t):
         """
-        Routine to evaluate both parts of the RHS
+        Routine to evaluate both parts of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            dtype_f: the RHS divided into two parts
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side divided into two parts.
         """
 
         f = self.dtype_f(self.V)

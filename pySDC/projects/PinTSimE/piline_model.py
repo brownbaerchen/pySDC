@@ -1,11 +1,12 @@
 import matplotlib as mpl
 import numpy as np
 import dill
+from pathlib import Path
 
 mpl.use('Agg')
 
 from pySDC.helpers.stats_helper import get_sorted
-from pySDC.core import CollBase as Collocation
+from pySDC.core.Collocation import CollBase as Collocation
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.problem_classes.Piline import piline
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
@@ -15,9 +16,7 @@ from pySDC.core.Hooks import hooks
 
 
 class log_data(hooks):
-
     def post_step(self, step, level_number):
-
         super(log_data, self).post_step(step, level_number)
 
         # some abbreviations
@@ -25,12 +24,33 @@ class log_data(hooks):
 
         L.sweep.compute_end_point()
 
-        self.add_to_stats(process=step.status.slot, time=L.time, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='v1', value=L.uend[0])
-        self.add_to_stats(process=step.status.slot, time=L.time, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='v2', value=L.uend[1])
-        self.add_to_stats(process=step.status.slot, time=L.time, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='p3', value=L.uend[2])
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='v1',
+            value=L.uend[0],
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='v2',
+            value=L.uend[1],
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='p3',
+            value=L.uend[2],
+        )
 
 
 def main():
@@ -40,26 +60,15 @@ def main():
 
     # initialize level parameters
     level_params = dict()
-    level_params['restol'] = 1E-10
+    level_params['restol'] = 1e-10
     level_params['dt'] = 0.25
 
     # initialize sweeper parameters
     sweeper_params = dict()
     sweeper_params['collocation_class'] = Collocation
-    sweeper_params['node_type'] = 'LEGENDRE'
     sweeper_params['quad_type'] = 'LOBATTO'
-    sweeper_params['num_nodes'] = 3
+    sweeper_params['num_nodes'] = 5
     # sweeper_params['QI'] = 'LU'  # For the IMEX sweeper, the LU-trick can be activated for the implicit part
-
-    # initialize problem parameters
-    problem_params = dict()
-    problem_params['Vs'] = 100.0
-    problem_params['Rs'] = 1.0
-    problem_params['C1'] = 1.0
-    problem_params['Rpi'] = 0.2
-    problem_params['C2'] = 1.0
-    problem_params['Lpi'] = 1.0
-    problem_params['Rl'] = 5.0
 
     # initialize step parameters
     step_params = dict()
@@ -67,26 +76,27 @@ def main():
 
     # initialize controller parameters
     controller_params = dict()
-    controller_params['logger_level'] = 20
+    controller_params['logger_level'] = 30
     controller_params['hook_class'] = log_data
 
     # fill description dictionary for easy step instantiation
+    # keep in mind: default params are used for the problem, but can be changed
     description = dict()
-    description['problem_class'] = piline                         # pass problem class
-    description['problem_params'] = problem_params                # pass problem parameters
-    description['sweeper_class'] = imex_1st_order                 # pass sweeper
-    description['sweeper_params'] = sweeper_params                # pass sweeper parameters
-    description['level_params'] = level_params                    # pass level parameters
-    description['step_params'] = step_params                      # pass step parameters
+    description['problem_class'] = piline  # pass problem class
+    description['sweeper_class'] = imex_1st_order  # pass sweeper
+    description['sweeper_params'] = sweeper_params  # pass sweeper parameters
+    description['level_params'] = level_params  # pass level parameters
+    description['step_params'] = step_params  # pass step parameters
 
     assert 'errtol' not in description['step_params'].keys(), "No exact or reference solution known to compute error"
 
     # set time parameters
     t0 = 0.0
-    Tend = 20
+    Tend = 15
+    num_procs = 1
 
     # instantiate controller
-    controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params, description=description)
 
     # get initial values on finest level
     P = controller.MS[0].levels[0].prob
@@ -95,7 +105,8 @@ def main():
     # call main function to get things done...
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
-    fname = 'piline.dat'
+    Path("data").mkdir(parents=True, exist_ok=True)
+    fname = 'data/piline.dat'
     f = open(fname, 'wb')
     dill.dump(stats, f)
     f.close()
@@ -107,7 +118,7 @@ def main():
     min_iter = 20
     max_iter = 0
 
-    f = open('piline_out.txt', 'w')
+    f = open('data/piline_out.txt', 'w')
     niters = np.array([item[1] for item in iter_counts])
     out = '   Mean number of iterations: %4.2f' % np.mean(niters)
     f.write(out + '\n')
@@ -126,7 +137,7 @@ def main():
 
 
 def plot_voltages(cwd='./'):
-    f = open(cwd + 'piline.dat', 'rb')
+    f = open(cwd + 'data/piline.dat', 'rb')
     stats = dill.load(f)
     f.close()
 
@@ -139,15 +150,16 @@ def plot_voltages(cwd='./'):
 
     setup_mpl()
     fig, ax = plt_helper.plt.subplots(1, 1, figsize=(4.5, 3))
-    ax.plot(times, [v[1] for v in v1], linewidth=1, label='$v_{C_1}$')
-    ax.plot(times, [v[1] for v in v2], linewidth=1, label='$v_{C_2}$')
-    ax.plot(times, [v[1] for v in p3], linewidth=1, label='$i_{L_\pi}$')
+    ax.plot(times, [v[1] for v in v1], linewidth=1, label=r'$v_{C_1}$')
+    ax.plot(times, [v[1] for v in v2], linewidth=1, label=r'$v_{C_2}$')
+    ax.plot(times, [v[1] for v in p3], linewidth=1, label=r'$i_{L_\pi}$')
     ax.legend(frameon=False, fontsize=12, loc='center right')
 
     ax.set_xlabel('Time')
     ax.set_ylabel('Energy')
 
     fig.savefig('data/piline_model_solution.png', dpi=300, bbox_inches='tight')
+    plt_helper.plt.close(fig)
 
 
 def setup_mpl(fontsize=8):

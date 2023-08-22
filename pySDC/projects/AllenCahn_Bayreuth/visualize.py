@@ -2,6 +2,7 @@ import json
 import glob
 import numpy as np
 import matplotlib
+
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
@@ -42,7 +43,6 @@ def plot_data(name=''):
 
 
 if __name__ == "__main__":
-
     # name = 'AC-test'
     name = 'AC-test-noforce'
     # name = 'AC-2D-application'

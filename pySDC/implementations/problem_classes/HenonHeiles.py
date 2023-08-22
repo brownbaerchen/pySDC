@@ -1,7 +1,5 @@
-
 import numpy as np
 
-from pySDC.core.Errors import ParameterError
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.particles import particles, acceleration
 
@@ -12,35 +10,29 @@ class henon_heiles(ptype):
     Example implementing the harmonic oscillator
     """
 
-    def __init__(self, problem_params, dtype_u=particles, dtype_f=acceleration):
-        """
-        Initialization routine
+    dtype_u = particles
+    dtype_f = acceleration
 
-        Args:
-            problem_params (dict): custom parameters for the example
-            dtype_u: particle data type (will be passed parent class)
-            dtype_f: acceleration data type (will be passed parent class)
-        """
-
-        # these parameters will be used later, so assert their existence
-        essential_keys = []
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
-
-        # invoke super init, passing nparts, dtype_u and dtype_f
-        super(henon_heiles, self).__init__((2, None, np.dtype('float64')), dtype_u, dtype_f, problem_params)
+    def __init__(self):
+        """Initialization routine"""
+        # invoke super init, passing nparts
+        super().__init__((2, None, np.dtype('float64')))
 
     def eval_f(self, u, t):
         """
-        Routine to compute the RHS
+        Routine to compute the right-hand side of the problem.
 
-        Args:
-            u (dtype_u): the particles
-            t (float): current time (not used here)
-        Returns:
-            dtype_f: RHS
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the particles.
+        t : float
+            Current time of the particles is computed (not used here).
+
+        Returns
+        -------
+        me : dtype_f
+            The right-hand side of the problem.
         """
         me = self.dtype_f(self.init)
         me[0] = -u.pos[0] - 2 * u.pos[0] * u.pos[1]
@@ -49,12 +41,17 @@ class henon_heiles(ptype):
 
     def u_exact(self, t):
         """
-        Routine to compute the exact/initial trajectory at time t
+        Routine to compute the exact/initial trajectory at time t.
 
-        Args:
-            t (float): current time
-        Returns:
-            dtype_u: exact/initial position and velocity
+        Parameters
+        ----------
+        t : float
+            Time of the exact/initial trajectory.
+
+        Returns
+        -------
+        me : dtype_u
+            Exact/initial position and velocity.
         """
         assert t == 0.0, 'error, u_exact only works for the initial time t0=0'
         me = self.dtype_u(self.init)
@@ -73,12 +70,17 @@ class henon_heiles(ptype):
 
     def eval_hamiltonian(self, u):
         """
-        Routine to compute the Hamiltonian
+        Routine to compute the Hamiltonian.
 
-        Args:
-            u (dtype_u): the particles
-        Returns:
-            float: hamiltonian
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of The particles.
+
+        Returns
+        -------
+        ham : float
+            The Hamiltonian.
         """
 
         ham = 0.5 * (u.vel[0] ** 2 + u.vel[1] ** 2)

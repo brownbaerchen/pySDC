@@ -1,11 +1,9 @@
 import logging
-
 import numpy as np
-import scipy.interpolate as intpl
 
 from pySDC.core.Nodes import NodesGenerator
 from pySDC.core.Errors import CollocationError
-from pySDC.core import LagrangeApproximation
+from pySDC.core.Lagrange import LagrangeApproximation
 
 
 class CollBase(object):
@@ -31,31 +29,26 @@ class CollBase(object):
     (inclusion of the left boundary), RADAU-RIGHT (inclusion of the right
     boundary) and LOBATTO (inclusion of left and right boundary).
 
-    Furthermore, the ``useSpline`` option can be activated to eventually use
-    spline interpolation when computing the weights.
+    Here is the equivalency table with the (old) original classes implemented
+    in pySDC :
 
-    Here is the equivalency table with the original classes implemented in
-    pySDC :
-
-    +-------------------------+-----------+-------------+-----------+
-    | Original Class          | node_type | quad_type   | useSpline |
-    +=========================+===========+=============+===========+
-    | Equidistant             | EQUID     | LOBATTO     | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | EquidistantInner        | EQUID     | GAUSS       | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | EquidistantNoLeft       | EQUID     | RADAU-RIGHT | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | EquidistantSpline_Right | EQUID     | RADAU-RIGHT | True      |
-    +-------------------------+-----------+-------------+-----------+
-    | CollGaussLegendre       | LEGENDRE  | GAUSS       | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | CollGaussLobatto        | LEGENDRE  | LOBATTO     | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | CollGaussRadau_Left     | LEGENDRE  | RADAU-LEFT  | False     |
-    +-------------------------+-----------+-------------+-----------+
-    | CollGaussRadau_Right    | LEGENDRE  | RADAU-RIGHT | False     |
-    +-------------------------+-----------+-------------+-----------+
+    +-------------------------+-----------+-------------+
+    | Original Class          | node_type | quad_type   |
+    +=========================+===========+=============+
+    | Equidistant             | EQUID     | LOBATTO     |
+    +-------------------------+-----------+-------------+
+    | EquidistantInner        | EQUID     | GAUSS       |
+    +-------------------------+-----------+-------------+
+    | EquidistantNoLeft       | EQUID     | RADAU-RIGHT |
+    +-------------------------+-----------+-------------+
+    | CollGaussLegendre       | LEGENDRE  | GAUSS       |
+    +-------------------------+-----------+-------------+
+    | CollGaussLobatto        | LEGENDRE  | LOBATTO     |
+    +-------------------------+-----------+-------------+
+    | CollGaussRadau_Left     | LEGENDRE  | RADAU-LEFT  |
+    +-------------------------+-----------+-------------+
+    | CollGaussRadau_Right    | LEGENDRE  | RADAU-RIGHT |
+    +-------------------------+-----------+-------------+
 
     Attributes:
         num_nodes (int): number of collocation nodes
@@ -70,10 +63,9 @@ class CollBase(object):
         left_is_node (bool): flag to indicate whether left point is collocation node
     """
 
-    def __init__(self, num_nodes, tleft=0, tright=1,
-                 node_type='LEGENDRE', quad_type='LOBATTO', useSpline=False):
+    def __init__(self, num_nodes=None, tleft=0, tright=1, node_type='LEGENDRE', quad_type=None, **kwargs):
         """
-        Initialization routine for an collocation object
+        Initialization routine for a collocation object
 
         Args:
             num_nodes (int): number of collocation nodes
@@ -93,29 +85,29 @@ class CollBase(object):
         self.tleft = tleft
         self.tright = tright
 
-        # Instanciate attributes
-        self.nodeGenerator = NodesGenerator(node_type, quad_type)
-        if useSpline:
-            self._getWeights = self._getWeights_spline
-            # We need: 1<=order<=5 and order < num_nodes
-            self.order = min(num_nodes - 1, 3)
-        elif node_type == 'EQUID':
+        self.node_type = node_type
+        self.quad_type = quad_type
+
+        # Instantiate attributes
+        self.nodeGenerator = NodesGenerator(self.node_type, self.quad_type)
+        if self.node_type == 'EQUID':
             self.order = num_nodes
         else:
-            if quad_type == 'GAUSS':
+            if self.quad_type == 'GAUSS':
                 self.order = 2 * num_nodes
-            elif quad_type.startswith('RADAU'):
+            elif self.quad_type.startswith('RADAU'):
                 self.order = 2 * num_nodes - 1
-            elif quad_type == 'LOBATTO':
+            elif self.quad_type == 'LOBATTO':
                 self.order = 2 * num_nodes - 2
+
+        self.left_is_node = self.quad_type in ['LOBATTO', 'RADAU-LEFT']
+        self.right_is_node = self.quad_type in ['LOBATTO', 'RADAU-RIGHT']
 
         self.nodes = self._getNodes
         self.weights = self._getWeights(tleft, tright)
-        self.Qmat = self._gen_Qmatrix_spline if useSpline else self._gen_Qmatrix
+        self.Qmat = self._gen_Qmatrix
         self.Smat = self._gen_Smatrix
         self.delta_m = self._gen_deltas
-        self.left_is_node = quad_type in ['LOBATTO', 'RADAU-LEFT']
-        self.right_is_node = quad_type in ['LOBATTO', 'RADAU-RIGHT']
 
     @staticmethod
     def evaluate(weights, data):
@@ -149,7 +141,7 @@ class CollBase(object):
             raise CollocationError(f"Need nodes before computing weights, got {self.nodes}")
 
         # Instantiate the Lagrange interpolator object
-        approx = LagrangeApproximation(self.nodes, weightComputation='AUTO')
+        approx = LagrangeApproximation(self.nodes)
 
         # Compute weights
         tLeft = np.ravel(self.tleft)[0]
@@ -172,10 +164,15 @@ class CollBase(object):
         # Scale nodes to [tleft, tright]
         a = self.tleft
         b = self.tright
-        nodes += 1
-        nodes /= 2
+        nodes += 1.0
+        nodes /= 2.0
         nodes *= b - a
         nodes += a
+
+        if self.left_is_node:
+            nodes[0] = self.tleft
+        if self.right_is_node:
+            nodes[-1] = self.tright
 
         return nodes
 
@@ -193,7 +190,7 @@ class CollBase(object):
         Q = np.zeros([M + 1, M + 1])
 
         # Instantiate the Lagrange interpolator object
-        approx = LagrangeApproximation(self.nodes, weightComputation='AUTO')
+        approx = LagrangeApproximation(self.nodes)
 
         # Compute tleft-to-node integration matrix
         tLeft = np.ravel(self.tleft)[0]
@@ -238,46 +235,3 @@ class CollBase(object):
             delta[m] = self.nodes[m] - self.nodes[m - 1]
 
         return delta
-
-    def _getWeights_spline(self, a, b):
-        """
-        Computes weights using spline interpolation instead of Gaussian
-        quadrature
-
-        Args:
-            a (float): left interval boundary
-            b (float): right interval boundary
-
-        Returns:
-            np.ndarray: weights of the collocation formula given by the nodes
-        """
-
-        # get the defining tck's for each spline basis function
-        circ_one = np.zeros(self.num_nodes)
-        circ_one[0] = 1.0
-        tcks = []
-        for i in range(self.num_nodes):
-            tcks.append(
-                intpl.splrep(self.nodes, np.roll(circ_one, i), xb=self.tleft, xe=self.tright, k=self.order, s=0.0))
-
-        weights = np.zeros(self.num_nodes)
-        for i in range(self.num_nodes):
-            weights[i] = intpl.splint(a, b, tcks[i])
-
-        return weights
-
-    @property
-    def _gen_Qmatrix_spline(self):
-        """
-        Compute tleft-to-node integration matrix for later use in collocation formulation
-        Returns:
-            numpy.ndarray: matrix containing the weights for tleft to node
-        """
-        M = self.num_nodes
-        Q = np.zeros([M + 1, M + 1])
-
-        # for all nodes, get weights for the interval [tleft,node]
-        for m in np.arange(M):
-            Q[m + 1, 1:] = self._getWeights(self.tleft, self.nodes[m])
-
-        return Q

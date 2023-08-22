@@ -4,64 +4,105 @@ from scipy.sparse.linalg import spsolve
 from pySDC.core.Errors import ParameterError
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
-from pySDC.implementations.problem_classes.acoustic_helpers.buildWave1DMatrix import getWave1DMatrix, \
-    getWave1DAdvectionMatrix
+from pySDC.implementations.problem_classes.acoustic_helpers.buildWave1DMatrix import (
+    getWave1DMatrix,
+    getWave1DAdvectionMatrix,
+)
 
 
 # noinspection PyUnusedLocal
 class acoustic_1d_imex(ptype):
+    r"""
+    This class implements the one-dimensional acoustics advection equation on a periodic domain :math:`[0, 1]`
+    fully investigated in [1]_. The equations are given by
+
+    .. math::
+        \frac{\partial u}{\partial t} + c_s \frac{\partial p}{\partial x} + U \frac{\partial u}{\partial x} = 0,
+
+    .. math::
+        \frac{\partial p}{\partial t} + c_s \frac{\partial u}{\partial x} + U \frac{\partial p}{\partial x} = 0.
+
+    For initial data :math:`u(x, 0) \equiv 0` and :math:`p(x, 0) = p_0 (x)` the analytical solution is
+
+    .. math::
+        u(x, t) = \frac{1}{2} p_0 (x - (U + c_s) t) - \frac{1}{2} p_0 (x - (U - c_s) t),
+
+    .. math::
+        p(x, t) = \frac{1}{2} p_0 (x - (U + c_s) t) + \frac{1}{2} p_0 (x - (U - c_s) t).
+
+    The problem is implemented in the way that is used for IMEX time-stepping.
+
+    Parameters
+    ----------
+    nvars : int, optional
+        Number of degrees of freedom.
+    cs : float, optional
+        Sound velocity :math:`c_s`.
+    cadv : float, optional
+        Advection speed :math:`U`.
+    order_adv : knt, optional
+        Order of which the advective derivative is discretized.
+    waveno : int, optional
+        The wave number.
+
+    Attributes
+    ----------
+    mesh : np.ndarray
+        1d mesh.
+    dx : float
+        Mesh size.
+    Dx : scipy.csc_matrix
+        Matrix for the advection operator.
+    Id : scipy.csc_matrix
+        Sparse identity matrix.
+    A : scipy.csc_matrix
+        Matrix for the wave operator.
+
+    References
+    ----------
+    .. [1] D. Ruprecht, R. Speck. Spectral deferred corrections with fast-wave slow-wave splitting.
+        SIAM J. Sci. Comput. Vol. 38 No. 4 (2016).
     """
-    Example implementing the one-dimensional IMEX acoustic-advection
 
-    Attributes:
-        mesh (numpy.ndarray): 1d mesh
-        dx (float): mesh size
-        Dx: matrix for the advection operator
-        Id: sparse identity matrix
-        A: matrix for the wave operator
+    dtype_u = mesh
+    dtype_f = imex_mesh
 
-    """
+    def __init__(self, nvars=None, cs=0.5, cadv=0.1, order_adv=5, waveno=5):
+        """Initialization routine"""
 
-    def __init__(self, problem_params, dtype_u=mesh, dtype_f=imex_mesh):
-        """
-        Initialization routine
+        if nvars is None:
+            nvars = [(2, 300)]
 
-        Args:
-            problem_params (dict): custom parameters for the example
-            dtype_u: mesh data
-            dtype_f: mesh data with two components
-        """
+        # invoke super init, passing number of dofs
+        super().__init__((nvars, None, np.dtype('float64')))
+        self._makeAttributeAndRegister('nvars', 'cs', 'cadv', 'order_adv', 'waveno', localVars=locals(), readOnly=True)
 
-        # these parameters will be used later, so assert their existence
-        essential_keys = ['nvars', 'cs', 'cadv', 'order_adv', 'waveno']
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
-
-        # invoke super init, passing number of dofs, dtype_u and dtype_f
-        super(acoustic_1d_imex, self).__init__((problem_params['nvars'], None, np.dtype('float64')),
-                                               dtype_u, dtype_f, problem_params)
-
-        self.mesh = np.linspace(0.0, 1.0, self.params.nvars[1], endpoint=False)
+        self.mesh = np.linspace(0.0, 1.0, self.nvars[1], endpoint=False)
         self.dx = self.mesh[1] - self.mesh[0]
 
-        self.Dx = -self.params.cadv * getWave1DAdvectionMatrix(self.params.nvars[1], self.dx, self.params.order_adv)
-        self.Id, A = getWave1DMatrix(self.params.nvars[1], self.dx, ['periodic', 'periodic'], ['periodic', 'periodic'])
-        self.A = -self.params.cs * A
+        self.Dx = -self.cadv * getWave1DAdvectionMatrix(self.nvars[1], self.dx, self.order_adv)
+        self.Id, A = getWave1DMatrix(self.nvars[1], self.dx, ['periodic', 'periodic'], ['periodic', 'periodic'])
+        self.A = -self.cs * A
 
     def solve_system(self, rhs, factor, u0, t):
-        """
-        Simple linear solver for (I-dtA)u = rhs
+        r"""
+        Simple linear solver for :math:`(I-factor\cdot A)\vec{u}=\vec{rhs}`.
 
-        Args:
-            rhs (dtype_f): right-hand side for the nonlinear system
-            factor (float): abbrev. for the node-to-node stepsize (or any other factor required)
-            u0 (dtype_u): initial guess for the iterative solver (not used here so far)
-            t (float): current time (e.g. for time-dependent BCs)
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the linear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time (e.g. for time-dependent BCs).
 
-        Returns:
-            dtype_u: solution as mesh
+        Returns
+        -------
+        me : dtype_u
+            The solution as mesh.
         """
 
         M = self.Id - factor * self.A
@@ -77,14 +118,19 @@ class acoustic_1d_imex(ptype):
 
     def __eval_fexpl(self, u, t):
         """
-        Helper routine to evaluate the explicit part of the RHS
+        Helper routine to evaluate the explicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values (not used here)
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time of the numerical solution is computed (not used here).
 
-        Returns:
-            explicit part of RHS
+        Returns
+        -------
+        fexpl : dtype_f
+            Explicit part of the right-hand side.
         """
 
         b = np.concatenate((u[0, :], u[1, :]))
@@ -97,14 +143,19 @@ class acoustic_1d_imex(ptype):
 
     def __eval_fimpl(self, u, t):
         """
-        Helper routine to evaluate the implicit part of the RHS
+        Helper routine to evaluate the implicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time (not used here)
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time of the numerical solution is computed (not used here).
 
-        Returns:
-            implicit part of RHS
+        Returns
+        -------
+        fimpl : dtype_f
+            Implicit part of the right-hand side.
         """
 
         b = np.concatenate((u[:][0, :], u[:][1, :]))
@@ -117,14 +168,19 @@ class acoustic_1d_imex(ptype):
 
     def eval_f(self, u, t):
         """
-        Routine to evaluate both parts of the RHS
+        Routine to evaluate both parts of the right-hand side of the problem.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time of the numerical solution is computed.
 
-        Returns:
-            dtype_f: the RHS divided into two parts
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side divided into two parts.
         """
 
         f = self.dtype_f(self.init)
@@ -134,21 +190,27 @@ class acoustic_1d_imex(ptype):
 
     def u_exact(self, t):
         """
-        Routine to compute the exact solution at time t
+        Routine to compute the exact solution at time t.
 
-        Args:
-            t (float): current time
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
 
-        Returns:
-            dtype_u: exact solution
+        Returns
+        -------
+        me : dtype_u
+            The exact solution.
         """
 
         def u_initial(x, k):
             return np.sin(k * 2.0 * np.pi * x) + np.sin(2.0 * np.pi * x)
 
         me = self.dtype_u(self.init)
-        me[0, :] = 0.5 * u_initial(self.mesh - (self.params.cadv + self.params.cs) * t, self.params.waveno) - \
-            0.5 * u_initial(self.mesh - (self.params.cadv - self.params.cs) * t, self.params.waveno)
-        me[1, :] = 0.5 * u_initial(self.mesh - (self.params.cadv + self.params.cs) * t, self.params.waveno) + \
-            0.5 * u_initial(self.mesh - (self.params.cadv - self.params.cs) * t, self.params.waveno)
+        me[0, :] = 0.5 * u_initial(self.mesh - (self.cadv + self.cs) * t, self.waveno) - 0.5 * u_initial(
+            self.mesh - (self.cadv - self.cs) * t, self.waveno
+        )
+        me[1, :] = 0.5 * u_initial(self.mesh - (self.cadv + self.cs) * t, self.waveno) + 0.5 * u_initial(
+            self.mesh - (self.cadv - self.cs) * t, self.waveno
+        )
         return me

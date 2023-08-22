@@ -1,4 +1,3 @@
-
 import logging
 
 import dolfin as df
@@ -20,7 +19,10 @@ class fenics_vortex_2d(ptype):
         K: stiffness matrix incl. diffusion coefficient (and correct sign)
     """
 
-    def __init__(self, problem_params, dtype_u=fenics_mesh, dtype_f=rhs_fenics_mesh):
+    dtype_u = fenics_mesh
+    dtype_f = rhs_fenics_mesh
+
+    def __init__(self, c_nvars=None, family='CG', order=4, refinements=None, nu=0.01, rho=50, delta=0.05):
         """
         Initialization routine
 
@@ -30,33 +32,33 @@ class fenics_vortex_2d(ptype):
             dtype_f: FEniCS mesh data data type with implicit and explicit parts (will be passed to parent class)
         """
 
+        if c_nvars is None:
+            c_nvars = [(32, 32)]
+
+        if refinements is None:
+            refinements = [1, 0]
+
         # Sub domain for Periodic boundary condition
         class PeriodicBoundary(df.SubDomain):
-
             # Left boundary is "target domain" G
             def inside(self, x, on_boundary):
                 # return True if on left or bottom boundary AND NOT on one of the two corners (0, 1) and (1, 0)
-                return bool((df.near(x[0], 0) or df.near(x[1], 0)) and
-                            (not ((df.near(x[0], 0) and df.near(x[1], 1)) or
-                                  (df.near(x[0], 1) and df.near(x[1], 0)))) and on_boundary)
+                return bool(
+                    (df.near(x[0], 0) or df.near(x[1], 0))
+                    and (not ((df.near(x[0], 0) and df.near(x[1], 1)) or (df.near(x[0], 1) and df.near(x[1], 0))))
+                    and on_boundary
+                )
 
             def map(self, x, y):
                 if df.near(x[0], 1) and df.near(x[1], 1):
-                    y[0] = x[0] - 1.
-                    y[1] = x[1] - 1.
+                    y[0] = x[0] - 1.0
+                    y[1] = x[1] - 1.0
                 elif df.near(x[0], 1):
-                    y[0] = x[0] - 1.
+                    y[0] = x[0] - 1.0
                     y[1] = x[1]
                 else:  # near(x[1], 1)
                     y[0] = x[0]
-                    y[1] = x[1] - 1.
-
-        # these parameters will be used later, so assert their existence
-        essential_keys = ['c_nvars', 'family', 'order', 'refinements', 'nu', 'rho', 'delta']
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
+                    y[1] = x[1] - 1.0
 
         # set logger level for FFC and dolfin
         df.set_log_level(df.WARNING)
@@ -67,20 +69,22 @@ class fenics_vortex_2d(ptype):
         df.parameters["form_compiler"]["cpp_optimize"] = True
 
         # set mesh and refinement (for multilevel)
-        mesh = df.UnitSquareMesh(problem_params['c_nvars'][0], problem_params['c_nvars'][1])
-        for _ in range(problem_params['refinements']):
+        mesh = df.UnitSquareMesh(c_nvars[0], c_nvars[1])
+        for _ in range(refinements):
             mesh = df.refine(mesh)
 
         self.mesh = df.Mesh(mesh)
 
         # define function space for future reference
-        self.V = df.FunctionSpace(mesh, problem_params['family'], problem_params['order'],
-                                  constrained_domain=PeriodicBoundary())
+        self.V = df.FunctionSpace(mesh, family, order, constrained_domain=PeriodicBoundary())
         tmp = df.Function(self.V)
         print('DoFs on this level:', len(tmp.vector().vector()[:]))
 
         # invoke super init, passing number of dofs, dtype_u and dtype_f
-        super(fenics_vortex_2d, self).__init__(self.V, dtype_u, dtype_f, problem_params)
+        super(fenics_vortex_2d, self).__init__(self.V)
+        self._makeAttributeAndRegister(
+            'c_nvars', 'family', 'order', 'refinements', 'nu', 'rho', 'delta', localVars=locals(), readOnly=True
+        )
 
         w = df.TrialFunction(self.V)
         v = df.TestFunction(self.V)
@@ -95,17 +99,24 @@ class fenics_vortex_2d(ptype):
         self.K = df.assemble(a_K)
 
     def solve_system(self, rhs, factor, u0, t):
-        """
-        Dolfin's linear solver for (M-dtA)u = rhs
+        r"""
+        Dolfin's linear solver for :math:`(M - factor A)\vec{u} = \vec{rhs}`.
 
-        Args:
-            rhs (dtype_f): right-hand side for the nonlinear system
-            factor (float): abbrev. for the node-to-node stepsize (or any other factor required)
-            u0 (dtype_u_: initial guess for the iterative solver (not used here so far)
-            t (float): current time
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the nonlinear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time.
 
-        Returns:
-            dtype_u: solution as mesh
+        Returns
+        -------
+        u : dtype_u
+            The solution as mesh.
         """
 
         A = self.M + self.nu * factor * self.K
@@ -118,14 +129,19 @@ class fenics_vortex_2d(ptype):
 
     def __eval_fexpl(self, u, t):
         """
-        Helper routine to evaluate the explicit part of the RHS
+        Helper routine to evaluate the explicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            explicit part of RHS
+        Returns
+        -------
+        fexpl : dtype_u
+            Explicit part of the right-hand side.
         """
 
         A = 1.0 * self.K
@@ -134,39 +150,50 @@ class fenics_vortex_2d(ptype):
         df.solve(A, psi.values.vector(), b.values.vector())
 
         fexpl = self.dtype_u(self.V)
-        fexpl.values = df.project(df.Dx(psi.values, 1) * df.Dx(u.values, 0) - df.Dx(psi.values, 0) * df.Dx(u.values, 1),
-                                  self.V)
+        fexpl.values = df.project(
+            df.Dx(psi.values, 1) * df.Dx(u.values, 0) - df.Dx(psi.values, 0) * df.Dx(u.values, 1), self.V
+        )
 
         return fexpl
 
     def __eval_fimpl(self, u, t):
         """
-        Helper routine to evaluate the implicit part of the RHS
+        Helper routine to evaluate the implicit part of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            implicit part of RHS
+        Returns
+        -------
+        fimpl : dtype_u
+            Implicit part of the right-hand side.
         """
 
         tmp = self.dtype_u(self.V)
-        tmp.values = df.Function(self.V, -1.0 * self.params.nu * self.K * u.values.vector())
+        tmp.values = df.Function(self.V, -1.0 * self.nu * self.K * u.values.vector())
         fimpl = self.__invert_mass_matrix(tmp)
 
         return fimpl
 
     def eval_f(self, u, t):
         """
-        Routine to evaluate both parts of the RHS
+        Routine to evaluate both parts of the right-hand side.
 
-        Args:
-            u (dtype_u): current values
-            t (float): current time
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time at which the numerical solution is computed.
 
-        Returns:
-            dtype_f: the RHS divided into two parts
+        Returns
+        -------
+        f : dtype_f
+            The right-hand side divided into two parts.
         """
 
         f = self.dtype_f(self.V)
@@ -175,14 +202,17 @@ class fenics_vortex_2d(ptype):
         return f
 
     def __apply_mass_matrix(self, u):
-        """
-        Routine to apply mass matrix
+        r"""
+        Routine to apply mass matrix.
 
-        Args:
-            u (dtype_u): current values
+        Parameters
+        u : dtype_u
+            Current values of the numerical solution.
 
-        Returns:
-            dtype_u: M*u
+        Returns
+        -------
+        me : dtype_u
+            The product :math:` M\vec{u}`.
         """
 
         me = self.dtype_u(self.V)
@@ -192,13 +222,17 @@ class fenics_vortex_2d(ptype):
 
     def __invert_mass_matrix(self, u):
         """
-        Helper routine to invert mass matrix
+        Helper routine to invert mass matrix.
 
-        Args:
-            u (dtype_u): current values
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
 
-        Returns:
-            dtype_u: inv(M)*u
+        Returns
+        -------
+        me : dtype_u
+            The product :math:`M^{-1} \vec{u}`.
         """
 
         me = self.dtype_u(self.V)
@@ -212,16 +246,22 @@ class fenics_vortex_2d(ptype):
 
     def u_exact(self, t):
         """
-        Routine to compute the exact solution at time t
+        Routine to compute the exact solution at time t.
 
-        Args:
-            t (float): current time
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
 
-        Returns:
-            dtype_u: exact solution
+        Returns
+        -------
+        me : dtype_u
+            The exact solution.
         """
+        assert t == 0, 'ERROR: u_exact only valid for t=0'
 
-        w = df.Expression('r*(1-pow(tanh(r*((0.75-4) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25-4))),2)) - \
+        w = df.Expression(
+            'r*(1-pow(tanh(r*((0.75-4) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25-4))),2)) - \
                            r*(1-pow(tanh(r*((0.75-3) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25-3))),2)) - \
                            r*(1-pow(tanh(r*((0.75-2) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25-2))),2)) - \
                            r*(1-pow(tanh(r*((0.75-1) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25-1))),2)) - \
@@ -231,7 +271,11 @@ class fenics_vortex_2d(ptype):
                            r*(1-pow(tanh(r*((0.75+3) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25+3))),2)) - \
                            r*(1-pow(tanh(r*((0.75+4) - x[1])),2)) + r*(1-pow(tanh(r*(x[1] - (0.25+4))),2)) - \
                            d*2*a*cos(2*a*(x[0]+0.25))',
-                          d=self.params.delta, r=self.params.rho, a=np.pi, degree=self.params.order)
+            d=self.delta,
+            r=self.rho,
+            a=np.pi,
+            degree=self.order,
+        )
 
         me = self.dtype_u(self.V)
         me.values = df.interpolate(w, self.V)

@@ -1,7 +1,5 @@
-
 import numpy as np
 
-from pySDC.core.Errors import ParameterError
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.particles import particles, acceleration
 
@@ -12,62 +10,51 @@ class outer_solar_system(ptype):
     Example implementing the outer solar system problem
     """
 
-    def __init__(self, problem_params, dtype_u=particles, dtype_f=acceleration):
-        """
-        Initialization routine
+    dtype_u = particles
+    dtype_f = acceleration
 
-        Args:
-            problem_params (dict): custom parameters for the example
-            dtype_u: particle data type (will be passed parent class)
-            dtype_f: acceleration data type (will be passed parent class)
-        """
+    G = 2.95912208286e-4
 
-        if 'sun_only' not in problem_params:
-            problem_params['sun_only'] = False
+    def __init__(self, sun_only=False):
+        """Initialization routine"""
 
-        # these parameters will be used later, so assert their existence
-        essential_keys = []
-        for key in essential_keys:
-            if key not in problem_params:
-                msg = 'need %s to instantiate problem, only got %s' % (key, str(problem_params.keys()))
-                raise ParameterError(msg)
-
-        # invoke super init, passing nparts, dtype_u and dtype_f
-        super(outer_solar_system, self).__init__(((3, 6), None, np.dtype('float64')), dtype_u, dtype_f, problem_params)
-
-        # gravitational constant
-        self.G = 2.95912208286E-4
+        # invoke super init, passing nparts
+        super().__init__(((3, 6), None, np.dtype('float64')))
+        self._makeAttributeAndRegister('sun_only', localVars=locals())
 
     def eval_f(self, u, t):
         """
-        Routine to compute the RHS
+        Routine to compute the right-hand side of the problem.
 
-        Args:
-            u (dtype_u): the particles
-            t (float): current time (not used here)
-        Returns:
-            dtype_f: RHS
+        Parameters
+        ----------
+        u : dtype_u
+            The particles.
+        t (float): Current time at which the particles are computed (not used here).
+
+        Returns
+        -------
+        me : dtype_f
+            The right-hand side of the problem.
         """
         me = self.dtype_f(self.init, val=0.0)
 
         # compute the acceleration due to gravitational forces
         # ... only with respect to the sun
-        if self.params.sun_only:
-
+        if self.sun_only:
             for i in range(1, self.init[0][-1]):
                 dx = u.pos[:, i] - u.pos[:, 0]
                 r = np.sqrt(np.dot(dx, dx))
-                df = self.G * dx / (r ** 3)
+                df = self.G * dx / (r**3)
                 me[:, i] -= u.m[0] * df
 
         # ... or with all planets involved
         else:
-
             for i in range(self.init[0][-1]):
                 for j in range(i):
                     dx = u.pos[:, i] - u.pos[:, j]
                     r = np.sqrt(np.dot(dx, dx))
-                    df = self.G * dx / (r ** 3)
+                    df = self.G * dx / (r**3)
                     me[:, i] -= u.m[j] * df
                     me[:, j] += u.m[i] * df
 
@@ -75,12 +62,17 @@ class outer_solar_system(ptype):
 
     def u_exact(self, t):
         """
-        Routine to compute the exact/initial trajectory at time t
+        Routine to compute the exact/initial trajectory at time t.
 
-        Args:
-            t (float): current time
-        Returns:
-            dtype_u: exact/initial position and velocity
+        Parameters
+        ----------
+        t : float
+            Time of the exact/initial trajectory.
+
+        Returns
+        -------
+        me : dtype_u
+            The exact/initial position and velocity.
         """
         assert t == 0.0, 'error, u_exact only works for the initial time t0=0'
         me = self.dtype_u(self.init)
@@ -99,23 +91,28 @@ class outer_solar_system(ptype):
         me.vel[:, 4] = [0.00288930, 0.00114527, 0.00039677]
         me.vel[:, 5] = [0.00276725, -0.0017072, -0.00136504]
 
-        me.m[0] = 1.00000597682         # Sun
-        me.m[1] = 0.000954786104043     # Jupiter
-        me.m[2] = 0.000285583733151     # Saturn
-        me.m[3] = 0.0000437273164546    # Uranus
-        me.m[4] = 0.0000517759138449    # Neptune
-        me.m[5] = 1.0 / 130000000.0     # Pluto
+        me.m[0] = 1.00000597682  # Sun
+        me.m[1] = 0.000954786104043  # Jupiter
+        me.m[2] = 0.000285583733151  # Saturn
+        me.m[3] = 0.0000437273164546  # Uranus
+        me.m[4] = 0.0000517759138449  # Neptune
+        me.m[5] = 1.0 / 130000000.0  # Pluto
 
         return me
 
     def eval_hamiltonian(self, u):
         """
-        Routine to compute the Hamiltonian
+        Routine to compute the Hamiltonian.
 
-        Args:
-            u (dtype_u): the particles
-        Returns:
-            float: hamiltonian
+        Parameters
+        ----------
+        u : dtype_u
+            The particles.
+
+        Returns
+        -------
+        ham : float
+            The Hamiltonian.
         """
 
         ham = 0

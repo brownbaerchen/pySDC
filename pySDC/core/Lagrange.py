@@ -38,18 +38,15 @@ def computeFejerRule(n):
     m = n - lN
     K = np.arange(m)
     # -- Build v0
-    v0 = np.concatenate([
-        2 * np.exp(1j * np.pi * K / n) / (1 - 4 * K**2),
-        np.zeros(lN + 1)])
+    v0 = np.concatenate([2 * np.exp(1j * np.pi * K / n) / (1 - 4 * K**2), np.zeros(lN + 1)])
     # -- Build v1 from v0
     v1 = np.empty(len(v0) - 1, dtype=complex)
     np.conjugate(v0[:0:-1], out=v1)
     v1 += v0[:-1]
-    # -- Compute inverse fourier transform
+    # -- Compute inverse Fourier transform
     w = np.fft.ifft(v1)
     if max(w.imag) > 1.0e-15:
-        raise ValueError(
-            f'Max imaginary value to important for ifft: {max(w.imag)}')
+        raise ValueError(f'Max imaginary value to important for ifft: {max(w.imag)}')
     # -- Store weights
     weights[:] = w.real
 
@@ -75,7 +72,13 @@ class LagrangeApproximation(object):
         w_j = \frac{1}{\prod_{k\neq j}(x_j-x_k)}
 
     are the barycentric weights.
-    The theory and implementation is inspired from [1]_.
+    The theory and implementation is inspired from `this paper <http://dx.doi.org/10.1137/S0036144502417715>`_.
+
+    Parameters
+    ----------
+    points : list, tuple or np.1darray
+        The given interpolation points, no specific scaling, but must be
+        ordered in increasing order.
 
     Attributes
     ----------
@@ -83,48 +86,9 @@ class LagrangeApproximation(object):
         The interpolating points
     weights : np.1darray
         The associated barycentric weights
-    n : int (property)
-        The number of points
-
-    Methods
-    -------
-    __init__(self, points, weightComputation='AUTO', scaleRef='MAX')
-        Instanciate the LagrangeApproximation object.
-    getInterpolationMatrix(self, times):
-        Compute the interpolation matrix for a given set of discrete "time" points.
-    getIntegrationMatrix(self, intervals, numQuad='LEGENDRE_NUMPY')
-        Compute the integration matrix for a given set of intervals.
-
-    .. [1] Berrut, J. P., & Trefethen, L. N. (2004).
-           "Barycentric lagrange interpolation." SIAM review, 46(3), 501-517.
     """
 
-    def __init__(self, points, weightComputation='AUTO', scaleRef='MAX'):
-        """
-
-        Parameters
-        ----------
-        points : list, tuple or np.1darray
-            The given interpolation points, no specific scaling, but must be
-            ordered in increasing order.
-        weightComputation : str, optional
-            Algorithm used to compute the barycentric weights. Can be :
-
-            - 'FAST' : uses the analytic formula (unstable for large number of points)
-            - 'STABLE' : uses logarithmic difference and scaling of the weights
-            - 'CHEBFUN' : uses the same approach as in the chebfun package
-
-            The default is 'AUTO' : it tries the 'FAST' algorithm, and if an
-            overflow is detected, it switches to the 'STABLE' algorithm.
-        scaleRef : str, optional
-            Scaling used in the 'STABLE' algorithm for weight computation.
-            Can be :
-
-            - 'ZERO' : scaling based on the weight for the value closest to :math:`t=0`.
-            - 'MAX' : scaling based on the maximum weight value.
-
-            The default is 'MAX'.
-        """
+    def __init__(self, points):
         points = np.asarray(points).ravel()
 
         diffs = points[:, None] - points[None, :]
@@ -136,51 +100,15 @@ class LagrangeApproximation(object):
             invProd **= -1
             return invProd
 
-        def logScale(diffs):
-            # Implementation using logarithmic difference and scaling
-            sign = np.sign(diffs).prod(axis=1)
-            wLog = -np.log(np.abs(diffs)).sum(axis=1)
-            if scaleRef == 'ZERO':
-                wScale = wLog[np.argmin(np.abs(points))]
-            elif scaleRef == 'MAX':
-                wScale = wLog.max()
-            else:
-                raise NotImplementedError(f'scaleRef={scaleRef}')
-            invProd = np.exp(wLog - wScale)
-            invProd *= sign
-            return invProd
-
-        def chebfun(diffs):
-            # Implementation used in chebfun
-            diffs *= 4 / (points.max() - points.min())
-            sign = np.sign(diffs).prod(axis=1)
-            vv = np.exp(np.log(np.abs(diffs)).sum(axis=1))
-            invProd = (sign * vv)
-            invProd **= -1
-            invProd /= np.linalg.norm(invProd, np.inf)
-            return invProd
-
-        if weightComputation == 'AUTO':
-            with np.errstate(divide='raise', over='ignore'):
-                try:
-                    invProd = analytic(diffs)
-                except FloatingPointError:
-                    invProd = logScale(diffs)
-        elif weightComputation == 'FAST':
-            invProd = analytic(diffs)
-        elif weightComputation == 'STABLE':
-            invProd = logScale(diffs)
-        elif weightComputation == 'CHEBFUN':
-            invProd = chebfun(diffs)
-        else:
-            raise NotImplementedError(
-                f'weightComputation={weightComputation}')
-        weights = invProd
+        with np.errstate(divide='raise', over='ignore'):
+            try:
+                weights = analytic(diffs)
+            except FloatingPointError:
+                raise ValueError('Lagrange formula unstable for that much nodes')
 
         # Store attributes
         self.points = points
         self.weights = weights
-        self.weightComputation = weightComputation
 
     @property
     def n(self):
@@ -295,8 +223,7 @@ class LagrangeApproximation(object):
         tEval = (bj - aj) / 2 * tau + (bj + aj) / 2
 
         # Compute the integrand function on nodes
-        integrand = self.getInterpolationMatrix(tEval.ravel()).T.reshape(
-            (-1,) + tEval.shape)
+        integrand = self.getInterpolationMatrix(tEval.ravel()).T.reshape((-1,) + tEval.shape)
 
         # Apply quadrature rule to integrate
         integrand *= omega
