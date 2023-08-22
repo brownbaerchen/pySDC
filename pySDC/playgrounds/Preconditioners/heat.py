@@ -1,40 +1,51 @@
 # script to run a simple advection problem
-from pySDC.implementations.collocation_classes.gauss_radau_right import CollGaussRadau_Right
+from pySDC.implementations.collocation_classes.gauss_radau_right import (
+    CollGaussRadau_Right,
+)
 from pySDC.implementations.problem_classes.AdvectionEquation_1D_FD import advection1d
-from pySDC.implementations.problem_classes.HeatEquation_ND_FD_forced_periodic import heatNd_periodic
+from pySDC.implementations.problem_classes.HeatEquation_ND_FD_forced_periodic import (
+    heatNd_periodic,
+)
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
 from pySDC.helpers.stats_helper import get_sorted
 import numpy as np
 
-from pySDC.implementations.convergence_controller_classes.estimate_extrapolation_error import EstimateExtrapolationErrorNonMPI
+from pySDC.implementations.convergence_controller_classes.estimate_extrapolation_error import (
+    EstimateExtrapolationErrorNonMPI,
+)
 
 
 def plot_embedded(stats, ax):
-    u = get_sorted(stats, type='u', recomputed=False)
-    uold = get_sorted(stats, type='uold', recomputed=False)
-    t = [get_sorted(stats, type='u', recomputed=False)[i][0] for i in range(len(u))]
-    e_em = np.array(get_sorted(stats, type='e_embedded', recomputed=False))[:, 1]
+    u = get_sorted(stats, type="u", recomputed=False)
+    uold = get_sorted(stats, type="uold", recomputed=False)
+    t = [get_sorted(stats, type="u", recomputed=False)[i][0] for i in range(len(u))]
+    e_em = np.array(get_sorted(stats, type="e_embedded", recomputed=False))[:, 1]
     e_em_semi_glob = [abs(u[i][1] - uold[i][1]) for i in range(len(u))]
-    ax.plot(t, e_em_semi_glob, label=r'$\|u^{\left(k-1\right)}-u^{\left(k\right)}\|$')
-    ax.plot(t, e_em, linestyle='--', label=r'$\epsilon$')
-    ax.set_xlabel(r'$t$')
+    ax.plot(t, e_em_semi_glob, label=r"$\|u^{\left(k-1\right)}-u^{\left(k\right)}\|$")
+    ax.plot(t, e_em, linestyle="--", label=r"$\epsilon$")
+    ax.set_xlabel(r"$t$")
     ax.legend(frameon=False)
 
 
 class log_data(hooks):
-
     def post_iteration(self, step, level_number):
         super(log_data, self).post_iteration(step, level_number)
         if step.status.iter == step.params.maxiter - 1:
             L = step.levels[level_number]
             L.sweep.compute_end_point()
-            self.add_to_stats(process=step.status.slot, time=L.time + L.dt, level=L.level_index, iter=0,
-                              sweep=L.status.sweep, type='uold', value=L.uold[-1])
+            self.add_to_stats(
+                process=step.status.slot,
+                time=L.time + L.dt,
+                level=L.level_index,
+                iter=0,
+                sweep=L.status.sweep,
+                type="uold",
+                value=L.uold[-1],
+            )
 
     def post_step(self, step, level_number):
-
         super(log_data, self).post_step(step, level_number)
 
         # some abbreviations
@@ -42,36 +53,71 @@ class log_data(hooks):
 
         L.sweep.compute_end_point()
 
-        self.add_to_stats(process=step.status.slot, time=L.time + L.dt, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='u', value=L.uend)
-        self.add_to_stats(process=step.status.slot, time=L.time, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='dt', value=L.dt)
-        self.add_to_stats(process=step.status.slot, time=L.time + L.dt, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='e_embedded', value=L.status.error_embedded_estimate)
-        self.add_to_stats(process=step.status.slot, time=L.time + L.dt, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='e_extrapolated', value=L.status.error_extrapolation_estimate)
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type="u",
+            value=L.uend,
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type="dt",
+            value=L.dt,
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type="e_embedded",
+            value=L.status.error_embedded_estimate,
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type="e_extrapolated",
+            value=L.status.error_extrapolation_estimate,
+        )
 
 
-def run_heat(custom_description=None, num_procs=1, Tend=2e-1, hook_class=log_data, fault_stuff=None,
-                  custom_controller_params=None, custom_problem_params=None):
-
+def run_heat(
+    custom_description=None,
+    num_procs=1,
+    Tend=2e-1,
+    hook_class=log_data,
+    fault_stuff=None,
+    custom_controller_params=None,
+    custom_problem_params=None,
+):
     # initialize level parameters
     level_params = dict()
-    level_params['dt'] = 0.05
+    level_params["dt"] = 0.05
 
     # initialize sweeper parameters
     sweeper_params = dict()
-    sweeper_params['collocation_class'] = CollGaussRadau_Right
-    sweeper_params['num_nodes'] = 4
-    sweeper_params['QI'] = 'LMM'
+    sweeper_params["collocation_class"] = CollGaussRadau_Right
+    sweeper_params["num_nodes"] = 4
+    sweeper_params["QI"] = "LMM"
+    sweeper_params["initial_guess"] = "LMM"
 
     problem_params = {
-        'freq': (2,),
-        'nvars': (2**7,),
-        'type': 'center',
-        'order': 8,
-        'nu': 1.,
-        'ndim': 1,
+        "freq": (2,),
+        "nvars": (2**7,),
+        "type": "center",
+        "order": 8,
+        "nu": 1.0,
+        "ndim": 1,
     }
 
     if custom_problem_params is not None:
@@ -79,29 +125,29 @@ def run_heat(custom_description=None, num_procs=1, Tend=2e-1, hook_class=log_dat
 
     # initialize step parameters
     step_params = dict()
-    step_params['maxiter'] = 5
+    step_params["maxiter"] = 5
 
     # initialize controller parameters
     controller_params = dict()
-    controller_params['logger_level'] = 30
-    controller_params['hook_class'] = hook_class
-    controller_params['mssdc_jac'] = False
+    controller_params["logger_level"] = 30
+    controller_params["hook_class"] = hook_class
+    controller_params["mssdc_jac"] = False
 
     if custom_controller_params is not None:
         controller_params = {**controller_params, **custom_controller_params}
 
     # fill description dictionary for easy step instantiation
     description = dict()
-    description['problem_class'] = heatNd_periodic  # pass problem class
-    description['problem_params'] = problem_params  # pass problem parameters
-    description['sweeper_class'] = imex_1st_order  # pass sweeper
-    description['sweeper_params'] = sweeper_params  # pass sweeper parameters
-    description['level_params'] = level_params  # pass level parameters
-    description['step_params'] = step_params
+    description["problem_class"] = heatNd_periodic  # pass problem class
+    description["problem_params"] = problem_params  # pass problem parameters
+    description["sweeper_class"] = imex_1st_order  # pass sweeper
+    description["sweeper_params"] = sweeper_params  # pass sweeper parameters
+    description["level_params"] = level_params  # pass level parameters
+    description["step_params"] = step_params
 
     if custom_description is not None:
         for k in custom_description.keys():
-            if k == 'sweeper_class':
+            if k == "sweeper_class":
                 description[k] = custom_description[k]
                 continue
             description[k] = {**description.get(k, {}), **custom_description.get(k, {})}
@@ -110,16 +156,23 @@ def run_heat(custom_description=None, num_procs=1, Tend=2e-1, hook_class=log_dat
     t0 = 0.0
 
     # instantiate controller
-    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params,
-                                   description=description)
+    controller = controller_nonMPI(
+        num_procs=num_procs,
+        controller_params=controller_params,
+        description=description,
+    )
 
-    error_est = controller.convergence_controllers[controller.convergence_controller_order[0]]
+    error_est = controller.convergence_controllers[
+        controller.convergence_controller_order[0]
+    ]
 
     # insert faults
     if fault_stuff is not None:
-        controller.hooks.random_generator = fault_stuff['rng']
-        controller.hooks.add_fault(rnd_args={'iteration': 5, **fault_stuff.get('rnd_params', {})},
-                                   args={'time': 1e-1, 'target': 0, **fault_stuff.get('args', {})})
+        controller.hooks.random_generator = fault_stuff["rng"]
+        controller.hooks.add_fault(
+            rnd_args={"iteration": 5, **fault_stuff.get("rnd_params", {})},
+            args={"time": 1e-1, "target": 0, **fault_stuff.get("args", {})},
+        )
 
     # get initial values on finest level
     P = controller.MS[0].levels[0].prob
@@ -129,8 +182,9 @@ def run_heat(custom_description=None, num_procs=1, Tend=2e-1, hook_class=log_dat
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
     return stats, controller, Tend
 
-if __name__ == '__main__':
-    #convergence_controllers = {EstimateExtrapolationErrorNonMPI: {}}
-    #custom_description = {'convergence_controllers': convergence_controllers}
+
+if __name__ == "__main__":
+    # convergence_controllers = {EstimateExtrapolationErrorNonMPI: {}}
+    # custom_description = {'convergence_controllers': convergence_controllers}
     custom_description = None
     run_heat(custom_description=custom_description)

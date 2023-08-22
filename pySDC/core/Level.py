@@ -8,13 +8,13 @@ class _Pars(FrozenClass):
         self.dt_initial = None
         self.restol = -1.0
         self.nsweeps = 1
-        self.residual_type = 'full_abs'
+        self.residual_type = "full_abs"
         for k, v in params.items():
             setattr(self, k, v)
         # freeze class, no further attributes allowed from this point
         self._freeze()
 
-        self.dt_initial = self.dt * 1.
+        self.dt_initial = self.dt * 1.0
 
 
 # short helper class to bundle all status variables
@@ -51,7 +51,15 @@ class level(FrozenClass):
         tau (list of dtype_u): FAS correction, allocated via step class if necessary
     """
 
-    def __init__(self, problem_class, problem_params, sweeper_class, sweeper_params, level_params, level_index):
+    def __init__(
+        self,
+        problem_class,
+        problem_params,
+        sweeper_class,
+        sweeper_params,
+        level_params,
+        level_index,
+    ):
         """
         Initialization routine
 
@@ -99,6 +107,13 @@ class level(FrozenClass):
 
         # reset status
         self.status = _Status()
+
+        if self.sweep.params.initial_guess == "LMM":
+            self.uend = None
+            self.uold = [None] * (self.sweep.coll.num_nodes + 1)
+            self.fold = [None] * (self.sweep.coll.num_nodes + 1)
+            self.tau = [None] * self.sweep.coll.num_nodes
+            return None
 
         # all data back to None
         self.uend = None
