@@ -246,6 +246,103 @@ def plot_recovery_thresholds(problem, num_procs_list=None):
     savefig(fig, 'threshold', tight_layout=False)
 
 
+def plot_efficiency_polar_vdp(problem, path='data/stats'):  # pragma: no cover
+    stats_analyser = get_stats(problem, path)
+    fig, ax = plt.subplots(
+        subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
+    )
+    theta, norms = plot_efficiency_polar_single(stats_analyser, ax)
+
+    labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
+    ax.set_xticks(theta[:-1], [f'{labels[i]}\nmax={norms[i]:.2f}' for i in range(len(labels))])
+    ax.set_rlabel_position(90)
+
+    fig.legend(frameon=False, loc='outside right', ncols=1)
+    savefig(fig, 'efficiency', tight_layout=False)
+
+
+def plot_efficiency_polar_other():  # pragma: no cover
+    problems = [run_Lorenz, run_Schroedinger, run_quench]
+    paths = ['./data/stats/', './data/stats-jusuf', './data/stats-jusuf']
+    titles = ['Lorenz attractor', r'Schr\"odinger', 'Quench']
+
+    fig, axs = plt.subplots(
+        1, 3, subplot_kw={'projection': 'polar'}, figsize=figsize_by_journal(JOURNAL, 0.7, 0.5), layout='constrained'
+    )
+
+    for i in range(len(problems)):
+        stats_analyser = get_stats(problems[i], paths[i])
+        ax = axs[i]
+        theta, norms = plot_efficiency_polar_single(stats_analyser, ax)
+
+        labels = ['fail rate', 'extra iterations\nfor recovery', 'iterations for solution']
+        ax.set_rlabel_position(90)
+        # ax.set_xticks(theta[:-1], [f'max={norms[i]:.2f}' for i in range(len(labels))])
+        ax.set_xticks(theta[:-1], ['' for i in range(len(labels))])
+        ax.set_title(titles[i])
+
+    handles, labels = fig.get_axes()[0].get_legend_handles_labels()
+    fig.legend(handles=handles, labels=labels, frameon=False, loc='outside lower center', ncols=4)
+    savefig(fig, 'efficiency_other', tight_layout=False)
+
+
+def plot_efficiency_polar_single(stats_analyser, ax):  # pragma: no cover
+    """
+    Plot the recovery rate and the computational cost in a polar plot.
+
+    Shown are three axes, where lower is better in all cases.
+    First is the fail rate, which is averaged across all faults, not just ones that can be fixed.
+    Then, there is the number of iterations, which we use as a measure for how expensive the scheme is to run.
+    And finally, there is an axis of how many extra iterations we need in case a fault is fixed by the resilience
+    scheme.
+
+    All quantities are plotted relative to their maximum.
+
+    Args:
+        problem (function): A problem to run
+        path (str): Path to the associated stats for the problem
+
+    Returns:
+        None
+    """
+    # TODO: fix docs
+    mask = stats_analyser.get_mask()  # get empty mask, potentially put in some other mask later
+
+    my_setup_mpl()
+
+    res = {}
+    for strategy in stats_analyser.strategies:
+        dat = stats_analyser.load(strategy=strategy, faults=True)
+        dat_no_faults = stats_analyser.load(strategy=strategy, faults=False)
+
+        mask = stats_analyser.get_fixable_faults_only(strategy=strategy)
+        fail_rate = 1.0 - stats_analyser.rec_rate(dat, dat_no_faults, 'recovered', mask)
+        iterations_no_faults = np.mean(dat_no_faults['total_iteration'])
+
+        detected = stats_analyser.get_mask(strategy=strategy, key='total_iteration', op='gt', val=iterations_no_faults)
+        rec_mask = stats_analyser.get_mask(strategy=strategy, key='recovered', op='eq', val=True, old_mask=detected)
+        if rec_mask.any():
+            extra_iterations = np.mean(dat['total_iteration'][rec_mask]) - iterations_no_faults
+        else:
+            extra_iterations = 0
+
+        res[strategy.name] = [fail_rate, extra_iterations, iterations_no_faults]
+
+    # normalize
+    # for strategy in stats_analyser.strategies:
+    norms = [max([res[k][i] for k in res.keys()]) for i in range(len(res['base']))]
+    norms[1] = norms[2]  # use same norm for all iterations
+    res_norm = res.copy()
+    for k in res_norm.keys():
+        for i in range(3):
+            res_norm[k][i] /= norms[i]
+
+    theta = np.array([30, 150, 270, 30]) * 2 * np.pi / 360
+    for s in stats_analyser.strategies:
+        ax.plot(theta, res_norm[s.name] + [res_norm[s.name][0]], label=s.label, color=s.color, marker=s.marker)
+    return theta, norms
+
+
 def plot_adaptivity_stuff():  # pragma: no cover
     """
     Plot the solution for a van der Pol problem as well as the local error and cost associated with the base scheme and
@@ -409,6 +506,67 @@ def plot_quench_solution():  # pragma: no cover
     ax.set_xlabel(r'$t$')
     ax.legend(frameon=False)
     savefig(fig, 'quench_sol')
+
+
+def plot_Lorenz_solution():  # pragma: no cover
+    """
+    Plot the solution of Lorenz attractor problem over time
+
+    Returns:
+        None
+    """
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    from pySDC.projects.Resilience.strategies import AdaptivityStrategy
+    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
+
+    strategy = AdaptivityStrategy()
+
+    my_setup_mpl()
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    # if JOURNAL == 'JSC_beamer':
+    #    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.5, 0.9))
+    # else:
+    #    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.33))
+
+    custom_description = strategy.get_custom_description(run_Lorenz, 1)
+    custom_description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-10}}
+
+    stats, _, _ = run_Lorenz(
+        custom_description=custom_description,
+        Tend=strategy.get_Tend(run_Lorenz, 1) * 20,
+        hook_class=LogGlobalErrorPostRun,
+    )
+
+    u = get_sorted(stats, type='u')
+    e = get_sorted(stats, type='e_global_post_run')[-1]
+    print(u[-1], e)
+    ax.plot([me[1][0] for me in u], [me[1][1] for me in u], [me[1][2] for me in u])
+
+    ##################
+    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy, IterateStrategy
+    from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+
+    strategy = ERKStrategy()
+    custom_description = strategy.get_custom_description(run_Lorenz, 1)
+    custom_description['convergence_controllers'] = {Adaptivity: {'e_tol': 1e-10}}
+    stats, _, _ = run_Lorenz(
+        custom_description=custom_description,
+        Tend=strategy.get_Tend(run_Lorenz, 1) * 20,
+        hook_class=LogGlobalErrorPostRun,
+    )
+
+    u = get_sorted(stats, type='u')
+    e = get_sorted(stats, type='e_global_post_run')[-1]
+    print(u[-1], e)
+    ax.plot([me[1][0] for me in u], [me[1][1] for me in u], [me[1][2] for me in u], ls='--')
+    ################
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    savefig(fig, 'lorenz_sol')
 
 
 def plot_vdp_solution():  # pragma: no cover
