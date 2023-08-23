@@ -805,6 +805,7 @@ def get_configs(mode, problem):
             AdaptivityCollocationRefinementStrategy,
             AdaptivityStrategy,
             AdaptivityExtrapolationWithinQStrategy,
+            DoubleAdaptivityQ,
         )
 
         strategies = [
@@ -817,8 +818,8 @@ def get_configs(mode, problem):
             strategy.restol = restol
 
         configurations[1] = {
-            'custom_description': {'step_params': {'maxiter': 99}, 'level_params': {'restol': 1e-11}},
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+            'custom_description': {'step_params': {'maxiter': 10}, 'level_params': {'restol': 1e-11}},
+            'strategies': [DoubleAdaptivityQ(useMPI=True)],
         }
         configurations[2] = {'strategies': strategies}
         configurations[3] = {
@@ -1355,9 +1356,9 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 

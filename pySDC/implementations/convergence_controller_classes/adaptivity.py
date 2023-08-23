@@ -380,9 +380,11 @@ class AdaptivityResidual(AdaptivityBase):
         Reutrns:
             None
         """
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
         if self.params.max_restarts is not None:
             conv_controllers = controller.convergence_controllers
-            restart_cont = [me for me in conv_controllers if type(me) == BasicRestartingNonMPI]
+            restart_cont = [me for me in conv_controllers if BasicRestarting in type(me).__bases__]
 
             if len(restart_cont) == 0:
                 raise NotImplementedError("Please implement override of maximum number of restarts!")
@@ -393,7 +395,6 @@ class AdaptivityResidual(AdaptivityBase):
     def check_parameters(self, controller, params, description, **kwargs):
         """
         Check whether parameters are compatible with whatever assumptions went into the step size functions etc.
-        For adaptivity, we want a fixed order of the scheme.
 
         Args:
             controller (pySDC.Controller): The controller
@@ -404,13 +405,6 @@ class AdaptivityResidual(AdaptivityBase):
             bool: Whether the parameters are compatible
             str: The error message
         """
-        if description["level_params"].get("restol", -1.0) >= 0:
-            return (
-                False,
-                "Adaptivity needs constant order in time and hence restol in the step parameters has to be \
-smaller than 0!",
-            )
-
         if controller.params.mssdc_jac:
             return (
                 False,

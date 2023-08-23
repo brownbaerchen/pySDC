@@ -56,6 +56,10 @@ class Strategy:
         # setup custom descriptions
         self.custom_description = {}
         self.custom_description['sweeper_params'] = {'skip_residual_computation': self.skip_residual_computation}
+        self.custom_description['level_params'] = {}
+        self.custom_description['problem_params'] = {}
+        self.custom_description['step_params'] = {}
+        self.custom_description['convergence_controllers'] = {}
 
         # prepare parameters for masks to identify faults that cannot be fixed by this strategy
         self.fixable = []
@@ -1422,7 +1426,7 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
  strategy'
             )
 
-        if problem.__name__ in ['run_Schroedinger', 'run_quench']:
+        if problem.__name__ in ['run_Schroedinger']:
             from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 
             sweeper_class = imex_1st_order
@@ -1440,6 +1444,7 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
             }
         }
         custom_description['sweeper_class'] = sweeper_class
+        custom_description['sweeper_params'] = {'QI': "LU"}
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -1462,3 +1467,16 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
                 return 9.319882663172407e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+
+class DoubleAdaptivityQ(AdaptivityExtrapolationWithinQStrategy):
+    def get_custom_description(self, problem, num_procs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
+
+        e_tol_low = 0.0
+        e_tol = 1.0
+        if problem.__name__ == 'run_quench':
+            e_tol = 3e-8
+        custom_desc = super().get_custom_description(problem, num_procs)
+        custom_desc['convergence_controllers'][AdaptivityResidual] = {'e_tol': e_tol, 'e_tol_low': e_tol_low}
+        return custom_desc
