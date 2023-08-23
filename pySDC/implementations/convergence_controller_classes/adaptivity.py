@@ -351,6 +351,7 @@ class AdaptivityResidual(AdaptivityBase):
          - control_order (int): The order relative to other convergence controllers
          - e_tol_low (float): Lower absolute threshold for the residual
          - e_tol (float): Upper absolute threshold for the residual
+         - use_restol (bool): Restart if the residual tolerance was not reached
          - max_restarts: Override maximum number of restarts
 
         Args:
@@ -365,6 +366,7 @@ class AdaptivityResidual(AdaptivityBase):
             "control_order": -45,
             "e_tol_low": 0,
             "e_tol": np.inf,
+            "use_restol": False,
             "max_restarts": 99 if "e_tol_low" in params else None,
             "allowed_modifications": ['increase', 'decrease'],  # what we are allowed to do with the step size
         }
@@ -434,7 +436,9 @@ class AdaptivityResidual(AdaptivityBase):
 
             dt_planned = L.status.dt_new if L.status.dt_new is not None else L.params.dt
 
-            if res > self.params.e_tol and 'decrease' in self.params.allowed_modifications:
+            if (
+                res > self.params.e_tol or (res > L.params.restol and self.params.use_restol)
+            ) and 'decrease' in self.params.allowed_modifications:
                 L.status.dt_new = min([dt_planned, L.params.dt / 2.0])
                 self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
             elif res < self.params.e_tol_low and 'increase' in self.params.allowed_modifications:

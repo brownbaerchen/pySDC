@@ -69,14 +69,19 @@ class Quench(ptype):
             'stencil_type',
             'bc',
             'nvars',
+            'reference_sol_type',
+            localVars=locals(),
+            readOnly=True,
+        )
+
+        self._makeAttributeAndRegister(
             'newton_tol',
             'newton_iter',
             'lintol',
             'liniter',
             'direct_solver',
-            'reference_sol_type',
             localVars=locals(),
-            readOnly=True,
+            readOnly=False,
         )
 
         # compute dx (equal in both dimensions) and get discretization matrix A

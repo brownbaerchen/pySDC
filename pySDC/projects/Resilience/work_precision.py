@@ -805,12 +805,18 @@ def get_configs(mode, problem):
             AdaptivityCollocationRefinementStrategy,
             AdaptivityStrategy,
             AdaptivityExtrapolationWithinQStrategy,
-            DoubleAdaptivityQ,
+            ESDIRKStrategy,
+            ERKStrategy,
         )
 
+        wild_params = {
+            'double_adaptivity': True,
+            'newton_inexactness': False,
+        }
+
         strategies = [
-            AdaptivityCollocationTypeStrategy(useMPI=True),
-            AdaptivityCollocationRefinementStrategy(useMPI=True),
+            AdaptivityCollocationTypeStrategy(useMPI=True, **wild_params),
+            AdaptivityCollocationRefinementStrategy(useMPI=True, **wild_params),
         ]
 
         restol = None
@@ -818,14 +824,29 @@ def get_configs(mode, problem):
             strategy.restol = restol
 
         configurations[1] = {
-            'custom_description': {'step_params': {'maxiter': 10}, 'level_params': {'restol': 1e-11}},
-            'strategies': [DoubleAdaptivityQ(useMPI=True)],
+            'custom_description': {'level_params': {'restol': 1e-10}},
+            #'custom_description': {'step_params': {'maxiter': 99}, 'level_params': {'restol': 1e-11}},
+            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True, **wild_params)],
         }
         configurations[2] = {'strategies': strategies}
-        configurations[3] = {
-            'custom_description': {'step_params': {'maxiter': 5}},
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-        }
+
+        if False:
+            configurations[3] = {
+                'custom_description': {'step_params': {'maxiter': 5}},
+                'strategies': [AdaptivityStrategy(useMPI=True)],
+            }
+            desc_RK = {}
+            if problem.__name__ in ['run_Schroedinger']:
+                desc_RK['problem_params'] = {'imex': False}
+
+            configurations[-1] = {
+                'strategies': [
+                    ERKStrategy(useMPI=True),
+                    ESDIRKStrategy(useMPI=True),
+                ],
+                'num_procs': 1,
+                'custom_description': desc_RK,
+            }
 
         # strategies2 = [AdaptivityCollocationTypeStrategy(useMPI=True), AdaptivityCollocationRefinementStrategy(useMPI=True)]
         # restol = 1e-6
@@ -1356,14 +1377,14 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',

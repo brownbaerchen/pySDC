@@ -31,7 +31,7 @@ class Strategy:
     Abstract class for resilience strategies
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='none'):
+    def __init__(self, useMPI=False, skip_residual_computation='none', **kwargs):
         '''
         Initialization routine
         '''
@@ -262,16 +262,48 @@ class Strategy:
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
+class WildRiot(Strategy):
+    def __init__(self, double_adaptivity=False, newton_inexactness=False, **kwargs):
+        super().__init__(**kwargs)
+        self.double_adaptivity = double_adaptivity
+        self.newton_inexactness = newton_inexactness
+
+    def get_custom_description(self, problem, num_procs=1):
+        from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
+
+        desc = {}
+        desc['sweeper_params'] = {'QI': 'LU'}
+        desc['step_params'] = {'maxiter': 99}
+        desc['convergence_controllers'] = {}
+
+        if self.newton_inexactness:
+            desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-5}
+
+        if self.double_adaptivity:
+            from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
+
+            desc['step_params']['maxiter'] = 10
+            desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
+
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
+        desc['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 49,
+            'crash_after_max_restarts': False,
+        }
+        return merge_descriptions(super().get_custom_description(problem, num_procs), desc)
+
+
 class BaseStrategy(Strategy):
     '''
     Do a fixed iteration count
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, skip_residual_computation='all', **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
         self.color = list(cmap.values())[0]
         self.marker = 'o'
         self.name = 'base'
@@ -310,13 +342,13 @@ class AdaptivityStrategy(Strategy):
     Adaptivity as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, skip_residual_computation='all', **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
@@ -427,8 +459,8 @@ class AdaptivityStrategy(Strategy):
 
 
 class AdaptivityRestartFirstStep(AdaptivityStrategy):
-    def __init__(self, useMPI=False):
-        super().__init__(useMPI=useMPI)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = 'teal'
         self.name = 'adaptivityRestartFirstStep'
 
@@ -726,18 +758,18 @@ class HotRodStrategy(Strategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityCollocationStrategy(Strategy):
+class AdaptivityCollocationStrategy(WildRiot):
     '''
     Adaptivity based on collocation as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='most'):
+    def __init__(self, useMPI=False, skip_residual_computation='most', **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation, **kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity_coll'
@@ -746,7 +778,6 @@ class AdaptivityCollocationStrategy(Strategy):
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityCollocation, 'e_tol']
         self.restol = None
-        self.maxiter = 99
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -762,7 +793,6 @@ class AdaptivityCollocationStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
         custom_description = {}
-        custom_description['step_params'] = {'maxiter': self.maxiter}
 
         dt_max = np.inf
         dt_min = 1e-5
@@ -802,8 +832,8 @@ class AdaptivityCollocationStrategy(Strategy):
 
 
 class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, skip_residual_computation='most'):
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+    def __init__(self, useMPI=False, **kwargs):
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.adaptive_coll_params = {
@@ -838,8 +868,8 @@ class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, skip_residual_computation='most'):
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+    def __init__(self, useMPI=False, **kwargs):
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[5]
         self.marker = '^'
         self.adaptive_coll_params = {
@@ -875,8 +905,8 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, skip_residual_computation='most'):
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+    def __init__(self, useMPI=False, **kwargs):
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[6]
         self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [4, 3]}
@@ -1363,18 +1393,18 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityExtrapolationWithinQStrategy(Strategy):
+class AdaptivityExtrapolationWithinQStrategy(WildRiot):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
 
-        super().__init__(useMPI=useMPI)
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[8]
         self.marker = '*'
         self.name = 'adaptivity_extraQ'
@@ -1383,7 +1413,6 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityExtrapolationWithinQ, 'e_tol']
         self.restol = None
-        self.maxiter = 99
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1399,7 +1428,6 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
 
         custom_description = {}
-        custom_description['step_params'] = {'maxiter': self.maxiter}
 
         dt_max = np.inf
         dt_min = 1e-5
@@ -1444,7 +1472,6 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
             }
         }
         custom_description['sweeper_class'] = sweeper_class
-        custom_description['sweeper_params'] = {'QI': "LU"}
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -1467,16 +1494,3 @@ class AdaptivityExtrapolationWithinQStrategy(Strategy):
                 return 9.319882663172407e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
-
-
-class DoubleAdaptivityQ(AdaptivityExtrapolationWithinQStrategy):
-    def get_custom_description(self, problem, num_procs):
-        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
-
-        e_tol_low = 0.0
-        e_tol = 1.0
-        if problem.__name__ == 'run_quench':
-            e_tol = 3e-8
-        custom_desc = super().get_custom_description(problem, num_procs)
-        custom_desc['convergence_controllers'][AdaptivityResidual] = {'e_tol': e_tol, 'e_tol_low': e_tol_low}
-        return custom_desc
