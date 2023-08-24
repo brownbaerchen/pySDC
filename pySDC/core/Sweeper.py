@@ -83,14 +83,7 @@ class sweeper(object):
 
     def get_Qdelta_implicit(self, coll, qd_type):
         def rho(x):
-            return max(
-                abs(
-                    np.linalg.eigvals(
-                        np.eye(m)
-                        - np.diag([x[i] for i in range(m)]).dot(coll.Qmat[1:, 1:])
-                    )
-                )
-            )
+            return max(abs(np.linalg.eigvals(np.eye(m) - np.diag([x[i] for i in range(m)]).dot(coll.Qmat[1:, 1:]))))
 
         QDmat = np.zeros(coll.Qmat.shape)
         if qd_type == "LU":
@@ -292,13 +285,11 @@ class sweeper(object):
                     x = [0.3749891032632652, 0.6666472946796036]
                 else:
                     NotImplementedError(
-                        "This combination of preconditioner, node type and node number is not "
-                        "implemented"
+                        "This combination of preconditioner, node type and node number is not " "implemented"
                     )
             else:
                 NotImplementedError(
-                    "This combination of preconditioner, node type and node number is not "
-                    "implemented"
+                    "This combination of preconditioner, node type and node number is not " "implemented"
                 )
             QDmat[1:, 1:] = np.diag(x)
             self.parallelizable = True
@@ -312,9 +303,7 @@ class sweeper(object):
             """
             for i in range(1, len(self.coll.nodes) + 1):
                 t_expand = self.coll.nodes[i - 1]
-                h = (
-                    np.append([0], self.coll.nodes[:i]) - t_expand
-                )  # time difference to where we expand about
+                h = np.append([0], self.coll.nodes[:i]) - t_expand  # time difference to where we expand about
 
                 u_signature = np.zeros_like(h)
                 u_signature[0] = 1
@@ -322,9 +311,7 @@ class sweeper(object):
                 f_signature = np.ones_like(h)
                 f_signature[0] = 0
 
-                u_coeff, f_coeff = get_linear_multistep_method(
-                    h, u_signature, f_signature
-                )
+                u_coeff, f_coeff = get_linear_multistep_method(h, u_signature, f_signature)
 
                 QDmat[i, 0 : i + 1] = f_coeff
         elif qd_type == "LMM":
@@ -336,18 +323,14 @@ class sweeper(object):
             """
             for i in range(1, len(self.coll.nodes) + 1):
                 t_expand = self.coll.nodes[i - 1]
-                h = (
-                    np.append([0], self.coll.nodes[:i]) - t_expand
-                )  # time difference to where we expand about
+                h = np.append([0], self.coll.nodes[:i]) - t_expand  # time difference to where we expand about
 
                 u_signature = np.zeros_like(h)
                 u_signature[i] = 1
 
                 f_signature = np.ones_like(h)
 
-                u_coeff, f_coeff = get_linear_multistep_method(
-                    h, u_signature, f_signature
-                )
+                u_coeff, f_coeff = get_linear_multistep_method(h, u_signature, f_signature)
 
                 QDmat[i, 0 : i + 1] = f_coeff
                 print("u_coeff", u_coeff)
@@ -371,9 +354,7 @@ class sweeper(object):
 
                 f_signature = np.ones_like(h)
 
-                u_coeff, f_coeff = get_linear_multistep_method(
-                    h, u_signature, f_signature
-                )
+                u_coeff, f_coeff = get_linear_multistep_method(h, u_signature, f_signature)
 
                 QDmat[i, :] = f_coeff
                 print("u_coeff", u_coeff)
@@ -386,9 +367,7 @@ class sweeper(object):
             """
             for i in range(1, len(self.coll.nodes) + 1):
                 t_expand = self.coll.nodes[i - 1]
-                h = (
-                    np.append([0], self.coll.nodes[:i]) - t_expand
-                )  # time difference to where we expand about
+                h = np.append([0], self.coll.nodes[:i]) - t_expand  # time difference to where we expand about
 
                 u_signature = np.zeros_like(h)
                 u_signature[0] = 1
@@ -397,12 +376,9 @@ class sweeper(object):
                 f_signature[-1] = 1
                 f_signature[0] = 1
 
-                u_coeff, f_coeff = get_linear_multistep_method(
-                    h, u_signature, f_signature
-                )
+                u_coeff, f_coeff = get_linear_multistep_method(h, u_signature, f_signature)
 
                 QDmat[i, 0 : i + 1] = f_coeff
-            QDmat[1:, 1:] = np.diag(x)
             self.parallelizable = True
 
         elif qd_type == "MIN-SR-S":
@@ -480,7 +456,12 @@ class sweeper(object):
         # evaluate RHS at left point
         L.f[0] = P.eval_f(L.u[0], L.time)
 
-        nodes = np.append([0], self.coll.nodes)
+        # try:
+        #    print([me[0] for me in L.u])
+        # except:
+        #    pass
+
+        nodes = self.coll.nodes - 1
         for m in range(1, self.coll.num_nodes + 1):
             # copy u[0] to all collocation nodes, evaluate RHS
             if self.params.initial_guess == "spread":
@@ -506,42 +487,46 @@ class sweeper(object):
                     L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
 
                 else:
-                    u_new = P.dtype_u(init=P.init, val=0.0)
+                    t_expand = self.coll.nodes[m - 1]
+                    h = -t_expand + nodes  # time difference to where we expand about
+                    h[m - 1] = 0.0
+                    nodes[m - 1] = t_expand
 
-                    t_expand = 1 + self.coll.nodes[m - 1]
-                    h = nodes - t_expand  # time difference to where we expand about
-                    nodes[m] = t_expand
-
-                    u_signature = np.zeros_like(h)
-                    u_signature[m] = 1
+                    u_signature = np.ones_like(h)
+                    u_signature[m - 1] = 0
 
                     f_signature = np.ones_like(h)
 
-                    u_coeff, f_coeff = get_linear_multistep_method(
-                        h, u_signature, f_signature
-                    )
+                    u_coeff, f_coeff = get_linear_multistep_method(h, u_signature, f_signature, max_order=3)
 
-                    # print(L.u, L.f)
-                    rhs = sum(
-                        u_coeff[m] * L.u[m] + f_coeff[m] * L.f[m]
-                        for i in range(len(L.u))
-                        if i != m
-                    )
+                    # print(
+                    #     m,
+                    #     h,
+                    #     u_coeff,
+                    #     f_coeff,
+                    # )
+                    rhs = sum(u_coeff[i - 1] * L.u[i] + f_coeff[i - 1] * L.f[i] for i in range(1, len(L.u)))
+                    rhs -= f_coeff[m - 1] * L.f[m]
                     L.u[m] = P.solve_system(
                         rhs,
-                        h[m] * f_coeff[m],
-                        L.u[m],
+                        f_coeff[m - 1],
+                        L.u[m - 1],
                         L.time + self.coll.nodes[m - 1] * L.dt,
                     )
                     L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
-                    print("u_coeff", u_coeff)
-                    print("f_coeff", f_coeff)
-                    print("h", h)
-                    print("nodes", nodes, self.coll.nodes)
+                    # print('idx', idx, h[idx])
+                    # print("u_coeff", u_coeff)
+                    # print("f_coeff", f_coeff)
+                    # print("h", h)
+                    # print("nodes", nodes, self.coll.nodes)
+                    # print(m, [me[0] for me in L.u])
             else:
-                raise ParameterError(
-                    f"initial_guess option {self.params.initial_guess} not implemented"
-                )
+                raise ParameterError(f"initial_guess option \"{self.params.initial_guess}\" not implemented")
+
+        try:
+            print('g', [me[0] for me in L.u])
+        except:
+            pass
 
         # indicate that this level is now ready for sweeps
         L.status.unlocked = True
@@ -554,7 +539,6 @@ class sweeper(object):
         Args:
             stage (str): The current stage of the step the level belongs to
         """
-
         # get current level and problem description
         L = self.level
 
@@ -598,15 +582,14 @@ class sweeper(object):
         # indicate that the residual has seen the new values
         L.status.updated = False
 
+        print('r', [me[0] for me in L.u], L.status.residual)
         return None
 
     def compute_end_point(self):
         """
         Abstract interface to end-node computation
         """
-        raise NotImplementedError(
-            "ERROR: sweeper has to implement compute_end_point(self)"
-        )
+        raise NotImplementedError("ERROR: sweeper has to implement compute_end_point(self)")
 
     def integrate(self):
         """

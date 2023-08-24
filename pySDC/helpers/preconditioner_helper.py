@@ -2,7 +2,7 @@ import numpy as np
 from scipy.special import factorial
 
 
-def get_linear_multistep_method(steps, u_signature, f_signature, checks=False):
+def get_linear_multistep_method(steps, u_signature, f_signature, checks=False, max_order=99):
     '''
     Derive a general linear multistep method from step sizes and a signature. This function will provide a consistent
     linear multistep method by cancelling terms in Taylor expansions, but note that this must not be stable!
@@ -23,38 +23,54 @@ def get_linear_multistep_method(steps, u_signature, f_signature, checks=False):
                             which you want to use the solution and to 0 at all other times
         f_signature (list): Analogue to u_signature for the right hand side evaluations
         checks (bool): Perform some checks on stability and convergence
+        max_order (int): Maximal allowed order
 
     Returns:
         list: Coefficients for u
         list: Coefficients for f
     '''
-    n_u = np.sum(u_signature, dtype=int)
-    n_f = np.sum(f_signature, dtype=int)
-    n = n_u + n_f  # number of available values
+    # limit the order
+    idx = np.argsort(steps)  # get an index for sorting the signature based on recency
+    u_signature = u_signature.copy()
+    f_signature = f_signature.copy()
+    n = max_order + 1  # n is equal to the order of the Taylor expansion we will perform
+    while n > max_order:
+        n_u = np.sum(u_signature, dtype=int)  # number of available solutions
+        n_f = np.sum(f_signature, dtype=int)  # number of available right hand side evaluations
+        n = n_u + n_f  # total number of available values
+
+        if n > max_order:
+            if n_u > 0 and n_u > n_f - 1:
+                u_signature[idx[np.argmax(u_signature[idx])]] = 0
+            elif n_f > 0:
+                f_signature[idx[np.argmax(f_signature[idx])]] = 0
+            else:
+                raise Exception(f'Cannot limit the order of the linear multistep method from {n} to {max_order}!')
+
     j = np.arange(n)  # index variable
-    inv_fac = 1. / factorial(j)  # compute inverse factorials once to use in Taylor expansions
+    inv_fac = 1.0 / factorial(j)  # compute inverse factorials once to use in Taylor expansions
 
     # build a matrix containing the Taylor coefficients
     A = np.zeros((n, n))
 
     # fill the entries for u
     for i in range(n_u):
-        A[:, i] = steps[u_signature > 0][i]**j * inv_fac
+        A[:, i] = steps[u_signature > 0][i] ** j * inv_fac
 
     # fill the entries for f
     for i in range(n_f):
-        A[1:, i + n_u] = steps[f_signature > 0][i]**j[:-1] * inv_fac[:-1]
+        A[1:, i + n_u] = steps[f_signature > 0][i] ** j[:-1] * inv_fac[:-1]
 
     # build a right hand side vector for solving the system
     b = np.zeros(n)
-    b[0] = 1.
+    b[0] = 1.0
 
     # solve the linear system
     coeff = np.linalg.solve(A, b)
 
     # distribute the coefficients
     u_coeff = np.zeros_like(u_signature)
-    u_coeff[u_signature > 0] = coeff[0: n_u]
+    u_coeff[u_signature > 0] = coeff[0:n_u]
     f_coeff = np.zeros_like(f_signature)
     f_coeff[f_signature > 0] = coeff[n_u:]
 
@@ -66,7 +82,7 @@ def get_linear_multistep_method(steps, u_signature, f_signature, checks=False):
         verify_root_condition(first_characteristic_polynomial(u_coeff))
 
         # Check if the method is stable for h*lambda=-1
-        p = stability_polynomial(u_coeff, f_coeff, -1.)
+        p = stability_polynomial(u_coeff, f_coeff, -1.0)
         strict_root_condition(p)
 
     return u_coeff, f_coeff
@@ -87,7 +103,7 @@ def first_characteristic_polynomial(u_coeff, r=1):
     j = np.arange(len(u_coeff))
     rho = np.zeros_like(u_coeff)
     rho = -u_coeff * r**j
-    rho[-1] = r**len(u_coeff)
+    rho[-1] = r ** len(u_coeff)
     return rho[::-1]  # reverse the order to go along with usual definitions
 
 
@@ -129,11 +145,13 @@ def verify_root_condition(rho):
     # check the conditions
     roots_distinct = len(np.unique(roots)) == len(roots)
     # give some leeway because we introduce some numerical error when computing the roots
-    modulus_condition = all(abs(roots) <= 1. + 10. * np.finfo(float).eps)
+    modulus_condition = all(abs(roots) <= 1.0 + 10.0 * np.finfo(float).eps)
 
     # raise errors if we violate one of the conditions
     assert roots_distinct, "Not all roots of the first characteristic polynomial of the LMM are distinct!"
-    assert modulus_condition, "Some of the roots of the first characteristic polynomial of the LMM have modulus larger \
+    assert (
+        modulus_condition
+    ), "Some of the roots of the first characteristic polynomial of the LMM have modulus larger \
 one!"
     return roots_distinct and modulus_condition
 
@@ -167,7 +185,7 @@ def check_linear_difference_operator(u_coeff, f_coeff, steps):
     # check that all is well
     L = np.sum(taylor_coeffs, axis=0)
     want = np.zeros_like(L)
-    want[0] = 1.
+    want[0] = 1.0
     assert all(np.isclose(L, want)), "Some derivatives do not cancel in the Taylor expansion!"
 
     return None

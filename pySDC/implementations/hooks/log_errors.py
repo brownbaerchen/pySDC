@@ -98,7 +98,7 @@ class LogGlobalErrorPostStep(LogError):
 
 class LogGlobalErrorPostIter(LogError):
     """
-    Log the global error after each iteration
+    Log the global error after each iteration as `e_global_post_iteration`.
     """
 
     def post_iteration(self, step, level_number):

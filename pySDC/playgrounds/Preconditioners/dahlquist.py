@@ -9,9 +9,7 @@ import matplotlib.pyplot as plt
 
 
 class log_data(hooks):
-
     def post_iteration(self, step, level_number):
-
         super().post_iteration(step, level_number)
 
         # some abbreviations
@@ -19,10 +17,35 @@ class log_data(hooks):
 
         L.sweep.compute_end_point()
 
-        self.add_to_stats(process=step.status.slot, time=L.time + L.dt, level=L.level_index, iter=step.status.iter,
-                          sweep=L.status.sweep, type='u', value=L.uend)
-        self.add_to_stats(process=step.status.slot, time=L.time, level=L.level_index, iter=0,
-                          sweep=L.status.sweep, type='dt', value=L.dt)
+        u_exact = L.prob.u_exact(t=L.time + L.dt)
+
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
+            type='u',
+            value=L.uend,
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
+            type='e',
+            value=np.abs((L.uend - u_exact) / u_exact),
+        )
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time,
+            level=L.level_index,
+            iter=0,
+            sweep=L.status.sweep,
+            type='dt',
+            value=L.dt,
+        )
 
     def pre_run(self, step, level_number):
         super().pre_run(step, level_number)
@@ -30,30 +53,38 @@ class log_data(hooks):
         self.add_to_stats(process=0, time=0, level=0, iter=0, sweep=0, type='lambdas', value=L.prob.lambdas)
 
 
-
-def run_dahlquist(custom_description=None, num_procs=1, Tend=1., hook_class=log_data, fault_stuff=None,
-                  custom_controller_params=None, custom_problem_params=None):
-
+def run_dahlquist(
+    custom_description=None,
+    num_procs=1,
+    Tend=1.0,
+    hook_class=log_data,
+    fault_stuff=None,
+    custom_controller_params=None,
+    custom_problem_params=None,
+):
     # initialize level parameters
     level_params = dict()
-    level_params['dt'] = 1.
+    level_params['dt'] = 1.0
 
     # initialize sweeper parameters
     sweeper_params = dict()
     sweeper_params['num_nodes'] = 3
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['QI'] = 'LMM'
+    sweeper_params['QI'] = 'IE'
     # sweeper_params['initial_guess'] = 'LMM'
 
     # build lambdas
     re = np.linspace(-30, 30, 400)
     im = np.linspace(-50, 50, 400)
-    lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).\
-        reshape((len(re) * len(im)))
+    # re = [-0.1, -0.01]
+    # im = [1.0, 0.0]
+    lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).reshape(
+        (len(re) * len(im))
+    )
 
     problem_params = {
         'lambdas': lambdas,
-        'u0': 1.,
+        'u0': 1.0,
     }
 
     if custom_problem_params is not None:
@@ -74,11 +105,11 @@ def run_dahlquist(custom_description=None, num_procs=1, Tend=1., hook_class=log_
 
     # fill description dictionary for easy step instantiation
     description = dict()
-    description['problem_class'] = testequation0d  # pass problem class
-    description['problem_params'] = problem_params  # pass problem parameters
-    description['sweeper_class'] = generic_implicit  # pass sweeper
-    description['sweeper_params'] = sweeper_params  # pass sweeper parameters
-    description['level_params'] = level_params  # pass level parameters
+    description['problem_class'] = testequation0d
+    description['problem_params'] = problem_params
+    description['sweeper_class'] = generic_implicit
+    description['sweeper_params'] = sweeper_params
+    description['level_params'] = level_params
     description['step_params'] = step_params
 
     if custom_description is not None:
@@ -92,8 +123,7 @@ def run_dahlquist(custom_description=None, num_procs=1, Tend=1., hook_class=log_
     t0 = 0.0
 
     # instantiate controller
-    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params,
-                                   description=description)
+    controller = controller_nonMPI(num_procs=num_procs, controller_params=controller_params, description=description)
 
     # insert faults
     if fault_stuff is not None:
@@ -108,16 +138,15 @@ def run_dahlquist(custom_description=None, num_procs=1, Tend=1., hook_class=log_
     return stats, controller, Tend
 
 
-def plot_accuracy(stats, ax=None, iter=None):
+def plot_stability(stats, ax=None, iter=None, key='u', time=1.0, thresh=1.0):
     lambdas = get_sorted(stats, type='lambdas')[0][1]
-    e = get_sorted(stats, type='e', sortby='iter', time=2.)
-    # print(u)
+    u = get_sorted(stats, type=key, sortby='iter', time=time)
 
     if ax is None:
         fig, ax = plt.subplots(1, 1)
 
     iter = [1] if iter is None else iter
-    colors = ['blue', 'red', 'violet', 'green']
+    colors = ['blue', 'red', 'violet', 'green', 'teal']
 
     for i in iter:
         # isolate the solutions from the iteration you want
@@ -125,32 +154,9 @@ def plot_accuracy(stats, ax=None, iter=None):
 
         # get a grid for plotting
         X, Y = np.meshgrid(np.unique(lambdas.real), np.unique(lambdas.imag))
-        ax.contour(X, Y, np.abs(U), levels=[1], colors=colors[i - 1])
+        ax.contour(X, Y, np.abs(U), levels=[thresh], colors=colors[i - 1])
         ax.plot([None], [None], color=colors[i - 1], label=f'k={i}')
-
-    # decorate
-    ax.axhline(0, color='black')
-    ax.axvline(0, color='black')
-    ax.legend(frameon=False)
-def plot_stability(stats, ax=None, iter=None):
-    lambdas = get_sorted(stats, type='lambdas')[0][1]
-    u = get_sorted(stats, type='u', sortby='iter', time=2.)
-    # print(u)
-
-    if ax is None:
-        fig, ax = plt.subplots(1, 1)
-
-    iter = [1] if iter is None else iter
-    colors = ['blue', 'red', 'violet', 'green']
-
-    for i in iter:
-        # isolate the solutions from the iteration you want
-        U = np.reshape([me[1] for me in u if me[0] == i], (len(np.unique(lambdas.real)), len(np.unique(lambdas.imag))))
-
-        # get a grid for plotting
-        X, Y = np.meshgrid(np.unique(lambdas.real), np.unique(lambdas.imag))
-        ax.contour(X, Y, np.abs(U), levels=[1], colors=colors[i - 1])
-        ax.plot([None], [None], color=colors[i - 1], label=f'k={i}')
+        print(X[0][0], Y[0][0], U[0, 0])
 
     # decorate
     ax.axhline(0, color='black')
@@ -159,7 +165,27 @@ def plot_stability(stats, ax=None, iter=None):
 
 
 if __name__ == '__main__':
-    custom_description = None
-    stats, controller, Tend = run_dahlquist(custom_description=custom_description, Tend=2.)
-    plot_stability(stats, iter=[1, 2, 3])
+    custom_description = {}
+    custom_description['sweeper_params'] = {
+        'QI': 'IE',
+        'initial_guess': 'LMM',
+        #'node_type': 'EQUID',
+        'num_nodes': 3,
+    }
+
+    re = np.linspace(-400, 200, 200)
+    im = np.linspace(-500, 500, 200)
+    re = [-100.0, -0.0]
+    im = [0.0, 0.0]
+    lambdas = np.array([[complex(re[i], im[j]) for i in range(len(re))] for j in range(len(im))]).reshape(
+        (len(re) * len(im))
+    )
+
+    custom_description['problem_params'] = {
+        'lambdas': lambdas,
+    }
+
+    stats, controller, Tend = run_dahlquist(custom_description=custom_description, Tend=2.0)
+    plot_stability(stats, iter=[1, 2, 3, 4, 5], time=2.0)
+    # plot_stability(stats, iter=[1, 2, 3, 4, 5], time=2., key='e', thresh=1e-1)
     plt.show()

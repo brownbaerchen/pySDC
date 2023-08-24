@@ -661,6 +661,25 @@ def get_configs(mode, problem):
             'handle': r'small step',
             'strategies': [IterateStrategy(useMPI=True)],
         }
+    elif mode == 'LMM_IG':
+        from pySDC.projects.Resilience.strategies import IterateStrategy
+        from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+
+        dashed = {'ls': '--'}
+
+        description_both = {'sweeper_class': generic_implicit}
+        description_LMM_IG = {'sweeper_params': {'initial_guess': 'LMM'}, **description_both}
+
+        configurations[2] = {
+            'custom_description': description_LMM_IG,
+            'handle': r'LMM IG',
+            'strategies': [IterateStrategy(useMPI=True)],
+            'plotting_params': dashed,
+        }
+        configurations[3] = {
+            'strategies': [IterateStrategy(useMPI=True)],
+            'custom_description': description_both,
+        }
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
 
@@ -1348,8 +1367,8 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
-        'runs': 5,
+        'mode': 'LMM_IG',
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
