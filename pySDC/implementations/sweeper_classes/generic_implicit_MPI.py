@@ -1,14 +1,16 @@
 from mpi4py import MPI
 
-from pySDC.core.Sweeper import sweeper
+from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+import logging
 
 
-class generic_implicit_MPI(sweeper):
+class generic_implicit_MPI(generic_implicit):
     """
-    Generic implicit sweeper, expecting lower triangular matrix type as input
+    Generic implicit sweeper parallelized across the nodes.
+    Please supply a communicator as `comm` to the parameters!
 
     Attributes:
-        QI: lower triangular matrix
+        rank (int): MPI rank
     """
 
     def __init__(self, params):
@@ -18,17 +20,20 @@ class generic_implicit_MPI(sweeper):
         Args:
             params: parameters for the sweeper
         """
+        self.logger = logging.getLogger('sweeper')
 
-        if 'QI' not in params:
-            params['QI'] = 'IE'
+        if 'comm' not in params.keys():
+            params['comm'] = MPI.COMM_WORLD
+            self.logger.debug('Using MPI.COMM_WORLD for the communicator because none was supplied in the params.')
 
         # call parent's initialization routine
         super().__init__(params)
-
-        # get QI matrix
-        self.QI = self.get_Qdelta_implicit(self.coll, qd_type=self.params.QI)
-
         self.rank = self.params.comm.Get_rank()
+
+        if self.params.comm.size != self.coll.num_nodes:
+            raise NotImplementedError(
+                f'The communicator in the {type(self).__name__} sweeper needs to have one rank for each node as of now! That means we need {self.coll.num_nodes} nodes, but got {self.params.comm.size} nodes.'
+            )
 
     def integrate(self):
         """
@@ -44,14 +49,10 @@ class generic_implicit_MPI(sweeper):
 
         me = P.dtype_u(P.init, val=0.0)
         for m in range(self.coll.num_nodes):
-            if m == self.rank:
-                self.params.comm.Reduce(
-                    L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], me, root=m, op=MPI.SUM
-                )
-            else:
-                self.params.comm.Reduce(
-                    L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], None, root=m, op=MPI.SUM
-                )
+            recvBuf = me if m == self.rank else None
+            self.params.comm.Reduce(
+                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
+            )
 
         return me
 
@@ -191,3 +192,22 @@ class generic_implicit_MPI(sweeper):
         # indicate that this level is now ready for sweeps
         L.status.unlocked = True
         L.status.updated = True
+
+    def broadcast_everything(self):
+        """
+        Broadcast the solutions and right hand side evaluations to all ranks such that every rank caries all information.
+        This is a bad idea in practice. This function should only be used when testing parts that interact with this that
+        are not yet parallelized.
+        """
+        self.logger.debug('Broadcasting solution and right hand side evaluations to all ranks')
+
+        L = self.level
+        comm = self.params.comm
+
+        for m in range(1, self.coll.num_nodes + 1):
+            if m - 1 != comm.rank:
+                L.u[m] = L.prob.dtype_u(L.prob.init)
+                L.f[m] = L.prob.dtype_f(L.prob.init)
+
+            L.u[m][:] = comm.bcast(L.u[m], root=m - 1)
+            L.f[m][:] = comm.bcast(L.f[m], root=m - 1)

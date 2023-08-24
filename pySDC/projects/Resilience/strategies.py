@@ -1398,13 +1398,13 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[8]
         self.marker = '*'
         self.name = 'adaptivity_extraQ'

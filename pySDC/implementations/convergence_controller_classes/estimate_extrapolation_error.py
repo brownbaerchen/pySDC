@@ -448,6 +448,11 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
         num_nodes = description['sweeper_params']['num_nodes']
+        self.comm = description['sweeper_params'].get('comm', None)
+        if self.comm:
+            from mpi4py import MPI
+
+            self.sum = MPI.SUM
 
         self.check_convergence = CheckConvergence.check_convergence
 
@@ -498,10 +503,21 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
  works with types imex_mesh and mesh"
             )
 
+        # compute the error with the weighted sum
         u_ex = lvl.prob.dtype_u(lvl.prob.init, val=0.0)
-        for i in range(self.params.n):
-            u_ex += self.coeff.u[i] * lvl.u[i] + self.coeff.f[i] * f[i]
+        if self.comm:
+            idx = (self.comm.rank + 1) % self.comm.size
+            sendbuf = self.coeff.u[idx] * lvl.u[idx] + self.coeff.f[idx] * lvl.f[idx]
+            self.comm.Reduce(sendbuf, u_ex, op=self.sum, root=self.comm.size - 1)
+        else:
+            for i in range(self.params.n):
+                u_ex += self.coeff.u[i] * lvl.u[i] + self.coeff.f[i] * f[i]
 
         # store the error
-        lvl.status.error_extrapolation_estimate = abs(u_ex - lvl.u[-1]) * self.coeff.prefactor
+        if self.comm:
+            lvl.status.error_extrapolation_estimate = self.comm.bcast(
+                abs(u_ex - lvl.u[self.comm.rank + 1]) * self.coeff.prefactor, root=self.comm.size - 1
+            )
+        else:
+            lvl.status.error_extrapolation_estimate = abs(u_ex - lvl.u[-1]) * self.coeff.prefactor
         return None

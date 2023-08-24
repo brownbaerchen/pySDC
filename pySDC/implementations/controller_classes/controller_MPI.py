@@ -459,6 +459,7 @@ class controller_MPI(controller):
         """
         Spreading phase
         """
+        print(f'{MPI.COMM_WORLD.rank} has reached spread')
 
         # first stage: spread values
         for hook in self.hooks:
@@ -585,6 +586,7 @@ class controller_MPI(controller):
         """
         Key routine to check for convergence/termination
         """
+        print(f'{MPI.COMM_WORLD.rank} has reached it_check')
 
         # Update values to compute the residual
         self.send_full(comm=comm, level=0)

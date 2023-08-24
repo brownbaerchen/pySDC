@@ -16,7 +16,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 5
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -1057,6 +1057,26 @@ def get_configs(mode, problem):
             'custom_description': desc,
             'param_range': param_range,
         }
+    elif mode == 'parallelSDC':
+        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
+        from pySDC.projects.Resilience.strategies import AdaptivityExtrapolationWithinQStrategy
+
+        num_nodes = 3
+        comm_world = MPI.COMM_WORLD
+        strategies = [AdaptivityExtrapolationWithinQStrategy(useMPI=True)]
+
+        desc_par = {}
+        desc_par['sweeper_class'] = generic_implicit_MPI
+        desc_par['sweeper_params'] = {'num_nodes': num_nodes, 'comm': comm_world.Split(comm_world.rank < num_nodes)}
+
+        if comm_world.rank > num_nodes:
+            return None
+
+        configurations[0] = {
+            'strategies': strategies,
+            'num_procs': 1,
+            'custom_description': desc_par,
+        }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
 
@@ -1370,7 +1390,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_adaptivity',
+        'mode': 'parallelSDC',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
