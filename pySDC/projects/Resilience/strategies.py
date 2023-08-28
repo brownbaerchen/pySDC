@@ -36,7 +36,7 @@ class Strategy:
         Initialization routine
         '''
         self.useMPI = useMPI
-        self.max_steps = 1e4
+        self.max_steps = 1e6
 
         # set default values for plotting
         self.linestyle = '-'
@@ -272,7 +272,7 @@ class WildRiot(Strategy):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
         desc = {}
-        desc['sweeper_params'] = {'QI': 'LU'}
+        desc['sweeper_params'] = {'QI': 'MIN'}
         desc['step_params'] = {'maxiter': 99}
         desc['convergence_controllers'] = {}
 
@@ -404,7 +404,7 @@ class AdaptivityStrategy(Strategy):
             dt_min = 1e-2
         elif problem.__name__ == "run_vdp":
             e_tol = 2e-5
-            dt_min = 1e-3
+            dt_min = 1e-5
         elif problem.__name__ == "run_Lorenz":
             e_tol = 2e-5
             dt_min = 1e-3
