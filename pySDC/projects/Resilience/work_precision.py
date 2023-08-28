@@ -871,27 +871,27 @@ def get_configs(mode, problem):
         }
         base_desc = {'sweeper_params': {'maxiter': 5, 'num_nodes': 3, 'QI': 'IE'}}
 
-        configurations[1] = {
+        configurations[0] = {
             'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
             'num_procs_sweeper': 3,
             'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
         }
-        configurations[1] = {
-            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-            'num_procs_sweeper': 3,
-            'num_procs': 4,
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
-        }
-        configurations[2] = {
-            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-            'num_procs_sweeper': 1,
-            'plotting_params': {'ls': '--'},
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
-        }
-        configurations[3] = {
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'custom_description': base_desc,
-        }
+        # configurations[1] = {
+        #     'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
+        #     'num_procs_sweeper': 3,
+        #     'num_procs': 4,
+        #     'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+        # }
+        # configurations[2] = {
+        #     'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
+        #     'num_procs_sweeper': 1,
+        #     'plotting_params': {'ls': '--'},
+        #     'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+        # }
+        # configurations[3] = {
+        #     'strategies': [AdaptivityStrategy(useMPI=True)],
+        #     'custom_description': base_desc,
+        # }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
