@@ -1,108 +1,41 @@
 from mpi4py import MPI
 
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+from pySDC.core.Sweeper import sweeper
 import logging
 
 
-class generic_implicit_MPI(generic_implicit):
+class SweeperMPI(sweeper):
     """
-    Generic implicit sweeper parallelized across the nodes.
-    Please supply a communicator as `comm` to the parameters!
+    MPI based sweeper where each rank administers one collocation node. Adapt sweepers to MPI by use of multiple inheritance.
+    See for example the `generic_implicit_MPI` sweeper, which has a class definition:
 
-    Attributes:
-        rank (int): MPI rank
+    ```
+    class generic_implicit_MPI(SweeperMPI, generic_implicit):
+    ```
+
+    this means in inherits both from `SweeperMPI` and `generic_implicit`. The hierarchy works such that functions are first
+    called from `SweeperMPI` and then from `generic_implicit`. For instance, in the `__init__` function, the `SweeperMPI`
+    class adds a communicator and nothing else. The `generic_implicit` implicit class adds a preconditioner and so on.
+    It's a bit confusing because `self.params` is overwritten in the second call to the `__init__` of the core `sweeper`
+    class, but the `SweeperMPI` class adds parameters to the `params` dictionary, which will again be added in
+    `generic_implicit`.
     """
 
     def __init__(self, params):
-        """
-        Initialization routine for the custom sweeper
-
-        Args:
-            params: parameters for the sweeper
-        """
         self.logger = logging.getLogger('sweeper')
 
         if 'comm' not in params.keys():
             params['comm'] = MPI.COMM_WORLD
             self.logger.debug('Using MPI.COMM_WORLD for the communicator because none was supplied in the params.')
-
-        # call parent's initialization routine
         super().__init__(params)
+
         self.rank = self.params.comm.Get_rank()
 
         if self.params.comm.size != self.coll.num_nodes:
             raise NotImplementedError(
                 f'The communicator in the {type(self).__name__} sweeper needs to have one rank for each node as of now! That means we need {self.coll.num_nodes} nodes, but got {self.params.comm.size} nodes.'
             )
-
-    def integrate(self):
-        """
-        Integrates the right-hand side
-
-        Returns:
-            list of dtype_u: containing the integral as values
-        """
-
-        # get current level and problem description
-        L = self.level
-        P = L.prob
-
-        me = P.dtype_u(P.init, val=0.0)
-        for m in range(self.coll.num_nodes):
-            recvBuf = me if m == self.rank else None
-            self.params.comm.Reduce(
-                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
-            )
-
-        return me
-
-    def update_nodes(self):
-        """
-        Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
-
-        Returns:
-            None
-        """
-
-        # get current level and problem description
-        L = self.level
-        P = L.prob
-
-        # only if the level has been touched before
-        assert L.status.unlocked
-
-        # get number of collocation nodes for easier access
-
-        # gather all terms which are known already (e.g. from the previous iteration)
-        # this corresponds to u0 + QF(u^k) - QdF(u^k) + tau
-
-        # get QF(u^k)
-        rhs = self.integrate()
-
-        rhs -= L.dt * self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1]
-
-        # add initial value
-        rhs += L.u[0]
-        # add tau if associated
-        if L.tau[self.rank] is not None:
-            rhs += L.tau[self.rank]
-
-        # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
-
-        # implicit solve with prefactor stemming from the diagonal of Qd
-        L.u[self.rank + 1] = P.solve_system(
-            rhs,
-            L.dt * self.QI[self.rank + 1, self.rank + 1],
-            L.u[self.rank + 1],
-            L.time + L.dt * self.coll.nodes[self.rank],
-        )
-        # update function values
-        L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
-
-        # indicate presence of new values at this level
-        L.status.updated = True
-
-        return None
 
     def compute_end_point(self):
         """
@@ -193,21 +126,81 @@ class generic_implicit_MPI(generic_implicit):
         L.status.unlocked = True
         L.status.updated = True
 
-    def broadcast_everything(self):
-        """
-        Broadcast the solutions and right hand side evaluations to all ranks such that every rank caries all information.
-        This is a bad idea in practice. This function should only be used when testing parts that interact with this that
-        are not yet parallelized.
-        """
-        self.logger.debug('Broadcasting solution and right hand side evaluations to all ranks')
 
+class generic_implicit_MPI(SweeperMPI, generic_implicit):
+    """
+    Generic implicit sweeper parallelized across the nodes.
+    Please supply a communicator as `comm` to the parameters!
+
+    Attributes:
+        rank (int): MPI rank
+    """
+
+    def integrate(self):
+        """
+        Integrates the right-hand side
+
+        Returns:
+            list of dtype_u: containing the integral as values
+        """
+
+        # get current level and problem description
         L = self.level
-        comm = self.params.comm
+        P = L.prob
 
-        for m in range(1, self.coll.num_nodes + 1):
-            if m - 1 != comm.rank:
-                L.u[m] = L.prob.dtype_u(L.prob.init)
-                L.f[m] = L.prob.dtype_f(L.prob.init)
+        me = P.dtype_u(P.init, val=0.0)
+        for m in range(self.coll.num_nodes):
+            recvBuf = me if m == self.rank else None
+            self.params.comm.Reduce(
+                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
+            )
 
-            L.u[m][:] = comm.bcast(L.u[m], root=m - 1)
-            L.f[m][:] = comm.bcast(L.f[m], root=m - 1)
+        return me
+
+    def update_nodes(self):
+        """
+        Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
+
+        Returns:
+            None
+        """
+
+        # get current level and problem description
+        L = self.level
+        P = L.prob
+
+        # only if the level has been touched before
+        assert L.status.unlocked
+
+        # get number of collocation nodes for easier access
+
+        # gather all terms which are known already (e.g. from the previous iteration)
+        # this corresponds to u0 + QF(u^k) - QdF(u^k) + tau
+
+        # get QF(u^k)
+        rhs = self.integrate()
+
+        rhs -= L.dt * self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1]
+
+        # add initial value
+        rhs += L.u[0]
+        # add tau if associated
+        if L.tau[self.rank] is not None:
+            rhs += L.tau[self.rank]
+
+        # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
+
+        # implicit solve with prefactor stemming from the diagonal of Qd
+        L.u[self.rank + 1] = P.solve_system(
+            rhs,
+            L.dt * self.QI[self.rank + 1, self.rank + 1],
+            L.u[self.rank + 1],
+            L.time + L.dt * self.coll.nodes[self.rank],
+        )
+        # update function values
+        L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+
+        # indicate presence of new values at this level
+        L.status.updated = True
+
+        return None

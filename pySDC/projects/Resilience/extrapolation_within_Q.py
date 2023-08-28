@@ -118,7 +118,7 @@ def main():
     num_nodes = 3
     quad_type = 'RADAU-RIGHT'
     check_order(ax, run_advection, [5e-1, 1e-1, 5e-2, 1e-2], num_nodes, quad_type, QI='MIN', useMPI=True)
-    # plt.show()
+    plt.show()
 
 
 if __name__ == "__main__":
