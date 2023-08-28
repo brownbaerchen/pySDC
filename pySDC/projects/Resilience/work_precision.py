@@ -1348,30 +1348,30 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
-        'runs': 5,
+        'mode': 'parallel_efficiency',
+        'runs': 10,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Schroedinger,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {
         'record': True,
-        'runs': 5,
+        'runs': 10,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
         #'num_procs': 4,
     }
 
-    for mode in ['RK_comp']:  # ['parallel_efficiency', 'compare_strategies']:
-        break
+    # for mode in ['RK_comp', 'parallel_efficiency', 'compare_strategies']:
+    for mode in ['parallel_efficiency', 'compare_strategies']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
