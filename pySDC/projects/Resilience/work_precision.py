@@ -875,23 +875,24 @@ def get_configs(mode, problem):
             'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
             'num_procs_sweeper': 3,
             'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+            'plotting_params': {'ls': '--'},
         }
-        # configurations[1] = {
-        #     'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-        #     'num_procs_sweeper': 3,
-        #     'num_procs': 4,
-        #     'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
-        # }
-        # configurations[2] = {
-        #     'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-        #     'num_procs_sweeper': 1,
-        #     'plotting_params': {'ls': '--'},
-        #     'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
-        # }
-        # configurations[3] = {
-        #     'strategies': [AdaptivityStrategy(useMPI=True)],
-        #     'custom_description': base_desc,
-        # }
+        configurations[1] = {
+            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
+            'num_procs_sweeper': 3,
+            'num_procs': 4,
+            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+        }
+        configurations[2] = {
+            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
+            'num_procs_sweeper': 1,
+            'plotting_params': {'ls': ':'},
+            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+        }
+        configurations[3] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': base_desc,
+        }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
@@ -1493,7 +1494,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_vdp,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
