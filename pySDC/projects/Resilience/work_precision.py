@@ -849,7 +849,6 @@ def get_configs(mode, problem):
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
             AdaptivityCollocationTypeStrategy,
-            AdaptivityCollocationRefinementStrategy,
             AdaptivityStrategy,
             AdaptivityExtrapolationWithinQStrategy,
         )
@@ -857,7 +856,7 @@ def get_configs(mode, problem):
 
         strategies = [
             AdaptivityCollocationTypeStrategy(useMPI=True),
-            AdaptivityCollocationRefinementStrategy(useMPI=True),
+            AdaptivityExtrapolationWithinQStrategy(useMPI=True),
         ]
 
         restol = None
@@ -874,20 +873,20 @@ def get_configs(mode, problem):
         configurations[0] = {
             'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
             'num_procs_sweeper': 3,
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+            'strategies': strategies,
             'plotting_params': {'ls': '--'},
         }
         configurations[1] = {
             'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
             'num_procs_sweeper': 3,
             'num_procs': 4,
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+            'strategies': strategies,
         }
         configurations[2] = {
             'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
             'num_procs_sweeper': 1,
             'plotting_params': {'ls': ':'},
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True)],
+            'strategies': strategies,
         }
         configurations[3] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -1494,7 +1493,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_vdp,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
