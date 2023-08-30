@@ -272,17 +272,20 @@ class WildRiot(Strategy):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
         desc = {}
-        desc['sweeper_params'] = {'QI': 'MIN'}
+        desc['sweeper_params'] = {'QI': 'MIN_GT'}
         desc['step_params'] = {'maxiter': 99}
+        desc['level_params'] = {'restol': 1e-10}
         desc['convergence_controllers'] = {}
 
         if self.newton_inexactness:
-            desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-5}
+            desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
+            # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-3,}
+            # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-2, 'maxiter': 40}
 
         if self.double_adaptivity:
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
 
-            desc['step_params']['maxiter'] = 10
+            desc['step_params']['maxiter'] = 12
             desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
 
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
@@ -1455,20 +1458,17 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
             )
 
         if problem.__name__ in ['run_Schroedinger']:
-            from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
-
-            sweeper_class = imex_1st_order
+            from pySDC.projects.Resilience.sweepers import imex_1st_order as sweeper_class
         else:
-            from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+            from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
 
-            sweeper_class = generic_implicit
-
-        custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
+        custom_description['level_params'] = {'restol': 1e-10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityExtrapolationWithinQ: {
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
+                'restol_rel': 1e-2,
             }
         }
         custom_description['sweeper_class'] = sweeper_class

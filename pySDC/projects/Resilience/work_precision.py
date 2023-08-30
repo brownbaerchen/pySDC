@@ -934,13 +934,14 @@ def get_configs(mode, problem):
         )
 
         wild_params = {
-            'double_adaptivity': True,
-            'newton_inexactness': False,
+            'double_adaptivity': False,
+            'newton_inexactness': True,
         }
 
         strategies = [
-            AdaptivityCollocationTypeStrategy(useMPI=True, **wild_params),
-            AdaptivityCollocationRefinementStrategy(useMPI=True, **wild_params),
+            # AdaptivityCollocationTypeStrategy,
+            AdaptivityExtrapolationWithinQStrategy,
+            # AdaptivityCollocationRefinementStrategy,
         ]
 
         restol = None
@@ -948,11 +949,18 @@ def get_configs(mode, problem):
             strategy.restol = restol
 
         configurations[1] = {
-            'custom_description': {'level_params': {'restol': 1e-10}},
-            #'custom_description': {'step_params': {'maxiter': 99}, 'level_params': {'restol': 1e-11}},
-            'strategies': [AdaptivityExtrapolationWithinQStrategy(useMPI=True, **wild_params)],
+            #'custom_description': {'level_params': {'restol': 1e-10}},
+            # 'custom_description': {'step_params': {'maxiter': 10}},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'handle': 'wild',
         }
-        configurations[2] = {'strategies': strategies}
+        configurations[2] = {
+            'strategies': [me(useMPI=True) for me in strategies],
+            'custom_description': {
+                'sweeper_params': {'QI': 'LU'},
+            },
+            'plotting_params': {'ls': '--'},
+        }
 
         if False:
             configurations[3] = {
@@ -1514,7 +1522,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'parallelSweeper',
+        'mode': 'compare_adaptivity',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1523,8 +1531,8 @@ if __name__ == "__main__":
         **params,
         'problem': run_vdp,
     }
-    record = False
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    record = True
+    single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
     all_params = {

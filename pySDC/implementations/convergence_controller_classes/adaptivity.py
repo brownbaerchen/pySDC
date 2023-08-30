@@ -635,8 +635,11 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
             dict: Updated parameters
         """
         defaults = {
+            'restol_rel': None,
             **super().setup(controller, params, description, **kwargs),
         }
+        if defaults['restol_rel']:
+            description['level_params']['restol'] = max([defaults['restol_rel'] * defaults['e_tol'], 1e-11])
         return defaults
 
     def dependencies(self, controller, description, **kwargs):
