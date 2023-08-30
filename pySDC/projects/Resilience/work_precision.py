@@ -870,17 +870,24 @@ def get_configs(mode, problem):
         }
         base_desc = {'sweeper_params': {'maxiter': 5, 'num_nodes': 3, 'QI': 'IE'}}
 
-        configurations[0] = {
-            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-            'num_procs_sweeper': 3,
+        configurations[-1] = {
+            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
+            'num_procs_sweeper': 1,
+            'num_procs': 4,
+            'plotting_params': {'ls': ':'},
             'strategies': strategies,
-            'plotting_params': {'ls': '--'},
         }
         configurations[1] = {
             'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
             'num_procs_sweeper': 3,
             'num_procs': 4,
             'strategies': strategies,
+        }
+        configurations[0] = {
+            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
+            'num_procs_sweeper': 3,
+            'strategies': strategies,
+            'plotting_params': {'ls': '--'},
         }
         configurations[2] = {
             'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},

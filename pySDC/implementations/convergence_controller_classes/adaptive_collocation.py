@@ -62,6 +62,12 @@ class AdaptiveCollocation(ConvergenceController):
             'vary_keys_level': [],
         }
 
+        if not controller.params.all_to_done:
+            controller.params.all_to_done = True
+            import logging
+
+            logging.getLogger(f"{type(self).__name__}").warning('Set `controller.params.all_to_done = True`!')
+
         # only these keys can be changed by this convergence controller
         self.allowed_sweeper_keys = ['quad_type', 'num_nodes', 'node_type', 'do_coll_update']
         self.allowed_level_keys = ['restol']

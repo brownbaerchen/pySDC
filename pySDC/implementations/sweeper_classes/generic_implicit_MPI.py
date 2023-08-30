@@ -34,7 +34,7 @@ class SweeperMPI(sweeper):
 
         if self.params.comm.size != self.coll.num_nodes:
             raise NotImplementedError(
-                f'The communicator in the {type(self).__name__} sweeper needs to have one rank for each node as of now! That means we need {self.coll.num_nodes} nodes, but got {self.params.comm.size} nodes.'
+                f'The communicator in the {type(self).__name__} sweeper needs to have one rank for each node as of now! That means we need {self.coll.num_nodes} nodes, but got {self.params.comm.size} processes.'
             )
 
     def compute_end_point(self):
