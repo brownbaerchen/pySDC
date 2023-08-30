@@ -1348,7 +1348,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'parallel_efficiency',
+        'mode': 'compare_strategies',
         'runs': 10,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1370,8 +1370,11 @@ if __name__ == "__main__":
         #'num_procs': 4,
     }
 
-    # for mode in ['RK_comp', 'parallel_efficiency', 'compare_strategies']:
-    for mode in ['parallel_efficiency', 'compare_strategies']:
+    for mode in [
+        'compare_strategies',
+        'RK_comp',
+        'parallel_efficiency',
+    ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

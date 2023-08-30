@@ -36,7 +36,7 @@ class Strategy:
         Initialization routine
         '''
         self.useMPI = useMPI
-        self.max_steps = 1e4
+        self.max_steps = 1e6
 
         # set default values for plotting
         self.linestyle = '-'
