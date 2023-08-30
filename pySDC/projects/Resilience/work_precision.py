@@ -871,53 +871,53 @@ def get_configs(mode, problem):
         }
         base_desc = {'sweeper_params': {'num_nodes': 3, 'QI': 'IE'}, 'step_params': {'maxiter': 5}}
 
-        # configurations[-1] = {
-        #     'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-        #     'num_procs_sweeper': 1,
-        #     'num_procs': 4,
-        #     'plotting_params': {
-        #         'ls': '-.',
-        #         'label': '4-1',
-        #     },
-        #     'strategies': strategies,
-        # }
-        # configurations[1] = {
-        #     'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-        #     'num_procs_sweeper': 3,
-        #     'num_procs': 4,
-        #     'plotting_params': {
-        #         'ls': '-',
-        #         'label': '4-3',
-        #     },
-        #     'strategies': strategies,
-        # }
-        # configurations[0] = {
-        #     'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-        #     'num_procs_sweeper': 3,
-        #     'num_procs': 1,
-        #     'strategies': strategies,
-        #     'plotting_params': {
-        #         'ls': '--',
-        #         'label': '1-3',
-        #     },
-        # }
-        # configurations[2] = {
-        #     'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-        #     'num_procs_sweeper': 1,
-        #     'num_procs': 1,
-        #     'plotting_params': {
-        #         'ls': ':',
-        #         'label': '1-1',
-        #     },
-        #     'strategies': strategies,
-        # }
-        # configurations[8] = {
-        #     'strategies': [
-        #         ERKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        #     # 'custom_description': desc_RK,
-        # }
+        configurations[-1] = {
+            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
+            'num_procs_sweeper': 1,
+            'num_procs': 4,
+            'plotting_params': {
+                'ls': '-.',
+                'label': '4-1',
+            },
+            'strategies': strategies,
+        }
+        configurations[1] = {
+            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
+            'num_procs_sweeper': 3,
+            'num_procs': 4,
+            'plotting_params': {
+                'ls': '-',
+                'label': '4-3',
+            },
+            'strategies': strategies,
+        }
+        configurations[0] = {
+            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
+            'num_procs_sweeper': 3,
+            'num_procs': 1,
+            'strategies': strategies,
+            'plotting_params': {
+                'ls': '--',
+                'label': '1-3',
+            },
+        }
+        configurations[2] = {
+            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
+            'num_procs_sweeper': 1,
+            'num_procs': 1,
+            'plotting_params': {
+                'ls': ':',
+                'label': '1-1',
+            },
+            'strategies': strategies,
+        }
+        configurations[8] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            # 'custom_description': desc_RK,
+        }
         configurations[3] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': base_desc,
@@ -1523,7 +1523,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_vdp,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
 
