@@ -62,6 +62,12 @@ class AdaptiveCollocation(ConvergenceController):
             'vary_keys_level': [],
         }
 
+        if not controller.params.all_to_done:
+            controller.params.all_to_done = True
+            import logging
+
+            logging.getLogger(f"{type(self).__name__}").warning('Set `controller.params.all_to_done = True`!')
+
         # only these keys can be changed by this convergence controller
         self.allowed_sweeper_keys = ['quad_type', 'num_nodes', 'node_type', 'do_coll_update']
         self.allowed_level_keys = ['restol']
@@ -247,11 +253,6 @@ class AdaptiveCollocation(ConvergenceController):
             return (
                 False,
                 "Switching the collocation problems requires solving them to some tolerance that can be reached. Please set attainable `restol` in the level params",
-            )
-        if description["step_params"].get("maxiter", -1.0) < 99:
-            return (
-                False,
-                "Switching the collocation problems requires solving them exactly, which may require many iterations please set `maxiter` to at least 99 in the step params",
             )
 
         return True, ""

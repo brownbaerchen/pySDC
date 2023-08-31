@@ -174,6 +174,7 @@ class controller(object):
                     out += '--> %s = %s\n' % (k, v)
                 else:
                     out += '    %s = %s\n' % (k, v)
+        out += f'    Number of steps: {step.status.time_size}\n'
 
         out += '    Level: %s\n' % step.levels[0].__class__
         for L in step.levels:

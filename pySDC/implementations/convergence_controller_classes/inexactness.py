@@ -24,8 +24,12 @@ class NewtonInexactness(ConvergenceController):
             "ratio": 1e-2,
             "min_tol": 0,
             "max_tol": 1e99,
+            "maxiter": None,
+            **super().setup(controller, params, description, **kwargs),
         }
-        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+        if defaults['maxiter']:
+            description['problem_params']['newton_maxiter'] = defaults['maxiter']
+        return defaults
 
     def post_iteration_processing(self, controller, step, **kwargs):
         """

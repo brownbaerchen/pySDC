@@ -351,6 +351,7 @@ class AdaptivityResidual(AdaptivityBase):
          - control_order (int): The order relative to other convergence controllers
          - e_tol_low (float): Lower absolute threshold for the residual
          - e_tol (float): Upper absolute threshold for the residual
+         - use_restol (bool): Restart if the residual tolerance was not reached
          - max_restarts: Override maximum number of restarts
 
         Args:
@@ -365,6 +366,7 @@ class AdaptivityResidual(AdaptivityBase):
             "control_order": -45,
             "e_tol_low": 0,
             "e_tol": np.inf,
+            "use_restol": False,
             "max_restarts": 99 if "e_tol_low" in params else None,
             "allowed_modifications": ['increase', 'decrease'],  # what we are allowed to do with the step size
         }
@@ -380,9 +382,11 @@ class AdaptivityResidual(AdaptivityBase):
         Reutrns:
             None
         """
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
         if self.params.max_restarts is not None:
             conv_controllers = controller.convergence_controllers
-            restart_cont = [me for me in conv_controllers if type(me) == BasicRestartingNonMPI]
+            restart_cont = [me for me in conv_controllers if BasicRestarting in type(me).__bases__]
 
             if len(restart_cont) == 0:
                 raise NotImplementedError("Please implement override of maximum number of restarts!")
@@ -393,7 +397,6 @@ class AdaptivityResidual(AdaptivityBase):
     def check_parameters(self, controller, params, description, **kwargs):
         """
         Check whether parameters are compatible with whatever assumptions went into the step size functions etc.
-        For adaptivity, we want a fixed order of the scheme.
 
         Args:
             controller (pySDC.Controller): The controller
@@ -404,13 +407,6 @@ class AdaptivityResidual(AdaptivityBase):
             bool: Whether the parameters are compatible
             str: The error message
         """
-        if description["level_params"].get("restol", -1.0) >= 0:
-            return (
-                False,
-                "Adaptivity needs constant order in time and hence restol in the step parameters has to be \
-smaller than 0!",
-            )
-
         if controller.params.mssdc_jac:
             return (
                 False,
@@ -440,7 +436,9 @@ smaller than 0!",
 
             dt_planned = L.status.dt_new if L.status.dt_new is not None else L.params.dt
 
-            if res > self.params.e_tol and 'decrease' in self.params.allowed_modifications:
+            if (
+                res > self.params.e_tol or (res > L.params.restol and self.params.use_restol)
+            ) and 'decrease' in self.params.allowed_modifications:
                 L.status.dt_new = min([dt_planned, L.params.dt / 2.0])
                 self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
             elif res < self.params.e_tol_low and 'increase' in self.params.allowed_modifications:
@@ -637,8 +635,11 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
             dict: Updated parameters
         """
         defaults = {
+            'restol_rel': None,
             **super().setup(controller, params, description, **kwargs),
         }
+        if defaults['restol_rel']:
+            description['level_params']['restol'] = max([defaults['restol_rel'] * defaults['e_tol'], 1e-11])
         return defaults
 
     def dependencies(self, controller, description, **kwargs):
