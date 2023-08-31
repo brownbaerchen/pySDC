@@ -145,3 +145,35 @@ class StepSizeSlopeLimiter(ConvergenceController):
                     L.status.dt_new = dt_new
 
         return None
+
+
+class WorkLimiter(ConvergenceController):
+    def __init__(self, controller, params, description, **kwargs):
+        self.work = [None] * 2
+        self.dt = [None] * 2
+        super().__init__(controller, params, description, **kwargs)
+
+    def setup(self, controller, params, description, **kwargs):
+        defaults = {
+            "control_order": +210,
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
+    def get_new_step_size(self, controller, S, **kwargs):
+        L = S.levels[0]
+        if S.status.done and not S.status.restart:
+            self.work[:-1] = self.work[1:]
+            self.work[-1] = S.status.iter * 1.0
+            self.dt[:-1] = self.dt[1:]
+            self.dt[-1] = S.dt * 1.0
+            # print(self.work, self.dt)
+
+        if None not in self.work and L.status.dt_new is not None:
+            # first order finite difference approximation of the derivative of the "power" wrt step size
+            diff = self.work[-1] / self.dt[-1] - self.work[-2] / self.dt[-2]  # / (self.dt[-1] - self.dt[-2])
+            if diff > 0 and L.status.dt_new > L.params.dt and self.dt[-1] > self.dt[-2]:
+                self.log(f'Found decrease in power by {diff:.2e}! Prohibiting step size increase!', S)
+                L.status.dt_new = L.params.dt
+        # if S.status.done:
+        #    print(self.work, self.dt, S.status.done, S.status.restart, S.status.iter, S.dt)
+        #    breakpoint()
