@@ -631,8 +631,9 @@ def get_configs(mode, problem):
     elif mode == 'compare_strategies':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
-        description_high_order = {'step_params': {'maxiter': 5}}
-        description_low_order = {'step_params': {'maxiter': 3}}
+        sweeper_params = {'num_nodes': 3, 'QI': 'IE'}
+        description_high_order = {'step_params': {'maxiter': 5}, 'sweeper_params': sweeper_params}
+        description_low_order = {'step_params': {'maxiter': 3}, 'sweeper_params': sweeper_params}
         dashed = {'ls': '--'}
 
         configurations[0] = {
@@ -660,36 +661,6 @@ def get_configs(mode, problem):
             'custom_description': description_small_step,
             'handle': r'small step',
             'strategies': [IterateStrategy(useMPI=True)],
-        }
-    elif mode == 'RK':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
-
-        # from pySDC.implementations.sweeper_classes.explicit import explicit
-        # configurations[3] = {
-        #    'custom_description': {
-        #        'step_params': {'maxiter': 5},
-        #        'sweeper_params': {'QE': 'EE'},
-        #        'sweeper_class': explicit,
-        #    },
-        #    'handle': 'explicit order 4',
-        #    'strategies': [AdaptivityStrategy(useMPI=True)],
-        #    'plotting_params': {'ls': ':', 'label': 'explicit SDC5(4)'},
-        # }
-        configurations[0] = {
-            'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
-            'num_procs': 1,
-        }
-        configurations[1] = {
-            'custom_description': {'step_params': {'maxiter': 5}},
-            'handle': 'order 5',
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'label': 'SDC5(4)'},
-        }
-        configurations[2] = {
-            'custom_description': {'step_params': {'maxiter': 4}},
-            'handle': 'order 4',
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
     elif mode == 'parallel_efficiency':
         from pySDC.projects.Resilience.strategies import (
