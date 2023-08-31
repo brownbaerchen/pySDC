@@ -934,8 +934,8 @@ def get_configs(mode, problem):
         )
 
         wild_params = {
-            'double_adaptivity': False,
-            'newton_inexactness': True,
+            'double_adaptivity': True,
+            #'newton_inexactness': True,
         }
 
         strategies = [

@@ -285,7 +285,7 @@ class WildRiot(Strategy):
         if self.double_adaptivity:
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
 
-            desc['step_params']['maxiter'] = 12
+            desc['step_params']['maxiter'] = 10
             desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
 
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
