@@ -264,9 +264,11 @@ class Strategy:
 
 class WildRiot(Strategy):
     def __init__(self, double_adaptivity=False, newton_inexactness=False, **kwargs):
+        kwargs = {**kwargs, 'skip_residual_computation': 'all'}
         super().__init__(**kwargs)
         self.double_adaptivity = double_adaptivity
         self.newton_inexactness = newton_inexactness
+        self.restol = -1
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
@@ -274,13 +276,14 @@ class WildRiot(Strategy):
         desc = {}
         desc['sweeper_params'] = {'QI': 'MIN_GT'}
         desc['step_params'] = {'maxiter': 99}
-        desc['level_params'] = {'restol': 1e-10}
+        desc['level_params'] = {'e_tol': 1e-10, 'restol': -1}
         desc['convergence_controllers'] = {}
 
         if self.newton_inexactness:
-            desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
-            # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-3,}
+            # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
+            # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-2, 'maxiter': 40}
+            desc['problem_params'] = {'newton_maxiter': 10}
 
         if self.double_adaptivity:
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
@@ -766,13 +769,19 @@ class AdaptivityCollocationStrategy(WildRiot):
     Adaptivity based on collocation as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='most', **kwargs):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
+        kwargs = {
+            'skip_residual_computation': 'most',
+            **kwargs,
+        }
+
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation, **kwargs)
+        self.restol = None
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity_coll'
@@ -780,7 +789,6 @@ class AdaptivityCollocationStrategy(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityCollocation, 'e_tol']
-        self.restol = None
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -822,7 +830,7 @@ class AdaptivityCollocationStrategy(WildRiot):
  strategy'
             )
 
-        custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
+        # custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityCollocation: {
                 'e_tol': e_tol,
@@ -1407,6 +1415,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityExtrapolationWithinQ
 
+        self.restol = None
         super().__init__(**kwargs)
         self.color = list(cmap.values())[8]
         self.marker = '*'
@@ -1415,7 +1424,6 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityExtrapolationWithinQ, 'e_tol']
-        self.restol = None
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1468,7 +1476,8 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
-                'restol_rel': 1e-2,
+                # 'restol_rel': 1e-2,
+                'e_tol_rel': 1e-2,
             }
         }
         custom_description['sweeper_class'] = sweeper_class

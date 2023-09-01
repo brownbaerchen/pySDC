@@ -636,10 +636,13 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
         """
         defaults = {
             'restol_rel': None,
+            'e_tol_rel': None,
             **super().setup(controller, params, description, **kwargs),
         }
         if defaults['restol_rel']:
             description['level_params']['restol'] = max([defaults['restol_rel'] * defaults['e_tol'], 1e-11])
+        elif defaults['e_tol_rel']:
+            description['level_params']['e_tol'] = min([max([defaults['e_tol'] * defaults['e_tol'], 1e-9]), 1e-5])
         return defaults
 
     def dependencies(self, controller, description, **kwargs):

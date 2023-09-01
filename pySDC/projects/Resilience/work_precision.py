@@ -11,6 +11,7 @@ from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
+from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -132,8 +133,16 @@ def single_run(
     t_last = perf_counter()
 
     # record all the metrics
+    stats_all = filter_stats(stats, comm=comm_sweep)
+    from pySDC.helpers.stats_helper import get_list_of_types
+
+    # print(len(stats), len(stats_all), comm_sweep.size, comm_sweep.rank, flush=True)
+    # print(filter_stats(stats, mudda='deine'))
     for key, mapping in MAPPINGS.items():
-        me = get_sorted(stats, comm=comm, type=mapping[0], recomputed=mapping[2])
+        # print(mapping, flush=True)
+        # if comm.rank == 0:
+        #    breakpoint()
+        me = get_sorted(stats_all, comm=comm_time, type=mapping[0], recomputed=mapping[2])
         if len(me) == 0:
             data[key] += [np.nan]
         else:
@@ -276,8 +285,8 @@ def record_work_precision(
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
 
-        if strategy.name == 'adaptivity_coll':
-            set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
+        # if strategy.name == 'adaptivity_coll':
+        #     set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
 
         if problem.__name__ == 'run_Schroedinger' and strategy.name in ['ESDIRK', 'ERK']:
             problem_params = custom_description['problem_params']
@@ -932,10 +941,11 @@ def get_configs(mode, problem):
             ESDIRKStrategy,
             ERKStrategy,
         )
+        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
 
         wild_params = {
-            'double_adaptivity': True,
-            #'newton_inexactness': True,
+            # 'double_adaptivity': True,
+            'newton_inexactness': True,
         }
 
         strategies = [
@@ -944,24 +954,30 @@ def get_configs(mode, problem):
             # AdaptivityCollocationRefinementStrategy,
         ]
 
-        restol = None
-        for strategy in strategies:
-            strategy.restol = restol
+        # restol = None
+        # for strategy in strategies:
+        #     strategy.restol = restol
 
         configurations[1] = {
             #'custom_description': {'level_params': {'restol': 1e-10}},
             # 'custom_description': {'step_params': {'maxiter': 10}},
+            'custom_description': {'sweeper_class': generic_implicit_MPI},
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'wild',
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
         }
         configurations[2] = {
-            'strategies': [me(useMPI=True) for me in strategies],
-            'custom_description': {
-                'sweeper_params': {'QI': 'LU'},
-            },
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            #'custom_description': {
+            #    'sweeper_params': {'QI': 'LU'},
+            # },
             'plotting_params': {'ls': '--'},
         }
 
+        configurations[3] = {
+            'custom_description': {'step_params': {'maxiter': 5}},
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+        }
         if False:
             configurations[3] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
@@ -1533,7 +1549,9 @@ if __name__ == "__main__":
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
-    # single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
+    single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='t', precision_key='k_Newton', record=False)
 
     all_params = {
         'record': False,

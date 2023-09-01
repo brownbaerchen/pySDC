@@ -142,7 +142,8 @@ class AdaptiveCollocation(ConvergenceController):
             P = L.prob
 
             # store solution of current level which will be interpolated to new level
-            u_old = [me.flatten() if me is not None else me for me in L.u]
+            u_prev = [me.flatten() if me is not None else me for me in L.u]
+            uold = [me.flatten() if me is not None else me for me in L.uold]
             nodes_old = L.sweep.coll.nodes.copy()
 
             # change sweeper
@@ -157,7 +158,10 @@ class AdaptiveCollocation(ConvergenceController):
             nodes_new = L.sweep.coll.nodes.copy()
             interpolator = LagrangeApproximation(points=np.append(0, nodes_old))
 
-            u_inter = self.matmul(interpolator.getInterpolationMatrix(np.append(0, nodes_new)), u_old)
+            interpolation_matrix = interpolator.getInterpolationMatrix(np.append(0, nodes_new))
+            u_inter = self.matmul(interpolation_matrix, u_prev)
+            if any([me is not None for me in uold]):
+                u_old_inter = self.matmul(interpolation_matrix, uold)
 
             # assign the interpolated values to the nodes in the level
             for i in range(0, len(u_inter)):
@@ -165,6 +169,10 @@ class AdaptiveCollocation(ConvergenceController):
                     me = P.dtype_u(P.init)
                     me[:] = np.reshape(u_inter[i], P.init[0])
                     L.u[i] = me
+                if u_old_inter[i] is not None:
+                    you = P.dtype_u(P.init)
+                    you[:] = np.reshape(u_old_inter[i], P.init[0])
+                    L.uold[i] = you
 
             # reevaluate rhs
             for i in range(L.sweep.coll.num_nodes + 1):
@@ -249,7 +257,10 @@ class AdaptiveCollocation(ConvergenceController):
             bool: Whether the parameters are compatible
             str: The error message
         """
-        if description["level_params"].get("restol", -1.0) <= 1e-16:
+        if (
+            description["level_params"].get("restol", -1.0) <= 1e-16
+            and description["level_params"].get('e_tol', -1) < 1e-16
+        ):
             return (
                 False,
                 "Switching the collocation problems requires solving them to some tolerance that can be reached. Please set attainable `restol` in the level params",

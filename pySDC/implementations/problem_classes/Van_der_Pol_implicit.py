@@ -130,6 +130,8 @@ class vanderpol(ptype):
         u : dtype_u
             The solution u.
         """
+        if u0[0] > 1e9:
+            print('wooooow', u0)
 
         mu = self.mu
 
