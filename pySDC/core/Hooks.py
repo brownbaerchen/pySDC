@@ -4,14 +4,14 @@ from collections import namedtuple
 
 # metadata with defaults
 meta_data = {
-    'process': 0,
-    'process_sweeper': -1,
+    'process': None,
+    'process_sweeper': None,
     'time': None,
     'level': None,
     'iter': None,
     'sweep': None,
     'type': None,
-    'num_restarts': 0,
+    'num_restarts': None,
 }
 Entry = namedtuple('Entry', meta_data.keys())
 
