@@ -18,6 +18,7 @@ from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
 LOGGER_LEVEL = 25
+LOG_TO_FILE = False
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
 
@@ -115,7 +116,7 @@ def single_run(
     if comm_sweep.size > 1:
         description['sweeper_params']['comm'] = comm_sweep
 
-    controller_params = {'logger_level': LOGGER_LEVEL}
+    controller_params = {'logger_level': LOGGER_LEVEL, 'log_to_file': LOG_TO_FILE, 'fname': 'out.txt'}
     problem_args = {} if problem_args is None else problem_args
 
     stats, controller, _ = problem(
@@ -336,6 +337,7 @@ def record_work_precision(
         with open(path, 'wb') as f:
             logger.debug(f'Dumping file \"{path}\"')
             pickle.dump(data, f)
+        return data
 
 
 def load(**kwargs):

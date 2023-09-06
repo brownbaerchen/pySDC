@@ -151,6 +151,51 @@ class AdaptivityBase(ConvergenceController):
         return None
 
 
+class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
+    def get_convergence(self, controller, S, **kwargs):
+        raise NotImplementedError(f"Please implement a way to check if the collocation problem is converged!")
+
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Add a default value for control order to the parameters.
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): Parameters for the convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            dict: Updated parameters
+        """
+        defaults = {
+            'restol_rel': None,
+            'e_tol_rel': None,
+            'restart_at_maxiter': False,
+            **super().setup(controller, params, description, **kwargs),
+        }
+        if defaults['restol_rel']:
+            description['level_params']['restol'] = max([defaults['restol_rel'] * defaults['e_tol'], 1e-11])
+        elif defaults['e_tol_rel']:
+            description['level_params']['e_tol'] = min([max([defaults['e_tol_rel'] * defaults['e_tol'], 1e-10]), 1e-5])
+
+        if defaults['restart_at_maxiter']:
+            defaults['maxiter'] = description['step_params'].get('maxiter', 99)
+        return defaults
+
+    def determine_restart(self, controller, S, **kwargs):
+        if self.get_convergence(controller, S, **kwargs):
+            if self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
+                S.status.restart = True
+            elif S.status.iter >= self.params.maxiter and self.params.restart_at_maxiter:
+                S.status.restart = True
+                for L in S.levels:
+                    L.status.dt_new = L.params.dt / 2.0
+                    self.log(
+                        f'Collocation problem not converged after max. number of iterations, halving step size to {L.status.dt_new:.2e}',
+                        S,
+                    )
+
+
 class Adaptivity(AdaptivityBase):
     """
     Class to compute time step size adaptively based on embedded error estimate.
@@ -461,7 +506,7 @@ class AdaptivityResidual(AdaptivityBase):
         return S.levels[0].status.residual
 
 
-class AdaptivityCollocation(AdaptivityBase):
+class AdaptivityCollocation(AdaptivityForConvergedCollocationProblems):
     """
     Control the step size via a collocation based estimate of the local error.
     The error estimate works by subtracting two solutions to collocation problems with different order. You can
@@ -491,6 +536,9 @@ class AdaptivityCollocation(AdaptivityBase):
         for key in defaults['adaptive_coll_params'].keys():
             if type(defaults['adaptive_coll_params'][key]) == list:
                 defaults['num_colls'] = max([defaults['num_colls'], len(defaults['adaptive_coll_params'][key])])
+
+        if defaults['restart_at_maxiter']:
+            defaults['maxiter'] = description['step_params'].get('maxiter', 99) * defaults['num_colls']
 
         return defaults
 
@@ -523,6 +571,9 @@ class AdaptivityCollocation(AdaptivityBase):
             params=params,
             description=description,
         )
+
+    def get_convergence(self, controller, S, **kwargs):
+        return len(self.status.order) == self.params.num_colls
 
     def get_local_error_estimate(self, controller, S, **kwargs):
         """
@@ -614,7 +665,7 @@ class AdaptivityCollocation(AdaptivityBase):
                 self.log(f"Restarting: e={e_est:.2e} >= e_tol={self.params.e_tol:.2e}", S)
 
 
-class AdaptivityExtrapolationWithinQ(AdaptivityBase):
+class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
     """
     Class to compute time step size adaptively based on error estimate obtained from extrapolation within the quadrature
     nodes.
@@ -623,27 +674,13 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
     """
 
     def setup(self, controller, params, description, **kwargs):
-        """
-        Add a default value for control order to the parameters.
+        from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
-        Args:
-            controller (pySDC.Controller): The controller
-            params (dict): Parameters for the convergence controller
-            description (dict): The description object used to instantiate the controller
+        self.check_convergence = CheckConvergence.check_convergence
+        return super().setup(controller, params, description, **kwargs)
 
-        Returns:
-            dict: Updated parameters
-        """
-        defaults = {
-            'restol_rel': None,
-            'e_tol_rel': None,
-            **super().setup(controller, params, description, **kwargs),
-        }
-        if defaults['restol_rel']:
-            description['level_params']['restol'] = max([defaults['restol_rel'] * defaults['e_tol'], 1e-11])
-        elif defaults['e_tol_rel']:
-            description['level_params']['e_tol'] = min([max([defaults['e_tol'] * defaults['e_tol'], 1e-9]), 1e-5])
-        return defaults
+    def get_convergence(self, controller, S, **kwargs):
+        return self.check_convergence(S)
 
     def dependencies(self, controller, description, **kwargs):
         """
@@ -690,6 +727,9 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
 
         return True, ""
 
+    def get_convergence(self, controller, S, **kwargs):
+        return self.check_convergence(S)
+
     def get_new_step_size(self, controller, S, **kwargs):
         """
         Determine a step size for the next step from the error estimate.
@@ -701,10 +741,7 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
         Returns:
             None
         """
-        # check if the step is converged
-        from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
-
-        if CheckConvergence.check_convergence(S):
+        if self.get_convergence(controller, S, **kwargs):
             L = S.levels[0]
 
             # compute next step size
@@ -721,9 +758,6 @@ class AdaptivityExtrapolationWithinQ(AdaptivityBase):
                 level=10,
             )
             self.log(f'Adjusting step size from {L.params.dt:.2e} to {L.status.dt_new:.2e}', S)
-
-            # check if we need to restart
-            S.status.restart = e_est > self.params.e_tol
 
         return None
 
