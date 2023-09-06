@@ -960,14 +960,14 @@ def get_configs(mode, problem):
         # for strategy in strategies:
         #     strategy.restol = restol
 
-        configurations[1] = {
-            #'custom_description': {'level_params': {'restol': 1e-10}},
-            # 'custom_description': {'step_params': {'maxiter': 10}},
-            'custom_description': {'sweeper_class': generic_implicit_MPI},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'parallel',
-            'num_procs_sweeper': 3,
-        }
+        # configurations[1] = {
+        #     #'custom_description': {'level_params': {'restol': 1e-10}},
+        #     # 'custom_description': {'step_params': {'maxiter': 10}},
+        #     'custom_description': {'sweeper_class': generic_implicit_MPI},
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'handle': 'parallel',
+        #     'num_procs_sweeper': 3,
+        # }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             #'custom_description': {

@@ -173,172 +173,6 @@ el multistep mode!",
 
         return None
 
-    def get_extrapolation_coefficients_garbagio(self, t, dt, t_eval, u_signature=None, f_signature=None):
-        """
-        This function solves a linear system where in the matrix A, the row index reflects the order of the derivative
-        in the Taylor expansion and the column index reflects the particular step and whether its u or f from that
-        step. The vector b on the other hand, contains a 1 in the first entry and zeros elsewhere, since we want to
-        compute the value itself and all the derivatives should vanish after combining the Taylor expansions. This
-        works to the order of the number of rows and since we want a square matrix for solving, we need the same amount
-        of columns, which determines the memory overhead, since it is equal to the solutions / rhs that we need in
-        memory at the time of evaluation.
-
-        This is enough to get the extrapolated solution, but if we want to compute the local error, we have to compute
-        a prefactor. This is based on error accumulation between steps (first step's solution is exact plus 1 LTE,
-        second solution is exact plus 2 LTE and so on), which can be computed for adaptive step sizes as well. However,
-        this is only true for linear problems, which means we expect the error estimate to work less well for non-linear
-        problems.
-
-        Since only time differences are important for computing the coefficients, we need to compute this only once when
-        using constant step sizes. When we allow the step size to change, however, we need to recompute this in every
-        step, which is activated by the `use_adaptivity` parameter.
-
-        Solving for the coefficients requires solving a dense linear system of equations. The number of unknowns is
-        equal to the order of the Taylor expansion, so this step should be cheap compared to the solves in each SDC
-        iteration.
-
-        The function stores the computed coefficients in the `self.coeff` variables.
-
-        Args:
-            t (list): The list of times at which we have solutions available
-            dt (list): The step sizes used for computing these solutions (needed for the prefactor)
-            t_eval (float): The time we want to extrapolate to
-
-        Returns:
-            None
-        """
-        u_signature = u_signature if u_signature else np.ones_like(dt)
-        f_signature = f_signature if f_signature else np.ones_like(dt)
-        f_signature[-1] = 0.0
-
-        n_u = np.sum(u_signature, dtype=int)
-        n_f = np.sum(f_signature, dtype=int)
-        n = n_u + n_f  # number of available values
-        j = np.arange(n)  # index variable
-        inv_fac = 1.0 / factorial(j)  # compute inverse factorials once to use in Taylor expansions
-
-        idx = np.argsort(t)
-        steps_from_now = t[idx] - t_eval
-
-        # build a matrix containing the Taylor coefficients
-        A = np.zeros((n, n))
-
-        # fill the entries for u
-        for i in range(n_u):
-            A[:, i] = steps_from_now[u_signature > 0][i] ** j * inv_fac
-            # A[i, : self.params.n] = steps_from_now ** j[i] * inv_facs[i]
-
-        # fill the entries for f
-        for i in range(n_f):
-            A[1:, i + n_u] = steps_from_now[f_signature > 0][i] ** j[:-1] * inv_fac[:-1]
-            # A[i, self.params.n : self.params.Taylor_order] = (
-            #     steps_from_now[2 * self.params.n - self.params.Taylor_order :] ** (j[i] - 1) * inv_facs[i - 1]
-            # )
-
-        # build a right hand side vector for solving the system
-        b = np.zeros(n)
-        b[0] = 1.0
-
-        # solve the linear system
-        coeff = np.linalg.solve(A, b)
-
-        # distribute the coefficients
-        u_coeff = np.zeros_like(u_signature)
-        u_coeff[u_signature > 0] = coeff[0:n_u]
-        f_coeff = np.zeros_like(f_signature)
-        f_coeff[f_signature > 0] = coeff[n_u:]
-
-        print(u_coeff, f_coeff, f_signature, u_signature)
-        return u_coeff, f_coeff
-
-        return None
-
-    def get_extrapolation_coefficients_trash_city(self, t, dt, t_eval, u_signature=None, f_signature=None):
-        """
-        This function solves a linear system where in the matrix A, the row index reflects the order of the derivative
-        in the Taylor expansion and the column index reflects the particular step and whether its u or f from that
-        step. The vector b on the other hand, contains a 1 in the first entry and zeros elsewhere, since we want to
-        compute the value itself and all the derivatives should vanish after combining the Taylor expansions. This
-        works to the order of the number of rows and since we want a square matrix for solving, we need the same amount
-        of columns, which determines the memory overhead, since it is equal to the solutions / rhs that we need in
-        memory at the time of evaluation.
-
-        This is enough to get the extrapolated solution, but if we want to compute the local error, we have to compute
-        a prefactor. This is based on error accumulation between steps (first step's solution is exact plus 1 LTE,
-        second solution is exact plus 2 LTE and so on), which can be computed for adaptive step sizes as well. However,
-        this is only true for linear problems, which means we expect the error estimate to work less well for non-linear
-        problems.
-
-        Since only time differences are important for computing the coefficients, we need to compute this only once when
-        using constant step sizes. When we allow the step size to change, however, we need to recompute this in every
-        step, which is activated by the `use_adaptivity` parameter.
-
-        Solving for the coefficients requires solving a dense linear system of equations. The number of unknowns is
-        equal to the order of the Taylor expansion, so this step should be cheap compared to the solves in each SDC
-        iteration.
-
-        The function stores the computed coefficients in the `self.coeff` variables.
-
-        Args:
-            t (list): The list of times at which we have solutions available
-            dt (list): The step sizes used for computing these solutions (needed for the prefactor)
-            t_eval (float): The time we want to extrapolate to
-
-        Returns:
-            None
-        """
-        u_signature = u_signature if u_signature else np.ones_like(dt)
-        f_signature = f_signature if f_signature else np.ones_like(dt)
-        n_u = sum(u_signature)
-        n_f = sum(f_signature)
-        n = n_u + n_f
-
-        # prepare A matrix
-        A = np.zeros((n, n))
-        A[0, 0:n_u] = 1.0
-        j = np.arange(max([n_u, n_f]))
-        inv_facs = 1.0 / factorial(j)
-
-        # get the steps backwards from the point of evaluation
-        idx = np.argsort(t)
-        steps_from_now = t[idx] - t_eval
-
-        # fill A matrix
-        for i in range(1, self.params.Taylor_order):
-            # Taylor expansions of the solutions
-            A[i, :n_u] = steps_from_now ** j[i] * inv_facs[i]
-
-            # Taylor expansions of the first derivatives a.k.a. right hand side evaluations
-            A[i, n_u:n_f] = (
-                steps_from_now[2 * self.params.n - self.params.Taylor_order :] ** (j[i] - 1) * inv_facs[i - 1]
-            )
-
-        # prepare rhs
-        b = np.zeros(self.params.Taylor_order)
-        b[0] = 1.0
-
-        # remove unwanted stuff based on signature
-        for i in range(self.params.n):
-            if u_signature[i] == 0:
-                A[:, i] = 0.0
-            if f_signature[i] == 0:
-                A[:, i + self.params.n] = 0.0
-
-        print(A, b)
-        # solve linear system for the coefficients
-        coeff = np.linalg.solve(A, b)
-        self.coeff.u = coeff[: self.params.n]
-        self.coeff.f[self.params.n * 2 - self.params.Taylor_order :] = coeff[self.params.n : self.params.Taylor_order]
-
-        # determine prefactor
-        step_size_ratios = abs(dt[len(dt) - len(self.coeff.u) :] / dt[-1]) ** (self.params.Taylor_order - 1)
-        inv_prefactor = -sum(step_size_ratios[1:]) - 1.0
-        for i in range(len(self.coeff.u)):
-            inv_prefactor += sum(step_size_ratios[1 : i + 1]) * self.coeff.u[i]
-        self.coeff.prefactor = 1.0 / abs(inv_prefactor)
-
-        return None
-
     def get_extrapolation_coefficients(self, t, dt, t_eval):
         """
         This function solves a linear system where in the matrix A, the row index reflects the order of the derivative
@@ -653,26 +487,15 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         dts = np.append(nodes_[0], nodes_[1:] - nodes_[:-1])
         self.params.Taylor_order = 2 * len(nodes)
         self.params.n = len(nodes)
-        discard = 0
-
-        # num_nodes = len(nodes_)
-        # self.params.Taylor_order = num_nodes + 2
-        # self.params.n = (self.params.Taylor_order + 1) // 2
-        # discard = num_nodes - self.params.n
-        # print(self.params.Taylor_order, self.params.n, discard)
 
         # compute the extrapolation coefficients
         # TODO: Maybe this can be reused
-        # self.coeff.u, self.coeff.f = self.get_extrapolation_coefficients(nodes, dts, t_eval)
-        # self.coeff.prefactor=1.
-        # self.get_extrapolation_coefficients_old(nodes, dts, t_eval)
-        # print('new', self.coeff.u, self.coeff.f)
-        self.get_extrapolation_coefficients(nodes[discard:], dts[discard:], t_eval)
-        self.coeff.u = [0.0] * discard + list(self.coeff.u)
-        self.coeff.f = [0.0] * discard + list(self.coeff.f)
-        # print('old', self.coeff.u, self.coeff.f)
+        self.get_extrapolation_coefficients(nodes, dts, t_eval)
 
         # compute the extrapolated solution
+        if lvl.f[0] is None:
+            lvl.f[0] = lvl.prob.eval_f(lvl.u[0], lvl.time)
+
         if type(lvl.f[0]) == imex_mesh:
             f = [lvl.f[i].impl + lvl.f[i].expl if self.coeff.f[i] else 0.0 for i in range(len(lvl.f) - 1)]
         elif type(lvl.f[0]) == mesh:
@@ -693,8 +516,6 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
             u_ex = lvl.prob.dtype_u(lvl.prob.init, val=0.0)
             for i in range(self.params.n):
                 u_ex += self.coeff.u[i] * lvl.u[i] + self.coeff.f[i] * f[i]
-            # print(self.coeff.f, self.coeff.f[-1])
-            # u_ex += self.coeff.f[-1] * f[-1]
 
         # store the error
         if self.comm:

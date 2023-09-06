@@ -262,7 +262,7 @@ class Strategy:
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class WildRiot(Strategy):
+class WildRiot2(Strategy):
     def __init__(self, double_adaptivity=False, newton_inexactness=False, **kwargs):
         kwargs = {**kwargs, 'skip_residual_computation': 'all'}
         super().__init__(**kwargs)
@@ -287,6 +287,52 @@ class WildRiot(Strategy):
                 'ratio': 1e-4,
                 'max_tol': 1e-9,
                 'use_e_tol': True,
+            }
+            desc['problem_params'] = {
+                'newton_maxiter': 10,
+                'stop_at_nan': False,
+            }
+
+        if self.double_adaptivity:
+            from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
+
+            desc['step_params']['maxiter'] = 10
+            desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
+
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+
+        desc['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
+            'max_restarts': 49,
+            'crash_after_max_restarts': False,
+        }
+        return merge_descriptions(super().get_custom_description(problem, num_procs), desc)
+
+
+class WildRiot(Strategy):
+    def __init__(self, double_adaptivity=False, newton_inexactness=False, **kwargs):
+        kwargs = {**kwargs, 'skip_residual_computation': 'most'}
+        super().__init__(**kwargs)
+        self.double_adaptivity = double_adaptivity
+        self.newton_inexactness = newton_inexactness
+        self.restol = -1
+
+    def get_custom_description(self, problem, num_procs=1):
+        from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
+
+        desc = {}
+        desc['sweeper_params'] = {'QI': 'MIN-SR-NS'}
+        desc['step_params'] = {'maxiter': 15}
+        desc['level_params'] = {'e_tol': 1e-10, 'restol': 1e-10, 'residual_type': 'last_rel'}
+        desc['convergence_controllers'] = {}
+
+        if self.newton_inexactness:
+            # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
+            # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
+            desc['convergence_controllers'][NewtonInexactness] = {
+                'min_tol': 1e-11,
+                'ratio': 1e-4,
+                'max_tol': 1e-9,
+                'use_e_tol': False,
             }
             desc['problem_params'] = {
                 'newton_maxiter': 10,
@@ -1473,10 +1519,10 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
  strategy'
             )
 
-        if problem.__name__ in ['run_Schroedinger']:
-            from pySDC.projects.Resilience.sweepers import imex_1st_order as sweeper_class
-        else:
-            from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
+        # if problem.__name__ in ['run_Schroedinger']:
+        #     from pySDC.projects.Resilience.sweepers import imex_1st_order as sweeper_class
+        # else:
+        #     from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
 
         custom_description['level_params'] = {'restol': 1e-10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
@@ -1484,12 +1530,12 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
-                # 'restol_rel': 1e-2,
-                'e_tol_rel': 1e-2,
+                'restol_rel': 1e-2,
+                # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
             }
         }
-        custom_description['sweeper_class'] = sweeper_class
+        # custom_description['sweeper_class'] = sweeper_class
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
