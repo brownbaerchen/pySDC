@@ -97,7 +97,16 @@ class SweeperMPI(sweeper):
         res_norm = abs(res)
 
         # find maximal residual over the nodes
-        L.status.residual = self.params.comm.allreduce(res_norm, op=MPI.MAX)
+        if L.params.residual_type == 'full_abs':
+            L.status.residual = self.comm.allreduce(res_norm, op=MPI.MAX)
+        elif L.params.residual_type == 'last_abs':
+            L.status.residual = self.comm.bcast(res_norm, root=self.comm.size - 1)
+        if L.params.residual_type == 'full_abs':
+            L.status.residual = self.comm.allreduce(res_norm / abs(L.u[0]), op=MPI.MAX)
+        elif L.params.residual_type == 'last_rel':
+            L.status.residual = self.comm.bcast(res_norm / abs(L.u[0]), root=self.comm.size - 1)
+        else:
+            raise NotImplementedError(f'residual type \"{L.params.residual_type}\" not implemented!')
 
         # indicate that the residual has seen the new values
         L.status.updated = False

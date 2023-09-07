@@ -40,7 +40,7 @@ class Quench(ptype):
         bc='neumann-zero',
         nvars=2**7,
         newton_tol=1e-8,
-        newton_iter=99,
+        newton_maxiter=99,
         lintol=1e-8,
         liniter=99,
         direct_solver=True,
@@ -76,7 +76,7 @@ class Quench(ptype):
 
         self._makeAttributeAndRegister(
             'newton_tol',
-            'newton_iter',
+            'newton_maxiter',
             'lintol',
             'liniter',
             'direct_solver',
@@ -249,7 +249,7 @@ class Quench(ptype):
         if not self.direct_solver:
             M = inv(self.Id - factor * self.A)
 
-        for n in range(0, self.newton_iter):
+        for n in range(0, self.newton_maxiter):
             # assemble G such that G(u) = 0 at the solution of the step
             G = u - factor * self.eval_f(u, t) - rhs
             self.work_counters[
@@ -345,7 +345,7 @@ class Quench(ptype):
                 description['problem_class'] = Quench
                 description['problem_params'] = {
                     'newton_tol': 1e-10,
-                    'newton_iter': 99,
+                    'newton_maxiter': 99,
                     'nvars': 2**10,
                     **self.params,
                 }

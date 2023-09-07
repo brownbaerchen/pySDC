@@ -135,7 +135,11 @@ class generic_implicit_efficient(efficient_sweeper, generic_implicit):
             res = lvl.u[0] - lvl.u[-1]
             for m in range(1, self.coll.num_nodes + 1):
                 res += lvl.dt * self.coll.Qmat[-1, m] * lvl.f[m]
-            lvl.status.residual = abs(res) / abs(lvl.u[0])
+
+            if lvl.params.residual_type[-3:] == 'abs':
+                lvl.status.residual = abs(res)
+            else:
+                lvl.status.residual = abs(res) / abs(lvl.u[0])
         else:
             lvl.status.residual = 99 if lvl.status.residual is None else lvl.status.residual
         lvl.status.updated = False

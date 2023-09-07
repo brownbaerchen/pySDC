@@ -11,7 +11,6 @@ from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
-from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -256,7 +255,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-3, -2, -1, 0, 1, 2, 3]
+        exponents = [-5, -4, -3, -2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -1547,7 +1546,7 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_Schroedinger,
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)

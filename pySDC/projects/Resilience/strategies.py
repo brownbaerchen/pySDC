@@ -225,7 +225,7 @@ class Strategy:
         elif problem.__name__ == "run_quench":
             custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_iter': 99, 'newton_tol': 1e-11}
+            custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
 
         custom_description['convergence_controllers'] = {
             StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
@@ -314,29 +314,30 @@ class WildRiot(Strategy):
         super().__init__(**kwargs)
         self.double_adaptivity = double_adaptivity
         self.newton_inexactness = newton_inexactness
-        self.restol = -1
+        # self.restol = -1
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
         desc = {}
-        desc['sweeper_params'] = {'QI': 'MIN-SR-NS'}
-        desc['step_params'] = {'maxiter': 15}
-        desc['level_params'] = {'e_tol': 1e-10, 'restol': 1e-10, 'residual_type': 'last_rel'}
+        desc['sweeper_params'] = {'QI': 'MIN'}
+        desc['step_params'] = {'maxiter': 10}
+        desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs'}
         desc['convergence_controllers'] = {}
 
         if self.newton_inexactness:
             # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
             desc['convergence_controllers'][NewtonInexactness] = {
-                'min_tol': 1e-11,
-                'ratio': 1e-4,
-                'max_tol': 1e-9,
+                'min_tol': 1e-12,
+                'ratio': 1e-2,
+                'max_tol': 1e-5,
                 'use_e_tol': False,
+                # 'maxiter': 10,
             }
             desc['problem_params'] = {
-                'newton_maxiter': 10,
-                'stop_at_nan': False,
+                # 'newton_maxiter': 10,
+                # 'stop_at_nan': False,
             }
 
         if self.double_adaptivity:
@@ -1524,7 +1525,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         # else:
         #     from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
 
-        custom_description['level_params'] = {'restol': 1e-10 if self.restol is None else self.restol}
+        # custom_description['level_params'] = {'restol': 1e-7 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityExtrapolationWithinQ: {
                 'e_tol': e_tol,
