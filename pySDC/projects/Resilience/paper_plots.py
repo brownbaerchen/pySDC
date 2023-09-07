@@ -480,12 +480,14 @@ def work_precision():  # pragma: no cover
     axs[2].set_yscale('linear')
     axs[2].set_xscale('linear')
     axs[1].set_xlabel(r'$e_\mathrm{tol}$')
-    axs[0].set_xticks([1e0, 3e0], minor=True)
+    axs[0].set_xticks([1e0, 3e0], [r'$10^{0}$', r'$3\times 10^{0}$'], minor=False)
 
     for ax in axs:
         ax.set_title(ax.get_ylabel())
         ax.set_ylabel('')
     fig.suptitle('Quench')
+
+    axs[1].set_yticks([4.0, 6.0, 8.0, 10.0, 12.0], minor=False)
 
     save_fig(
         fig=fig,

@@ -1322,6 +1322,8 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             decorate=True,
             configurations=get_configs(mode, problems[i]),
         )
+        if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
+            axs.flatten()[i].set_xticks([2.0, 4.0], minor=True)
 
     if plotting and shared_params['comm_world'].rank == 0:
         save_fig(
