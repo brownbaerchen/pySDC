@@ -973,25 +973,26 @@ def get_configs(mode, problem):
         # for strategy in strategies:
         #     strategy.restol = restol
 
-        # configurations[1] = {
-        #     'custom_description': {'sweeper_class': generic_implicit_MPI},
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'handle': 'parallel',
-        #     'num_procs_sweeper': 3,
-        # }
-        # configurations[2] = {
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     #'custom_description': {
-        #     #    'sweeper_params': {'QI': 'LU'},
-        #     # },
-        #     'plotting_params': {'ls': '--'},
-        # }
+        configurations[1] = {
+            'custom_description': {'sweeper_class': generic_implicit_MPI},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
+        }
+        configurations[2] = {
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            #'custom_description': {
+            #    'sweeper_params': {'QI': 'LU'},
+            # },
+            'plotting_params': {'ls': '--'},
+        }
         configurations[3] = {
             'custom_description': {'sweeper_class': generic_implicit_MPI},
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             'handle': 'parallel',
             'num_procs_sweeper': 3,
             'num_procs': 4,
+            'plotting_params': {'ls': ':', 'label': '12 procs'},
         }
 
         configurations[4] = {

@@ -329,7 +329,7 @@ class WildRiot(Strategy):
         desc = {}
         desc['sweeper_params'] = {'QI': 'MIN-SR-S'}
         desc['step_params'] = {'maxiter': 20}
-        desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs', 'dt': 1e-4}
+        desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs'}
         desc['convergence_controllers'] = {}
 
         inexactness_params = {

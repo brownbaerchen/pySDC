@@ -49,7 +49,7 @@ def run_AC(
 
     # initialize level parameters
     level_params = {}
-    level_params['dt'] = 1e-3
+    level_params['dt'] = 1e-4
     level_params['restol'] = 1e-8
 
     # initialize sweeper parameters
