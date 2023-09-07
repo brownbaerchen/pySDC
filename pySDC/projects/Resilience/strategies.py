@@ -189,6 +189,8 @@ class Strategy:
             return 1.0
         elif problem.__name__ == "run_quench":
             return 500.0
+        elif problem.__name__ == "run_AC":
+            return 1e-2
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -224,6 +226,10 @@ class Strategy:
             custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
         elif problem.__name__ == "run_quench":
             custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
+            custom_description['step_params'] = {'maxiter': 5}
+            custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
+        elif problem.__name__ == "run_AC":
+            custom_description['level_params'] = {'restol': -1, 'dt': 1e-2}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
 
@@ -309,36 +315,49 @@ class WildRiot2(Strategy):
 
 
 class WildRiot(Strategy):
-    def __init__(self, double_adaptivity=False, newton_inexactness=False, **kwargs):
+    def __init__(self, double_adaptivity=False, newton_inexactness=False, linear_inexactness=False, **kwargs):
         kwargs = {**kwargs, 'skip_residual_computation': 'most'}
         super().__init__(**kwargs)
         self.double_adaptivity = double_adaptivity
         self.newton_inexactness = newton_inexactness
+        self.linear_inexactness = linear_inexactness
         # self.restol = -1
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
         desc = {}
-        desc['sweeper_params'] = {'QI': 'MIN'}
-        desc['step_params'] = {'maxiter': 10}
-        desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs'}
+        desc['sweeper_params'] = {'QI': 'MIN-SR-S'}
+        desc['step_params'] = {'maxiter': 20}
+        desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs', 'dt': 1e-4}
         desc['convergence_controllers'] = {}
+
+        inexactness_params = {
+            'min_tol': 1e-12,
+            'ratio': 1e-2,
+            'max_tol': 1e-4,
+            'use_e_tol': False,
+            'maxiter': 10,
+        }
 
         if self.newton_inexactness:
             # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
-            desc['convergence_controllers'][NewtonInexactness] = {
-                'min_tol': 1e-12,
-                'ratio': 1e-2,
-                'max_tol': 1e-5,
-                'use_e_tol': False,
-                # 'maxiter': 10,
-            }
-            desc['problem_params'] = {
-                # 'newton_maxiter': 10,
-                # 'stop_at_nan': False,
-            }
+            desc['convergence_controllers'][NewtonInexactness] = inexactness_params
+            # desc['problem_params'] = {
+            #         # 'newton_maxiter': 10,
+            #     # 'stop_at_nan': False,
+            # }
+        if self.linear_inexactness:
+            from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
+
+            desc['problem_params'] = {'lin_tol_inexactness_ratio': 1e-1}
+            # desc['convergence_controllers'][LinearInexactness] = {
+            #        **inexactness_params,
+            #        'ratio': inexactness_params['ratio'] * 1e-1,
+            #        'max_tol': inexactness_params['max_tol'] * 1e-1,
+            #        'maxiter': 30,
+            # }
 
         if self.double_adaptivity:
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
@@ -483,6 +502,8 @@ class AdaptivityStrategy(Strategy):
             custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
                 'max_restarts': 15,
             }
+        elif problem.__name__ == "run_AC":
+            e_tol = 1e-4
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -879,6 +900,8 @@ class AdaptivityCollocationStrategy(WildRiot):
             e_tol = 1e-5
             dt_min = 1e-3
             dt_max = 1e2
+        elif problem.__name__ == "run_AC":
+            e_tol = 1e-4
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -1514,6 +1537,8 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
             e_tol = 1e-5
             dt_min = 1e-3
             dt_max = 1e2
+        elif problem.__name__ == "run_AC":
+            e_tol = 1e-4
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -1531,7 +1556,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
-                'restol_rel': 1e-2,
+                'restol_rel': 1e-1,
                 # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
             }

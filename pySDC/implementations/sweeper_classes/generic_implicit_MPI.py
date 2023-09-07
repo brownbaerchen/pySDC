@@ -101,7 +101,7 @@ class SweeperMPI(sweeper):
             L.status.residual = self.comm.allreduce(res_norm, op=MPI.MAX)
         elif L.params.residual_type == 'last_abs':
             L.status.residual = self.comm.bcast(res_norm, root=self.comm.size - 1)
-        if L.params.residual_type == 'full_abs':
+        elif L.params.residual_type == 'full_rel':
             L.status.residual = self.comm.allreduce(res_norm / abs(L.u[0]), op=MPI.MAX)
         elif L.params.residual_type == 'last_rel':
             L.status.residual = self.comm.bcast(res_norm / abs(L.u[0]), root=self.comm.size - 1)

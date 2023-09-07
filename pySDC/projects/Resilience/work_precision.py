@@ -11,6 +11,7 @@ from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
+from pySDC.projects.Resilience.AC import run_AC
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -29,6 +30,7 @@ MAPPINGS = {
     'k_SDC': ('k', sum, None),
     'k_SDC_no_restart': ('k', sum, False),
     'k_Newton': ('work_newton', sum, None),
+    'k_linear': ('work_linear', sum, None),
     'k_Newton_no_restart': ('work_newton', sum, False),
     'k_rhs': ('work_rhs', sum, None),
     'restart': ('restart', sum, None),
@@ -281,6 +283,10 @@ def record_work_precision(
         elif param == 'dt':
             param_range = [500 / 2.0**me for me in [5, 6, 7, 8]]
 
+    elif problem.__name__ == 'run_AC':
+        if param == 'e_tol':
+            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+
     # run multiple times with different parameters
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
@@ -318,9 +324,15 @@ def record_work_precision(
             comm_world.Barrier()
 
             if comm_world.rank == 0:
+                if np.isfinite(data[param_range[i]]["k_linear"][-1]):
+                    k_type = "k_linear"
+                elif np.isfinite(data[param_range[i]]["k_Newton"][-1]):
+                    k_type = 'k_Newton'
+                else:
+                    k_type = "k_SDC"
                 logger.log(
                     25,
-                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, k={data[param_range[i]]["k_SDC"][-1]}',
+                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, {k_type}={data[param_range[i]][k_type][-1]}',
                 )
 
     if comm_world.rank == 0:
@@ -493,6 +505,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'u0_increment_mean': r'$\bar{\Delta u_0}$',
         'u0_increment_max_no_restart': r'$\| \Delta u_0 \|_{\infty} $ (restarts excluded)',
         'u0_increment_mean_no_restart': r'$\bar{\Delta u_0}$ (restarts excluded)',
+        'k_linear': 'Linear solver iterations',
     }
 
     if not title_only:
@@ -947,6 +960,7 @@ def get_configs(mode, problem):
         wild_params = {
             # 'double_adaptivity': True,
             'newton_inexactness': True,
+            'linear_inexactness': True,
         }
 
         strategies = [
@@ -960,27 +974,32 @@ def get_configs(mode, problem):
         #     strategy.restol = restol
 
         # configurations[1] = {
-        #     #'custom_description': {'level_params': {'restol': 1e-10}},
-        #     # 'custom_description': {'step_params': {'maxiter': 10}},
         #     'custom_description': {'sweeper_class': generic_implicit_MPI},
         #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
         #     'handle': 'parallel',
         #     'num_procs_sweeper': 3,
         # }
-        configurations[2] = {
+        # configurations[2] = {
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     #'custom_description': {
+        #     #    'sweeper_params': {'QI': 'LU'},
+        #     # },
+        #     'plotting_params': {'ls': '--'},
+        # }
+        configurations[3] = {
+            'custom_description': {'sweeper_class': generic_implicit_MPI},
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            #'custom_description': {
-            #    'sweeper_params': {'QI': 'LU'},
-            # },
-            'plotting_params': {'ls': '--'},
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
+            'num_procs': 4,
         }
 
-        configurations[3] = {
+        configurations[4] = {
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
-        if False:
-            configurations[3] = {
+        if True:
+            configurations[4] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
                 'strategies': [AdaptivityStrategy(useMPI=True)],
             }
@@ -990,7 +1009,7 @@ def get_configs(mode, problem):
 
             configurations[-1] = {
                 'strategies': [
-                    ERKStrategy(useMPI=True),
+                    # ERKStrategy(useMPI=True),
                     ESDIRKStrategy(useMPI=True),
                 ],
                 'num_procs': 1,
@@ -1548,10 +1567,11 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_AC,
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
     single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='t', precision_key='k_Newton', record=False)

@@ -1,7 +1,7 @@
 from pySDC.core.ConvergenceController import ConvergenceController
 
 
-class NewtonInexactness(ConvergenceController):
+class Inexactness(ConvergenceController):
     """
     Gradually refine Newton tolerance based on SDC residual.
     Be aware that the problem needs a parameter called "newton_tol" which controls the tolerance for the Newton solver for this to work!
@@ -30,7 +30,7 @@ class NewtonInexactness(ConvergenceController):
             **super().setup(controller, params, description, **kwargs),
         }
         if defaults['maxiter']:
-            description['problem_params']['newton_maxiter'] = defaults['maxiter']
+            self.set_maxiter(description, defaults['maxiter'])
         return defaults
 
     def dependencies(self, controller, description, **kwargs):
@@ -76,8 +76,28 @@ class NewtonInexactness(ConvergenceController):
                 else lvl.status.residual
             )
             SDC_accuracy = self.params.initial_tol if SDC_accuracy is None else SDC_accuracy
-            lvl.prob.newton_tol = max(
-                [min([SDC_accuracy * self.params.ratio, self.params.max_tol]), self.params.min_tol]
-            )
+            tol = max([min([SDC_accuracy * self.params.ratio, self.params.max_tol]), self.params.min_tol])
+            self.set_tolerance(lvl, tol)
+            self.log(f'Changed tolerance to {tol:.2e}', step)
 
-            self.log(f'Changed Newton tolerance to {lvl.prob.newton_tol:.2e}', step)
+    def set_tolerance(self, lvl, tol):
+        raise NotImplementedError
+
+    def set_maxiter(self, description, maxiter):
+        raise NotImplementedError
+
+
+class NewtonInexactness(Inexactness):
+    def set_tolerance(self, lvl, tol):
+        lvl.prob.newton_tol = tol
+
+    def set_maxiter(self, description, maxiter):
+        description['problem_params']['newton_maxiter'] = maxiter
+
+
+class LinearInexactness(Inexactness):
+    def set_tolerance(self, lvl, tol):
+        lvl.prob.lin_tol = tol
+
+    def set_maxiter(self, description, maxiter):
+        description['problem_params']['lin_maxiter'] = maxiter
