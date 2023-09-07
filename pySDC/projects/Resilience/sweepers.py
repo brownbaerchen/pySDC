@@ -128,20 +128,23 @@ class generic_implicit_efficient(efficient_sweeper, generic_implicit):
 
     def compute_residual(self, stage=''):
         lvl = self.level
-        if stage not in self.params.skip_residual_computation:
-            lvl.f[-1] = lvl.prob.eval_f(lvl.u[-1], lvl.time + lvl.dt * self.coll.nodes[-1])
 
-            # compute residual with 'last_rel' rule, regardless of what the level params say
-            res = lvl.u[0] - lvl.u[-1]
-            for m in range(1, self.coll.num_nodes + 1):
-                res += lvl.dt * self.coll.Qmat[-1, m] * lvl.f[m]
+        if lvl.params.residual_type[:4] == 'full' or stage in self.params.skip_residual_computation:
+            super().compute_residual(stage=stage)
+            return None
 
-            if lvl.params.residual_type[-3:] == 'abs':
-                lvl.status.residual = abs(res)
-            else:
-                lvl.status.residual = abs(res) / abs(lvl.u[0])
+        # compute residual of last rank without involvement of all of them
+        lvl.f[-1] = lvl.prob.eval_f(lvl.u[-1], lvl.time + lvl.dt * self.coll.nodes[-1])
+
+        res = lvl.u[0] - lvl.u[-1]
+        for m in range(1, self.coll.num_nodes + 1):
+            res += lvl.dt * self.coll.Qmat[-1, m] * lvl.f[m]
+
+        if lvl.params.residual_type[-3:] == 'abs':
+            lvl.status.residual = abs(res)
         else:
-            lvl.status.residual = 99 if lvl.status.residual is None else lvl.status.residual
+            lvl.status.residual = abs(res) / abs(lvl.u[0])
+
         lvl.status.updated = False
 
 
@@ -230,3 +233,24 @@ class imex_1st_order_efficient(efficient_sweeper, imex_1st_order):
         L.status.updated = True
 
         return None
+
+    def compute_residual(self, stage=''):
+        lvl = self.level
+
+        if lvl.params.residual_type[:4] == 'full' or stage in self.params.skip_residual_computation:
+            super().compute_residual(stage=stage)
+            return None
+
+        # compute residual of last rank without involvement of all of them
+        lvl.f[-1] = lvl.prob.eval_f(lvl.u[-1], lvl.time + lvl.dt * self.coll.nodes[-1])
+
+        res = lvl.u[0] - lvl.u[-1]
+        for m in range(1, self.coll.num_nodes + 1):
+            res += lvl.dt * self.coll.Qmat[-1, m] * (lvl.f[m].impl + lvl.f[m].expl)
+
+        if lvl.params.residual_type[-3:] == 'abs':
+            lvl.status.residual = abs(res)
+        else:
+            lvl.status.residual = abs(res) / abs(lvl.u[0])
+
+        lvl.status.updated = False

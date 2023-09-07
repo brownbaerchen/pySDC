@@ -1,18 +1,14 @@
 from mpi4py import MPI
 import numpy as np
 
-from pySDC.helpers.stats_helper import get_sorted
-
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
-from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import (
     nonlinearschroedinger_imex,
     nonlinearschroedinger_fully_implicit,
 )
-from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_fft
 from pySDC.projects.Resilience.hook import LogData, hook_collection
 from pySDC.projects.Resilience.strategies import merge_descriptions
+from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient, generic_implicit_efficient
 
 from pySDC.core.Hooks import hooks
 
@@ -148,7 +144,7 @@ def run_Schroedinger(
     description = dict()
     description['problem_params'] = problem_params
     description['problem_class'] = nonlinearschroedinger_imex if imex else nonlinearschroedinger_fully_implicit
-    description['sweeper_class'] = imex_1st_order if imex else generic_implicit
+    description['sweeper_class'] = imex_1st_order_efficient if imex else generic_implicit_efficient
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params

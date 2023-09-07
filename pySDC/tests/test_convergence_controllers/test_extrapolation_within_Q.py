@@ -133,7 +133,6 @@ def check_order(dts, **kwargs):
 
     for key in keys:
         errors = np.array([res[dt][key] for dt in dts])
-        print(errors)
 
         mask = np.logical_and(errors < 1e-0, errors > 1e-10)
         order = np.log(errors[mask][1:] / errors[mask][:-1]) / np.log(dts[mask][1:] / dts[mask][:-1])
