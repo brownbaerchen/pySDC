@@ -229,7 +229,7 @@ class Strategy:
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
         elif problem.__name__ == "run_AC":
-            custom_description['level_params'] = {'restol': -1, 'dt': 1e-2}
+            custom_description['level_params'] = {'restol': -1, 'dt': 1e-4}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
 
