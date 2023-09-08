@@ -342,7 +342,7 @@ class WildRiot(Strategy):
             'maxiter': 10,
         }
 
-        if self.newton_inexactness and problem not in ['run_Schroedinger']:
+        if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
             # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
