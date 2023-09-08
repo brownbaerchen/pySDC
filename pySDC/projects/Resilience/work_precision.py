@@ -257,7 +257,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-5, -4, -3, -2, -1, 0, 1, 2, 3]
+        exponents = [-3, -2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -955,7 +955,13 @@ def get_configs(mode, problem):
             ESDIRKStrategy,
             ERKStrategy,
         )
-        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
 
         wild_params = {
             # 'double_adaptivity': True,
@@ -974,32 +980,32 @@ def get_configs(mode, problem):
         #     strategy.restol = restol
 
         configurations[1] = {
-            'custom_description': {'sweeper_class': generic_implicit_MPI},
+            'custom_description': {'sweeper_class': parallel_sweeper},
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             'handle': 'parallel',
             'num_procs_sweeper': 3,
         }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            #'custom_description': {
-            #    'sweeper_params': {'QI': 'LU'},
-            # },
+            'custom_description': {
+                'sweeper_params': {'QI': 'LU'},
+            },
             'plotting_params': {'ls': '--'},
         }
-        configurations[3] = {
-            'custom_description': {'sweeper_class': generic_implicit_MPI},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'parallel',
-            'num_procs_sweeper': 3,
-            'num_procs': 4,
-            'plotting_params': {'ls': ':', 'label': '12 procs'},
-        }
+        # configurations[3] = {
+        #     'custom_description': {'sweeper_class': generic_implicit_MPI},
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'handle': 'parallel',
+        #     'num_procs_sweeper': 3,
+        #     'num_procs': 4,
+        #     'plotting_params': {'ls': ':', 'label': '12 procs'},
+        # }
 
         configurations[4] = {
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
-        if True:
+        if False:
             configurations[4] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
                 'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -1572,7 +1578,7 @@ if __name__ == "__main__":
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
-    single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
     single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='t', precision_key='k_Newton', record=False)

@@ -1,7 +1,7 @@
 import pytest
 
 
-def single_run(dt, Tend, num_nodes, quad_type, QI, useMPI):
+def single_run(dt, Tend, num_nodes, quad_type, QI, useMPI, high_Taylor_order):
     """
     Runs a single advection problem with certain parameters
 
@@ -12,6 +12,7 @@ def single_run(dt, Tend, num_nodes, quad_type, QI, useMPI):
         quad_type (str): Type of quadrature
         QI (str): Preconditioner
         useMPI (bool): Whether or not to use MPI
+        high_Taylor_order (bool): Whether to use the low order approximation or the high order one
 
     Returns:
        (dict): Stats object generated during the run
@@ -66,7 +67,9 @@ def single_run(dt, Tend, num_nodes, quad_type, QI, useMPI):
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
-    description['convergence_controllers'] = {EstimateExtrapolationErrorWithinQ: {}}
+    description['convergence_controllers'] = {
+        EstimateExtrapolationErrorWithinQ: {'high_Taylor_order': high_Taylor_order}
+    }
 
     # set time parameters
     t0 = 0.0
@@ -128,7 +131,7 @@ def check_order(dts, **kwargs):
 
     expected_order = {
         'e_loc': coll_order + 1,
-        'e_ex': kwargs['num_nodes'] + 1,
+        'e_ex': kwargs['num_nodes'] if kwargs['high_Taylor_order'] else kwargs['num_nodes'] + 1,
     }
 
     for key in keys:
@@ -145,12 +148,14 @@ def check_order(dts, **kwargs):
 @pytest.mark.base
 @pytest.mark.parametrize('num_nodes', [2, 3])
 @pytest.mark.parametrize('quad_type', ['RADAU-RIGHT', 'GAUSS'])
-def test_extrapolation_within_Q(num_nodes, quad_type):
+@pytest.mark.parametrize('high_Taylor_order', [True, False])
+def test_extrapolation_within_Q(num_nodes, quad_type, high_Taylor_order):
     kwargs = {
         'num_nodes': num_nodes,
         'quad_type': quad_type,
         'useMPI': False,
         'QI': 'MIN',
+        'high_Taylor_order': high_Taylor_order,
     }
     check_order([5e-1, 1e-1, 8e-2, 5e-2], **kwargs)
 
@@ -187,5 +192,6 @@ if __name__ == "__main__":
             'quad_type': sys.argv[2],
             'useMPI': True,
             'QI': 'MIN',
+            'high_Taylor_order': True,
         }
         check_order([5e-1, 1e-1, 8e-2, 5e-2], **kwargs)

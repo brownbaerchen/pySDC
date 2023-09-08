@@ -326,8 +326,10 @@ class WildRiot(Strategy):
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
+        preconditioner = 'MIN-SR-NS' if problem in ['run_vdp', 'run_Lorenz'] else 'MIN-SR-S'
+
         desc = {}
-        desc['sweeper_params'] = {'QI': 'MIN-SR-S'}
+        desc['sweeper_params'] = {'QI': preconditioner}
         desc['step_params'] = {'maxiter': 20}
         desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs'}
         desc['convergence_controllers'] = {}
@@ -340,7 +342,7 @@ class WildRiot(Strategy):
             'maxiter': 10,
         }
 
-        if self.newton_inexactness:
+        if self.newton_inexactness and problem not in ['run_Schroedinger']:
             # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
@@ -348,7 +350,7 @@ class WildRiot(Strategy):
             #         # 'newton_maxiter': 10,
             #     # 'stop_at_nan': False,
             # }
-        if self.linear_inexactness:
+        if self.linear_inexactness and problem.__name__ in ['run_AC']:
             from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
 
             desc['problem_params'] = {'lin_tol_inexactness_ratio': 1e-1}

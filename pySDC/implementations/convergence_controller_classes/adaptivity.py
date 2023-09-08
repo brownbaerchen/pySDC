@@ -3,9 +3,6 @@ from pySDC.core.ConvergenceController import ConvergenceController, Status
 from pySDC.implementations.convergence_controller_classes.step_size_limiter import (
     StepSizeLimiter,
 )
-from pySDC.implementations.convergence_controller_classes.basic_restarting import (
-    BasicRestartingNonMPI,
-)
 
 
 class AdaptivityBase(ConvergenceController):
@@ -153,7 +150,7 @@ class AdaptivityBase(ConvergenceController):
 
 class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
     def get_convergence(self, controller, S, **kwargs):
-        raise NotImplementedError(f"Please implement a way to check if the collocation problem is converged!")
+        raise NotImplementedError("Please implement a way to check if the collocation problem is converged!")
 
     def setup(self, controller, params, description, **kwargs):
         """
@@ -676,8 +673,13 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
     def setup(self, controller, params, description, **kwargs):
         from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
+        defaults = {
+            'high_Taylor_order': False,
+            **params,
+        }
+
         self.check_convergence = CheckConvergence.check_convergence
-        return super().setup(controller, params, description, **kwargs)
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
     def get_convergence(self, controller, S, **kwargs):
         return self.check_convergence(S)
@@ -702,6 +704,7 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
         controller.add_convergence_controller(
             EstimateExtrapolationErrorWithinQ,
             description=description,
+            params={'high_Taylor_order': self.params.high_Taylor_order},
         )
         return None
 
@@ -727,9 +730,6 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
 
         return True, ""
 
-    def get_convergence(self, controller, S, **kwargs):
-        return self.check_convergence(S)
-
     def get_new_step_size(self, controller, S, **kwargs):
         """
         Determine a step size for the next step from the error estimate.
@@ -745,7 +745,7 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
             L = S.levels[0]
 
             # compute next step size
-            order = L.sweep.coll.num_nodes + 1
+            order = L.sweep.coll.num_nodes if self.params.high_Taylor_order else L.sweep.coll.num_nodes + 1
 
             e_est = self.get_local_error_estimate(controller, S)
             L.status.dt_new = self.compute_optimal_step_size(
