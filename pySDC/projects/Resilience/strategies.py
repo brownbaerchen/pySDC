@@ -1558,7 +1558,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
-                'restol_rel': 1e-1,
+                'restol_rel': 1e-2,
                 # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
             }

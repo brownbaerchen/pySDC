@@ -285,7 +285,7 @@ def record_work_precision(
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
-            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
