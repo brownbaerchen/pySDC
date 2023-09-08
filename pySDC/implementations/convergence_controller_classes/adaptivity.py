@@ -745,7 +745,7 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
             L = S.levels[0]
 
             # compute next step size
-            order = L.sweep.coll.num_nodes if self.params.high_Taylor_order else L.sweep.coll.num_nodes + 1
+            order = L.sweep.coll.num_nodes + 1 if self.params.high_Taylor_order else L.sweep.coll.num_nodes
 
             e_est = self.get_local_error_estimate(controller, S)
             L.status.dt_new = self.compute_optimal_step_size(

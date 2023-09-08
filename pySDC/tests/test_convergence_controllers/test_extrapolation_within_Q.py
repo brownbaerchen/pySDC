@@ -131,7 +131,7 @@ def check_order(dts, **kwargs):
 
     expected_order = {
         'e_loc': coll_order + 1,
-        'e_ex': kwargs['num_nodes'] if kwargs['high_Taylor_order'] else kwargs['num_nodes'] + 1,
+        'e_ex': kwargs['num_nodes'] + 1 if kwargs['high_Taylor_order'] else kwargs['num_nodes'],
     }
 
     for key in keys:

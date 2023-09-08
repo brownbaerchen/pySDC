@@ -487,12 +487,13 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         t_eval = S.time + nodes_[-1]
 
         dts = np.append(nodes_[0], nodes_[1:] - nodes_[:-1])
-        self.params.Taylor_order = len(nodes) if self.params.high_Taylor_order else 2 * len(nodes)
+        self.params.Taylor_order = len(nodes) * 2 if self.params.high_Taylor_order else len(nodes)
         self.params.n = len(nodes)
 
         # compute the extrapolation coefficients
         # TODO: Maybe this can be reused
         self.get_extrapolation_coefficients(nodes, dts, t_eval)
+        # print(nodes, dts, t_eval, self.coeff.u, self.coeff.f, self.params.high_Taylor_order, self.params.Taylor_order, flush=True)
 
         # compute the extrapolated solution
         if lvl.f[0] is None:
