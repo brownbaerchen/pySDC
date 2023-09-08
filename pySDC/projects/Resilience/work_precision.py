@@ -992,14 +992,14 @@ def get_configs(mode, problem):
             },
             'plotting_params': {'ls': '--'},
         }
-        # configurations[3] = {
-        #     'custom_description': {'sweeper_class': generic_implicit_MPI},
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'handle': 'parallel',
-        #     'num_procs_sweeper': 3,
-        #     'num_procs': 4,
-        #     'plotting_params': {'ls': ':', 'label': '12 procs'},
-        # }
+        configurations[3] = {
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
+            'num_procs': 4,
+            'plotting_params': {'ls': ':', 'label': '12 procs'},
+        }
 
         configurations[4] = {
             'custom_description': {'step_params': {'maxiter': 5}},
@@ -1574,7 +1574,7 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_AC,
+        'problem': run_Schroedinger,
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)

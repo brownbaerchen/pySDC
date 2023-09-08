@@ -460,6 +460,7 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
             'Taylor_order': 2 * num_nodes,
             'n': num_nodes,
             'high_Taylor_order': False,
+            'recompute_coefficients': False,
             **params,
         }
 
@@ -491,9 +492,8 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         self.params.n = len(nodes)
 
         # compute the extrapolation coefficients
-        # TODO: Maybe this can be reused
-        self.get_extrapolation_coefficients(nodes, dts, t_eval)
-        # print(nodes, dts, t_eval, self.coeff.u, self.coeff.f, self.params.high_Taylor_order, self.params.Taylor_order, flush=True)
+        if None in self.coeff.u or self.params.recompute_coefficients:
+            self.get_extrapolation_coefficients(nodes, dts, t_eval)
 
         # compute the extrapolated solution
         if lvl.f[0] is None:
