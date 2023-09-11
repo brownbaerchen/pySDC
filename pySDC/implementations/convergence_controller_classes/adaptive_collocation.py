@@ -109,7 +109,7 @@ class AdaptiveCollocation(ConvergenceController):
         if self.comm:
             res = [A[i, 0] * b[0] if b[i] is not None else None for i in range(A.shape[0])]
             buf = b[0] * 0.0
-            for i in range(1, A.shape[1]):
+            for i in range(1, A.shape[0]):
                 self.comm.Reduce(A[i, self.comm.rank + 1] * b[self.comm.rank + 1], buf, op=self.MPI_SUM, root=i - 1)
                 if i == self.comm.rank + 1:
                     res[i] += buf

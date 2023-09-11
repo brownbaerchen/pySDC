@@ -1,6 +1,7 @@
 import numpy as np
 from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.core.Errors import ConvergenceError
 
 
 class LorenzAttractor(ptype):
@@ -145,10 +146,10 @@ class LorenzAttractor(ptype):
             if res <= self.newton_tol:
                 break
             if np.isnan(res) and self.stop_at_nan:
-                self.logger.warning('Newton got nan after %i iterations...' % n)
-                raise ProblemError('Newton got nan after %i iterations, aborting...' % n)
+                self.logger.warning('Newton got nan after %i iterations...' % _n)
+                raise ConvergenceError('Newton got nan after %i iterations, aborting...' % _n)
             elif np.isnan(res):
-                self.logger.warning('Newton got nan after %i iterations...' % n)
+                self.logger.warning('Newton got nan after %i iterations...' % _n)
                 break
 
             # assemble inverse of Jacobian J of G

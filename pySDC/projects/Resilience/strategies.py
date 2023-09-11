@@ -335,8 +335,8 @@ class WildRiot(Strategy):
         desc['convergence_controllers'] = {}
 
         inexactness_params = {
-            'min_tol': 1e-12,
-            'ratio': 1e-2,
+            'min_tol': 1e-13,
+            'ratio': 1e-4,
             'max_tol': 1e-4,
             'use_e_tol': False,
             'maxiter': 10,
@@ -1559,6 +1559,111 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
                 'dt_min': dt_min,
                 'dt_max': dt_max,
                 'restol_rel': 1e-2,
+                # 'e_tol_rel': 1e-2,
+                'restart_at_maxiter': True,
+            }
+        }
+        # custom_description['sweeper_class'] = sweeper_class
+        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+
+    def get_reference_value(self, problem, key, op, num_procs=1):
+        """
+        Get a reference value for a given problem for testing in CI.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            key (str): The name of the variable you want to compare
+            op (function): The operation you want to apply to the data
+            num_procs (int): Number of processes
+
+        Returns:
+            The reference value
+        """
+        if problem.__name__ == "run_vdp":
+            if key == 'work_newton' and op == sum:
+                return 2259
+            elif key == 'e_global_post_run' and op == max:
+                return 9.319882663172407e-06
+
+        raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+
+class AdaptivityInterpolationError(WildRiot):
+    '''
+    Adaptivity based on extrapolation between collocation nodes as a resilience strategy
+    '''
+
+    def __init__(self, **kwargs):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityInterpolationError
+
+        self.restol = None
+        super().__init__(**kwargs)
+        self.color = list(cmap.values())[9]
+        self.marker = '*'
+        self.name = 'adaptivity_interpolation'
+        self.bar_plot_x_label = 'adaptivity Q'
+        self.precision_parameter = 'e_tol'
+        self.adaptive_coll_params = {}
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityInterpolationError, 'e_tol']
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityInterpolationError
+
+        custom_description = {}
+
+        dt_max = np.inf
+        dt_min = 1e-5
+
+        if problem.__name__ == "run_vdp":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        elif problem.__name__ == "run_piline":
+            e_tol = 1e-7
+            dt_min = 1e-2
+        elif problem.__name__ == "run_Lorenz":
+            e_tol = 2e-5
+            dt_min = 1e-3
+        elif problem.__name__ == "run_Schroedinger":
+            e_tol = 4e-6
+            dt_min = 1e-3
+        elif problem.__name__ == "run_quench":
+            e_tol = 1e-5
+            dt_min = 1e-3
+            dt_max = 1e2
+        elif problem.__name__ == "run_AC":
+            e_tol = 1e-4
+        else:
+            raise NotImplementedError(
+                'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
+ strategy'
+            )
+
+        # if problem.__name__ in ['run_Schroedinger']:
+        #     from pySDC.projects.Resilience.sweepers import imex_1st_order as sweeper_class
+        # else:
+        #     from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
+
+        # custom_description['level_params'] = {'restol': 1e-9 if self.restol is None else self.restol}
+        custom_description['convergence_controllers'] = {
+            AdaptivityInterpolationError: {
+                'e_tol': e_tol,
+                'dt_min': dt_min,
+                # 'dt_max': dt_max,
+                'restol_rel': 1e-4,
+                'restol_min': 1e-13,
                 # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
             }

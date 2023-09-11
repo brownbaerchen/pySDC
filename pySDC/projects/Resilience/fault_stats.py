@@ -1624,18 +1624,18 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_quench,
+        'prob': run_Lorenz,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
         'reload': True,
         **parse_args(),
     }
-    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy
+    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy, AdaptivityInterpolationError
 
     stats_analyser = FaultStats(
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        strategies=[DIRKStrategy(), ERKStrategy()],
+        strategies=[AdaptivityInterpolationError()],
         faults=[False, True],
         recovery_thresh=1.5,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),

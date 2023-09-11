@@ -954,6 +954,7 @@ def get_configs(mode, problem):
             AdaptivityExtrapolationWithinQStrategy,
             ESDIRKStrategy,
             ERKStrategy,
+            AdaptivityInterpolationError,
         )
 
         if problem.__name__ in ['run_Schroedinger']:
@@ -970,9 +971,9 @@ def get_configs(mode, problem):
         }
 
         strategies = [
-            # AdaptivityCollocationTypeStrategy,
+            AdaptivityInterpolationError,
             AdaptivityExtrapolationWithinQStrategy,
-            # AdaptivityCollocationRefinementStrategy,
+            # AdaptivityCollocationTypeStrategy,
         ]
 
         # restol = None
@@ -985,27 +986,27 @@ def get_configs(mode, problem):
             'handle': 'parallel',
             'num_procs_sweeper': 3,
         }
-        configurations[2] = {
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'custom_description': {
-                'sweeper_params': {'QI': 'LU'},
-            },
-            'plotting_params': {'ls': '--'},
-        }
-        configurations[3] = {
-            'custom_description': {'sweeper_class': parallel_sweeper},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'parallel',
-            'num_procs_sweeper': 3,
-            'num_procs': 4,
-            'plotting_params': {'ls': ':', 'label': '12 procs'},
-        }
+        # configurations[2] = {
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'custom_description': {
+        #         'sweeper_params': {'QI': 'LU'},
+        #     },
+        #     'plotting_params': {'ls': '--'},
+        # }
+        # configurations[3] = {
+        #     'custom_description': {'sweeper_class': parallel_sweeper},
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'handle': 'parallel',
+        #     'num_procs_sweeper': 3,
+        #     'num_procs': 4,
+        #     'plotting_params': {'ls': ':', 'label': '12 procs'},
+        # }
 
-        configurations[4] = {
-            'custom_description': {'step_params': {'maxiter': 5}},
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-        }
-        if False:
+        # configurations[4] = {
+        #     'custom_description': {'step_params': {'maxiter': 5}},
+        #     'strategies': [AdaptivityStrategy(useMPI=True)],
+        # }
+        if True:
             configurations[4] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
                 'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -1574,11 +1575,11 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_AC,
     }
-    record = True
-    single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
-    # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
+    record = False
+    # single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
     single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='t', precision_key='k_Newton', record=False)
