@@ -972,7 +972,7 @@ def get_configs(mode, problem):
 
         strategies = [
             AdaptivityInterpolationError,
-            AdaptivityExtrapolationWithinQStrategy,
+            # AdaptivityExtrapolationWithinQStrategy,
             # AdaptivityCollocationTypeStrategy,
         ]
 
@@ -986,21 +986,21 @@ def get_configs(mode, problem):
             'handle': 'parallel',
             'num_procs_sweeper': 3,
         }
-        # configurations[2] = {
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'custom_description': {
-        #         'sweeper_params': {'QI': 'LU'},
-        #     },
-        #     'plotting_params': {'ls': '--'},
-        # }
-        # configurations[3] = {
-        #     'custom_description': {'sweeper_class': parallel_sweeper},
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'handle': 'parallel',
-        #     'num_procs_sweeper': 3,
-        #     'num_procs': 4,
-        #     'plotting_params': {'ls': ':', 'label': '12 procs'},
-        # }
+        configurations[2] = {
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'custom_description': {
+                'sweeper_params': {'QI': 'LU'},
+            },
+            'plotting_params': {'ls': '--'},
+        }
+        configurations[3] = {
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
+            'num_procs': 4,
+            'plotting_params': {'ls': ':', 'label': '12 procs'},
+        }
 
         # configurations[4] = {
         #     'custom_description': {'step_params': {'maxiter': 5}},
@@ -1594,7 +1594,6 @@ if __name__ == "__main__":
     }
 
     for mode in ['compare_adaptivity']:  # ['parallel_efficiency', 'compare_strategies']:
-        break
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
