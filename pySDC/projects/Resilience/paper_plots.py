@@ -306,6 +306,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
     axs[2].set_xlabel(r'$t$')
     axs[0].set_ylabel('solution')
     axs[2].legend(frameon=JOURNAL == 'JSC_beamer')
+    axs[1].legend(frameon=True)
     savefig(fig, 'adaptivity')
 
 
