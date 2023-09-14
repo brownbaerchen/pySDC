@@ -985,6 +985,7 @@ def get_configs(mode, problem):
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             'handle': 'parallel',
             'num_procs_sweeper': 3,
+            'plotting_params': {'ls': '-', 'label': '3 procs'},
         }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
@@ -1418,7 +1419,7 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):  #
         mode (str): What you want to look at
         problem (function): A problem to run
     """
-    fig, ax = get_fig(1, 1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.5))
+    fig, ax = get_fig(1, 1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.8))
 
     params = {
         'work_key': 'k_SDC',
@@ -1577,7 +1578,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_AC,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)

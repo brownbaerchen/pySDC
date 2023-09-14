@@ -1557,7 +1557,7 @@ class AdaptivityInterpolationError(WildRiot):
         super().__init__(**kwargs)
         self.color = list(cmap.values())[9]
         self.marker = '*'
-        self.name = 'adaptivity_interpolation'
+        self.name = 'adaptivity-inter'
         self.bar_plot_x_label = 'adaptivity Q'
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
