@@ -1,7 +1,7 @@
 import pytest
 
 
-def get_controller(dt, num_nodes, quad_type, useMPI):
+def get_controller(dt, num_nodes, quad_type, useMPI, useEndPoint=True):
     """
     Runs a single advection problem with certain parameters
 
@@ -17,9 +17,16 @@ def get_controller(dt, num_nodes, quad_type, useMPI):
     """
     from pySDC.implementations.problem_classes.polynomial_test_problem import polynomial_testequation
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.implementations.convergence_controller_classes.estimate_interpolation_error import (
-        EstimateInterpolationError,
-    )
+    import numpy as np
+
+    if useEndPoint:
+        from pySDC.implementations.convergence_controller_classes.estimate_interpolation_error import (
+            EstimateInterpolationErrorEndpoint as error_estimator,
+        )
+    else:
+        from pySDC.implementations.convergence_controller_classes.estimate_interpolation_error import (
+            EstimateInterpolationError as error_estimator,
+        )
 
     if useMPI:
         from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI as sweeper_class
@@ -40,6 +47,7 @@ def get_controller(dt, num_nodes, quad_type, useMPI):
     sweeper_params = {}
     sweeper_params['quad_type'] = quad_type
     sweeper_params['num_nodes'] = num_nodes
+    sweeper_params['do_coll_update'] = True
     sweeper_params['comm'] = comm
 
     problem_params = {'degree': 12}
@@ -61,10 +69,16 @@ def get_controller(dt, num_nodes, quad_type, useMPI):
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
-    description['convergence_controllers'] = {EstimateInterpolationError: {}}
+    description['convergence_controllers'] = {error_estimator: {}}
 
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
-    return controller
+
+    cont = controller.convergence_controllers[
+        np.arange(len(controller.convergence_controllers))[
+            [type(me).__name__ == error_estimator.__name__ for me in controller.convergence_controllers]
+        ][0]
+    ]
+    return controller, cont
 
 
 def single_test(**kwargs):
@@ -86,15 +100,10 @@ def single_test(**kwargs):
     }
 
     # prepare variables
-    controller = get_controller(**args)
+    controller, cont = get_controller(**args)
     step = controller.MS[0]
     level = step.levels[0]
     prob = level.prob
-    cont = controller.convergence_controllers[
-        np.arange(len(controller.convergence_controllers))[
-            [type(me).__name__ == 'EstimateInterpolationError' for me in controller.convergence_controllers]
-        ][0]
-    ]
     nodes = np.append([0], level.sweep.coll.nodes)
 
     # initialize variables
@@ -222,4 +231,4 @@ if __name__ == "__main__":
         }
         check_order(steps, useMPI=True, **kwargs)
     else:
-        check_order(steps, useMPI=False, num_nodes=3, quad_type='RADAU-RIGHT')
+        check_order(steps, useMPI=False, num_nodes=3, quad_type='GAUSS')
