@@ -971,7 +971,7 @@ def get_configs(mode, problem):
         }
 
         strategies = [
-            AdaptivityInterpolationError,
+            # AdaptivityInterpolationError,
             # AdaptivityExtrapolationWithinQStrategy,
             AdaptivityCollocationTypeStrategy,
         ]
@@ -994,14 +994,14 @@ def get_configs(mode, problem):
             },
             'plotting_params': {'ls': '--'},
         }
-        configurations[3] = {
-            'custom_description': {'sweeper_class': parallel_sweeper},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'parallel',
-            'num_procs_sweeper': 3,
-            'num_procs': 4,
-            'plotting_params': {'ls': ':', 'label': '12 procs'},
-        }
+        # configurations[3] = {
+        #    'custom_description': {'sweeper_class': parallel_sweeper},
+        #    'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #    'handle': 'parallel',
+        #    'num_procs_sweeper': 3,
+        #    'num_procs': 4,
+        #    'plotting_params': {'ls': ':', 'label': '12 procs'},
+        # }
 
         # configurations[4] = {
         #     'custom_description': {'step_params': {'maxiter': 5}},
@@ -1579,7 +1579,8 @@ if __name__ == "__main__":
         'problem': run_AC,
     }
     record = True
-    single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='param', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
     single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
