@@ -971,9 +971,9 @@ def get_configs(mode, problem):
         }
 
         strategies = [
-            # AdaptivityInterpolationError,
-            # AdaptivityExtrapolationWithinQStrategy,
+            AdaptivityInterpolationError,
             AdaptivityCollocationTypeStrategy,
+            # AdaptivityExtrapolationWithinQStrategy,
         ]
 
         # restol = None
@@ -1007,7 +1007,7 @@ def get_configs(mode, problem):
         #     'custom_description': {'step_params': {'maxiter': 5}},
         #     'strategies': [AdaptivityStrategy(useMPI=True)],
         # }
-        if False:
+        if True:
             configurations[4] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
                 'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -1578,7 +1578,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_AC,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=record)
     single_problem(**params_single, work_key='param', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
@@ -1587,7 +1587,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',

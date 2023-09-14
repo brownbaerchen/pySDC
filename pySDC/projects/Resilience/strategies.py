@@ -871,7 +871,7 @@ class AdaptivityCollocationStrategy(WildRiot):
                 'dt_min': dt_min,
                 'dt_max': dt_max,
                 'adaptive_coll_params': self.adaptive_coll_params,
-                'restol_rel': 1e0,
+                'restol_rel': 1e-2,
             }
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
