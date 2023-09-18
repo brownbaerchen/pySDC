@@ -1083,6 +1083,68 @@ class DIRKStrategy(AdaptivityStrategy):
         return rnd_params
 
 
+class ARKStrategy(AdaptivityStrategy):
+    '''
+    ARK5(4), allegedly
+    '''
+
+    def __init__(self, useMPI=False, skip_residual_computation='all'):
+        '''
+        Initialization routine
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+
+        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        self.color = 'violet'
+        self.marker = '^'
+        self.name = 'ARK'
+        self.bar_plot_x_label = 'ARK5(4)'
+        self.precision_parameter = 'e_tol'
+        self.precision_parameter_loc = ['convergence_controllers', AdaptivityRK, 'e_tol']
+        self.max_steps = 1e5
+
+    @property
+    def label(self):
+        return 'ARK5(4)'
+
+    def get_custom_description(self, problem, num_procs):
+        '''
+        Routine to get a custom description that adds adaptivity
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            The custom descriptions you can supply to the problem when running it
+        '''
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK54
+
+        adaptivity_description = super().get_custom_description(problem, num_procs)
+
+        e_tol = adaptivity_description['convergence_controllers'][Adaptivity]['e_tol']
+        adaptivity_description['convergence_controllers'].pop(Adaptivity, None)
+        adaptivity_description.pop('sweeper_params', None)
+
+        rk_params = {
+            'step_params': {'maxiter': 1},
+            'sweeper_class': ARK54,
+            'convergence_controllers': {
+                AdaptivityRK: {'e_tol': e_tol},
+                BasicRestarting.get_implementation(useMPI=self.useMPI): {
+                    'max_restarts': 49,
+                    'crash_after_max_restarts': False,
+                },
+            },
+        }
+
+        custom_description = merge_descriptions(adaptivity_description, rk_params)
+
+        return custom_description
+
+
 class ESDIRKStrategy(AdaptivityStrategy):
     '''
     ESDIRK5(3)

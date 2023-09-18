@@ -1112,6 +1112,7 @@ def get_configs(mode, problem):
             ERKStrategy,
             DIRKStrategy,
             ESDIRKStrategy,
+            ARKStrategy,
         )
 
         desc = {}
@@ -1131,12 +1132,12 @@ def get_configs(mode, problem):
 
         desc_RK = {}
         if problem.__name__ in ['run_Schroedinger']:
-            desc_RK['problem_params'] = {'imex': False}
+            desc_RK['problem_params'] = {'imex': True}
 
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
-                ESDIRKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
             'custom_description': desc_RK,
@@ -1150,7 +1151,7 @@ def get_configs(mode, problem):
                 'plotting_params': {'ls': ls[num_procs], 'label': label},
             }
     elif mode == 'imex':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy, ARKStrategy
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
@@ -1166,25 +1167,29 @@ def get_configs(mode, problem):
 
         desc_RK = {}
         desc_RK['problem_params'] = {'imex': False}
-        configurations[-1] = {
-            'strategies': [
-                ESDIRKStrategy(useMPI=True),
-            ],
+        configurations[-2] = {
+            'strategies': [ARKStrategy(useMPI=True)],
             'num_procs': 1,
-            'custom_description': desc_RK,
         }
+        # configurations[-1] = {
+        #     'strategies': [
+        #         ESDIRKStrategy(useMPI=True),
+        #     ],
+        #     'num_procs': 1,
+        #     'custom_description': desc_RK,
+        # }
         i = 10
-        for imex, label, ls in zip([True, False], ['IMEX', 'fully implicit'], ['-', ':']):
-            desc['problem_params'] = {'imex': imex}
-            plotting_params = {'ls': ls, 'label': f'{label} SDC'}
-            configurations[i] = {
-                'strategies': [AdaptivityStrategy(True)],
-                'custom_description': copy.deepcopy(desc),
-                'num_procs': 1,
-                'plotting_params': plotting_params,
-                'handle': label,
-            }
-            i += 1
+        # for imex, label, ls in zip([True, False], ['IMEX', 'fully implicit'], ['-', ':']):
+        #     desc['problem_params'] = {'imex': imex}
+        #     plotting_params = {'ls': ls, 'label': f'{label} SDC'}
+        #     configurations[i] = {
+        #         'strategies': [AdaptivityStrategy(True)],
+        #         'custom_description': copy.deepcopy(desc),
+        #         'num_procs': 1,
+        #         'plotting_params': plotting_params,
+        #         'handle': label,
+        #     }
+        #     i += 1
     elif mode == 'newton_tol':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
@@ -1569,16 +1574,16 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_adaptivity',
-        'runs': 1,
+        'mode': 'RK_comp',
+        'runs': 10,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_AC,
+        'problem': run_Schroedinger,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=record)
     single_problem(**params_single, work_key='param', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
