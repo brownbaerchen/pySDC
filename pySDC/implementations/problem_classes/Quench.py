@@ -44,6 +44,7 @@ class Quench(ptype):
         lintol=1e-8,
         liniter=99,
         direct_solver=True,
+        inexact_linear_ratio=None,
         reference_sol_type='scipy',
     ):
         """
@@ -69,14 +70,19 @@ class Quench(ptype):
             'stencil_type',
             'bc',
             'nvars',
-            'newton_tol',
-            'newton_iter',
-            'lintol',
-            'liniter',
             'direct_solver',
             'reference_sol_type',
             localVars=locals(),
             readOnly=True,
+        )
+        self._makeAttributeAndRegister(
+            'newton_tol',
+            'newton_iter',
+            'lintol',
+            'liniter',
+            'inexact_linear_ratio',
+            localVars=locals(),
+            readOnly=False,
         )
 
         # compute dx (equal in both dimensions) and get discretization matrix A
@@ -254,6 +260,9 @@ class Quench(ptype):
             res = np.linalg.norm(G, np.inf)
             if res <= self.newton_tol and n > 0:  # we want to make at least one Newton iteration
                 break
+
+            if self.inexact_linear_ratio:
+                self.lintol = res * self.inexact_linear_ratio
 
             # assemble Jacobian J of G
             J = self.Id - factor * (self.A + self.get_non_linear_Jacobian(u))
