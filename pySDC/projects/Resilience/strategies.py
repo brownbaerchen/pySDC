@@ -1085,7 +1085,7 @@ class DIRKStrategy(AdaptivityStrategy):
 
 class ARKStrategy(AdaptivityStrategy):
     '''
-    ARK5(4), allegedly
+    ARK5(4)
     '''
 
     def __init__(self, useMPI=False, skip_residual_computation='all'):
@@ -1120,7 +1120,7 @@ class ARKStrategy(AdaptivityStrategy):
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK, Adaptivity
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
-        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK54
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK548L2SA
 
         adaptivity_description = super().get_custom_description(problem, num_procs)
 
@@ -1130,7 +1130,7 @@ class ARKStrategy(AdaptivityStrategy):
 
         rk_params = {
             'step_params': {'maxiter': 1},
-            'sweeper_class': ARK54,
+            'sweeper_class': ARK548L2SA,
             'convergence_controllers': {
                 AdaptivityRK: {'e_tol': e_tol},
                 BasicRestarting.get_implementation(useMPI=self.useMPI): {
