@@ -1095,8 +1095,8 @@ class ARKStrategy(AdaptivityStrategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
         super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
-        self.color = 'violet'
-        self.marker = '^'
+        self.color = list(cmap.values())[7]
+        self.marker = 'P'
         self.name = 'ARK'
         self.bar_plot_x_label = 'ARK5(4)'
         self.precision_parameter = 'e_tol'

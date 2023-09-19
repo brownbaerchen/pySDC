@@ -954,6 +954,7 @@ def get_configs(mode, problem):
             AdaptivityExtrapolationWithinQStrategy,
             ESDIRKStrategy,
             ERKStrategy,
+            ARKStrategy,
             AdaptivityInterpolationError,
         )
 
@@ -1013,13 +1014,15 @@ def get_configs(mode, problem):
                 'strategies': [AdaptivityStrategy(useMPI=True)],
             }
             desc_RK = {}
+            DIRK_strategy = ESDIRKStrategy
             if problem.__name__ in ['run_Schroedinger']:
-                desc_RK['problem_params'] = {'imex': False}
+                # desc_RK['problem_params'] = {'imex': False}
+                DIRK_strategy = ARKStrategy
 
             configurations[-1] = {
                 'strategies': [
                     # ERKStrategy(useMPI=True),
-                    ESDIRKStrategy(useMPI=True),
+                    DIRK_strategy(useMPI=True),
                 ],
                 'num_procs': 1,
                 'custom_description': desc_RK,
@@ -1303,7 +1306,12 @@ def save_fig(
     Returns:
         None
     """
-    handles, labels = fig.get_axes()[0].get_legend_handles_labels()
+    handles = []
+    labels = []
+    for ax in fig.get_axes():
+        h, l = ax.get_legend_handles_labels()
+        handles += [h[i] for i in range(len(h)) if l[i] not in labels]
+        labels += [me for me in l if me not in labels]
     order = np.argsort([me[0] for me in labels])
     fig.legend(
         [handles[i] for i in order],
@@ -1574,8 +1582,8 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
-        'runs': 10,
+        'mode': 'compare_adaptivity',
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
@@ -1583,7 +1591,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=record)
     single_problem(**params_single, work_key='param', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
