@@ -395,7 +395,7 @@ def plot_quench_solution():  # pragma: no cover
 
     strategy = BaseStrategy()
 
-    custom_description = strategy.get_custom_description(run_quench)
+    custom_description = strategy.get_custom_description(run_quench, num_procs=1)
 
     stats, controller, _ = run_quench(custom_description=custom_description, Tend=strategy.get_Tend(run_quench))
 
@@ -542,9 +542,9 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
-    # plot_quench_solution()
+    plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)

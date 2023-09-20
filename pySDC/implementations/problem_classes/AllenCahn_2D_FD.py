@@ -59,7 +59,7 @@ class allencahn_fullyimplicit(ptype):
         newton_tol=1e-12,
         lin_tol=1e-8,
         lin_maxiter=100,
-        lin_tol_inexactness_ratio=None,
+        inexact_linear_ratio=None,
         radius=0.25,
         order=2,
     ):
@@ -90,7 +90,7 @@ class allencahn_fullyimplicit(ptype):
             'newton_tol',
             'lin_tol',
             'lin_maxiter',
-            'lin_tol_inexactness_ratio',
+            'inexact_linear_ratio',
             localVars=locals(),
             readOnly=False,
         )
@@ -192,8 +192,8 @@ class allencahn_fullyimplicit(ptype):
             res = np.linalg.norm(g, np.inf)
 
             # do inexactness in the linear solver
-            if self.lin_tol_inexactness_ratio:
-                self.lin_tol = res * self.lin_tol_inexactness_ratio
+            if self.inexact_linear_ratio:
+                self.lin_tol = res * self.inexact_linear_ratio
 
             if res < self.newton_tol:
                 break

@@ -251,7 +251,7 @@ class Adaptivity(AdaptivityBase):
         """
         from pySDC.implementations.convergence_controller_classes.estimate_embedded_error import EstimateEmbeddedError
 
-        super().dependencies(controller, description)
+        super().dependencies(controller, description, **kwargs)
 
         controller.add_convergence_controller(
             EstimateEmbeddedError.get_implementation(self.params.embedded_error_flavor, self.params.useMPI),
@@ -565,7 +565,7 @@ class AdaptivityCollocation(AdaptivityForConvergedCollocationProblems):
             EstimateEmbeddedErrorCollocation,
         )
 
-        super().dependencies(controller, description)
+        super().dependencies(controller, description, **kwargs)
 
         params = {'adaptive_coll_params': self.params.adaptive_coll_params}
         controller.add_convergence_controller(
@@ -698,7 +698,7 @@ class AdaptivityExtrapolationWithinQ(AdaptivityForConvergedCollocationProblems):
             EstimateExtrapolationErrorWithinQ,
         )
 
-        super().dependencies(controller, description)
+        super().dependencies(controller, description, **kwargs)
 
         controller.add_convergence_controller(
             EstimateExtrapolationErrorWithinQ,
@@ -789,7 +789,7 @@ class AdaptivityInterpolationError(AdaptivityForConvergedCollocationProblems):
             EstimateInterpolationError,
         )
 
-        super().dependencies(controller, description)
+        super().dependencies(controller, description, **kwargs)
 
         controller.add_convergence_controller(
             EstimateInterpolationError,

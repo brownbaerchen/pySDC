@@ -77,7 +77,7 @@ class Quench(ptype):
         )
         self._makeAttributeAndRegister(
             'newton_tol',
-            'newton_iter',
+            'newton_maxiter',
             'lintol',
             'liniter',
             'inexact_linear_ratio',
@@ -129,6 +129,26 @@ class Quench(ptype):
         if not self.direct_solver:
             self.work_counters['linear'] = WorkCounter()
 
+    def apply_BCs(self, f):
+        """
+        Apply boundary conditions to the right hand side. Please supply only the nonlinear part as f!
+
+        Args:
+            dtype_f: nonlinear (!) part of the right hand side
+
+        Returns:
+            dtype_f: nonlinear part of the right hand side with boundary conditions
+        """
+        if self.bc == 'neumann-zero':
+            f[0] = 0.0
+            f[-1] = 0.0
+        elif self.bc == 'periodic':
+            pass
+        else:
+            raise NotImplementedError(f'BCs \"{self.bc}\" not implemented!')
+
+        return f
+
     def eval_f_non_linear(self, u, t):
         """
         Get the non-linear part of f.
@@ -169,7 +189,7 @@ class Quench(ptype):
 
         me[:] /= self.Cv
 
-        return me
+        return self.apply_BCs(me)
 
     def eval_f(self, u, t):
         """
@@ -189,6 +209,7 @@ class Quench(ptype):
         """
         f = self.dtype_f(self.init)
         f[:] = self.A.dot(u.flatten()).reshape(self.nvars) + self.eval_f_non_linear(u, t)
+
         self.work_counters['rhs']()
         return f
 
@@ -230,7 +251,7 @@ class Quench(ptype):
 
         me[:] /= self.Cv
 
-        return sp.diags(me, format='csc')
+        return sp.diags(self.apply_BCs(me), format='csc')
 
     def solve_system(self, rhs, factor, u0, t):
         r"""
@@ -254,7 +275,8 @@ class Quench(ptype):
         """
         u = self.dtype_u(u0)
         res = np.inf
-        delta = np.zeros_like(u)
+        delta = self.dtype_u(self.init, val=0.0)
+        z = self.dtype_u(self.init, val=0.0)
 
         # construct a preconditioner for the space solver
         if not self.direct_solver:
@@ -272,7 +294,7 @@ class Quench(ptype):
                 break
 
             if self.inexact_linear_ratio:
-                self.lintol = res * self.inexact_linear_ratio
+                self.lintol = max([res * self.inexact_linear_ratio, 1e-12])
 
             # assemble Jacobian J of G
             J = self.Id - factor * (self.A + self.get_non_linear_Jacobian(u))
@@ -284,7 +306,7 @@ class Quench(ptype):
                 delta, info = gmres(
                     J,
                     G,
-                    x0=delta,
+                    x0=z,
                     M=M,
                     tol=self.lintol,
                     maxiter=self.liniter,

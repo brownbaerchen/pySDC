@@ -36,6 +36,7 @@ MAPPINGS = {
     'restart': ('restart', sum, None),
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
+    'dt_min': ('dt', min, False),
     'e_embedded_max': ('error_embedded_estimate', max, False),
     'u0_increment_max': ('u0_increment', max, None),
     'u0_increment_mean': ('u0_increment', np.mean, None),
@@ -279,9 +280,11 @@ def record_work_precision(
         if param == 'restol':
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'e_tol':
-            param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
+            # param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
+            # param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
+            param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'dt':
-            param_range = [500 / 2.0**me for me in [5, 6, 7, 8]]
+            param_range = [500 / 2.0**me for me in [4, 5, 6, 7]]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -289,7 +292,7 @@ def record_work_precision(
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i])
+        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
 
         # if strategy.name == 'adaptivity_coll':
         #     set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
@@ -698,7 +701,7 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
             }
 
-    elif mode == 'compare_strategies':
+    elif mode == 'compare_strategies_oldBS_trashfest':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
 
         description_high_order = {'step_params': {'maxiter': 5}}
@@ -730,6 +733,29 @@ def get_configs(mode, problem):
             'custom_description': description_small_step,
             'handle': r'small step',
             'strategies': [IterateStrategy(useMPI=True)],
+        }
+    elif mode == 'compare_strategies':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            kAdaptivityStrategy,
+            AdaptivityInterpolationError,
+            BaseStrategy,
+        )
+
+        configurations[0] = {
+            'custom_description': {
+                'step_params': {'maxiter': 5},
+                'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
+            },
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
+        }
+
+        configurations[1] = {
+            'strategies': [AdaptivityInterpolationError(useMPI=True)],
+        }
+
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
@@ -945,6 +971,41 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': base_desc,
         }
+    elif mode == 'inexactness':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityCollocationTypeStrategy,
+            AdaptivityInterpolationError,
+        )
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        wild_params = {
+            'newton_inexactness': True,
+            'linear_inexactness': True,
+        }
+
+        strategies = [
+            AdaptivityInterpolationError,
+        ]
+
+        configurations[0] = {
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'num_procs_sweeper': 3,
+            'plotting_params': {'ls': '-', 'label': 'inexact'},
+        }
+        configurations[1] = {
+            'custom_description': {'sweeper_params': {'preconditioner': 'LU'}},
+            'strategies': [me(useMPI=True, newton_inexactness=False, linear_inexactness=False) for me in strategies],
+            'num_procs_sweeper': 1,
+            'handle': 'exact',
+            'plotting_params': {'ls': '--'},
+        }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
@@ -973,7 +1034,7 @@ def get_configs(mode, problem):
 
         strategies = [
             AdaptivityInterpolationError,
-            AdaptivityCollocationTypeStrategy,
+            # AdaptivityCollocationTypeStrategy,
             # AdaptivityExtrapolationWithinQStrategy,
         ]
 
@@ -1362,6 +1423,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             ax=axs.flatten()[i],
             decorate=True,
             configurations=get_configs(mode, problems[i]),
+            mode=mode,
         )
         if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
             axs.flatten()[i].set_xticks([2.0, 4.0], minor=True)
@@ -1446,7 +1508,9 @@ def single_problem(mode, problem, plotting=True, base_path='data', **kwargs):  #
     }
 
     logger.log(26, f"Doing single problem {mode}")
-    execute_configurations(**params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem))
+    execute_configurations(
+        **params, problem=problem, ax=ax, decorate=True, configurations=get_configs(mode, problem), mode=mode
+    )
 
     if plotting:
         save_fig(
@@ -1582,21 +1646,22 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_adaptivity',
+        'mode': 'inexactness',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_vdp,
     }
-    record = False
-    single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=record)
-    single_problem(**params_single, work_key='param', precision_key='e_global', record=record)
+    record = True
+    single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
+    # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
+    # single_problem(**params_single, work_key='dt_mean', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
@@ -1608,7 +1673,8 @@ if __name__ == "__main__":
         #'num_procs': 4,
     }
 
-    for mode in ['compare_adaptivity']:  # ['parallel_efficiency', 'compare_strategies']:
+    for mode in ['compare_adaptivity', 'compare_strategies']:
+        break
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

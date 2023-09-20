@@ -80,6 +80,7 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
+        self.precision_range_fac = 1.0
 
     def __str__(self):
         return self.name
@@ -227,7 +228,13 @@ class Strategy:
         elif problem.__name__ == "run_quench":
             custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
+            custom_description['problem_params'] = {
+                'newton_maxiter': 99,
+                'newton_tol': 1e-9,
+                'nvars': 2**7,
+                'direct_solver': False,
+                'lintol': 1e-10,
+            }
         elif problem.__name__ == "run_AC":
             custom_description['level_params'] = {'restol': -1, 'dt': 1e-4}
             custom_description['step_params'] = {'maxiter': 5}
@@ -269,7 +276,7 @@ class Strategy:
 
 
 class WildRiot(Strategy):
-    def __init__(self, double_adaptivity=False, newton_inexactness=False, linear_inexactness=False, **kwargs):
+    def __init__(self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, **kwargs):
         kwargs = {**kwargs, 'skip_residual_computation': 'most'}
         super().__init__(**kwargs)
         self.double_adaptivity = double_adaptivity
@@ -284,7 +291,8 @@ class WildRiot(Strategy):
 
         desc = {}
         desc['sweeper_params'] = {'QI': preconditioner}
-        desc['step_params'] = {'maxiter': 20}
+        desc['step_params'] = {'maxiter': 16}
+        desc['problem_params'] = {}
         desc['level_params'] = {'restol': 1e-8, 'residual_type': 'last_abs'}
         desc['convergence_controllers'] = {}
 
@@ -299,15 +307,23 @@ class WildRiot(Strategy):
         if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
             # desc['convergence_controllers'][NewtonInexactness] = {'maxiter': 10}
             # desc['convergence_controllers'][NewtonInexactness] = {'min_tol': 1e-12, 'ratio': 1e-1,}
+            if problem.__name__ == 'run_quench':
+                inexactness_params['ratio'] = 1e-4
+                inexactness_params['min_tol'] = 1e-10
+                inexactness_params['max_tol'] = 1e-4
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
-            # desc['problem_params'] = {
-            #         # 'newton_maxiter': 10,
-            #     # 'stop_at_nan': False,
-            # }
-        if self.linear_inexactness and problem.__name__ in ['run_AC']:
-            from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
 
-            desc['problem_params'] = {'lin_tol_inexactness_ratio': 1e-1}
+        if problem.__name__ in ['run_vdp']:
+            desc['problem_params']['stop_at_nan'] = False
+
+        if self.linear_inexactness and problem.__name__ in ['run_AC', 'run_quench']:
+            # from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
+
+            desc['problem_params']['inexact_linear_ratio'] = 1e-1
+            if problem.__name__ in ['run_quench']:
+                desc['problem_params']['direct_solver'] = False
+                desc['problem_params']['liniter'] = 5
+
             # desc['convergence_controllers'][LinearInexactness] = {
             #        **inexactness_params,
             #        'ratio': inexactness_params['ratio'] * 1e-1,
@@ -427,6 +443,7 @@ class AdaptivityStrategy(Strategy):
             The custom descriptions you can supply to the problem when running it
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
         custom_description['convergence_controllers'] = {}
@@ -450,7 +467,7 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_quench":
             e_tol = 1e-5
             dt_min = 1e-3
-            # dt_max = 25
+            dt_max = 100.0
             # dt_slope_max = 4.
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
@@ -468,9 +485,11 @@ class AdaptivityStrategy(Strategy):
 
         custom_description['convergence_controllers'][Adaptivity] = {
             'e_tol': e_tol,
+            'dt_slope_max': dt_slope_max,
+        }
+        custom_description['convergence_controllers'][StepSizeLimiter] = {
             'dt_min': dt_min,
             'dt_max': dt_max,
-            'dt_slope_max': dt_slope_max,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
@@ -686,6 +705,18 @@ strategy'
                 return 0.0005961192269257065
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+
+class kAdaptivityStrategy(IterateStrategy):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.precision_parameter = 'dt'
+        self.precision_parameter_loc = ['level_params', 'dt']
+
+    def get_custom_description(self, *args, **kwargs):
+        desc = super().get_custom_description(*args, **kwargs)
+        desc['level_params']['restol'] = 1e-9
+        return desc
 
 
 class HotRodStrategy(Strategy):
@@ -1625,6 +1656,7 @@ class AdaptivityInterpolationError(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityInterpolationError, 'e_tol']
+        self.precision_range_fac = 15e1
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1638,6 +1670,7 @@ class AdaptivityInterpolationError(WildRiot):
             The custom descriptions you can supply to the problem when running it
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityInterpolationError
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
 
@@ -1674,16 +1707,19 @@ class AdaptivityInterpolationError(WildRiot):
         #     from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
 
         # custom_description['level_params'] = {'restol': 1e-9 if self.restol is None else self.restol}
+        restol_min = 1e-9 if problem in ['run_quench'] else 1e-13
         custom_description['convergence_controllers'] = {
             AdaptivityInterpolationError: {
                 'e_tol': e_tol,
-                'dt_min': dt_min,
-                # 'dt_max': dt_max,
                 'restol_rel': 1e-4,
-                'restol_min': 1e-13,
+                'restol_min': restol_min,
                 # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
-            }
+            },
+            StepSizeLimiter: {
+                'dt_min': dt_min,
+                'dt_max': dt_max,
+            },
         }
         # custom_description['sweeper_class'] = sweeper_class
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
