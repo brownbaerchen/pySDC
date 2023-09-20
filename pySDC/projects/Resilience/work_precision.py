@@ -738,7 +738,7 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             kAdaptivityStrategy,
-            AdaptivityInterpolationError,
+            AdaptivityPolynomialError,
             BaseStrategy,
         )
 
@@ -751,7 +751,7 @@ def get_configs(mode, problem):
         }
 
         configurations[1] = {
-            'strategies': [AdaptivityInterpolationError(useMPI=True)],
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
 
         configurations[2] = {
@@ -974,7 +974,7 @@ def get_configs(mode, problem):
     elif mode == 'inexactness':
         from pySDC.projects.Resilience.strategies import (
             AdaptivityCollocationTypeStrategy,
-            AdaptivityInterpolationError,
+            AdaptivityPolynomialError,
         )
 
         if problem.__name__ in ['run_Schroedinger']:
@@ -990,7 +990,7 @@ def get_configs(mode, problem):
         }
 
         strategies = [
-            AdaptivityInterpolationError,
+            AdaptivityPolynomialError,
         ]
 
         configurations[0] = {
@@ -1000,9 +1000,11 @@ def get_configs(mode, problem):
             'plotting_params': {'ls': '-', 'label': 'inexact'},
         }
         configurations[1] = {
-            'custom_description': {'sweeper_params': {'preconditioner': 'LU'}},
-            'strategies': [me(useMPI=True, newton_inexactness=False, linear_inexactness=False) for me in strategies],
-            'num_procs_sweeper': 1,
+            # 'custom_description': {'sweeper_params': {'preconditioner': 'LU'}},
+            'strategies': [
+                me(useMPI=True, newton_inexactness=False, linear_inexactness=False, SDC_maxiter=20) for me in strategies
+            ],
+            'num_procs_sweeper': 3,
             'handle': 'exact',
             'plotting_params': {'ls': '--'},
         }
@@ -1016,7 +1018,7 @@ def get_configs(mode, problem):
             ESDIRKStrategy,
             ERKStrategy,
             ARKStrategy,
-            AdaptivityInterpolationError,
+            AdaptivityPolynomialError,
         )
 
         if problem.__name__ in ['run_Schroedinger']:
@@ -1033,7 +1035,7 @@ def get_configs(mode, problem):
         }
 
         strategies = [
-            AdaptivityInterpolationError,
+            AdaptivityPolynomialError,
             # AdaptivityCollocationTypeStrategy,
             # AdaptivityExtrapolationWithinQStrategy,
         ]
@@ -1281,13 +1283,13 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             AdaptivityAvoidRestartsStrategy,
-            AdaptivityInterpolationStrategy,
+            AdaptivityPolynomialStrategy,
         )
 
         desc = {'sweeper_params': {'QI': 'IE'}, 'step_params': {'maxiter': 3}}
         param_range = [1e-3, 1e-5]
         configurations[0] = {
-            'strategies': [AdaptivityInterpolationStrategy(useMPI=True)],
+            'strategies': [AdaptivityPolynomialStrategy(useMPI=True)],
             'plotting_params': {'ls': '--'},
             'custom_description': desc,
             'param_range': param_range,
@@ -1653,13 +1655,13 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_Lorenz,
     }
     record = True
     single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
-    # single_problem(**params_single, work_key='k_Newton', precision_key='restart', record=False)
+    # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='dt_mean', precision_key='e_global_rel', record=False)
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
