@@ -993,18 +993,27 @@ def get_configs(mode, problem):
             AdaptivityPolynomialError,
         ]
 
+        # configurations[0] = {
+        #     'custom_description': {'sweeper_class': parallel_sweeper},
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'num_procs_sweeper': 3,
+        #     'plotting_params': {'ls': '-', 'label': 'inexact'},
+        # }
         configurations[0] = {
-            'custom_description': {'sweeper_class': parallel_sweeper},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'num_procs_sweeper': 3,
-            'plotting_params': {'ls': '-', 'label': 'inexact'},
-        }
-        configurations[1] = {
-            # 'custom_description': {'sweeper_params': {'preconditioner': 'LU'}},
+            #'custom_description': {'sweeper_params': {'preconditioner': 'IE'}},
             'strategies': [
                 me(useMPI=True, newton_inexactness=False, linear_inexactness=False, SDC_maxiter=20) for me in strategies
             ],
-            'num_procs_sweeper': 3,
+            'num_procs_sweeper': 1,
+            'handle': 'exact',
+            'plotting_params': {'ls': '--'},
+        }
+        configurations[1] = {
+            'custom_description': {'sweeper_params': {'preconditioner': 'IE'}},
+            'strategies': [
+                me(useMPI=True, newton_inexactness=False, linear_inexactness=False, SDC_maxiter=20) for me in strategies
+            ],
+            'num_procs_sweeper': 1,
             'handle': 'exact',
             'plotting_params': {'ls': '--'},
         }
@@ -1658,7 +1667,7 @@ if __name__ == "__main__":
         'problem': run_Lorenz,
     }
     record = True
-    single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
+    # single_problem(**params_single, work_key='k_Newton', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False)
@@ -1667,7 +1676,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1676,7 +1685,6 @@ if __name__ == "__main__":
     }
 
     for mode in ['compare_adaptivity', 'compare_strategies']:
-        break
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

@@ -190,6 +190,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
                 S.status.restart = True
             elif S.status.iter >= self.params.maxiter and self.params.restart_at_maxiter:
                 S.status.restart = True
+                print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
                 for L in S.levels:
                     L.status.dt_new = L.params.dt / 2.0
                     self.log(
@@ -765,11 +766,12 @@ class AdaptivityPolynomialError(AdaptivityForConvergedCollocationProblems):
 
         defaults = {
             'control_order': -50,
+            **super().setup(controller, params, description, **kwargs),
             **params,
         }
 
         self.check_convergence = CheckConvergence.check_convergence
-        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+        return defaults
 
     def get_convergence(self, controller, S, **kwargs):
         return self.check_convergence(S)
