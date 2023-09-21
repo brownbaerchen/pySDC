@@ -1631,17 +1631,18 @@ def main():
         'reload': True,
         **parse_args(),
     }
-    from pySDC.projects.Resilience.strategies import DIRKStrategy, ERKStrategy, AdaptivityInterpolationError
+    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
     stats_analyser = FaultStats(
         # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        strategies=[AdaptivityInterpolationError()],
+        strategies=[AdaptivityPolynomialError()],
         faults=[False, True],
         recovery_thresh=1.5,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
         **kwargs,
     )
+    # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=True, run=16)
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data

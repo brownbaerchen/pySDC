@@ -142,6 +142,8 @@ class Strategy:
 
         if problem.__name__ == "run_quench":
             rnd_params['iteration'] = 1
+        elif problem.__name__ == 'run_Lorenz':
+            rnd_params['iteration'] = 3
         return rnd_params
 
     @property
