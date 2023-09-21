@@ -186,6 +186,7 @@ class LorenzAttractor(ptype):
             u = u - delta
             self.work_counters['newton']()
 
+        # print(self.newton_tol, self.newton_maxiter, _n)
         return u
 
     def u_exact(self, t, u_init=None, t_init=None):

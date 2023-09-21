@@ -232,7 +232,7 @@ class Strategy:
                 'newton_maxiter': 99,
                 'newton_tol': 1e-9,
                 'nvars': 2**7,
-                'direct_solver': True,
+                'direct_solver': False,
                 'lintol': 1e-10,
             }
         elif problem.__name__ == "run_AC":
@@ -304,14 +304,14 @@ class WildRiot(Strategy):
             'ratio': 1e-2,
             'max_tol': 1e-4,
             'use_e_tol': False,
-            'maxiter': 99,
+            'maxiter': 15,
         }
 
         if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
             if problem.__name__ == 'run_quench':
-                inexactness_params['ratio'] = 1e-4
-                inexactness_params['min_tol'] = 1e-9
-                inexactness_params['max_tol'] = 1e-4
+                inexactness_params['ratio'] = 1e-2
+                inexactness_params['min_tol'] = 1e-10
+                inexactness_params['max_tol'] = 1e-3
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
 
         if problem.__name__ in ['run_vdp']:
@@ -341,7 +341,7 @@ class WildRiot(Strategy):
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
         desc['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
-            'max_restarts': 10,
+            'max_restarts': 99,
             'crash_after_max_restarts': False,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), desc)
@@ -474,7 +474,7 @@ class AdaptivityStrategy(Strategy):
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
             custom_description['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
-                'max_restarts': 15,
+                'max_restarts': 99,
             }
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
@@ -489,7 +489,7 @@ class AdaptivityStrategy(Strategy):
             'dt_slope_max': dt_slope_max,
         }
         custom_description['convergence_controllers'][StepSizeLimiter] = {
-            'dt_min': dt_min,
+            # 'dt_min': dt_min,
             'dt_max': dt_max,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
@@ -1717,7 +1717,7 @@ class AdaptivityPolynomialError(WildRiot):
                 'restart_at_maxiter': True,
             },
             StepSizeLimiter: {
-                'dt_min': dt_min,
+                #'dt_min': dt_min,
                 'dt_max': dt_max,
             },
         }

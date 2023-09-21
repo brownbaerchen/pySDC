@@ -183,21 +183,34 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
         if defaults['restart_at_maxiter']:
             defaults['maxiter'] = description['step_params'].get('maxiter', 99)
 
+        self.res_last_iter = np.inf
+
         return defaults
 
     def determine_restart(self, controller, S, **kwargs):
+        # print(self.res_last_iter, S.levels[0].status.residual, S.status.iter, self.get_convergence(controller, S, **kwargs))
         if self.get_convergence(controller, S, **kwargs):
+            self.res_last_iter = np.inf
+
             if self.params.restart_at_maxiter and S.levels[0].status.residual > S.levels[0].params.restol:
-                S.status.restart = True
-                print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
-                for L in S.levels:
-                    L.status.dt_new = L.params.dt / 2.0
-                    self.log(
-                        f'Collocation problem not converged after max. number of iterations, halving step size to {L.status.dt_new:.2e}',
-                        S,
-                    )
+                self.trigger_restart_upon_nonconvergence(S)
             elif self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
                 S.status.restart = True
+        elif self.res_last_iter < S.levels[0].status.residual and S.status.iter > 0:
+            self.trigger_restart_upon_nonconvergence(S)
+
+        self.res_last_iter = S.levels[0].status.residual * 1.0
+
+    def trigger_restart_upon_nonconvergence(self, S):
+        S.status.restart = True
+        S.status.force_done = True
+        for L in S.levels:
+            L.status.dt_new = L.params.dt / 2.0
+            self.log(
+                f'Collocation problem not converged. Halving step size to {L.status.dt_new:.2e}',
+                S,
+            )
+        # print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
 
 
 class Adaptivity(AdaptivityBase):
