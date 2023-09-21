@@ -742,16 +742,16 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        }
+
         configurations[0] = {
             'custom_description': {
                 'step_params': {'maxiter': 5},
                 'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
             },
             'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
-        }
-
-        configurations[1] = {
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
 
         configurations[2] = {
@@ -1659,17 +1659,17 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'inexactness',
+        'mode': 'compare_strategies',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1677,7 +1677,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',

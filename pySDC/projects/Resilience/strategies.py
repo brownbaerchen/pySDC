@@ -300,7 +300,7 @@ class WildRiot(Strategy):
         desc['convergence_controllers'] = {}
 
         inexactness_params = {
-            'min_tol': 1e-13,
+            'min_tol': 1e-12,
             'ratio': 1e-2,
             'max_tol': 1e-4,
             'use_e_tol': False,
@@ -1706,7 +1706,10 @@ class AdaptivityPolynomialError(WildRiot):
  strategy'
             )
 
-        restol_min = 1e-9 if problem.__name__ in ['run_quench', 'run_Lorenz'] else 1e-13
+        if problem.__name__ == 'run_quench':
+            restol_min = 1e-9
+        else:
+            restol_min = 1e-12
         custom_description['convergence_controllers'] = {
             AdaptivityPolynomialError: {
                 'e_tol': e_tol,
