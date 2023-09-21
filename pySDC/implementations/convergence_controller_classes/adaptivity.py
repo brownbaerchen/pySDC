@@ -182,13 +182,12 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
 
         if defaults['restart_at_maxiter']:
             defaults['maxiter'] = description['step_params'].get('maxiter', 99)
+
         return defaults
 
     def determine_restart(self, controller, S, **kwargs):
         if self.get_convergence(controller, S, **kwargs):
-            if self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
-                S.status.restart = True
-            elif S.status.iter >= self.params.maxiter and self.params.restart_at_maxiter:
+            if self.params.restart_at_maxiter and S.levels[0].status.residual > S.levels[0].params.restol:
                 S.status.restart = True
                 print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
                 for L in S.levels:
@@ -197,6 +196,8 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
                         f'Collocation problem not converged after max. number of iterations, halving step size to {L.status.dt_new:.2e}',
                         S,
                     )
+            elif self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
+                S.status.restart = True
 
 
 class Adaptivity(AdaptivityBase):

@@ -301,7 +301,7 @@ class WildRiot(Strategy):
 
         inexactness_params = {
             'min_tol': 1e-13,
-            'ratio': 1e-1,
+            'ratio': 1e-2,
             'max_tol': 1e-4,
             'use_e_tol': False,
             'maxiter': 99,
@@ -322,7 +322,7 @@ class WildRiot(Strategy):
 
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
-                desc['problem_params']['direct_solver'] = True
+                desc['problem_params']['direct_solver'] = False
                 desc['problem_params']['liniter'] = 5
 
             # desc['convergence_controllers'][LinearInexactness] = {
@@ -1713,6 +1713,7 @@ class AdaptivityPolynomialError(WildRiot):
                 'restol_rel': 1e-4,
                 'restol_min': restol_min,
                 # 'e_tol_rel': 1e-2,
+                # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
             },
             StepSizeLimiter: {
