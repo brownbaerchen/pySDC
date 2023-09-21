@@ -661,6 +661,23 @@ def get_configs(mode, problem):
             'handle': r'small step',
             'strategies': [IterateStrategy(useMPI=True)],
         }
+    elif mode == 'compare_strategies_light':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
+
+        description_high_order = {'step_params': {'maxiter': 5}}
+        dashed = {'ls': '--'}
+
+        configurations[0] = {
+            'custom_description': description_high_order,
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
+        }
+
+        description_small_step = {'level_params': {'dt': 1.0 if problem.__name__ == 'run_quench' else 1e-2}}
+
+        configurations[3] = {
+            'custom_description': description_small_step,
+            'strategies': [IterateStrategy(useMPI=True)],
+        }
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
 

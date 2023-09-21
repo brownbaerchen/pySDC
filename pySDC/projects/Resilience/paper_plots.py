@@ -564,9 +564,55 @@ def make_plots_for_notes():  # pragma: no cover
     analyse_resilience(run_quench, format='png')
 
 
+def science_highlight():
+    global JOURNAL, BASE_PATH
+    JOURNAL = 'JSC_beamer'
+    fig, axs = plt.subplots(1, 2, figsize=figsize_by_journal(JOURNAL, 1.0, 2.0 / 4.0))
+    plot_recovery_rate_recoverable_only(get_stats(run_Lorenz), fig, axs[1])
+
+    from pySDC.projects.Resilience.work_precision import (
+        all_problems,
+        single_problem,
+        ODEs,
+        get_fig,
+        execute_configurations,
+        save_fig,
+        get_configs,
+        MPI,
+        vdp_stiffness_plot,
+    )
+
+    all_params = {
+        'record': False,
+        'work_key': 't',
+        'precision_key': 'e_global_rel',
+        'plotting': True,
+        # 'base_path': 'data/paper',
+    }
+
+    params = {
+        **all_params,
+        'problem': run_Lorenz,
+        'decorate': True,
+        'configurations': get_configs('compare_strategies_light', run_quench),
+        'num_procs': 1,
+        'runs': 1,
+        'comm_world': MPI.COMM_WORLD,
+    }
+    execute_configurations(**{**params, 'work_key': 'k_Newton', 'precision_key': 'e_global'}, ax=axs[0])
+    axs[1].set_ylabel('recovery rate')
+    axs[1].set_xlabel('flipped bit in 64 bit floating point number')
+
+    fig.suptitle(axs[0].get_title())
+    axs[0].set_title('')
+
+    savefig(fig, 'science_highlight')
+
+
 if __name__ == "__main__":
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
     # make_plots_for_TIME_X_website()
     # plot_recovery_thresholds(run_Schroedinger)
-    make_plots_for_paper()
+    # make_plots_for_paper()
+    science_highlight()
