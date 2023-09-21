@@ -232,7 +232,7 @@ class Strategy:
                 'newton_maxiter': 99,
                 'newton_tol': 1e-9,
                 'nvars': 2**7,
-                'direct_solver': False,
+                'direct_solver': True,
                 'lintol': 1e-10,
             }
         elif problem.__name__ == "run_AC":
@@ -290,7 +290,7 @@ class WildRiot(Strategy):
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
-        preconditioner = 'MIN-SR-NS' if problem in ['run_vdp', 'run_Lorenz'] else 'MIN-SR-S'
+        preconditioner = 'MIN-SR-NS' if problem.__name__ in ['run_vdp', 'run_Lorenz'] else 'MIN-SR-S'
 
         desc = {}
         desc['sweeper_params'] = {'QI': preconditioner}
@@ -322,7 +322,7 @@ class WildRiot(Strategy):
 
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
-                desc['problem_params']['direct_solver'] = False
+                desc['problem_params']['direct_solver'] = True
                 desc['problem_params']['liniter'] = 5
 
             # desc['convergence_controllers'][LinearInexactness] = {
@@ -1657,7 +1657,7 @@ class AdaptivityPolynomialError(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
-        self.precision_range_fac = 15e1
+        self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1697,7 +1697,7 @@ class AdaptivityPolynomialError(WildRiot):
         elif problem.__name__ == "run_quench":
             e_tol = 1e-5
             dt_min = 1e-3
-            dt_max = 1e2
+            # dt_max = 1e2
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
         else:

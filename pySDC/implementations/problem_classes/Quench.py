@@ -99,12 +99,12 @@ class Quench(ptype):
         if self.bc == 'periodic':
             self.dx = 1.0 / self.nvars
             xvalues = np.array([i * self.dx for i in range(self.nvars)])
-        elif self.bc == 'dirichlet-zero':
+        elif self.bc in ['neumann-zero', 'dirichlet-zero']:
             self.dx = 1.0 / (self.nvars + 1)
             xvalues = np.array([(i + 1) * self.dx for i in range(self.nvars)])
-        elif self.bc == 'neumann-zero':
-            self.dx = 1.0 / (self.nvars - 1)
-            xvalues = np.array([i * self.dx for i in range(self.nvars)])
+        # elif self.bc == 'neumann-zero':
+        #     self.dx = 1.0 / (self.nvars -1)
+        #     xvalues = np.array([i * self.dx for i in range(self.nvars)])
         else:
             raise ProblemError(f'Boundary conditions {self.bc} not implemented.')
 
