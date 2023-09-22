@@ -87,6 +87,9 @@ class Strategy:
     def __str__(self):
         return self.name
 
+    def get_controller_params(self, **kwargs):
+        return {}
+
     def get_fixable_params(self, **kwargs):
         """
         Return a list containing dictionaries which can be passed to `FaultStats.get_mask` as keyword arguments to
@@ -300,6 +303,9 @@ class WildRiot(Strategy):
         self.linear_inexactness = linear_inexactness
         self.SDC_maxiter = SDC_maxiter
         # self.restol = -1
+
+    def get_controller_params(self, **kwargs):
+        return {'all_to_done': True}
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness

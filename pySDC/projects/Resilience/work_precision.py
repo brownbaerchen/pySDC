@@ -118,7 +118,12 @@ def single_run(
     if comm_sweep.size > 1:
         description['sweeper_params']['comm'] = comm_sweep
 
-    controller_params = {'logger_level': LOGGER_LEVEL, 'log_to_file': LOG_TO_FILE, 'fname': 'out.txt'}
+    controller_params = {
+        'logger_level': LOGGER_LEVEL,
+        'log_to_file': LOG_TO_FILE,
+        'fname': 'out.txt',
+        **strategy.get_controller_params(),
+    }
     problem_args = {} if problem_args is None else problem_args
 
     stats, controller, _ = problem(

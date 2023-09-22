@@ -35,6 +35,10 @@ class AdaptivityBase(ConvergenceController):
 
         controller.add_hook(LogStepSize)
 
+        from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
+
+        self.communicate_convergence = CheckConvergence.communicate_convergence
+
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
     def dependencies(self, controller, description, **kwargs):
@@ -198,6 +202,9 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
                 S.status.restart = True
         elif self.res_last_iter < S.levels[0].status.residual and S.status.iter > 0:
             self.trigger_restart_upon_nonconvergence(S)
+
+        if self.params.useMPI:
+            self.communicate_convergence(self, controller, S, **kwargs)
 
         self.res_last_iter = S.levels[0].status.residual * 1.0
 
