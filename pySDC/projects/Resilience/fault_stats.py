@@ -1624,7 +1624,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_Lorenz,
+        'prob': run_Schroedinger,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
@@ -1634,10 +1634,16 @@ def main():
     from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
     stats_analyser = FaultStats(
-        # strategies=[BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), HotRodStrategy()],
-        strategies=[AdaptivityPolynomialError()],
+        strategies=[
+            BaseStrategy(),
+            AdaptivityStrategy(),
+            IterateStrategy(),
+            HotRodStrategy(),
+            AdaptivityPolynomialError(),
+        ],
+        # strategies=[AdaptivityPolynomialError()],
         faults=[False, True],
-        recovery_thresh=1.5,
+        recovery_thresh=1.1,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
         **kwargs,
@@ -1711,6 +1717,7 @@ def main():
     )
 
     stats_analyser.plot_recovery_thresholds()
+    plt.show()
 
 
 if __name__ == "__main__":
