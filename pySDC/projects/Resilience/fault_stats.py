@@ -1624,22 +1624,27 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_Schroedinger,
+        'prob': run_vdp,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
         'reload': True,
         **parse_args(),
     }
+
+    strategy_args = {
+        'stop_at_nan': True,
+    }
+
     from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
     stats_analyser = FaultStats(
         strategies=[
-            BaseStrategy(),
-            AdaptivityStrategy(),
-            IterateStrategy(),
-            HotRodStrategy(),
-            AdaptivityPolynomialError(),
+            BaseStrategy(**strategy_args),
+            AdaptivityStrategy(**strategy_args),
+            IterateStrategy(**strategy_args),
+            HotRodStrategy(**strategy_args),
+            AdaptivityPolynomialError(**strategy_args),
         ],
         # strategies=[AdaptivityPolynomialError()],
         faults=[False, True],

@@ -31,12 +31,12 @@ class Strategy:
     Abstract class for resilience strategies
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='none', **kwargs):
+    def __init__(self, useMPI=False, skip_residual_computation='none', stop_at_nan=True, **kwargs):
         '''
         Initialization routine
         '''
         self.useMPI = useMPI
-        self.max_steps = 1e5
+        self.max_steps = 1e6
 
         # set default values for plotting
         self.linestyle = '-'
@@ -52,6 +52,8 @@ class Strategy:
             self.skip_residual_computation = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         else:
             self.skip_residual_computation = ()
+
+        self.stop_at_nan = stop_at_nan
 
         # setup custom descriptions
         self.custom_description = {}
@@ -211,11 +213,14 @@ class Strategy:
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
+        # custom_description['step_params'] = {}
+        # custom_description['level_params'] = {}
+        # custom_description['problem_params'] = {}
+
         if problem.__name__ == "run_vdp":
             custom_description['step_params'] = {'maxiter': 3}
             custom_description['problem_params'] = {
                 'u0': np.array([2, 0], dtype=np.float64),
-                # 'u0': np.array([0.99995, -0.00999985], dtype=np.float64),  # old stuff
                 'crash_at_maxiter': False,
                 'newton_tol': 1e-11,
             }
@@ -245,6 +250,11 @@ class Strategy:
         custom_description['convergence_controllers'] = {
             StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
         }
+
+        if self.stop_at_nan:
+            from pySDC.implementations.convergence_controller_classes.stop_at_nan import StopAtNan
+
+            custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
         return custom_description
 
     def get_custom_description(self, problem, num_procs=1):
@@ -632,11 +642,11 @@ class IterateStrategy(Strategy):
     Iterate for as much as you want
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='most'):
+    def __init__(self, skip_residual_computation='most', **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
         self.color = list(cmap.values())[2]
         self.marker = 'v'
         self.name = 'iterate'
@@ -727,11 +737,11 @@ class HotRodStrategy(Strategy):
     Hot Rod as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, skip_residual_computation='all', **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
         self.color = list(cmap.values())[3]
         self.marker = '^'
         self.name = 'Hot Rod'
