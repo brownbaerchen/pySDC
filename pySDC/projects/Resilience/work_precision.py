@@ -787,7 +787,7 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
         }
-    elif mode == 'parallel_efficiency':
+    elif mode == 'parallel_efficiency_old_trashfest':
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             BaseStrategy,
@@ -832,6 +832,56 @@ def get_configs(mode, problem):
             #     'num_procs': num_procs,
             #     'plotting_params': plotting_params,
             # }
+    elif mode == 'parallel_efficiency':
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityPolynomialError
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
+        desc['step_params'] = {'maxiter': 5}
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
+        }
+
+        for num_procs in [4, 1]:
+            plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(useMPI=True)],
+                'custom_description': desc,
+                'num_procs': num_procs,
+                'plotting_params': plotting_params,
+            }
+
+            configurations[num_procs * 100 + 79] = {
+                'custom_description': {'sweeper_class': parallel_sweeper},
+                'strategies': [
+                    AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)
+                ],
+                'num_procs_sweeper': 3,
+                'num_procs': num_procs,
+                'plotting_params': {'ls': '-', 'label': '{num_procs} x 3 procs'},
+            }
+            configurations[num_procs * 200 + 79] = {
+                'strategies': [
+                    AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)
+                ],
+                'custom_description': {
+                    'sweeper_params': {'QI': 'LU'},
+                },
+                'num_procs': num_procs,
+                'plotting_params': {'ls': '--', 'label': '{num_procs} x 1 procs'},
+            }
 
     elif mode[:13] == 'vdp_stiffness':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
@@ -1677,7 +1727,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1685,7 +1735,9 @@ if __name__ == "__main__":
         #'num_procs': 4,
     }
 
-    for mode in ['compare_adaptivity', 'compare_strategies']:
+    for mode in [
+        'parallel_efficiency',
+    ]:  # ['compare_adaptivity', 'compare_strategies']:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

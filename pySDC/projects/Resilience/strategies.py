@@ -223,12 +223,14 @@ class Strategy:
                 'u0': np.array([2, 0], dtype=np.float64),
                 'crash_at_maxiter': False,
                 'newton_tol': 1e-11,
+                'stop_at_nan': False,
             }
             custom_description['level_params'] = {'dt': 1e-2}
 
         elif problem.__name__ == "run_Lorenz":
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['level_params'] = {'dt': 1e-2}
+            custom_description['problem_params'] = {'stop_at_nan': False}
         elif problem.__name__ == "run_Schroedinger":
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
