@@ -257,9 +257,20 @@ class Strategy:
         }
 
         if self.stop_at_nan:
-            from pySDC.implementations.convergence_controller_classes.stop_at_nan import StopAtNan
+            from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
             custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
+
+        from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
+
+        max_runtime = {
+                'run_vdp': 40,
+                'run_Lorenz': 40,
+                'run_Schroedinger': 80,
+                'run_quench': 100,
+        }
+
+        custom_description['convergence_controllers'][StopAtMaxRuntime] = {'max_runtime': max_runtime.get(problem.__name__, 100)}
         return custom_description
 
     def get_custom_description(self, problem, num_procs=1):
