@@ -372,7 +372,7 @@ class WildRiot(Strategy):
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
         desc['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
-            'max_restarts': 20,
+            'max_restarts': 30,
             'crash_after_max_restarts': True,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), desc)
