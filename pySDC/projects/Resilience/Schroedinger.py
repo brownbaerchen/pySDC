@@ -9,6 +9,7 @@ from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import (
 from pySDC.projects.Resilience.hook import LogData, hook_collection
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient, generic_implicit_efficient
+from pySDC.core.Errors import ConvergenceError
 
 from pySDC.core.Hooks import hooks
 
@@ -183,7 +184,11 @@ def run_Schroedinger(
         prepare_controller_for_faults(controller, fault_stuff, rnd_args)
 
     # call main function to get things done...
-    uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
+    try:
+        uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
+    except ConvergenceError as e:
+        print(f'Warning: Premature termination: {e}')
+        stats = controller.return_stats()
 
     return stats, controller, Tend
 

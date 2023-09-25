@@ -264,13 +264,15 @@ class Strategy:
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
         max_runtime = {
-                'run_vdp': 40,
-                'run_Lorenz': 40,
-                'run_Schroedinger': 80,
-                'run_quench': 100,
+            'run_vdp': 40,
+            'run_Lorenz': 40,
+            'run_Schroedinger': 80,
+            'run_quench': 100,
         }
 
-        custom_description['convergence_controllers'][StopAtMaxRuntime] = {'max_runtime': max_runtime.get(problem.__name__, 100)}
+        custom_description['convergence_controllers'][StopAtMaxRuntime] = {
+            'max_runtime': max_runtime.get(problem.__name__, 100)
+        }
         return custom_description
 
     def get_custom_description(self, problem, num_procs=1):
@@ -372,7 +374,7 @@ class WildRiot(Strategy):
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
         desc['convergence_controllers'][BasicRestarting.get_implementation(useMPI=self.useMPI)] = {
-            'max_restarts': 30,
+            'max_restarts': 99,
             'crash_after_max_restarts': True,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), desc)

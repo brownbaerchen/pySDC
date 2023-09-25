@@ -1724,7 +1724,7 @@ if __name__ == "__main__":
         'problem': run_quench,
     }
     record = True
-    # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1732,7 +1732,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1741,9 +1741,9 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'parallel_efficiency',
-        'compare_adaptivity',
-        'compare_strategies',
+        #'parallel_efficiency',
+        #'compare_adaptivity',
+        #'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
