@@ -174,6 +174,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             'restart_at_maxiter': False,
             'restol_min': 1e-12,
             'restol_max': 1e-5,
+            'factor_if_not_converged': 2.0,
             'maxiter': description['sweeper_params'].get('maxiter', 99),
             **super().setup(controller, params, description, **kwargs),
         }
@@ -212,9 +213,9 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
         S.status.restart = True
         S.status.force_done = True
         for L in S.levels:
-            L.status.dt_new = L.params.dt / 2.0
+            L.status.dt_new = L.params.dt / self.params.factor_if_not_converged
             self.log(
-                f'Collocation problem not converged. Halving step size to {L.status.dt_new:.2e}',
+                f'Collocation problem not converged. Reducing step size to {L.status.dt_new:.2e}',
                 S,
             )
         # print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)

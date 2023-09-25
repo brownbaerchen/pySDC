@@ -1714,6 +1714,7 @@ class AdaptivityPolynomialError(WildRiot):
 
         dt_max = np.inf
         dt_min = 1e-5
+        max_slope = 2.0
 
         if problem.__name__ == "run_vdp":
             e_tol = 2e-5
@@ -1731,6 +1732,7 @@ class AdaptivityPolynomialError(WildRiot):
             e_tol = 1e-5
             dt_min = 1e-3
             # dt_max = 1e2
+            max_slope = 4.0
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
         else:
@@ -1751,11 +1753,12 @@ class AdaptivityPolynomialError(WildRiot):
                 # 'e_tol_rel': 1e-2,
                 # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
+                'factor_if_not_converged': max_slope,
             },
             StepSizeLimiter: {
                 #'dt_min': dt_min,
                 'dt_max': dt_max,
-                'dt_slope_max': 2,
+                'dt_slope_max': max_slope,
             },
         }
         # custom_description['sweeper_class'] = sweeper_class
