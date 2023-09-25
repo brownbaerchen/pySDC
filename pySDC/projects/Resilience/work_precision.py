@@ -1111,17 +1111,17 @@ def get_configs(mode, problem):
         # for strategy in strategies:
         #     strategy.restol = restol
 
-        # configurations[1] = {
-        #     'custom_description': {'sweeper_class': parallel_sweeper},
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'handle': 'parallel',
-        #     'num_procs_sweeper': 3,
-        #     'plotting_params': {'ls': '-', 'label': '3 procs'},
-        # }
+        configurations[1] = {
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'handle': 'parallel',
+            'num_procs_sweeper': 3,
+            'plotting_params': {'ls': '-', 'label': '3 procs'},
+        }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             'custom_description': {
-                'sweeper_params': {'QI': 'LU'},
+                #'sweeper_params': {'QI': 'LU'},
             },
             'plotting_params': {'ls': '--'},
         }
@@ -1722,7 +1722,7 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Lorenz,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
@@ -1733,7 +1733,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1742,9 +1742,9 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        #'parallel_efficiency',
-        #'compare_adaptivity',
-        #'compare_strategies',
+        'parallel_efficiency',
+        'compare_adaptivity',
+        'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

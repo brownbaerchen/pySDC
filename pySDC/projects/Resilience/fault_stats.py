@@ -1624,7 +1624,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_vdp,
+        'prob': run_Lorenz,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
@@ -1648,7 +1648,7 @@ def main():
         ],
         # strategies=[AdaptivityPolynomialError()],
         faults=[False, True],
-        recovery_thresh=1.1,
+        recovery_thresh=1.15,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
         **kwargs,
@@ -1721,7 +1721,7 @@ def main():
         'error', 'bit', True, op=stats_analyser.mean, mask=mask, args={'yscale': 'log'}
     )
 
-    stats_analyser.plot_recovery_thresholds()
+    stats_analyser.plot_recovery_thresholds(thresh_range=np.linspace(0.9, 1.3, 100))
     plt.show()
 
 
