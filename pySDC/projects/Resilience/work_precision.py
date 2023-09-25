@@ -855,8 +855,9 @@ def get_configs(mode, problem):
             1: '-',
             2: '--',
             3: '-.',
-            4: ':',
+            4: '--',
             5: ':',
+            12: ':',
         }
 
         for num_procs in [4, 1]:
@@ -875,7 +876,7 @@ def get_configs(mode, problem):
                 ],
                 'num_procs_sweeper': 3,
                 'num_procs': num_procs,
-                'plotting_params': {'ls': '-', 'label': '{num_procs} x 3 procs'},
+                'plotting_params': {'ls': ls.get(num_procs * 3, '-'), 'label': f'{num_procs} x 3 procs'},
             }
             configurations[num_procs * 200 + 79] = {
                 'strategies': [
@@ -885,7 +886,7 @@ def get_configs(mode, problem):
                     'sweeper_params': {'QI': 'LU'},
                 },
                 'num_procs': num_procs,
-                'plotting_params': {'ls': '--', 'label': '{num_procs} x 1 procs'},
+                'plotting_params': {'ls': ls.get(num_procs, '-'), 'label': f'{num_procs} x 1 procs'},
             }
 
     elif mode[:13] == 'vdp_stiffness':

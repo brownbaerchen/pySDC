@@ -17,6 +17,7 @@ from pySDC.projects.Resilience.strategies import (
     HotRodStrategy,
     DIRKStrategy,
     ERKStrategy,
+    AdaptivityPolynomialError,
 )
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 from pySDC.helpers.stats_helper import get_sorted
@@ -43,7 +44,7 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1, strategy_type='SDC'
     if strategy_type == 'SDC':
         strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
         if JOURNAL not in ['JSC_beamer']:
-            strategies += [HotRodStrategy()]
+            strategies += [HotRodStrategy(), AdaptivityPolynomialError()]
     elif strategy_type == 'RK':
         strategies = [DIRKStrategy()]
         if problem.__name__ in ['run_Lorenz', 'run_vdp']:
@@ -542,7 +543,7 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
