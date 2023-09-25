@@ -253,7 +253,7 @@ class Strategy:
             custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
 
         custom_description['convergence_controllers'] = {
-            StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
+            # StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
         }
 
         if self.stop_at_nan:
@@ -1715,6 +1715,7 @@ class AdaptivityPolynomialError(WildRiot):
         dt_max = np.inf
         dt_min = 1e-5
         max_slope = 2.0
+        level_params = {}
 
         if problem.__name__ == "run_vdp":
             e_tol = 2e-5
@@ -1732,6 +1733,7 @@ class AdaptivityPolynomialError(WildRiot):
             e_tol = 1e-5
             dt_min = 1e-3
             # dt_max = 1e2
+            level_params['dt'] = 1.0
             max_slope = 4.0
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4

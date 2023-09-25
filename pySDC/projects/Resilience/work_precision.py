@@ -1111,13 +1111,13 @@ def get_configs(mode, problem):
         # for strategy in strategies:
         #     strategy.restol = restol
 
-        configurations[1] = {
-            'custom_description': {'sweeper_class': parallel_sweeper},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'handle': 'parallel',
-            'num_procs_sweeper': 3,
-            'plotting_params': {'ls': '-', 'label': '3 procs'},
-        }
+        # configurations[1] = {
+        #     'custom_description': {'sweeper_class': parallel_sweeper},
+        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+        #     'handle': 'parallel',
+        #     'num_procs_sweeper': 3,
+        #     'plotting_params': {'ls': '-', 'label': '3 procs'},
+        # }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
             'custom_description': {
