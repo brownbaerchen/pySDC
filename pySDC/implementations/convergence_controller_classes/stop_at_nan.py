@@ -58,7 +58,8 @@ class StopAtNan(ConvergenceController):
             for u in lvl.u:
                 if u is None:
                     break
-                isfinite = all(np.isfinite(u))
+                isfinite = all(np.isfinite(u.flatten()))
+
                 below_limit = abs(u) < self.params.thresh
 
                 crash = not (isfinite and below_limit)
