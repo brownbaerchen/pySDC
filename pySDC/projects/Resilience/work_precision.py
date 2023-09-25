@@ -1714,14 +1714,14 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_strategies',
+        'mode': 'compare_adaptivity',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
     record = True
     # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
@@ -1732,7 +1732,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1742,7 +1742,9 @@ if __name__ == "__main__":
 
     for mode in [
         'parallel_efficiency',
-    ]:  # ['compare_adaptivity', 'compare_strategies']:
+        'compare_adaptivity',
+        'compare_strategies',
+    ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 

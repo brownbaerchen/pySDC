@@ -142,6 +142,7 @@ class StepSizeSlopeLimiter(ConvergenceController):
 {dt_new:.2e}",
                         S,
                     )
+                    print(f"Step size slope exceeds maximum, decreasing from {L.status.dt_new:.2e} to {dt_new:.2e}")
                     L.status.dt_new = dt_new
 
         return None

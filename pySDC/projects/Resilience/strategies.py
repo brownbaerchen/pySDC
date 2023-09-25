@@ -1742,6 +1742,7 @@ class AdaptivityPolynomialError(WildRiot):
             StepSizeLimiter: {
                 #'dt_min': dt_min,
                 'dt_max': dt_max,
+                'dt_slope_max': 9,
             },
         }
         # custom_description['sweeper_class'] = sweeper_class

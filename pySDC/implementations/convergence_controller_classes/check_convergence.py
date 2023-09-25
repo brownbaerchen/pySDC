@@ -129,7 +129,7 @@ class CheckConvergence(ConvergenceController):
             for hook in controller.hooks:
                 hook.pre_comm(step=S, level_number=0)
             S.status.done = comm.allreduce(sendobj=S.status.done, op=LAND)
-            S.status.force_done = comm.allreduce(sendobj=S.status.done, op=LOR)
+            S.status.force_done = comm.allreduce(sendobj=S.status.force_done, op=LOR)
             for hook in controller.hooks:
                 hook.post_comm(step=S, level_number=0, add_to_stats=True)
 
