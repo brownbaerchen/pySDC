@@ -66,7 +66,7 @@ class StopAtNan(CrashBase):
 
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
-    def post_iteration_processing(self, controller, S, **kwargs):
+    def prepare_next_block(self, controller, S, *args, **kwargs):
         """
         Check if we need to crash the code.
 
@@ -124,7 +124,7 @@ class StopAtMaxRuntime(CrashBase):
 
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
-    def post_iteration_processing(self, controller, S, **kwargs):
+    def prepare_next_block(self, controller, S, *args, **kwargs):
         """
         Check if we need to crash the code.
 
