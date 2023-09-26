@@ -1325,7 +1325,7 @@ class ERKStrategy(DIRKStrategy):
         Initialization routine
         '''
         super().__init__(useMPI=useMPI, **kwargs)
-        self.color = list(cmap.values())[9]
+        self.color = list(cmap.values())[8]
         self.marker = 'x'
         self.name = 'ERK'
         self.bar_plot_x_label = 'ERK5(4)'
