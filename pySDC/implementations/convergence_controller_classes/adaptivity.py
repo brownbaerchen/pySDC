@@ -175,6 +175,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             'restol_min': 1e-12,
             'restol_max': 1e-5,
             'factor_if_not_converged': 2.0,
+            'residual_max_tol': 1e9,
             'maxiter': description['sweeper_params'].get('maxiter', 99),
             **super().setup(controller, params, description, **kwargs),
         }
@@ -202,6 +203,8 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             elif self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
                 S.status.restart = True
         elif S.status.time_size == 1 and self.res_last_iter < S.levels[0].status.residual and S.status.iter > 0:
+            self.trigger_restart_upon_nonconvergence(S)
+        elif S.levels[0].status.residual > self.params.residual_max_tol:
             self.trigger_restart_upon_nonconvergence(S)
 
         if self.params.useMPI:
