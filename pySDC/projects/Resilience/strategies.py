@@ -216,9 +216,9 @@ class Strategy:
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
-        # custom_description['step_params'] = {}
-        # custom_description['level_params'] = {}
-        # custom_description['problem_params'] = {}
+        custom_description['step_params'] = {}
+        custom_description['level_params'] = {}
+        custom_description['problem_params'] = {}
 
         if problem.__name__ == "run_vdp":
             custom_description['step_params'] = {'maxiter': 3}
@@ -237,6 +237,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['level_params'] = {'dt': 1e-2, 'restol': -1}
+            custom_description['problem_params']['nvars'] = (256, 256)
         elif problem.__name__ == "run_quench":
             custom_description['level_params'] = {'restol': -1, 'dt': 8.0}
             custom_description['step_params'] = {'maxiter': 5}
@@ -259,7 +260,7 @@ class Strategy:
         if self.stop_at_nan:
             from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
-            custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
+            # custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
 
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
@@ -1684,7 +1685,7 @@ class AdaptivityPolynomialError(WildRiot):
         self.restol = None
         super().__init__(**kwargs)
         self.color = list(cmap.values())[9]
-        self.marker = '*'
+        self.marker = '+'
         self.name = 'adaptivity-inter'
         self.bar_plot_x_label = 'adaptivity Q'
         self.precision_parameter = 'e_tol'
@@ -1786,3 +1787,7 @@ class AdaptivityPolynomialError(WildRiot):
                 return 4.375184403937471e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
+    @property
+    def label(self):
+        return r'$\Delta t~\mathrm{adaptivity}-Q$'

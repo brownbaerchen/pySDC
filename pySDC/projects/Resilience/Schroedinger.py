@@ -116,6 +116,7 @@ def run_Schroedinger(
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'IE'
+    sweeper_params['QE'] = 'PIC'
     sweeper_params['initial_guess'] = 'spread'
 
     # initialize problem parameters

@@ -4,6 +4,12 @@ from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 
 
 class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
+    def __init__(self, params):
+        super().__init__(params)
+        assert (
+            self.params.QE == 'PIC'
+        ), f"Only Picard is implemented for explicit precondioner so far in {type(self).__name__}! You chose \"{self.params.QE}\""
+
     def integrate(self):
         """
         Integrates the right-hand side (here impl + expl)
@@ -49,10 +55,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         # get QF(u^k)
         rhs = self.integrate()
 
-        rhs -= L.dt * (
-            self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1].impl
-            + self.QE[self.rank + 1, self.rank + 1] * L.f[self.rank + 1].expl
-        )
+        rhs -= L.dt * (self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1].impl)
 
         # add initial value
         rhs += L.u[0]

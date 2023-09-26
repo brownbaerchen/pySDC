@@ -126,6 +126,7 @@ def single_run(
     }
     problem_args = {} if problem_args is None else problem_args
 
+    # print(custom_description, flush=True)
     stats, controller, _ = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
@@ -1120,24 +1121,11 @@ def get_configs(mode, problem):
         }
         configurations[2] = {
             'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            'custom_description': {
-                #'sweeper_params': {'QI': 'LU'},
-            },
+            # 'custom_description': {
+            #     #'sweeper_params': {'QI': 'LU'},
+            # },
             'plotting_params': {'ls': '--'},
         }
-        # configurations[3] = {
-        #    'custom_description': {'sweeper_class': parallel_sweeper},
-        #    'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #    'handle': 'parallel',
-        #    'num_procs_sweeper': 3,
-        #    'num_procs': 4,
-        #    'plotting_params': {'ls': ':', 'label': '12 procs'},
-        # }
-
-        # configurations[4] = {
-        #     'custom_description': {'step_params': {'maxiter': 5}},
-        #     'strategies': [AdaptivityStrategy(useMPI=True)],
-        # }
         if True:
             configurations[4] = {
                 'custom_description': {'step_params': {'maxiter': 5}},
@@ -1715,17 +1703,17 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_adaptivity',
+        'mode': 'parallel_efficiency',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Lorenz,
+        'problem': run_vdp,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1733,7 +1721,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1743,8 +1731,8 @@ if __name__ == "__main__":
 
     for mode in [
         'parallel_efficiency',
-        'compare_adaptivity',
-        'compare_strategies',
+        # 'compare_adaptivity',
+        # 'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
