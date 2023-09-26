@@ -869,7 +869,6 @@ def get_configs(mode, problem):
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
-            continue
             configurations[num_procs * 100 + 79] = {
                 'custom_description': {'sweeper_class': parallel_sweeper},
                 'strategies': [
@@ -1723,7 +1722,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
@@ -1732,7 +1731,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
@@ -1744,7 +1743,7 @@ if __name__ == "__main__":
         # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
-        'RK_comp',
+        # 'RK_comp',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

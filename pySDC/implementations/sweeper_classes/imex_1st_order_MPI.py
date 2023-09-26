@@ -10,9 +10,12 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
             self.params.QE == 'PIC'
         ), f"Only Picard is implemented for explicit precondioner so far in {type(self).__name__}! You chose \"{self.params.QE}\""
 
-    def integrate(self):
+    def integrate(self, last_only=False):
         """
         Integrates the right-hand side (here impl + expl)
+
+        Args:
+            last_only (bool): Integrate only the last node for the residual or all of them
 
         Returns:
             list of dtype_u: containing the integral as values
@@ -22,7 +25,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         P = L.prob
 
         me = P.dtype_u(P.init, val=0.0)
-        for m in range(self.coll.num_nodes):
+        for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
             recvBuf = me if m == self.rank else None
             self.comm.Reduce(
                 L.dt * self.coll.Qmat[m + 1, self.rank + 1] * (L.f[self.rank + 1].impl + L.f[self.rank + 1].expl),

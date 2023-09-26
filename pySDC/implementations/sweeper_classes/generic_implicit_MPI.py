@@ -91,7 +91,7 @@ class SweeperMPI(sweeper):
         # compute the residual for each node
 
         # build QF(u)
-        res = self.integrate()
+        res = self.integrate(last_only=L.params.residual_type[:4] == 'last')
         res += L.u[0] - L.u[self.rank + 1]
         # add tau if associated
         if L.tau[self.rank] is not None:
@@ -151,19 +151,21 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
         rank (int): MPI rank
     """
 
-    def integrate(self):
+    def integrate(self, last_only=False):
         """
         Integrates the right-hand side
+
+        Args:
+            last_only (bool): Integrate only the last node for the residual or all of them
 
         Returns:
             list of dtype_u: containing the integral as values
         """
-
         L = self.level
         P = L.prob
 
         me = P.dtype_u(P.init, val=0.0)
-        for m in range(self.coll.num_nodes):
+        for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
             recvBuf = me if m == self.rank else None
             self.comm.Reduce(
                 L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
