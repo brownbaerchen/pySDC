@@ -1728,9 +1728,10 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
+        'RK_comp',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
