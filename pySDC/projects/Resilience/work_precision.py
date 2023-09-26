@@ -1226,17 +1226,25 @@ def get_configs(mode, problem):
     elif mode == 'RK_comp':
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
-            BaseStrategy,
-            IterateStrategy,
             ERKStrategy,
-            DIRKStrategy,
             ESDIRKStrategy,
             ARKStrategy,
+            AdaptivityPolynomialError,
         )
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
         desc['step_params'] = {'maxiter': 5}
+
+        desc_poly = {}
+        desc_poly['sweeper_class'] = parallel_sweeper
 
         descIterate = {}
         descIterate['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
@@ -1253,6 +1261,12 @@ def get_configs(mode, problem):
         if problem.__name__ in ['run_Schroedinger']:
             desc_RK['problem_params'] = {'imex': True}
 
+        configurations[3] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+        }
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
@@ -1262,13 +1276,11 @@ def get_configs(mode, problem):
             'custom_description': desc_RK,
         }
 
-        for num_procs, label in zip([4, 1], ['GSSDC 4 procs', 'SDC']):
-            configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(useMPI=True)],
-                'custom_description': desc,
-                'num_procs': num_procs,
-                'plotting_params': {'ls': ls[num_procs], 'label': label},
-            }
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 4,
+        }
     elif mode == 'imex':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy, ARKStrategy
 
@@ -1719,7 +1731,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
