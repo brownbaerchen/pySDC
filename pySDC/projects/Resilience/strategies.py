@@ -590,13 +590,13 @@ class AdaptiveHotRodStrategy(Strategy):
     Adaptivity + Hot Rod as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, skip_residual_computation='all', **kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
@@ -668,11 +668,11 @@ class IterateStrategy(Strategy):
     Iterate for as much as you want
     '''
 
-    def __init__(self, skip_residual_computation='most', **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
+        super().__init__(skip_residual_computation='most', **kwargs)
         self.color = list(cmap.values())[2]
         self.marker = 'v'
         self.name = 'iterate'
@@ -763,11 +763,11 @@ class HotRodStrategy(Strategy):
     Hot Rod as a resilience strategy
     '''
 
-    def __init__(self, skip_residual_computation='all', **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
+        super().__init__(skip_residual_computation='all', **kwargs)
         self.color = list(cmap.values())[3]
         self.marker = '^'
         self.name = 'Hot Rod'
@@ -1058,13 +1058,13 @@ class DIRKStrategy(AdaptivityStrategy):
     DIRK4(3)
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'DIRK'
@@ -1158,13 +1158,13 @@ class ARKStrategy(AdaptivityStrategy):
     ARK5(4)
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[7]
         self.marker = 'P'
         self.name = 'ARK'
@@ -1220,13 +1220,13 @@ class ESDIRKStrategy(AdaptivityStrategy):
     ESDIRK5(3)
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = 'violet'
         self.marker = '^'
         self.name = 'ESDIRK'
@@ -1320,11 +1320,11 @@ class ERKStrategy(DIRKStrategy):
     Explicit embedded RK using Cash-Karp's method
     """
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, **kwargs)
         self.color = list(cmap.values())[9]
         self.marker = 'x'
         self.name = 'ERK'
@@ -1384,13 +1384,13 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
     Adaptivity based both on embedded estimate and on residual
     '''
 
-    def __init__(self, useMPI=False, skip_residual_computation='all'):
+    def __init__(self, useMPI=False, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(useMPI=useMPI, skip_residual_computation=skip_residual_computation)
+        super().__init__(useMPI=useMPI, skip_residual_computation='all', **kwargs)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'double_adaptivity'

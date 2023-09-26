@@ -879,16 +879,14 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
             }
 
-            configurations[num_procs * 200 + 79] = {
-                'strategies': [
-                    AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)
-                ],
-                'custom_description': {
-                    'sweeper_params': {'QI': 'LU'},
-                },
-                'num_procs': num_procs,
-                'plotting_params': {'ls': ls.get(num_procs, '-'), 'label': f'{num_procs} x 1 procs'},
-            }
+        configurations[num_procs * 200 + 79] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)],
+            'custom_description': {
+                #'sweeper_params': {'QI': 'LU'},
+            },
+            'num_procs': 1,
+            #'plotting_params': {'ls': ls.get(1, '-'), 'label': f'{num_procs} x 1 procs'},
+        }
 
     elif mode[:13] == 'vdp_stiffness':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
@@ -1266,7 +1264,7 @@ def get_configs(mode, problem):
 
         for num_procs, label in zip([4, 1], ['GSSDC 4 procs', 'SDC']):
             configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True)],
+                'strategies': [AdaptivityStrategy(useMPI=True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': {'ls': ls[num_procs], 'label': label},
@@ -1710,9 +1708,9 @@ if __name__ == "__main__":
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
