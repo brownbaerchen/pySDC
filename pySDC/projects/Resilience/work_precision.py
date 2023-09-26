@@ -818,14 +818,14 @@ def get_configs(mode, problem):
         for num_procs in [4, 2, 1]:
             plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
             configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True)],
+                'strategies': [AdaptivityStrategy(useMPI=True)],
                 'custom_description': desc,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
             }
             plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
             configurations[num_procs + 100] = {
-                'strategies': [IterateStrategy(True)],
+                'strategies': [IterateStrategy(useMPI=True)],
                 'custom_description': descIterate,
                 'num_procs': num_procs,
                 'plotting_params': plotting_params,
@@ -1703,7 +1703,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'parallel_efficiency',
+        'mode': 'parallel_efficiency_old_trashfest',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1721,7 +1721,7 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
+        'record': False,
         'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',

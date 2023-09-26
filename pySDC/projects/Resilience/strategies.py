@@ -50,8 +50,12 @@ class Strategy:
             self.skip_residual_computation = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         elif skip_residual_computation == 'most':
             self.skip_residual_computation = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
-        else:
+        elif skip_residual_computation == 'none':
             self.skip_residual_computation = ()
+        else:
+            raise NotImplementedError(
+                f'Don\'t know when to skip residual computation with rule \"{skip_residual_computation}\"'
+            )
 
         self.stop_at_nan = stop_at_nan
 
@@ -88,7 +92,7 @@ class Strategy:
         return self.name
 
     def get_controller_params(self, **kwargs):
-        return {}
+        return {'all_to_done': False}
 
     def get_fixable_params(self, **kwargs):
         """
@@ -267,7 +271,7 @@ class Strategy:
         max_runtime = {
             'run_vdp': 40,
             'run_Lorenz': 40,
-            'run_Schroedinger': 80,
+            'run_Schroedinger': 110,
             'run_quench': 100,
         }
 
@@ -429,13 +433,13 @@ class AdaptivityStrategy(Strategy):
     Adaptivity as a resilience strategy
     '''
 
-    def __init__(self, skip_residual_computation='all', **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(skip_residual_computation=skip_residual_computation, **kwargs)
+        super().__init__(skip_residual_computation='all', **kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
