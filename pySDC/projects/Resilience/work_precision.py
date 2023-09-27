@@ -265,6 +265,7 @@ def record_work_precision(
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
         exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
+        exponents = [-1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -1263,7 +1264,6 @@ def get_configs(mode, problem):
 
         configurations[3] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'custom_description': desc,
             'num_procs': 1,
             'num_procs_sweeper': 3,
         }
@@ -1713,7 +1713,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'parallel_efficiency',
+        'mode': 'RK_comp',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1722,8 +1722,8 @@ if __name__ == "__main__":
         **params,
         'problem': run_Schroedinger,
     }
-    record = False
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    record = True
+    # single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1732,7 +1732,7 @@ if __name__ == "__main__":
 
     all_params = {
         'record': False,
-        'runs': 1,
+        'runs': 10,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
@@ -1740,10 +1740,10 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        # 'parallel_efficiency',
+        'RK_comp',
+        'parallel_efficiency',
         # 'compare_adaptivity',
-        # 'compare_strategies',
-        # 'RK_comp',
+        'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

@@ -290,11 +290,13 @@ def plot_adaptivity_stuff():  # pragma: no cover
         ax.set_ylabel('local error')
         iter_ax.set_ylabel(r'Newton iterations')
 
-    force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}}
+    force_params = {}  # {'convergence_controllers': {EstimateEmbeddedError: {}}}
     # force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
-    for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy]:
+    for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy, AdaptivityPolynomialError]:
         stats, _, _ = stats_analyser.single_run(
-            strategy=strategy(), force_params=force_params, hook_class=[LogLocalErrorPostStep, LogData, LogWork]
+            strategy=strategy(useMPI=False),
+            force_params=force_params,
+            hook_class=[LogLocalErrorPostStep, LogData, LogWork],
         )
         plot_error(stats, axs[1], axs[2], strategy())
 
@@ -543,13 +545,13 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
+    plot_adaptivity_stuff()
     work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
-    # plot_adaptivity_stuff()
 
     # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
     for i in [1]:

@@ -1723,7 +1723,7 @@ class AdaptivityPolynomialError(WildRiot):
         level_params = {}
 
         if problem.__name__ == "run_vdp":
-            e_tol = 2e-5
+            e_tol = 2e-4
             dt_min = 1e-3
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
@@ -1794,4 +1794,4 @@ class AdaptivityPolynomialError(WildRiot):
 
     @property
     def label(self):
-        return r'$\Delta t~\mathrm{adaptivity}-Q$'
+        return r'$\Delta tk~\mathrm{adaptivity}$'
