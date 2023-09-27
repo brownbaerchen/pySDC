@@ -29,7 +29,7 @@ plot_helper.setup_mpl(reset=True)
 LOGGER_LEVEL = 40
 
 RECOVERY_THRESH_ABS = {
-    run_quench: 5e-3,
+    # run_quench: 5e-3,
     # run_Schroedinger: 1.7e-6,
 }
 
@@ -1624,7 +1624,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_vdp,
+        'prob': run_quench,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
@@ -1656,15 +1656,15 @@ def main():
     # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=True, run=16)
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
-    ##################
-    S = AdaptivityPolynomialError()
-    stats_analyser.scrutinize(S, run=1161, faults=False, logger_level=15)
+    # ##################
+    # S = AdaptivityPolynomialError()
+    # stats_analyser.scrutinize(S, run=1161, faults=False, logger_level=15)
 
-    recoverable = stats_analyser.get_fixable_faults_only(S)
-    mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
-    stats_analyser.print_faults(mask, strategy=S)
-    return None
-    ##################
+    # recoverable = stats_analyser.get_fixable_faults_only(S)
+    # mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
+    # stats_analyser.print_faults(mask, strategy=S)
+    # return None
+    # ##################
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None

@@ -488,24 +488,18 @@ class AdaptivityStrategy(Strategy):
         custom_description['convergence_controllers'] = {}
 
         dt_max = np.inf
-        dt_min = 1e-5
         dt_slope_max = np.inf
 
         if problem.__name__ == "run_piline":
             e_tol = 1e-7
-            dt_min = 1e-2
         elif problem.__name__ == "run_vdp":
             e_tol = 2e-5
-            dt_min = 1e-5
         elif problem.__name__ == "run_Lorenz":
             e_tol = 2e-5
-            dt_min = 1e-3
         elif problem.__name__ == "run_Schroedinger":
             e_tol = 4e-6
-            dt_min = 1e-3
         elif problem.__name__ == "run_quench":
             e_tol = 1e-5
-            dt_min = 1e-3
             dt_max = 100.0
             # dt_slope_max = 4.
 
@@ -527,7 +521,6 @@ class AdaptivityStrategy(Strategy):
             'dt_slope_max': dt_slope_max,
         }
         custom_description['convergence_controllers'][StepSizeLimiter] = {
-            # 'dt_min': dt_min,
             'dt_max': dt_max,
         }
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
@@ -1695,7 +1688,7 @@ class AdaptivityPolynomialError(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
-        self.precision_range_fac = 1e1
+        # self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1718,27 +1711,20 @@ class AdaptivityPolynomialError(WildRiot):
         # }
 
         dt_max = np.inf
-        dt_min = 1e-5
         max_slope = 4.0
         level_params = {}
 
         if problem.__name__ == "run_vdp":
             e_tol = 6e-4
-            dt_min = 1e-3
             level_params['dt'] = 0.1
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
-            dt_min = 1e-2
         elif problem.__name__ == "run_Lorenz":
-            e_tol = 2e-5
-            dt_min = 1e-3
+            e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
-            e_tol = 4e-6
-            dt_min = 1e-3
+            e_tol = 3e-4
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-5
-            dt_min = 1e-3
-            # dt_max = 1e2
+            e_tol = 1e-4
             level_params['dt'] = 1.0
             max_slope = 4.0
         elif problem.__name__ == "run_AC":
@@ -1764,7 +1750,6 @@ class AdaptivityPolynomialError(WildRiot):
                 'factor_if_not_converged': max_slope,
             },
             StepSizeLimiter: {
-                #'dt_min': dt_min,
                 'dt_max': dt_max,
                 'dt_slope_max': max_slope,
             },
