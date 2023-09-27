@@ -76,12 +76,12 @@ class Strategy:
                 'val': 0,
             }
         ]
-        # self.fixable += [
-        #     {
-        #         'key': 'error',
-        #         'op': 'isfinite',
-        #     }
-        # ]
+        self.fixable += [
+            {
+                'key': 'error',
+                'op': 'isfinite',
+            }
+        ]
 
         # stuff for work-precision diagrams
         self.precision_parameter = None
@@ -1194,7 +1194,7 @@ class ARKStrategy(AdaptivityStrategy):
 
         adaptivity_description = super().get_custom_description(problem, num_procs)
 
-        e_tol = adaptivity_description['convergence_controllers'][Adaptivity]['e_tol']
+        e_tol = adaptivity_description['convergence_controllers'][Adaptivity]['e_tol'] / 20.0
         adaptivity_description['convergence_controllers'].pop(Adaptivity, None)
         adaptivity_description.pop('sweeper_params', None)
 
@@ -1719,12 +1719,13 @@ class AdaptivityPolynomialError(WildRiot):
 
         dt_max = np.inf
         dt_min = 1e-5
-        max_slope = 2.0
+        max_slope = 4.0
         level_params = {}
 
         if problem.__name__ == "run_vdp":
-            e_tol = 2e-4
+            e_tol = 6e-4
             dt_min = 1e-3
+            level_params['dt'] = 0.1
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
             dt_min = 1e-2

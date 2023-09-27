@@ -165,6 +165,11 @@ class EstimatePolynomialError(ConvergenceController):
             else:
                 L.status.error_embedded_estimate = abs(u_inter - high_order_sol)
 
+            self.debug(
+                f'Obtained error estimate: {L.status.error_embedded_estimate:.2e} of order {L.status.order_embedded_estimate}',
+                S,
+            )
+
     def check_parameters(self, controller, params, description, **kwargs):
         """
         Check if we allow the scheme to solve the collocation problems to convergence.

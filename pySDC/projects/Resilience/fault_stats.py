@@ -515,7 +515,7 @@ class FaultStats:
 
         u_all = get_sorted(stats, type='u', recomputed=False)
         t, u = get_sorted(stats, type='u', recomputed=False)[np.argmax([me[0] for me in u_all])]
-        k = get_sorted(stats, type='k')
+        k = [me[1] for me in get_sorted(stats, type='k')]
 
         fault_hook = [me for me in controller.hooks if type(me) == FaultInjector]
 
@@ -1640,10 +1640,10 @@ def main():
 
     stats_analyser = FaultStats(
         strategies=[
-            # BaseStrategy(**strategy_args),
-            # AdaptivityStrategy(**strategy_args),
-            # IterateStrategy(**strategy_args),
-            # HotRodStrategy(**strategy_args),
+            BaseStrategy(**strategy_args),
+            AdaptivityStrategy(**strategy_args),
+            IterateStrategy(**strategy_args),
+            HotRodStrategy(**strategy_args),
             AdaptivityPolynomialError(**strategy_args),
         ],
         # strategies=[AdaptivityPolynomialError()],
@@ -1655,6 +1655,16 @@ def main():
     )
     # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=True, run=16)
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
+
+    ##################
+    S = AdaptivityPolynomialError()
+    stats_analyser.scrutinize(S, run=1161, faults=False, logger_level=15)
+
+    recoverable = stats_analyser.get_fixable_faults_only(S)
+    mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
+    stats_analyser.print_faults(mask, strategy=S)
+    return None
+    ##################
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None
