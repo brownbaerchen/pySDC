@@ -143,6 +143,7 @@ def single_run(
 
     # record all the metrics
     stats_all = filter_stats(stats, comm=comm_sweep)
+    comm_sweep.Free()
     from pySDC.helpers.stats_helper import get_list_of_types
 
     # print(len(stats), len(stats_all), comm_sweep.size, comm_sweep.rank, flush=True)
@@ -161,6 +162,7 @@ def single_run(
     logger.debug(f'Recorded all data after {t_now - t_last:.2e} s')
     t_last = perf_counter()
 
+    comm_time.Free()
     comm.Free()
     return stats
 
@@ -265,7 +267,6 @@ def record_work_precision(
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
         exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
-        exponents = [-1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -1729,8 +1730,8 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
-        'runs': 10,
+        'record': True,
+        'runs': 5,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
