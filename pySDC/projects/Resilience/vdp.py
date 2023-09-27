@@ -184,7 +184,7 @@ def run_vdp(
     # call main function to get things done...
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
-    except (ProblemError, ConvergenceError) as e:
+    except (ProblemError, ConvergenceError, ZeroDivisionError) as e:
         print(f'Warning: Premature termination: {e}')
         stats = controller.return_stats()
 

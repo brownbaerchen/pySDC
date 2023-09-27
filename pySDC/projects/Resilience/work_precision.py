@@ -1247,9 +1247,6 @@ def get_configs(mode, problem):
         desc_poly = {}
         desc_poly['sweeper_class'] = parallel_sweeper
 
-        descIterate = {}
-        descIterate['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
-
         ls = {
             1: '-',
             2: '--',
@@ -1263,6 +1260,7 @@ def get_configs(mode, problem):
             desc_RK['problem_params'] = {'imex': True}
 
         configurations[3] = {
+            'custom_description': desc_poly,
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
             'num_procs': 1,
             'num_procs_sweeper': 3,

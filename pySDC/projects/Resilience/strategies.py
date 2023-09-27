@@ -76,12 +76,12 @@ class Strategy:
                 'val': 0,
             }
         ]
-        self.fixable += [
-            {
-                'key': 'error',
-                'op': 'isfinite',
-            }
-        ]
+        # self.fixable += [
+        #     {
+        #         'key': 'error',
+        #         'op': 'isfinite',
+        #     }
+        # ]
 
         # stuff for work-precision diagrams
         self.precision_parameter = None
@@ -269,10 +269,10 @@ class Strategy:
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
         max_runtime = {
-            'run_vdp': 40,
-            'run_Lorenz': 40,
-            'run_Schroedinger': 110,
-            'run_quench': 100,
+            'run_vdp': 60,
+            'run_Lorenz': 60,
+            'run_Schroedinger': 150,
+            'run_quench': 150,
         }
 
         custom_description['convergence_controllers'][StopAtMaxRuntime] = {
