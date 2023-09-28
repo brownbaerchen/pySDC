@@ -255,28 +255,30 @@ class FaultStats:
                 continue
 
             # perform a single experiment with the correct random seed
-            stats, controller, Tend = self.single_run(strategy=strategy, run=i, faults=faults, space_comm=space_comm)
+            stats, controller, crash = self.single_run(strategy=strategy, run=i, faults=faults, space_comm=space_comm)
 
             # get the data from the stats
             faults_run = get_sorted(stats, type='bitflip')
-            t, u = get_sorted(stats, type='u', recomputed=False)[-1]
 
-            error = self.get_error(u, t, controller, strategy, Tend)
+            if faults:
+                dat['level'][i] = faults_run[0][1][0]
+                dat['iteration'][i] = faults_run[0][1][1]
+                dat['node'][i] = faults_run[0][1][2]
+                dat['problem_pos'] += [faults_run[0][1][3]]
+                dat['bit'][i] = faults_run[0][1][4]
+                dat['target'][i] = faults_run[0][1][5]
+                dat['rank'][i] = faults_run[0][1][6]
+            else:
+                assert self.mode == 'regular', f'No faults where recorded in run {i} of strategy {strategy.name}!'
+            if crash:
+                continue
+
+            # record the rest of the data
+            t, u = get_sorted(stats, type='u', recomputed=False)[-1]
+            error = self.get_error(u, t, controller, strategy, self.get_Tend())
             total_iteration = sum([k[1] for k in get_sorted(stats, type='k')])
             total_newton_iteration = sum([k[1] for k in get_sorted(stats, type='work_newton')])
 
-            # record the new data point
-            if faults:
-                if len(faults_run) > 0:
-                    dat['level'][i] = faults_run[0][1][0]
-                    dat['iteration'][i] = faults_run[0][1][1]
-                    dat['node'][i] = faults_run[0][1][2]
-                    dat['problem_pos'] += [faults_run[0][1][3]]
-                    dat['bit'][i] = faults_run[0][1][4]
-                    dat['target'][i] = faults_run[0][1][5]
-                    dat['rank'][i] = faults_run[0][1][6]
-                else:
-                    assert self.mode == 'regular', f'No faults where recorded in run {i} of strategy {strategy.name}!'
             dat['error'][i] = error
             dat['total_iteration'][i] = total_iteration
             dat['total_newton_iteration'][i] = total_newton_iteration
@@ -1624,11 +1626,11 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_Schroedinger,
+        'prob': run_vdp,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': False,
+        'reload': True,
         **parse_args(),
     }
 

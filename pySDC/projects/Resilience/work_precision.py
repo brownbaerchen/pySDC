@@ -126,8 +126,7 @@ def single_run(
     }
     problem_args = {} if problem_args is None else problem_args
 
-    # print(custom_description, flush=True)
-    stats, controller, _ = problem(
+    stats, controller, crash = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
         hook_class=[LogData, LogWork, LogGlobalErrorPostRun] + hooks,
@@ -146,12 +145,10 @@ def single_run(
     comm_sweep.Free()
     from pySDC.helpers.stats_helper import get_list_of_types
 
-    # print(len(stats), len(stats_all), comm_sweep.size, comm_sweep.rank, flush=True)
-    # print(filter_stats(stats, mudda='deine'))
     for key, mapping in MAPPINGS.items():
-        # print(mapping, flush=True)
-        # if comm.rank == 0:
-        #    breakpoint()
+        if crash:
+            data[key] += [np.nan]
+            continue
         me = get_sorted(stats_all, comm=comm_time, type=mapping[0], recomputed=mapping[2])
         if len(me) == 0:
             data[key] += [np.nan]

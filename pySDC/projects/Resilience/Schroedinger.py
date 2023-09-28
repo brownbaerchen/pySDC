@@ -92,7 +92,7 @@ def run_Schroedinger(
     Returns:
         dict: The stats object
         controller: The controller
-        Tend: The time that was supposed to be integrated to
+        bool: If the code crashed
     """
     if custom_description is not None:
         problem_params = custom_description.get('problem_params', {})
@@ -185,13 +185,15 @@ def run_Schroedinger(
         prepare_controller_for_faults(controller, fault_stuff, rnd_args)
 
     # call main function to get things done...
+    crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
     except ConvergenceError as e:
         print(f'Warning: Premature termination: {e}')
         stats = controller.return_stats()
+        crash = True
 
-    return stats, controller, Tend
+    return stats, controller, crash
 
 
 def main():

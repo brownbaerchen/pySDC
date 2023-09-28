@@ -37,7 +37,7 @@ def run_Lorenz(
     Returns:
         dict: The stats object
         controller: The controller
-        Tend: The time that was supposed to be integrated to
+        bool: WHether the code crashed
     """
 
     # initialize level parameters
@@ -105,13 +105,15 @@ def run_Lorenz(
         prepare_controller_for_faults(controller, fault_stuff)
 
     # call main function to get things done...
+    crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
     except (ConvergenceError, ZeroDivisionError) as e:
         print(f'Warning: Premature termination: {e}')
         stats = controller.return_stats()
+        crash = True
 
-    return stats, controller, Tend
+    return stats, controller, crash
 
 
 def plot_solution(stats):  # pragma: no cover

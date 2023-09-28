@@ -293,6 +293,23 @@ def plot_adaptivity_stuff():  # pragma: no cover
     force_params = {}  # {'convergence_controllers': {EstimateEmbeddedError: {}}}
     # force_params = {'convergence_controllers': {EstimateEmbeddedError: {}}, 'step_params': {'maxiter': 5}, 'level_params': {'dt': 4e-2}}
     for strategy in [BaseStrategy, AdaptivityStrategy, IterateStrategy, AdaptivityPolynomialError]:
+        if strategy == AdaptivityPolynomialError:
+            from pySDC.implementations.convergence_controller_classes.adaptivity import (
+                AdaptivityPolynomialError as adaptivity,
+            )
+
+            force_params = {'sweeper_params': {'num_nodes': 2}}
+            force_params['convergence_controllers'] = {
+                adaptivity: {
+                    'e_tol': 7e-5,
+                    'restol_rel': 1e-4,
+                    'restol_min': 1e-10,
+                    'restart_at_maxiter': True,
+                    'factor_if_not_converged': 4.0,
+                },
+            }
+        else:
+            force_params = {}
         stats, _, _ = stats_analyser.single_run(
             strategy=strategy(useMPI=False),
             force_params=force_params,
