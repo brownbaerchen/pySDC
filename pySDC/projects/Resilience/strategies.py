@@ -312,7 +312,7 @@ class Strategy:
 
 class WildRiot(Strategy):
     def __init__(
-        self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=20, **kwargs
+        self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=16, **kwargs
     ):
         kwargs = {**kwargs, 'skip_residual_computation': 'most'}
         super().__init__(**kwargs)
