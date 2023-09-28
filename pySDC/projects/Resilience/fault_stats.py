@@ -1624,11 +1624,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-<<<<<<< HEAD
-        'prob': run_vdp,
-=======
         'prob': run_Schroedinger,
->>>>>>> 4f308e2d8 (oh my!)
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
