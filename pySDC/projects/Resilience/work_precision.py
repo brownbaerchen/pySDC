@@ -1739,8 +1739,8 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'RK_comp',
-        # 'parallel_efficiency',
+        # 'RK_comp',
+        'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
     ]:
