@@ -1624,7 +1624,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_quench,
+        'prob': run_vdp,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
@@ -1640,10 +1640,10 @@ def main():
 
     stats_analyser = FaultStats(
         strategies=[
-            BaseStrategy(**strategy_args),
-            AdaptivityStrategy(**strategy_args),
-            IterateStrategy(**strategy_args),
-            HotRodStrategy(**strategy_args),
+            # BaseStrategy(**strategy_args),
+            # AdaptivityStrategy(**strategy_args),
+            # IterateStrategy(**strategy_args),
+            # HotRodStrategy(**strategy_args),
             AdaptivityPolynomialError(**strategy_args),
         ],
         # strategies=[AdaptivityPolynomialError()],

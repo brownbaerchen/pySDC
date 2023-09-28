@@ -55,7 +55,7 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1, strategy_type='SDC'
         strategies=strategies,
         faults=[False, True],
         reload=True,
-        recovery_thresh=1.2,
+        recovery_thresh=1.1,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(problem, 0),
         mode='default',
         stats_path=path,
@@ -554,8 +554,8 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_fault_vdp(13)
 
     # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
-    for i in [1]:
-        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
+    # for i in [1]:
+    #     compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover
