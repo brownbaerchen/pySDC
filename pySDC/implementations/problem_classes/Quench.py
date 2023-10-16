@@ -51,7 +51,7 @@ class Quench(ptype):
         Spatial resolution.
     newton_tol : float, optional
         Tolerance for Newton to terminate.
-    newton_iter : int, optional
+    newton_maxiter : int, optional
         Maximum number of Newton iterations to be done.
     lintol : float, optional
         Tolerance for linear solver to be done.
