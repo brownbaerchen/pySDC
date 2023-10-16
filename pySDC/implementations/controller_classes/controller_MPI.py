@@ -177,8 +177,6 @@ class controller_MPI(controller):
         Returns:
             block of (all) steps
         """
-        # if MPI.COMM_WORLD.rank == 0:
-        #    breakpoint()
 
         # store link to previous step
         self.S.prev = (self.S.status.slot - 1) % size

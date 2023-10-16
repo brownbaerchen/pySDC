@@ -37,7 +37,7 @@ def run_Lorenz(
     Returns:
         dict: The stats object
         controller: The controller
-        bool: WHether the code crashed
+        bool: Whether the code crashed
     """
 
     # initialize level parameters

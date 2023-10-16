@@ -39,7 +39,7 @@ def run_AC(
     Returns:
         dict: The stats object
         controller: The controller
-        Tend: The time that was supposed to be integrated to
+        bool: If the code crashed
     """
     if custom_description is not None:
         problem_params = custom_description.get('problem_params', {})
@@ -116,12 +116,14 @@ def run_AC(
         prepare_controller_for_faults(controller, fault_stuff)
 
     # call main function to get things done...
+    crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
     except ConvergenceError:
         print('Warning: Premature termination!')
         stats = controller.return_stats()
-    return stats, controller, Tend
+        crash = True
+    return stats, controller, crash
 
 
 def plot_solution(stats):  # pragma: no cover
@@ -131,7 +133,6 @@ def plot_solution(stats):  # pragma: no cover
     fig, ax = plt.subplots(1, 1)
 
     u = get_sorted(stats, type='u', recomputed=False)
-    print(get_sorted(stats, type='e_local_post_step', recomputed=False))
     for me in u:  # pun intended
         ax.imshow(me[1], vmin=-1, vmax=1)
         ax.set_title(f't={me[0]:.2e}')
