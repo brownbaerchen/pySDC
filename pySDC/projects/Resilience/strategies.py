@@ -200,7 +200,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             return 1.0
         elif problem.__name__ == "run_quench":
-            return 500.0
+            return 600.0
         elif problem.__name__ == "run_AC":
             return 1e-2
         else:
