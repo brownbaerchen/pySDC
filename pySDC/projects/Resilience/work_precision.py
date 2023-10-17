@@ -285,9 +285,8 @@ def record_work_precision(
         if param == 'restol':
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'e_tol':
-            # param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
-            # param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
-            param_range = [1e-5, 1e-6, 1e-7, 1e-8]
+            # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
+            param_range = np.logspace(-5, -8, 6)
         elif param == 'dt':
             param_range = [500 / 2.0**me for me in [4, 5, 6, 7]]
 
@@ -636,7 +635,10 @@ def get_configs(mode, problem):
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
-        limits = [25.0, 50.0]
+        limits = [
+            70.0,
+            50.0,
+        ]
         colors = ['teal', 'magenta']
         markers = ['v', 'x']
         markersize = 9
@@ -649,7 +651,7 @@ def get_configs(mode, problem):
                     'color': colors[i],
                     'marker': markers[i],
                     'label': rf'$\Delta t \leq {{{limits[i]:.0f}}}$',
-                    'ls': '',
+                    # 'ls': '',
                     'markersize': markersize,
                 },
                 'num_procs': 1,
@@ -659,7 +661,7 @@ def get_configs(mode, problem):
             'handle': 'no limits',
             'plotting_params': {
                 'label': 'no limiter',
-                'ls': '',
+                # 'ls': '',
                 'markersize': markersize,
             },
             'strategies': [AdaptivityStrategy(useMPI=True)],
@@ -1710,7 +1712,7 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'RK_comp',
-        'runs': 5,
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
@@ -1718,7 +1720,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_quench,
     }
-    record = True
+    record = False
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
@@ -1737,7 +1739,7 @@ if __name__ == "__main__":
 
     for mode in [
         # 'RK_comp',
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
     ]:

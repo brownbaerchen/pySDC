@@ -348,7 +348,7 @@ class WildRiot(Strategy):
         if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
             if problem.__name__ == 'run_quench':
                 inexactness_params['ratio'] = 1e-2
-                inexactness_params['min_tol'] = 1e-10
+                inexactness_params['min_tol'] = 1e-12
                 inexactness_params['max_tol'] = 1e-3
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
 
@@ -1712,6 +1712,8 @@ class AdaptivityPolynomialError(WildRiot):
 
         dt_max = np.inf
         max_slope = 4.0
+        restol_rel = 1e-4
+        restol_min = 1e-12
         level_params = {}
 
         if problem.__name__ == "run_vdp":
@@ -1726,7 +1728,8 @@ class AdaptivityPolynomialError(WildRiot):
         elif problem.__name__ == "run_quench":
             e_tol = 1e-4
             level_params['dt'] = 1.0
-            max_slope = 4.0
+            restol_min = 1e-11
+            restol_rel = 1e-3
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
         else:
@@ -1735,14 +1738,10 @@ class AdaptivityPolynomialError(WildRiot):
  strategy'
             )
 
-        if problem.__name__ == 'run_quench':
-            restol_min = 1e-9
-        else:
-            restol_min = 1e-12
         custom_description['convergence_controllers'] = {
             AdaptivityPolynomialError: {
                 'e_tol': e_tol,
-                'restol_rel': 1e-4,
+                'restol_rel': restol_rel,
                 'restol_min': restol_min,
                 # 'e_tol_rel': 1e-2,
                 # 'restol_max': 1e-4,
