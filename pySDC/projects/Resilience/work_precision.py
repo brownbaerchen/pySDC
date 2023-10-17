@@ -287,7 +287,7 @@ def record_work_precision(
         elif param == 'e_tol':
             # param_range = [1e-2 / 2.0**me for me in [4, 5, 6, 7, 8, 9, 10]]
             # param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]
-            param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
+            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
         elif param == 'dt':
             param_range = [500 / 2.0**me for me in [4, 5, 6, 7]]
 
@@ -1719,7 +1719,7 @@ if __name__ == "__main__":
         'problem': run_quench,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global', record=record)
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
