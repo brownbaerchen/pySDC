@@ -1708,7 +1708,7 @@ if __name__ == "__main__":
 
     params = {
         'mode': 'RK_comp',
-        'runs': 5,
+        'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }

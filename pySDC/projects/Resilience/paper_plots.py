@@ -479,8 +479,8 @@ def work_precision():  # pragma: no cover
         'base_path': 'data/paper',
     }
 
-    # for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
-    #     all_problems(**all_params, mode=mode)
+    for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
+        all_problems(**all_params, mode=mode)
 
     # Quench stuff
     fig, axs = get_fig(x=3, y=1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.47))
