@@ -89,8 +89,8 @@ class Quench(ptype):
         self,
         Cv=1000.0,
         K=1000.0,
-        u_thresh=1e-2,
-        u_max=2e-2,
+        u_thresh=3e-2,
+        u_max=6e-2,
         Q_max=1.0,
         leak_range=(0.45, 0.55),
         leak_type='linear',
@@ -239,7 +239,7 @@ class Quench(ptype):
 
         me[:] /= self.Cv
 
-        return self.apply_BCs(me)
+        return me
 
     def eval_f(self, u, t):
         """
@@ -301,7 +301,7 @@ class Quench(ptype):
 
         me[:] /= self.Cv
 
-        return sp.diags(self.apply_BCs(me), format='csc')
+        return sp.diags(me, format='csc')
 
     def solve_system(self, rhs, factor, u0, t):
         r"""

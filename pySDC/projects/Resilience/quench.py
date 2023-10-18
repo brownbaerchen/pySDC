@@ -153,6 +153,7 @@ def run_quench(
         'controller_params': controller_params,
         'description': description,
     }
+
     if use_MPI:
         from mpi4py import MPI
         from pySDC.implementations.controller_classes.controller_MPI import controller_MPI

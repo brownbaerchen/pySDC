@@ -110,14 +110,19 @@ def get_finite_difference_matrix(
     if "dirichlet" in bc:
         A_1d = sp.diags(coeff, steps, shape=(size, size), format='csc')
     elif "neumann" in bc:
-        A_1d = sp.diags(coeff, steps, shape=(size, size), format='lil')
-
-        # replace the first and last lines with one-sided stencils for a first derivative of the same order as the rest
-        bc_coeff, bc_steps = get_finite_difference_stencil(derivative=1, order=order, stencil_type='forward')
-        A_1d[0, :] = 0.0
-        A_1d[0, bc_steps] = bc_coeff * (dx ** (derivative - 1))
-        A_1d[-1, :] = 0.0
-        A_1d[-1, -bc_steps - 1] = bc_coeff * (dx ** (derivative - 1))
+        A_1d = sp.diags(coeff, steps, shape=(size, size), format='csc')
+        if derivative == 1 and stencil_type == 'center' and order == 2:
+            A_1d[0, 0] = -(dx ** (derivative - 1))
+            A_1d[0, 1] = +(dx ** (derivative - 1))
+            A_1d[-1, -1] = -(dx ** (derivative - 1))
+            A_1d[-1, -2] = +(dx ** (derivative - 1))
+        elif derivative == 2 and stencil_type == 'center' and order == 2:
+            A_1d[0, 0] = -2.0
+            A_1d[0, 1] = +2.0
+            A_1d[-1, -1] = -2.0
+            A_1d[-1, -2] = +2.0
+        else:
+            raise NotImplementedError('Neumann BCs not implemented for your configuration.')
     elif bc == 'periodic':
         A_1d = 0 * sp.eye(size, format='csc')
         for i in steps:

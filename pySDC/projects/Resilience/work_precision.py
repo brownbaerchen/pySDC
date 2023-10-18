@@ -298,14 +298,6 @@ def record_work_precision(
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
 
-        # if strategy.name == 'adaptivity_coll':
-        #     set_parameter(description, ['level_params', 'restol'], param_range[i] / 10.0)
-
-        if problem.__name__ == 'run_Schroedinger' and strategy.name in ['ESDIRK', 'ERK']:
-            problem_params = custom_description['problem_params']
-            if not problem_params.get('imex', True):
-                description["problem_params"]['lintol'] = param_range[i]
-
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
         data[param_range[i]][param] = [param_range[i]]
@@ -641,7 +633,7 @@ def get_configs(mode, problem):
 
         limits = [
             #    70.0,
-            50.0,
+            # 50.0,
         ]
         colors = ['teal', 'magenta']
         markers = ['v', 'x']
@@ -1715,14 +1707,14 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'step_size_limiting',
-        'runs': 1,
+        'mode': 'RK_comp',
+        'runs': 5,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_Schroedinger,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)

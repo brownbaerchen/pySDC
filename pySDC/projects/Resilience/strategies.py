@@ -94,7 +94,7 @@ class Strategy:
     def get_controller_params(self, **kwargs):
         return {'all_to_done': False}
 
-    def get_description_for_tolerance(self, param, **kwargs):
+    def get_description_for_tolerance(self, problem, param, **kwargs):
         return {}
 
     def get_fixable_params(self, **kwargs):
@@ -328,6 +328,12 @@ class WildRiot(Strategy):
     def get_controller_params(self, **kwargs):
         return {'all_to_done': True}
 
+    # def get_description_for_tolerance(self, problem, param, **kwargs):
+    #     desc = {}
+    #     if problem.__name__ in ['run_quench']:
+    #         desc['level_params'] = {'restol': max([1e-9, param / 1e2])}
+    #     return desc
+
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
 
@@ -365,13 +371,6 @@ class WildRiot(Strategy):
             if problem.__name__ in ['run_quench']:
                 desc['problem_params']['direct_solver'] = False
                 desc['problem_params']['liniter'] = 5
-
-            # desc['convergence_controllers'][LinearInexactness] = {
-            #        **inexactness_params,
-            #        'ratio': inexactness_params['ratio'] * 1e-1,
-            #        'max_tol': inexactness_params['max_tol'] * 1e-1,
-            #        'maxiter': 30,
-            # }
 
         if self.double_adaptivity:
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
@@ -457,7 +456,7 @@ class AdaptivityStrategy(Strategy):
     def get_description_for_tolerance(self, problem, param, **kwargs):
         desc = {}
         if problem.__name__ in ['run_quench']:
-            desc['problem_params'] = {'newton_tol': param / 1e1, 'lintol': param / 1e2}
+            desc['problem_params'] = {'newton_tol': max([param / 1e1, 1e-10]), 'lintol': max([param / 1e2, 1e-10])}
         return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
@@ -1241,6 +1240,12 @@ class ESDIRKStrategy(AdaptivityStrategy):
     def label(self):
         return 'ESDIRK5(3)'
 
+    def get_description_for_tolerance(self, problem, param, **kwargs):
+        desc = {}
+        if problem.__name__ == 'run_Schroedinger':
+            desc['problem_params'] = {'lintol': param}
+        return desc
+
     def get_custom_description(self, problem, num_procs):
         '''
         Routine to get a custom description that adds adaptivity
@@ -1331,6 +1336,12 @@ class ERKStrategy(DIRKStrategy):
         self.marker = 'x'
         self.name = 'ERK'
         self.bar_plot_x_label = 'ERK5(4)'
+
+    def get_description_for_tolerance(self, problem, param, **kwargs):
+        desc = {}
+        if problem.__name__ == 'run_Schroedinger':
+            desc['problem_params'] = {'lintol': param}
+        return desc
 
     @property
     def label(self):
@@ -1733,12 +1744,13 @@ class AdaptivityPolynomialError(WildRiot):
         elif problem.__name__ == "run_Lorenz":
             e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
+            restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
             e_tol = 1e-4
             level_params['dt'] = 1.0
-            restol_min = 1e-11
-            restol_rel = 1e-3
+            restol_min = 1e-10
+            restol_rel = 1e-1
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
         else:
