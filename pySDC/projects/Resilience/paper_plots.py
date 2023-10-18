@@ -479,8 +479,8 @@ def work_precision():  # pragma: no cover
         'base_path': 'data/paper',
     }
 
-    for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
-        all_problems(**all_params, mode=mode)
+    # for mode in ['compare_strategies', 'parallel_efficiency', 'RK_comp']:
+    #     all_problems(**all_params, mode=mode)
 
     # Quench stuff
     fig, axs = get_fig(x=3, y=1, figsize=figsize_by_journal('Springer_Numerical_Algorithms', 1, 0.47))
@@ -492,23 +492,24 @@ def work_precision():  # pragma: no cover
         'num_procs': 1,
         'runs': 1,
         'comm_world': MPI.COMM_WORLD,
+        'mode': 'step_size_limiting',
     }
     quench_params.pop('base_path', None)
-    execute_configurations(**{**quench_params, 'work_key': 'k_SDC', 'precision_key': 'k_Newton'}, ax=axs[2])
+    execute_configurations(**{**quench_params, 'work_key': 'k_SDC', 'precision_key': 'k_linear'}, ax=axs[2])
     execute_configurations(**{**quench_params, 'work_key': 'param', 'precision_key': 'restart'}, ax=axs[1])
     execute_configurations(**{**quench_params, 'work_key': 't', 'precision_key': 'e_global_rel'}, ax=axs[0])
     axs[1].set_yscale('linear')
-    axs[2].set_yscale('linear')
+    # axs[2].set_yscale('linear')
     axs[2].set_xscale('linear')
     axs[1].set_xlabel(r'$e_\mathrm{tol}$')
-    axs[0].set_xticks([1e0, 3e0], [r'$10^{0}$', r'$3\times 10^{0}$'], minor=False)
+    # axs[0].set_xticks([1e0, 3e0], [r'$10^{0}$', r'$3\times 10^{0}$'], minor=False)
 
     for ax in axs:
         ax.set_title(ax.get_ylabel())
         ax.set_ylabel('')
     fig.suptitle('Quench')
 
-    axs[1].set_yticks([4.0, 6.0, 8.0, 10.0, 12.0], minor=False)
+    # axs[1].set_yticks([4.0, 6.0, 8.0, 10.0, 12.0], minor=False)
 
     save_fig(
         fig=fig,
@@ -563,9 +564,9 @@ def make_plots_for_paper():  # pragma: no cover
     BASE_PATH = 'data/paper'
 
     # plot_adaptivity_stuff()
-    # work_precision()
+    work_precision()
     # plot_vdp_solution()
-    plot_quench_solution()
+    # plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)

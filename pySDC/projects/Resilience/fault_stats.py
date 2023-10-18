@@ -268,8 +268,6 @@ class FaultStats:
                 dat['bit'][i] = faults_run[0][1][4]
                 dat['target'][i] = faults_run[0][1][5]
                 dat['rank'][i] = faults_run[0][1][6]
-            else:
-                assert self.mode == 'regular', f'No faults where recorded in run {i} of strategy {strategy.name}!'
             if crash:
                 continue
 
@@ -1626,11 +1624,11 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_vdp,
+        'prob': run_quench,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1642,10 +1640,10 @@ def main():
 
     stats_analyser = FaultStats(
         strategies=[
-            # BaseStrategy(**strategy_args),
-            # AdaptivityStrategy(**strategy_args),
-            # IterateStrategy(**strategy_args),
-            # HotRodStrategy(**strategy_args),
+            BaseStrategy(**strategy_args),
+            AdaptivityStrategy(**strategy_args),
+            IterateStrategy(**strategy_args),
+            HotRodStrategy(**strategy_args),
             AdaptivityPolynomialError(**strategy_args),
         ],
         # strategies=[AdaptivityPolynomialError()],
@@ -1655,7 +1653,8 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=True, run=16)
+    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=True, run=0)
+    # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     # ##################

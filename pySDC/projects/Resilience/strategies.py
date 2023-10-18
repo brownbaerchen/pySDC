@@ -94,6 +94,9 @@ class Strategy:
     def get_controller_params(self, **kwargs):
         return {'all_to_done': False}
 
+    def get_description_for_tolerance(self, param, **kwargs):
+        return {}
+
     def get_fixable_params(self, **kwargs):
         """
         Return a list containing dictionaries which can be passed to `FaultStats.get_mask` as keyword arguments to
@@ -247,10 +250,10 @@ class Strategy:
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
                 'newton_maxiter': 99,
-                'newton_tol': 1e-9,
+                'newton_tol': 1e-7,
                 'nvars': 2**7,
                 'direct_solver': False,
-                'lintol': 1e-10,
+                'lintol': 1e-8,
             }
         elif problem.__name__ == "run_AC":
             custom_description['level_params'] = {'restol': -1, 'dt': 1e-4}
@@ -450,6 +453,12 @@ class AdaptivityStrategy(Strategy):
     @property
     def label(self):
         return r'$\Delta t$ adaptivity'
+
+    def get_description_for_tolerance(self, problem, param, **kwargs):
+        desc = {}
+        if problem.__name__ in ['run_quench']:
+            desc['problem_params'] = {'newton_tol': param / 1e1, 'lintol': param / 1e2}
+        return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
         """

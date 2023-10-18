@@ -309,6 +309,10 @@ def record_work_precision(
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
         data[param_range[i]][param] = [param_range[i]]
+
+        description = merge_descriptions(
+            descA=description, descB=strategy.get_description_for_tolerance(problem=problem, param=param_range[i])
+        )
         for _j in range(runs):
             if comm_world.rank == 0:
                 logger.log(
@@ -636,7 +640,7 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
         limits = [
-            70.0,
+            #    70.0,
             50.0,
         ]
         colors = ['teal', 'magenta']
@@ -1491,7 +1495,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             mode=mode,
         )
         if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
-            axs.flatten()[i].set_xticks([2.0, 4.0], minor=True)
+            axs.flatten()[i].set_xticks([4.0, 10.0], minor=True)
 
     if plotting and shared_params['comm_world'].rank == 0:
         save_fig(
@@ -1711,7 +1715,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
+        'mode': 'step_size_limiting',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
@@ -1720,7 +1724,7 @@ if __name__ == "__main__":
         **params,
         'problem': run_quench,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
