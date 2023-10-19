@@ -170,12 +170,9 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
     if bc == 'periodic':
         dx = L / size
         xvalues = np.array([left_boundary + dx * i for i in range(size)])
-    elif "dirichlet" in bc:
+    elif "dirichlet" in bc or "neumann" in bc:
         dx = L / (size + 1)
         xvalues = np.array([left_boundary + dx * (i + 1) for i in range(size)])
-    elif "neumann" in bc:
-        dx = L / (size - 1)
-        xvalues = np.array([left_boundary + dx * i for i in range(size)])
     else:
         raise NotImplementedError(f'Boundary conditions \"{bc}\" not implemented.')
 

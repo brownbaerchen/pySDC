@@ -1739,13 +1739,13 @@ class AdaptivityPolynomialError(WildRiot):
         if problem.__name__ == "run_vdp":
             e_tol = 6e-4
             level_params['dt'] = 0.1
-            restol_rel = 1e-3
+            # restol_rel = 1e-3
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
         elif problem.__name__ == "run_Lorenz":
             e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
-            restol_rel = 1e-3
+            # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
             e_tol = 1e-4

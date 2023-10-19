@@ -171,10 +171,10 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
         defaults = {
             'restol_rel': None,
             'e_tol_rel': None,
-            'restart_at_maxiter': False,
+            'restart_at_maxiter': True,
             'restol_min': 1e-12,
             'restol_max': 1e-5,
-            'factor_if_not_converged': 2.0,
+            'factor_if_not_converged': 4.0,
             'residual_max_tol': 1e9,
             'maxiter': description['sweeper_params'].get('maxiter', 99),
             **super().setup(controller, params, description, **kwargs),

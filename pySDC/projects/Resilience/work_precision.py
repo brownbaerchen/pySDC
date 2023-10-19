@@ -288,7 +288,8 @@ def record_work_precision(
             # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
             param_range = np.logspace(-5, -8, 6)
         elif param == 'dt':
-            param_range = [500 / 2.0**me for me in [4, 5, 6, 7]]
+            # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
+            param_range = [1.0, 2.5, 5.0, 10.0, 20.0]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -745,6 +746,9 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
+        }
         configurations[1] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
@@ -757,9 +761,6 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
         }
 
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
-        }
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
 
@@ -1707,14 +1708,14 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
+        'mode': 'compare_strategies',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_Schroedinger,
+        'problem': run_quench,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
