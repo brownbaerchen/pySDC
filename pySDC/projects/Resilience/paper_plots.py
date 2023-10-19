@@ -147,7 +147,13 @@ def plot_recovery_rate(stats_analyser, **kwargs):  # pragma: no cover
     my_setup_mpl()
     fig, axs = plt.subplots(1, 2, figsize=(TEXTWIDTH, 5 * cm), sharex=True, sharey=True)
     stats_analyser.plot_things_per_things(
-        'recovered', 'bit', False, op=stats_analyser.rec_rate, args={'ylabel': 'recovery rate'}, ax=axs[0]
+        'recovered',
+        'bit',
+        False,
+        op=stats_analyser.rec_rate,
+        args={'ylabel': 'recovery rate'},
+        plotting_args={'markevery': 5},
+        ax=axs[0],
     )
     plot_recovery_rate_recoverable_only(stats_analyser, fig, axs[1], ylabel='')
     axs[1].get_legend().remove()
@@ -181,6 +187,7 @@ def plot_recovery_rate_recoverable_only(stats_analyser, fig, ax, **kwargs):  # p
             ax=ax,
             fig=fig,
             strategies=[stats_analyser.strategies[i]],
+            plotting_args={'markevery': 5},
         )
 
 
@@ -571,9 +578,9 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
 
-    # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
-    # for i in [1]:
-    #     compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
+    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
+    for i in [1]:
+        compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover

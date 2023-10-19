@@ -789,7 +789,15 @@ class FaultStats:
             return None
 
     def plot_thingA_per_thingB(
-        self, strategy, thingA, thingB, ax=None, mask=None, recovered=False, op=None
+        self,
+        strategy,
+        thingA,
+        thingB,
+        ax=None,
+        mask=None,
+        recovered=False,
+        op=None,
+        **kwargs,
     ):  # pragma: no cover
         '''
         Plot thingA vs. thingB for a single strategy
@@ -832,10 +840,17 @@ class FaultStats:
                 marker=strategy.marker,
                 ls='--',
                 linewidth=3,
+                **kwargs,
             )
 
         ax.plot(
-            admissable_thingB, me, label=f'{strategy.label}', color=strategy.color, marker=strategy.marker, linewidth=2
+            admissable_thingB,
+            me,
+            label=f'{strategy.label}',
+            color=strategy.color,
+            marker=strategy.marker,
+            linewidth=2,
+            **kwargs,
         )
 
         ax.legend(frameon=False)
@@ -856,6 +871,7 @@ class FaultStats:
         store=True,
         ax=None,
         fig=None,
+        plotting_args=None,
     ):  # pragma: no cover
         '''
         Plot thingA vs thingB for multiple strategies
@@ -887,7 +903,16 @@ class FaultStats:
 
         # execute the plots for all strategies
         for s in strategies:
-            self.plot_thingA_per_thingB(s, thingA=thingA, thingB=thingB, recovered=recovered, ax=ax, mask=mask, op=op)
+            self.plot_thingA_per_thingB(
+                s,
+                thingA=thingA,
+                thingB=thingB,
+                recovered=recovered,
+                ax=ax,
+                mask=mask,
+                op=op,
+                **(plotting_args if plotting_args else {}),
+            )
 
         # set the parameters
         [plt.setp(ax, k, v) for k, v in args.items()]

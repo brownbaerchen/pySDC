@@ -372,11 +372,11 @@ class WildRiot(Strategy):
                 desc['problem_params']['direct_solver'] = False
                 desc['problem_params']['liniter'] = 5
 
-        if self.double_adaptivity:
-            from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
+        # if self.double_adaptivity:
+        #     from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
 
-            desc['step_params']['maxiter'] = 10
-            desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
+        #     desc['step_params']['maxiter'] = 10
+        #     desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
 
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
