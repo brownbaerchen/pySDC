@@ -290,6 +290,7 @@ def record_work_precision(
         elif param == 'dt':
             # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
             param_range = [1.0, 2.5, 5.0, 10.0, 20.0]
+            # param_range = [20.]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -633,8 +634,8 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
         limits = [
-            #    70.0,
-            # 50.0,
+               70.0,
+            50.0,
         ]
         colors = ['teal', 'magenta']
         markers = ['v', 'x']
@@ -746,19 +747,22 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
-        }
-        configurations[1] = {
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        }
+        #configurations[2] = {
+        #    'strategies': [kAdaptivityStrategy(useMPI=True)],
+        #}
+        #configurations[1] = {
+        #    'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        #}
 
         configurations[0] = {
             'custom_description': {
                 'step_params': {'maxiter': 5},
                 'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
             },
-            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
+            'strategies': [
+                AdaptivityStrategy(useMPI=True),
+                # BaseStrategy(useMPI=True)
+                ],
         }
 
     elif mode == 'RK':
@@ -1708,7 +1712,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_strategies',
+        'mode': 'RK_comp',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,

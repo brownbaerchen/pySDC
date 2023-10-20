@@ -453,11 +453,11 @@ class AdaptivityStrategy(Strategy):
     def label(self):
         return r'$\Delta t$ adaptivity'
 
-    def get_description_for_tolerance(self, problem, param, **kwargs):
-        desc = {}
-        if problem.__name__ in ['run_quench']:
-            desc['problem_params'] = {'newton_tol': max([param / 1e1, 1e-10]), 'lintol': max([param / 1e2, 1e-10])}
-        return desc
+    # def get_description_for_tolerance(self, problem, param, **kwargs):
+    #     desc = {}
+    #     if problem.__name__ in ['run_quench']:
+    #         desc['problem_params'] = {'newton_tol': max([param / 1e0, 1e-9]), 'lintol': max([param / 1e1, 1e-9]), 'liniter': 20, 'newton_maxiter': 99}
+    #     return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
         """

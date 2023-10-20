@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import spsolve, gmres, inv
+from scipy.sparse.linalg import spsolve, gmres#, inv
+from scipy.linalg import inv
 
 from pySDC.core.Errors import ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
@@ -158,7 +159,7 @@ class Quench(ptype):
         # setup finite difference discretization from problem helper
         self.dx, xvalues = problem_helper.get_1d_grid(size=self.nvars, bc=self.bc)
 
-        self.A = problem_helper.get_finite_difference_matrix(
+        self.A, self.b = problem_helper.get_finite_difference_matrix(
             derivative=2,
             order=self.order,
             stencil_type=self.stencil_type,
@@ -178,26 +179,6 @@ class Quench(ptype):
         self.work_counters['rhs'] = WorkCounter()
         if not self.direct_solver:
             self.work_counters['linear'] = WorkCounter()
-
-    def apply_BCs(self, f):
-        """
-        Apply boundary conditions to the right hand side. Please supply only the nonlinear part as f!
-
-        Args:
-            dtype_f: nonlinear (!) part of the right hand side
-
-        Returns:
-            dtype_f: nonlinear part of the right hand side with boundary conditions
-        """
-        if self.bc == 'neumann-zero':
-            f[0] = 0.0
-            f[-1] = 0.0
-        elif self.bc == 'periodic':
-            pass
-        else:
-            raise NotImplementedError(f'BCs \"{self.bc}\" not implemented!')
-
-        return f
 
     def eval_f_non_linear(self, u, t):
         """
@@ -258,7 +239,7 @@ class Quench(ptype):
             The right-hand side of the problem.
         """
         f = self.dtype_f(self.init)
-        f[:] = self.A.dot(u.flatten()).reshape(self.nvars) + self.eval_f_non_linear(u, t)
+        f[:] = self.A.dot(u.flatten()).reshape(self.nvars) + self.b + self.eval_f_non_linear(u, t)
 
         self.work_counters['rhs']()
         return f
@@ -330,7 +311,7 @@ class Quench(ptype):
 
         # construct a preconditioner for the space solver
         if not self.direct_solver:
-            M = inv(self.Id - factor * self.A)
+            M = inv((self.Id - factor * self.A).toarray())
 
         for n in range(0, self.newton_maxiter):
             # assemble G such that G(u) = 0 at the solution of the step
@@ -363,6 +344,7 @@ class Quench(ptype):
                     atol=0,
                     callback=self.work_counters['linear'],
                 )
+                #print(self.lintol, self.liniter, self.newton_tol, self.newton_maxiter)
 
             if not np.isfinite(delta).all():
                 break
@@ -523,7 +505,7 @@ class QuenchIMEX(Quench):
 
         f = self.dtype_f(self.init)
         f.impl[:] = self.A.dot(u.flatten()).reshape(self.nvars)
-        f.expl[:] = self.eval_f_non_linear(u, t)
+        f.expl[:] = self.eval_f_non_linear(u, t) + self.b
 
         self.work_counters['rhs']()
         return f
