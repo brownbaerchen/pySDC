@@ -508,8 +508,8 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             e_tol = 4e-6
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-5
-            dt_max = 100.0
+            e_tol = 5e-9
+            # dt_max = 100.0
             # dt_slope_max = 4.
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
@@ -1749,7 +1749,7 @@ class AdaptivityPolynomialError(WildRiot):
             # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-4
+            e_tol = 1e-6
             level_params['dt'] = 1.0
             restol_min = 1e-10
             restol_rel = 1e-1

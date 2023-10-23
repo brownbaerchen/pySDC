@@ -473,16 +473,16 @@ def iteration_counts():
     description['level_params'] = {'dt': 5.0, 'restol': -1}
     description = merge_descriptions(description, strategy.get_custom_description(run_quench, 1))
     description['step_params'] = {'maxiter': 5}
-    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-7
+    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-11
     description['problem_params']['newton_maxiter'] = 20
     description['problem_params']['liniter'] = 20
 
-    controller_params = {'logger_level': 30}
+    controller_params = {'logger_level': 15}
 
     stats, controller, _ = run_quench(
         custom_description=description,
         hook_class=[LogWork, LogSolution],
-        Tend=1000.0,
+        Tend=600.0,
         imex=False,
         custom_controller_params=controller_params,
     )

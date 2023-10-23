@@ -284,9 +284,9 @@ def record_work_precision(
     if problem.__name__ == 'run_quench':
         if param == 'restol':
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
-        elif param == 'e_tol':
-            # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
-            param_range = np.logspace(-5, -8, 6)
+        # elif param == 'e_tol':
+        #     # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
+        #     param_range = np.logspace(-5, -8, 6)
         elif param == 'dt':
             # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
             param_range = [1.0, 2.5, 5.0, 10.0, 20.0][::-1]
@@ -634,7 +634,7 @@ def get_configs(mode, problem):
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy
 
         limits = [
-            # 30.0,
+            25.0,
             50.0,
         ]
         colors = ['teal', 'magenta']
@@ -1719,7 +1719,7 @@ if __name__ == "__main__":
         'problem': run_quench,
     }
     record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    single_problem(**params_single, work_key='k_linear', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1736,7 +1736,7 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'RK_comp',
+        # 'RK_comp',
         # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
