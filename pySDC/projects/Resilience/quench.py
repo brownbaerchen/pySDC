@@ -449,6 +449,64 @@ def compare_reference_solutions_single():
     fig.savefig('data/quench_refs_single.pdf', bbox_inches='tight')
 
 
+def iteration_counts():
+    from pySDC.implementations.hooks.log_work import LogWork
+    from pySDC.implementations.hooks.log_solution import LogSolution
+    from pySDC.projects.Resilience.strategies import AdaptivityStrategy
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+    fig, ax = plt.subplots(1, 1)
+    iter_ax = ax.twinx()
+
+    strategy = AdaptivityStrategy()
+
+    description = {}
+    description['level_params'] = {'dt': 5.0, 'restol': 1e-10}
+    description['sweeper_params'] = {'QI': 'MIN-SR-S', 'num_nodes': 3}
+    description['problem_params'] = {
+        'leak_type': 'linear',
+        'leak_transition': 'step',
+        'nvars': 2**10,
+        'newton_tol': 1e-12,
+    }
+
+    description['level_params'] = {'dt': 5.0, 'restol': -1}
+    description = merge_descriptions(description, strategy.get_custom_description(run_quench, 1))
+    description['step_params'] = {'maxiter': 5}
+    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-7
+    description['problem_params']['newton_maxiter'] = 20
+    description['problem_params']['liniter'] = 20
+
+    controller_params = {'logger_level': 30}
+
+    stats, controller, _ = run_quench(
+        custom_description=description,
+        hook_class=[LogWork, LogSolution],
+        Tend=1000.0,
+        imex=False,
+        custom_controller_params=controller_params,
+    )
+    e_glob = get_sorted(stats, type='e_global_post_step', recomputed=False)
+    e_loc = get_sorted(stats, type='e_local_post_step', recomputed=False)
+    u = get_sorted(stats, type='u', recomputed=False)
+
+    from pySDC.helpers.stats_helper import get_list_of_types
+    from pySDC.projects.Resilience.strategies import cmap
+
+    for key, color in zip(['linear', 'newton', 'rhs'], cmap):
+        k = get_sorted(stats, type=f'work_{key}', recomputed=None)
+        iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), label=f'{key} cumulative', color=color)
+        iter_ax.scatter([me[0] for me in k], ([me[1] for me in k]), label=key, color=color)
+    print('noice')
+    iter_ax.set_yscale('log')
+    iter_ax.legend(frameon=False)
+
+    ax.plot([me[0] for me in u], [max(me[1]) for me in u], color='black', label='solution')
+
+    # error_ax.plot([me[0] for me in e_glob], [me[1] for me in e_glob], color=colors[j], ls='--')
+    # error_ax.plot([me[0] for me in e_loc], [me[1] for me in e_loc], color=colors[j], ls=':')
+
+
 def compare_reference_solutions():
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
 
@@ -496,12 +554,14 @@ def check_order(reference_sol_type='scipy'):
 
     Tend = 500
     maxiter_list = [1, 2, 3, 4, 5]
-    dt_list = [Tend / 2.0**me for me in [4, 5, 6, 7, 8, 9]]
-    # dt_list = [Tend / 2.**me for me in [6, 7, 8]]
+    # maxiter_list = [9]
+    dt_list = [Tend / 2.0**me for me in [4, 5, 6, 7, 8]]
 
     fig, ax = plt.subplots()
 
     from pySDC.implementations.sweeper_classes.Runge_Kutta import DIRK43
+
+    controller_params = {'logger_level': 30}
 
     colors = ['black', 'teal', 'magenta', 'orange', 'red']
     for j in range(len(maxiter_list)):
@@ -515,8 +575,11 @@ def check_order(reference_sol_type='scipy'):
             description['problem_params'] = {
                 'leak_type': 'linear',
                 'leak_transition': 'step',
-                'nvars': 2**10,
+                'nvars': 2**7,
                 'reference_sol_type': reference_sol_type,
+                'newton_tol': 1e-10,
+                'lintol': 1e-10,
+                'direct_solver': True,
             }
             description['convergence_controllers'] = {EstimateEmbeddedError: {}}
 
@@ -524,11 +587,18 @@ def check_order(reference_sol_type='scipy'):
             #    description['sweeper_class'] = DIRK43
             #    description['sweeper_params'] = {'maxiter': 1}
 
+            hook_class = [
+                # LogGlobalErrorPostRun,
+            ]
             stats, controller, _ = run_quench(
-                custom_description=description, hook_class=[LogGlobalErrorPostRun], Tend=Tend, imex=False
+                custom_description=description,
+                hook_class=hook_class,
+                Tend=Tend,
+                imex=False,
+                custom_controller_params=controller_params,
             )
-            # errors[i] = max([me[1] for me in get_sorted(stats, type='error_embedded_estimate')])
-            errors[i] = get_sorted(stats, type='e_global_post_run')[-1][1]
+            errors[i] = max([me[1] for me in get_sorted(stats, type='error_embedded_estimate')])
+            # errors[i] = get_sorted(stats, type='e_global_post_run')[-1][1]
             print(errors)
         ax.loglog(dt_list, errors, color=colors[j], label=f'{maxiter_list[j]} iterations')
         ax.loglog(
@@ -551,10 +621,11 @@ def check_order(reference_sol_type='scipy'):
 
 
 if __name__ == '__main__':
-    compare_reference_solutions_single()
-    # for reference_sol_type in ['DIRK', 'SDC', 'scipy']:
+    # compare_reference_solutions_single()
+    # for reference_sol_type in ['scipy']:
     #   check_order(reference_sol_type=reference_sol_type)
     # faults(19)
     # get_crossing_time()
     # compare_imex_full(plotting=True)
+    iteration_counts()
     plt.show()

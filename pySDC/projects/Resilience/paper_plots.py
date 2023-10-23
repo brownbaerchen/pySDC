@@ -502,7 +502,7 @@ def work_precision():  # pragma: no cover
         'mode': 'step_size_limiting',
     }
     quench_params.pop('base_path', None)
-    execute_configurations(**{**quench_params, 'work_key': 'k_SDC', 'precision_key': 'k_linear'}, ax=axs[2])
+    execute_configurations(**{**quench_params, 'work_key': 'k_SDC', 'precision_key': 'k_Newton'}, ax=axs[2])
     execute_configurations(**{**quench_params, 'work_key': 'param', 'precision_key': 'restart'}, ax=axs[1])
     execute_configurations(**{**quench_params, 'work_key': 't', 'precision_key': 'e_global_rel'}, ax=axs[0])
     axs[1].set_yscale('linear')
