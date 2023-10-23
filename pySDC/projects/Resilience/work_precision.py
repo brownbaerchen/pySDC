@@ -750,19 +750,16 @@ def get_configs(mode, problem):
         configurations[2] = {
             'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
-        # configurations[1] = {
-        #    'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        # }
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        }
 
         configurations[0] = {
             'custom_description': {
                 'step_params': {'maxiter': 5},
                 'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
             },
-            'strategies': [
-                AdaptivityStrategy(useMPI=True),
-                # BaseStrategy(useMPI=True)
-            ],
+            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
         }
 
     elif mode == 'RK':
@@ -1712,7 +1709,7 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'step_size_limiting',
+        'mode': 'compare_strategies',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
