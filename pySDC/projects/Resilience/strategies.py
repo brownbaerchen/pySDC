@@ -508,7 +508,7 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             e_tol = 4e-6
         elif problem.__name__ == "run_quench":
-            e_tol = 5e-9
+            e_tol = 1e-8
             # dt_max = 100.0
             # dt_slope_max = 4.
 

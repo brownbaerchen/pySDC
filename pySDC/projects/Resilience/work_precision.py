@@ -747,11 +747,11 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
-        }
         configurations[1] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        }
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
 
         configurations[0] = {

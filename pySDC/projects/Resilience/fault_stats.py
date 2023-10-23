@@ -175,7 +175,7 @@ class FaultStats:
 
         for j in range(0, len(strategies), comm.size):
             self.generate_stats(
-                strategy=strategies[j + (comm.rank % len(strategies) % (len(strategies)) - j)],
+                strategy=strategies[j + (comm.rank % len(strategies) % (len(strategies) - j))],
                 runs=min(_runs_partial, max_runs),
                 faults=faults,
                 reload=reload,
@@ -269,6 +269,7 @@ class FaultStats:
                 dat['target'][i] = faults_run[0][1][5]
                 dat['rank'][i] = faults_run[0][1][6]
             if crash:
+                print('Code crashed!')
                 continue
 
             # record the rest of the data
@@ -1653,7 +1654,7 @@ def main():
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': False,
+        'reload': True,
         **parse_args(),
     }
 
@@ -1678,8 +1679,8 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=True, run=0)
-    # return None
+    stats_analyser.scrutinize(AdaptivityStrategy(), faults=True, run=0)
+    return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     # ##################

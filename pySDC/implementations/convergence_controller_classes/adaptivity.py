@@ -153,6 +153,32 @@ class AdaptivityBase(ConvergenceController):
 
 
 class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
+    def dependencies(self, controller, description, **kwargs):
+        """
+        Load interpolation between restarts.
+
+        Args:
+            controller (pySDC.Controller): The controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            None
+        """
+        super().dependencies(controller, description, **kwargs)
+
+        if self.params.interpolate_between_restarts:
+            from pySDC.implementations.convergence_controller_classes.interpolate_between_restarts import (
+                InterpolateBetweenRestarts,
+            )
+
+            controller.add_convergence_controller(
+                InterpolateBetweenRestarts,
+                description=description,
+                params={},
+            )
+        self.interpolator = controller.convergence_controllers[-1]
+        return None
+
     def get_convergence(self, controller, S, **kwargs):
         raise NotImplementedError("Please implement a way to check if the collocation problem is converged!")
 
@@ -177,6 +203,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             'factor_if_not_converged': 4.0,
             'residual_max_tol': 1e9,
             'maxiter': description['sweeper_params'].get('maxiter', 99),
+            'interpolate_between_restarts': True,
             **super().setup(controller, params, description, **kwargs),
         }
         if defaults['restol_rel']:
@@ -221,6 +248,8 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
                 f'Collocation problem not converged. Reducing step size to {L.status.dt_new:.2e}',
                 S,
             )
+        if self.params.interpolate_between_restarts:
+            self.interpolator.status.skip_interpolation = True
         # print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
 
 

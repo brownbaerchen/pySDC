@@ -32,11 +32,12 @@ class InterpolateBetweenRestarts(ConvergenceController):
         Args:
             controller (pySDC.Controller.controller): The controller
         """
-        self.status = Status(['u_inter', 'f_inter', 'perform_interpolation'])
+        self.status = Status(['u_inter', 'f_inter', 'perform_interpolation', 'skip_interpolation'])
 
         self.status.u_inter = []
         self.status.f_inter = []
         self.status.perform_interpolation = False
+        self.status.skip_interpolation = False
 
     def post_spread_processing(self, controller, step, **kwargs):
         """
@@ -46,9 +47,13 @@ class InterpolateBetweenRestarts(ConvergenceController):
             controller (pySDC.Controller.controller): The controller
             step (pySDC.Step.step): The current step
         """
-        if self.status.perform_interpolation:
+        if self.status.perform_interpolation and not self.status.skip_interpolation:
             for i in range(len(step.levels)):
                 level = step.levels[i]
+
+                if level.f[0] is None:
+                    level.f[0] = level.prob.dtype_f(level.prob.init)
+
                 for m in range(len(level.u)):
                     level.u[m][:] = self.status.u_inter[i][m][:]
                     level.f[m][:] = self.status.f_inter[i][m][:]
@@ -57,6 +62,8 @@ class InterpolateBetweenRestarts(ConvergenceController):
             self.status.perform_interpolation = False
             self.status.u_inter = []
             self.status.f_inter = []
+
+        self.status.skip_interpolation = False
 
     def post_iteration_processing(self, controller, step, **kwargs):
         """
@@ -73,10 +80,18 @@ class InterpolateBetweenRestarts(ConvergenceController):
             controller (pySDC.Controller): The controller
             step (pySDC.Step.step): The current step
         """
-        if step.status.restart and all(level.status.dt_new for level in step.levels):
+        if (
+            step.status.restart
+            and all(level.status.dt_new for level in step.levels)
+            and not self.status.skip_interpolation
+        ):
             for level in step.levels:
                 nodes_old = level.sweep.coll.nodes.copy()
                 nodes_new = level.sweep.coll.nodes.copy() * level.status.dt_new / level.params.dt
+
+                if level.f[0] is None:
+                    prob = level.prob
+                    level.f[0] = prob.eval_f(level.u[0], level.time)
 
                 interpolator = LagrangeApproximation(points=np.append(0, nodes_old))
                 interpolation_matrix = interpolator.getInterpolationMatrix(np.append(0, nodes_new))
