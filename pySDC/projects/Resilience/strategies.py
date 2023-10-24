@@ -1694,7 +1694,7 @@ class AdaptivityPolynomialError(WildRiot):
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, **kwargs):
+    def __init__(self, interpolate_between_restarts=True, **kwargs):
         '''
         Initialization routine
         '''
@@ -1709,6 +1709,7 @@ class AdaptivityPolynomialError(WildRiot):
         self.precision_parameter = 'e_tol'
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
+        self.interpolate_between_restarts = interpolate_between_restarts
         # self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
@@ -1770,6 +1771,7 @@ class AdaptivityPolynomialError(WildRiot):
                 # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
                 'factor_if_not_converged': max_slope,
+                'interpolate_between_restarts': self.interpolate_between_restarts,
             },
             StepSizeLimiter: {
                 'dt_max': dt_max,

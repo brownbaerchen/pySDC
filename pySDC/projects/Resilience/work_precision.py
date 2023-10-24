@@ -762,6 +762,22 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
         }
 
+    elif mode == 'interpolate_between_restarts':
+        from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
+
+        i = 0
+        for interpolate_between_restarts, handle, ls in zip(
+            [True, False], ['Interpolation bewteen restarts', 'regular'], ['--', '-']
+        ):
+            configurations[i] = {
+                'strategies': [
+                    AdaptivityPolynomialError(interpolate_between_restarts=interpolate_between_restarts, useMPI=True)
+                ],
+                'plotting_params': {'ls': ls},
+                'handle': handle,
+            }
+            i += 1
+
     elif mode == 'RK':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
 
@@ -1709,17 +1725,17 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'compare_strategies',
+        'mode': 'interpolate_between_restarts',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
-    record = True
-    single_problem(**params_single, work_key='k_linear', precision_key='e_global_rel', record=record)
+    record = False
+    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)

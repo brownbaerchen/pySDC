@@ -55,8 +55,8 @@ class InterpolateBetweenRestarts(ConvergenceController):
                     level.f[0] = level.prob.dtype_f(level.prob.init)
 
                 for m in range(len(level.u)):
-                    level.u[m][:] = self.status.u_inter[i][m][:]
-                    level.f[m][:] = self.status.f_inter[i][m][:]
+                    level.u[m][:] = self.status.u_inter[i][m].reshape(level.prob.init[0])[:]
+                    level.f[m][:] = self.status.f_inter[i][m].reshape(level.prob.init[0])[:]
 
             # reset the status variables
             self.status.perform_interpolation = False
@@ -95,8 +95,8 @@ class InterpolateBetweenRestarts(ConvergenceController):
 
                 interpolator = LagrangeApproximation(points=np.append(0, nodes_old))
                 interpolation_matrix = interpolator.getInterpolationMatrix(np.append(0, nodes_new))
-                self.status.u_inter += [(interpolation_matrix @ level.u[:])[:]]
-                self.status.f_inter += [(interpolation_matrix @ level.f[:])[:]]
+                self.status.u_inter += [(interpolation_matrix @ [me.flatten() for me in level.u][:])[:]]
+                self.status.f_inter += [(interpolation_matrix @ [me.flatten() for me in level.f][:])[:]]
                 self.status.perform_interpolation = True
 
                 self.log(
