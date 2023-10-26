@@ -119,6 +119,8 @@ def run_quench(
     problem_params = {
         'newton_tol': 1e-9,
         'direct_solver': False,
+        'order': 6,
+        'nvars': 2**7,
     }
 
     # initialize step parameters
@@ -474,9 +476,10 @@ def iteration_counts():
     description['level_params'] = {'dt': 5.0, 'restol': -1}
     description = merge_descriptions(description, strategy.get_custom_description(run_quench, 1))
     description['step_params'] = {'maxiter': 5}
-    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-11
+    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-10
     description['problem_params']['newton_maxiter'] = 20
     description['problem_params']['liniter'] = 20
+    description['problem_params']['nvars'] = 2**5
 
     controller_params = {'logger_level': 15}
 
@@ -487,8 +490,6 @@ def iteration_counts():
         imex=False,
         custom_controller_params=controller_params,
     )
-    e_glob = get_sorted(stats, type='e_global_post_step', recomputed=False)
-    e_loc = get_sorted(stats, type='e_local_post_step', recomputed=False)
     u = get_sorted(stats, type='u', recomputed=False)
 
     from pySDC.helpers.stats_helper import get_list_of_types

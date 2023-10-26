@@ -1725,16 +1725,16 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'interpolate_between_restarts',
+        'mode': 'RK_comp',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
-    record = False
+    record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)

@@ -203,7 +203,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             return 1.0
         elif problem.__name__ == "run_quench":
-            return 600.0
+            return 500.0
         elif problem.__name__ == "run_AC":
             return 1e-2
         else:
@@ -251,10 +251,11 @@ class Strategy:
             custom_description['problem_params'] = {
                 'newton_maxiter': 29,
                 'newton_tol': 1e-7,
-                'nvars': 2**7,
+                'nvars': 2**5,
                 'direct_solver': False,
                 'lintol': 1e-8,
                 'liniter': 29,
+                'order': 6,
             }
         elif problem.__name__ == "run_AC":
             custom_description['level_params'] = {'restol': -1, 'dt': 1e-4}
@@ -1694,7 +1695,7 @@ class AdaptivityPolynomialError(WildRiot):
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, interpolate_between_restarts=True, **kwargs):
+    def __init__(self, interpolate_between_restarts=False, **kwargs):
         '''
         Initialization routine
         '''

@@ -173,7 +173,9 @@ class LogGlobalErrorPostRun(hooks):
             L = step.levels[level_number]
 
             u_num = L.uend
+            print('u_num', max(u_num))
             u_ref = L.prob.u_exact(t=self.t_last_solution)
+            print('u_ref', max(u_ref), 'e', max(u_num) - max(u_ref), self.t_last_solution)
 
             self.logger.info(f'Finished with a global error of e={abs(u_num-u_ref):.2e}')
 

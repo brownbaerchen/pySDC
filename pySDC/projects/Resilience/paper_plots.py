@@ -428,7 +428,7 @@ def plot_quench_solution():  # pragma: no cover
 
     prob = controller.MS[0].levels[0].prob
 
-    u = get_sorted(stats, type='u')
+    u = get_sorted(stats, type='u', recomputed=False)
 
     ax.plot([me[0] for me in u], [max(me[1]) for me in u], color='black', label='$T$')
     ax.axhline(prob.u_thresh, label='$T_\mathrm{thresh}$', ls='--', color='grey', zorder=-1)
@@ -571,9 +571,9 @@ def make_plots_for_paper():  # pragma: no cover
     BASE_PATH = 'data/paper'
 
     # plot_adaptivity_stuff()
-    work_precision()
+    # work_precision()
     # plot_vdp_solution()
-    # plot_quench_solution()
+    plot_quench_solution()
     # plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
