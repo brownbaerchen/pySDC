@@ -12,13 +12,26 @@ def generate_description(problem_class, **kwargs):
     from pySDC.core.Level import _Pars as level_params
     from pySDC.core.Step import _Pars as step_params
 
+    from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+
+    if problem_class.dtype_f in [mesh]:
+        from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+
+        default_sweeper = generic_implicit
+    elif problem_class.dtype_f in [imex_mesh]:
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+
+        default_sweeper = imex_1st_order
+    else:
+        default_sweeper = None
+
     description = {
         'level_params': {},
         'problem_params': {},
         'sweeper_params': {},
         'problem_class': problem_class,
         'step_params': {},
-        'sweeper_class': kwargs.get('sweeper_class', problem_class.get_default_sweeper_class()),
+        'sweeper_class': kwargs.get('sweeper_class', default_sweeper),
         'convergence_controllers': {},
     }
 
