@@ -119,8 +119,11 @@ def run_quench(
     problem_params = {
         'newton_tol': 1e-9,
         'direct_solver': False,
+<<<<<<< HEAD
         'order': 6,
         'nvars': 2**7,
+=======
+>>>>>>> upstream/master
     }
 
     # initialize step parameters
