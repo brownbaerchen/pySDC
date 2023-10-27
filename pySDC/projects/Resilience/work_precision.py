@@ -1210,32 +1210,45 @@ def get_configs(mode, problem):
             BaseStrategy,
             ESDIRKStrategy,
             ERKStrategy,
+            AdaptivityPolynomialError,
         )
 
-        strategies = [AdaptivityStrategy(useMPI=True)]
+        inexacness = False
+        strategies = [
+            AdaptivityPolynomialError(
+                useMPI=True, SDC_maxiter=29, newton_inexactness=inexacness, linear_inexactness=inexacness
+            ),
+            BaseStrategy(useMPI=True),
+        ]
 
         desc = {}
-        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
-        desc['step_params'] = {'maxiter': 5}
+        desc['sweeper_params'] = {
+            'num_nodes': 3,
+        }
+        # desc['step_params'] = {'maxiter': 5}
 
         precons = ['IE', 'LU']
-        ls = ['-', '--', '-.', ':']
-        for i in range(len(precons)):
-            desc['sweeper_params']['QI'] = precons[i]
+        ls = ['-.', '--', '-', ':']
+        for i in range(len(precons) + 1):
+            if i < len(precons):
+                desc['sweeper_params']['QI'] = precons[i]
+                handle = precons[i]
+            else:
+                handle = None
             configurations[i] = {
                 'strategies': strategies,
                 'custom_description': copy.deepcopy(desc),
-                'handle': precons[i],
+                'handle': handle,
                 'plotting_params': {'ls': ls[i]},
             }
 
-        configurations[-1] = {
-            'strategies': [
-                ERKStrategy(useMPI=True),
-                ESDIRKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-        }
+        # configurations[-1] = {
+        #     'strategies': [
+        #         ERKStrategy(useMPI=True),
+        #         ESDIRKStrategy(useMPI=True),
+        #     ],
+        #     'num_procs': 1,
+        # }
 
     elif mode == 'RK_comp':
         from pySDC.projects.Resilience.strategies import (
@@ -1429,7 +1442,7 @@ def get_fig(x=1, y=1, **kwargs):  # pragma: no cover
 
 
 def save_fig(
-    fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', **kwargs
+    fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', squares=True, **kwargs
 ):  # pragma: no cover
     """
     Save a figure with a legend on the bottom.
@@ -1441,6 +1454,8 @@ def save_fig(
         precision_key (str): The key in the recorded data you want on the y-axis
         legend (bool): Put a legend or not
         format (str): Format to store the figure with
+        base_path (str): Some path where all the files are stored
+        squares (bool): Adjust aspect ratio to squares if true
 
     Returns:
         None
@@ -1451,6 +1466,8 @@ def save_fig(
         h, l = ax.get_legend_handles_labels()
         handles += [h[i] for i in range(len(h)) if l[i] not in labels]
         labels += [me for me in l if me not in labels]
+        if squares:
+            ax.set_box_aspect(1)
     order = np.argsort([me[0] for me in labels])
     fig.legend(
         [handles[i] for i in order],
@@ -1503,8 +1520,8 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             configurations=get_configs(mode, problems[i]),
             mode=mode,
         )
-        if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
-            axs.flatten()[i].set_xticks([4.0, 10.0], minor=True)
+        # if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
+        #     axs.flatten()[i].set_xticks([4.0, 10.0], minor=True)
 
     if plotting and shared_params['comm_world'].rank == 0:
         save_fig(
@@ -1724,17 +1741,17 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'inexactness',
+        'mode': 'preconditioners',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_vdp,
+        'problem': run_quench,
     }
-    record = True
-    single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = False
+    # single_problem(**params_single, work_key='k_linear', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1742,9 +1759,9 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
+        'record': True,
         'runs': 5,
-        'work_key': 'restart',
+        'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
         #'num_procs': 4,
@@ -1755,6 +1772,7 @@ if __name__ == "__main__":
         # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
+        'preconditioners',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
