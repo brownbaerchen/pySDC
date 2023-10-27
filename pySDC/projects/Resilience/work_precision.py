@@ -1058,36 +1058,35 @@ def get_configs(mode, problem):
             AdaptivityPolynomialError,
         ]
 
+        inexactness = {
+            'newton_inexactness': True,
+            'linear_inexactness': True,
+        }
+        no_inexactness = {
+            'newton_inexactness': False,
+            'linear_inexactness': False,
+            'SDC_maxiter': 99,
+            'use_restol_rel': False,
+        }
+
         # configurations[0] = {
         #     'custom_description': {'sweeper_class': parallel_sweeper},
         #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
         #     'num_procs_sweeper': 3,
         #     'plotting_params': {'ls': '-', 'label': 'inexact'},
         # }
-        configurations[0] = {
-            #'custom_description': {'sweeper_params': {'QI': 'IEpar'}},
-            'strategies': [
-                me(useMPI=True, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=20) for me in strategies
-            ],
-            'num_procs_sweeper': 3,
-        }
         configurations[1] = {
-            'custom_description': {'sweeper_params': {'QI': 'IEpar'}},
-            'strategies': [
-                me(useMPI=True, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=20) for me in strategies
-            ],
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **no_inexactness) for me in strategies],
             'num_procs_sweeper': 3,
-            'handle': 'IEpar',
+            'handle': 'exact',
             'plotting_params': {'ls': '--'},
         }
-        configurations[2] = {
-            'custom_description': {'sweeper_params': {'QI': 'LU'}},
-            'strategies': [
-                me(useMPI=True, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=20) for me in strategies
-            ],
-            'num_procs_sweeper': 1,
-            'handle': 'LU',
-            'plotting_params': {'ls': ':'},
+        configurations[0] = {
+            'custom_description': {'sweeper_class': parallel_sweeper},
+            'strategies': [me(useMPI=True, **inexactness) for me in strategies],
+            'handle': 'inexact',
+            'num_procs_sweeper': 3,
         }
     elif mode == 'compare_adaptivity':
         # TODO: configurations not final!

@@ -358,9 +358,10 @@ class WildRiot(Strategy):
 
         if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
             if problem.__name__ == 'run_quench':
-                inexactness_params['ratio'] = 1e-2
-                inexactness_params['min_tol'] = 1e-12
-                inexactness_params['max_tol'] = 1e-3
+                inexactness_params['ratio'] = 1e-1
+                inexactness_params['min_tol'] = 1e-11
+                # inexactness_params['max_tol'] = 1e-3
+                inexactness_params['maxiter'] = 5
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
 
         if problem.__name__ in ['run_vdp']:
@@ -372,7 +373,8 @@ class WildRiot(Strategy):
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
                 desc['problem_params']['direct_solver'] = False
-                desc['problem_params']['liniter'] = 5
+                desc['problem_params']['liniter'] = 9
+                desc['problem_params']['min_lintol'] = 1e-11
 
         # if self.double_adaptivity:
         #     from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
@@ -509,7 +511,7 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             e_tol = 4e-6
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-10
+            e_tol = 1e-9
             # dt_max = 100.0
             # dt_slope_max = 4.
 
@@ -1697,7 +1699,7 @@ class AdaptivityPolynomialError(WildRiot):
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, interpolate_between_restarts=False, **kwargs):
+    def __init__(self, interpolate_between_restarts=False, use_restol_rel=True, **kwargs):
         '''
         Initialization routine
         '''
@@ -1713,6 +1715,7 @@ class AdaptivityPolynomialError(WildRiot):
         self.adaptive_coll_params = {}
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
         self.interpolate_between_restarts = interpolate_between_restarts
+        self.use_restol_rel = use_restol_rel
         # self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
@@ -1753,9 +1756,9 @@ class AdaptivityPolynomialError(WildRiot):
             # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-7
-            level_params['dt'] = 1.0
-            restol_min = 1e-12
+            e_tol = 1e-6
+            level_params['dt'] = 50.0
+            restol_min = 1e-11
             restol_rel = 1e-1
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
@@ -1768,8 +1771,8 @@ class AdaptivityPolynomialError(WildRiot):
         custom_description['convergence_controllers'] = {
             AdaptivityPolynomialError: {
                 'e_tol': e_tol,
-                'restol_rel': restol_rel,
-                'restol_min': restol_min,
+                'restol_rel': restol_rel if self.use_restol_rel else 1e-11,
+                'restol_min': restol_min if self.use_restol_rel else 1e-12,
                 # 'e_tol_rel': 1e-2,
                 # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
@@ -1781,7 +1784,7 @@ class AdaptivityPolynomialError(WildRiot):
                 'dt_slope_max': max_slope,
             },
         }
-        # custom_description['sweeper_class'] = sweeper_class
+        custom_description['level_params'] = level_params
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
