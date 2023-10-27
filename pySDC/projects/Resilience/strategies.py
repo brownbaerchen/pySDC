@@ -511,7 +511,7 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             e_tol = 4e-6
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-9
+            e_tol = 1e-8
             # dt_max = 100.0
             # dt_slope_max = 4.
 
@@ -1271,7 +1271,7 @@ class ESDIRKStrategy(AdaptivityStrategy):
         adaptivity_description['convergence_controllers'].pop(Adaptivity, None)
         adaptivity_description.pop('sweeper_params', None)
 
-        mod = 1e2 if problem.__name__ == 'run_quench' else 1.0
+        mod = 1e1 if problem.__name__ == 'run_quench' else 1.0
 
         rk_params = {
             'step_params': {'maxiter': 1},
@@ -1756,7 +1756,7 @@ class AdaptivityPolynomialError(WildRiot):
             # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
-            e_tol = 1e-6
+            e_tol = 1e-7
             level_params['dt'] = 50.0
             restol_min = 1e-11
             restol_rel = 1e-1

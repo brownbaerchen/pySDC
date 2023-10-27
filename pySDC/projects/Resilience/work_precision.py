@@ -1724,14 +1724,14 @@ if __name__ == "__main__":
     # ERK_stiff_weirdness()
 
     params = {
-        'mode': 'RK_comp',
+        'mode': 'inexactness',
         'runs': 1,
         #'num_procs': 1,  # min(comm_world.size, 5),
         'plotting': comm_world.rank == 0,
     }
     params_single = {
         **params,
-        'problem': run_quench,
+        'problem': run_vdp,
     }
     record = True
     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
