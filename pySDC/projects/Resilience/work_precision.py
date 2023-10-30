@@ -263,7 +263,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
+        exponents = [-3, -2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -287,10 +287,10 @@ def record_work_precision(
         # elif param == 'e_tol':
         #     # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
         #     param_range = np.logspace(-5, -8, 6)
-        elif param == 'dt':
-            # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
-            param_range = [1.0, 2.5, 5.0, 10.0, 20.0][::-1]
-            # param_range = [20.]
+        # elif param == 'dt':
+        #     # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
+        #     param_range = [1.0, 2.5, 5.0, 10.0, 20.0][::-1]
+        #     # param_range = [20.]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -1740,9 +1740,11 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
 
+    record = True
     for mode in [
-        # 'compare_strategies',
+        'compare_strategies',
         'RK_comp',
+        'step_size_limiting',
     ]:
         params = {
             'mode': mode,
@@ -1754,8 +1756,7 @@ if __name__ == "__main__":
             **params,
             'problem': run_quench,
         }
-        record = True
-        single_problem(**params_single, work_key='k_linear', precision_key='e_global_rel', record=record)
+        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1776,7 +1777,7 @@ if __name__ == "__main__":
         # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
-        'preconditioners',
+        # 'preconditioners',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

@@ -460,7 +460,7 @@ class AdaptivityStrategy(Strategy):
     # def get_description_for_tolerance(self, problem, param, **kwargs):
     #     desc = {}
     #     if problem.__name__ in ['run_quench']:
-    #         desc['problem_params'] = {'newton_tol': max([param / 1e0, 1e-9]), 'lintol': max([param / 1e1, 1e-9]), 'liniter': 20, 'newton_maxiter': 99}
+    #         desc['problem_params'] = {'newton_tol': min([max([param / 1e2, 1e-11]), 1e-7]), 'lintol': min([max([param / 1e2, 1e-11]), 1e-7]), 'liniter': 29, 'newton_maxiter': 29}
     #     return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
@@ -512,6 +512,10 @@ class AdaptivityStrategy(Strategy):
             e_tol = 4e-6
         elif problem.__name__ == "run_quench":
             e_tol = 1e-8
+            custom_description['problem_params'] = {
+                'newton_tol': 1e-9,
+                'lintol': 1e-10,
+            }
             # dt_max = 100.0
             # dt_slope_max = 4.
 
@@ -725,7 +729,7 @@ strategy'
         }
 
         if problem.__name__ == "run_quench":
-            custom_description['level_params']['dt'] = 1
+            custom_description['level_params']['dt'] = 1.0
 
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
@@ -757,9 +761,13 @@ class kAdaptivityStrategy(IterateStrategy):
         self.precision_parameter = 'dt'
         self.precision_parameter_loc = ['level_params', 'dt']
 
-    def get_custom_description(self, *args, **kwargs):
-        desc = super().get_custom_description(*args, **kwargs)
+    def get_custom_description(self, problem, num_procs, *args, **kwargs):
+        desc = super().get_custom_description(problem, num_procs, *args, **kwargs)
         desc['level_params']['restol'] = 1e-9
+        if problem.__name__ == "run_quench":
+            desc['problem_params']['newton_tol'] = 1e-9
+            desc['problem_params']['lintol'] = 1e-9
+            desc['level_params']['dt'] = 2.5
         return desc
 
 
