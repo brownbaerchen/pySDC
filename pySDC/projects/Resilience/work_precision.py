@@ -477,6 +477,36 @@ def plot_work_precision(
             ax.text(0.1, 0.2, "No sampling!", transform=ax.transAxes)
 
 
+def plot_parallel_efficiency_diagonalSDC(ax, work_key, precision_key, num_procs_sweeper, num_procs=1, **kwargs):
+    serial_data = load(
+        num_procs=num_procs,
+        num_procs_sweeper=1,
+        **kwargs,
+    )
+    parallel_data = load(
+        num_procs=num_procs,
+        num_procs_sweeper=num_procs_sweeper,
+        **kwargs,
+    )
+    serial_work, serial_precision = extract_data(serial_data, work_key, precision_key)
+    parallel_work, parallel_precision = extract_data(parallel_data, work_key, precision_key)
+    # assert np.allclose(serial_precision, parallel_precision)
+
+    serial_work = np.asarray(serial_work)
+    parallel_work = np.asarray(parallel_work)
+
+    # ax.loglog(serial_work, serial_precision)
+    # ax.loglog(parallel_work, parallel_precision)
+
+    speedup = serial_work / parallel_work
+    parallel_efficiency = np.median(speedup) / num_procs_sweeper
+    ax.plot(serial_precision, speedup)
+    ax.set_xscale('log')
+    ax.set_ylabel('speedup')
+
+    return np.median(speedup), parallel_efficiency
+
+
 def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only=False):  # pragma: no cover
     """
     Decorate a plot
@@ -865,7 +895,7 @@ def get_configs(mode, problem):
 
         for parallel in [False, True]:
             desc = {'sweeper_class': parallel_sweeper} if parallel else {}
-            for num_nodes, ls in zip([3, 4, 2], ['-', '--', ':', '-.']):
+            for num_nodes, ls in zip([3, 4, 5], ['-', '--', ':', '-.']):
                 configurations[num_nodes + (99 if parallel else 0)] = {
                     'custom_description': {**desc, 'sweeper_params': {'num_nodes': num_nodes}},
                     'strategies': [
@@ -1763,10 +1793,43 @@ def ERK_stiff_weirdness():
     plt.show()
 
 
+def aggregate_parallel_efficiency_plot():
+    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
+
+    _fig, _ax = plt.subplots(1, 1)
+    num_procs = 1
+    num_procs_sweeper = 2
+    problem = run_Schroedinger
+
+    num_procs_sweeper_list = [3, 4, 5]
+    speedup = []
+    for num_procs_sweeper in num_procs_sweeper_list:
+        s, e = plot_parallel_efficiency_diagonalSDC(
+            ax=_ax,
+            work_key='t',
+            precision_key='e_global_rel',
+            num_procs=num_procs,
+            num_procs_sweeper=num_procs_sweeper,
+            problem=problem,
+            strategy=AdaptivityPolynomialError(),
+            mode='diagonal_SDC',
+            handle=f'{num_procs_sweeper} nodes',
+        )
+        speedup += [s]
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(num_procs_sweeper_list, speedup)
+    ax.plot(num_procs_sweeper_list, [speedup[i] / num_procs_sweeper_list[i] for i in range(len(speedup))])
+    print(num_procs_sweeper_list, speedup)
+
+
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
     # vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
+
+    aggregate_parallel_efficiency_plot()
+    plt.show()
 
     record = True
     for mode in [
