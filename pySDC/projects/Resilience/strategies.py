@@ -423,7 +423,7 @@ class BaseStrategy(Strategy):
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
-        desc['level_params']['dt'] = 3.0
+        desc['level_params']['dt'] = 5.0
         return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -786,7 +786,7 @@ class kAdaptivityStrategy(IterateStrategy):
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
-        desc['level_params']['dt'] = 3.0
+        desc['level_params']['dt'] = 5.0
         return desc
 
 
@@ -878,7 +878,7 @@ class HotRodStrategy(Strategy):
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
-        desc['level_params']['dt'] = 3.0
+        desc['level_params']['dt'] = 5.0
         return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):

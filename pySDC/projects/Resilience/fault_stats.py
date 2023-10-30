@@ -1654,7 +1654,7 @@ def main():
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1679,7 +1679,7 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(HotRodStrategy(), faults=True, run=0)
+    # stats_analyser.scrutinize(kAdaptivityStrategy(), faults=False, run=0)
     # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
