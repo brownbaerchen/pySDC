@@ -287,10 +287,10 @@ def record_work_precision(
         # elif param == 'e_tol':
         #     # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
         #     param_range = np.logspace(-5, -8, 6)
-        # elif param == 'dt':
-        #     # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
-        #     param_range = [1.0, 2.5, 5.0, 10.0, 20.0][::-1]
-        #     # param_range = [20.]
+        elif param == 'dt':
+            # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
+            param_range = [1.25, 2.5, 5.0, 10.0, 20.0][::-1]
+            # param_range = [20.]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -863,7 +863,7 @@ def get_configs(mode, problem):
                 generic_implicit_MPI as parallel_sweeper,
             )
 
-        for parallel in [True, False]:
+        for parallel in [False, True]:
             desc = {'sweeper_class': parallel_sweeper} if parallel else {}
             for num_nodes, ls in zip([3, 4, 2], ['-', '--', ':', '-.']):
                 configurations[num_nodes + (99 if parallel else 0)] = {
@@ -877,7 +877,7 @@ def get_configs(mode, problem):
                     'plotting_params': {
                         'ls': ls,
                         'label': f'{num_nodes} procs',
-                        **{'color': 'grey' if parallel else None},
+                        # **{'color': 'grey' if parallel else None},
                     },
                 }
 
@@ -1770,7 +1770,7 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        # 'compare_strategies',
+        'compare_strategies',
         # 'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
@@ -1778,13 +1778,13 @@ if __name__ == "__main__":
     ]:
         params = {
             'mode': mode,
-            'runs': 1,
+            'runs': 5,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }
         params_single = {
             **params,
-            'problem': run_vdp,
+            'problem': run_quench,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
