@@ -251,7 +251,7 @@ class Strategy:
             custom_description['problem_params'] = {
                 'newton_maxiter': 29,
                 'newton_tol': 1e-7,
-                'nvars': 2**5,
+                'nvars': 2**6,
                 'direct_solver': False,
                 'lintol': 1e-8,
                 'liniter': 29,
