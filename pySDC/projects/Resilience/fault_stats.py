@@ -358,7 +358,7 @@ class FaultStats:
         force_params = {} if force_params is None else force_params
 
         # build the custom description
-        custom_description = strategy.get_custom_description(self.prob, self.num_procs)
+        custom_description = strategy.get_custom_description_for_faults(self.prob, self.num_procs)
         for k in force_params.keys():
             custom_description[k] = {**custom_description.get(k, {}), **force_params[k]}
 
@@ -1662,13 +1662,13 @@ def main():
         'stop_at_nan': True,
     }
 
-    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
+    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError, kAdaptivityStrategy
 
     stats_analyser = FaultStats(
         strategies=[
             BaseStrategy(**strategy_args),
             AdaptivityStrategy(**strategy_args),
-            IterateStrategy(**strategy_args),
+            kAdaptivityStrategy(**strategy_args),
             HotRodStrategy(**strategy_args),
             AdaptivityPolynomialError(**strategy_args),
         ],
@@ -1679,8 +1679,8 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.scrutinize(AdaptivityStrategy(), faults=True, run=0)
-    return None
+    # stats_analyser.scrutinize(HotRodStrategy(), faults=True, run=0)
+    # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     # ##################

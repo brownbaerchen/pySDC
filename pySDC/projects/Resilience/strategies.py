@@ -299,6 +299,15 @@ class Strategy:
         custom_description = self.get_base_parameters(problem, num_procs)
         return merge_descriptions(custom_description, self.custom_description)
 
+    def get_custom_description_for_faults(self, *args, **kwargs):
+        '''
+        Get a custom description based on the problem to run the fault stuff
+
+        Returns:
+            dict: Custom description
+        '''
+        return self.get_custom_description(*args, **kwargs)
+
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
         Get a reference value for a given problem for testing in CI.
@@ -411,6 +420,11 @@ class BaseStrategy(Strategy):
     @property
     def label(self):
         return r'fixed'
+
+    def get_custom_description_for_faults(self, problem, *args, **kwargs):
+        desc = self.get_custom_description(problem, *args, **kwargs)
+        desc['level_params']['dt'] = 3.0
+        return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
@@ -770,6 +784,11 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['level_params']['dt'] = 2.5
         return desc
 
+    def get_custom_description_for_faults(self, problem, *args, **kwargs):
+        desc = self.get_custom_description(problem, *args, **kwargs)
+        desc['level_params']['dt'] = 3.0
+        return desc
+
 
 class HotRodStrategy(Strategy):
     '''
@@ -856,6 +875,11 @@ class HotRodStrategy(Strategy):
         }
 
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+
+    def get_custom_description_for_faults(self, problem, *args, **kwargs):
+        desc = self.get_custom_description(problem, *args, **kwargs)
+        desc['level_params']['dt'] = 3.0
+        return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
@@ -1794,6 +1818,14 @@ class AdaptivityPolynomialError(WildRiot):
         }
         custom_description['level_params'] = level_params
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+
+    def get_custom_description_for_faults(self, problem, *args, **kwargs):
+        desc = self.get_custom_description(problem, *args, **kwargs)
+        if problem.__name__ == "run_quench":
+            from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+
+            desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] *= 10
+        return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
