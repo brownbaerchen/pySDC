@@ -263,7 +263,7 @@ def record_work_precision(
     if param == 'e_tol':
         power = 10.0
         set_parameter(description, strategy.precision_parameter_loc[:-1] + ['dt_min'], 0)
-        exponents = [-3, -2, -1, 0, 1, 2, 3]
+        exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
@@ -853,6 +853,34 @@ def get_configs(mode, problem):
             #     'num_procs': num_procs,
             #     'plotting_params': plotting_params,
             # }
+    elif mode == 'diagonal_SDC':
+        from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        for parallel in [True, False]:
+            desc = {'sweeper_class': parallel_sweeper} if parallel else {}
+            for num_nodes, ls in zip([3, 4, 2], ['-', '--', ':', '-.']):
+                configurations[num_nodes + (99 if parallel else 0)] = {
+                    'custom_description': {**desc, 'sweeper_params': {'num_nodes': num_nodes}},
+                    'strategies': [
+                        AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)
+                    ],
+                    'num_procs_sweeper': num_nodes if parallel else 1,
+                    'num_procs': 1,
+                    'handle': f'{num_nodes} nodes',
+                    'plotting_params': {
+                        'ls': ls,
+                        'label': f'{num_nodes} procs',
+                        **{'color': 'grey' if parallel else None},
+                    },
+                }
+
     elif mode == 'parallel_efficiency':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityPolynomialError
 
@@ -1742,19 +1770,21 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        'compare_strategies',
-        'RK_comp',
-        'step_size_limiting',
+        # 'compare_strategies',
+        # 'RK_comp',
+        # 'step_size_limiting',
+        # 'parallel_efficiency',
+        'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
-            'runs': 5,
+            'runs': 1,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }
         params_single = {
             **params,
-            'problem': run_quench,
+            'problem': run_vdp,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
