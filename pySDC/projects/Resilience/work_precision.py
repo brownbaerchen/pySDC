@@ -895,7 +895,7 @@ def get_configs(mode, problem):
 
         for parallel in [False, True]:
             desc = {'sweeper_class': parallel_sweeper} if parallel else {}
-            for num_nodes, ls in zip([3, 4, 5], ['-', '--', ':', '-.']):
+            for num_nodes, ls in zip([3, 4, 2], ['-', '--', ':', '-.']):
                 configurations[num_nodes + (99 if parallel else 0)] = {
                     'custom_description': {**desc, 'sweeper_params': {'num_nodes': num_nodes}},
                     'strategies': [
@@ -1828,12 +1828,12 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
 
-    aggregate_parallel_efficiency_plot()
-    plt.show()
+    # aggregate_parallel_efficiency_plot()
+    # plt.show()
 
     record = True
     for mode in [
-        'compare_strategies',
+        # 'compare_strategies',
         # 'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
@@ -1841,7 +1841,7 @@ if __name__ == "__main__":
     ]:
         params = {
             'mode': mode,
-            'runs': 5,
+            'runs': 1,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }
@@ -1857,8 +1857,8 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': False,
-        'runs': 5,
+        'record': True,
+        'runs': 1,
         'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
@@ -1871,6 +1871,7 @@ if __name__ == "__main__":
         # 'compare_adaptivity',
         # 'compare_strategies',
         # 'preconditioners',
+        # 'diagonal_SDC',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

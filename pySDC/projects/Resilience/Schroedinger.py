@@ -188,7 +188,7 @@ def run_Schroedinger(
     crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
-    except ConvergenceError as e:
+    except (ConvergenceError, OverflowError) as e:
         print(f'Warning: Premature termination: {e}')
         stats = controller.return_stats()
         crash = True
