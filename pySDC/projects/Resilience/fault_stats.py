@@ -321,7 +321,7 @@ class FaultStats:
         Tend_reached = t + lvl.params.dt_initial >= Tend
 
         if Tend_reached:
-            return abs(u - lvl.prob.u_exact(t=t))
+            return abs(u - lvl.prob.u_exact(t=t)) / abs(u)
         else:
             print(f'Final time was not reached! Code crashed at t={t:.2f} instead of reaching Tend={Tend:.2f}')
             return np.inf
@@ -547,8 +547,7 @@ class FaultStats:
         recovery_thresh = self.get_thresh(strategy)
 
         print(
-            f'e={error:.2e}, e^*={e_star:.2e}, thresh: {recovery_thresh:.2e} -> recovered: \
-{error < recovery_thresh}'
+            f'e={error:.2e}, e^*={e_star:.2e}, thresh: {recovery_thresh:.2e} -> recovered: {error < recovery_thresh}, e_rel = {error/abs(u):.2e}'
         )
         print(f'k: sum: {np.sum(k)}, min: {np.min(k)}, max: {np.max(k)}, mean: {np.mean(k):.2f},')
 
@@ -1654,7 +1653,7 @@ def main():
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1679,13 +1678,13 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(kAdaptivityStrategy(), faults=False, run=0)
+    # stats_analyser.scrutinize(BaseStrategy(), faults=True, run=1)
     # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     # ##################
-    # S = AdaptivityPolynomialError()
-    # stats_analyser.scrutinize(S, run=1, faults=False, logger_level=15)
+    # S = AdaptivityStrategy()
+    # stats_analyser.scrutinize(S, run=189, faults=True, logger_level=15)
 
     # recoverable = stats_analyser.get_fixable_faults_only(S)
     # mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)

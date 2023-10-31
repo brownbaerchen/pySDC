@@ -126,7 +126,7 @@ class Strategy:
         elif problem.__name__ == "run_Schroedinger":
             args['time'] = 0.3
         elif problem.__name__ == "run_quench":
-            args['time'] = 31.0
+            args['time'] = 41.0
         elif problem.__name__ == "run_Lorenz":
             args['time'] = 0.3
 
@@ -153,7 +153,7 @@ class Strategy:
             rnd_params['min_node'] = 1
 
         if problem.__name__ == "run_quench":
-            rnd_params['iteration'] = 1
+            rnd_params['iteration'] = 5
         elif problem.__name__ == 'run_Lorenz':
             rnd_params['iteration'] = 3
         return rnd_params
@@ -1825,7 +1825,7 @@ class AdaptivityPolynomialError(WildRiot):
         if problem.__name__ == "run_quench":
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
 
-            desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] *= 11
+            desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] = 1e-7 * 11
             desc['level_params']['dt'] = 4.0
         return desc
 
