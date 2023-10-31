@@ -1678,8 +1678,8 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.scrutinize(kAdaptivityStrategy(), faults=False, run=1)
-    return None
+    # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=True, run=1)
+    # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     # ##################

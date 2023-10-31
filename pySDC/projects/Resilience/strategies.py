@@ -759,7 +759,7 @@ strategy'
             dict: Randomization parameters
         '''
 
-        rnd_params = super.get_random_params(problem, num_procs)
+        rnd_params = super().get_random_params(problem, num_procs)
         if problem.__name__ == "run_quench":
             rnd_params['iteration'] = 1
         return rnd_params
@@ -1845,6 +1845,23 @@ class AdaptivityPolynomialError(WildRiot):
             desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] = 1e-7 * 11
             desc['level_params']['dt'] = 4.0
         return desc
+
+    def get_random_params(self, problem, num_procs):
+        '''
+        Routine to get parameters for the randomization of faults
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            dict: Randomization parameters
+        '''
+
+        rnd_params = super().get_random_params(problem, num_procs)
+        if problem.__name__ == "run_quench":
+            rnd_params['iteration'] = 1
+        return rnd_params
 
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
