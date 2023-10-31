@@ -747,6 +747,23 @@ strategy'
 
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
+    def get_random_params(self, problem, num_procs):
+        '''
+        Routine to get parameters for the randomization of faults
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            num_procs (int): Number of processes you intend to run with
+
+        Returns:
+            dict: Randomization parameters
+        '''
+
+        rnd_params = super.get_random_params(problem, num_procs)
+        if problem.__name__ == "run_quench":
+            rnd_params['iteration'] = 1
+        return rnd_params
+
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
         Get a reference value for a given problem for testing in CI.
