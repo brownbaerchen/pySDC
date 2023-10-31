@@ -561,7 +561,7 @@ class FaultStats:
 
         # checkout the step size
         dt = [me[1] for me in get_sorted(stats, type='dt')]
-        print(f'dt: min: {np.min(dt):.2e}, max: {np.max(dt):.2e}, mean: {np.mean(dt):.2e}')
+        print(f't: {t:.2f}, dt: min: {np.min(dt):.2e}, max: {np.max(dt):.2e}, mean: {np.mean(dt):.2e}')
 
         # restarts
         restarts = [me[1] for me in get_sorted(stats, type='restart')]
@@ -1654,7 +1654,7 @@ def main():
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
-        'reload': False,
+        'reload': True,
         **parse_args(),
     }
 
@@ -1685,11 +1685,11 @@ def main():
 
     # ##################
     # S = AdaptivityPolynomialError()
-    # stats_analyser.scrutinize(S, run=1161, faults=False, logger_level=15)
+    # stats_analyser.scrutinize(S, run=1, faults=False, logger_level=15)
 
     # recoverable = stats_analyser.get_fixable_faults_only(S)
     # mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
-    # stats_analyser.print_faults(mask, strategy=S)
+    # # stats_analyser.print_faults(mask, strategy=S)
     # return None
     # ##################
 

@@ -786,7 +786,8 @@ class kAdaptivityStrategy(IterateStrategy):
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
-        desc['level_params']['dt'] = 5.0
+        if problem.__name__ == 'run_quench':
+            desc['level_params']['dt'] = 5.0
         return desc
 
 
@@ -1824,7 +1825,8 @@ class AdaptivityPolynomialError(WildRiot):
         if problem.__name__ == "run_quench":
             from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
 
-            desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] *= 10
+            desc['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] *= 11
+            desc['level_params']['dt'] = 4.0
         return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
