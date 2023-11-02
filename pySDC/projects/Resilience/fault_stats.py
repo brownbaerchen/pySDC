@@ -1653,7 +1653,7 @@ def main():
         'prob': run_Lorenz,
         'num_procs': 1,
         'mode': 'default',
-        'runs': 2000,
+        'runs': 5000,
         'reload': False,
         **parse_args(),
     }
@@ -1684,7 +1684,7 @@ def main():
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     ##################
-    S = AdaptivityStrategy()
+    S = BaseStrategy()
     stats_analyser.scrutinize(S, run=3, faults=True)
     mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
     # stats_analyser.print_faults(mask)
