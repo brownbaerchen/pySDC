@@ -1370,6 +1370,62 @@ def get_configs(mode, problem):
             'custom_description': desc,
             'num_procs': 4,
         }
+    elif mode == 'RK_comp_high_order':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            ERKStrategy,
+            ESDIRKStrategy,
+            ARKStrategy,
+            AdaptivityPolynomialError,
+        )
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 4, 'QI': 'IE', 'QE': "EE"}
+        desc['step_params'] = {'maxiter': 7}
+
+        desc_poly = {}
+        desc_poly['sweeper_class'] = parallel_sweeper
+        desc_poly['sweeper_params'] = {'num_nodes': 4}
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
+        }
+
+        desc_RK = {}
+        if problem.__name__ in ['run_Schroedinger']:
+            desc_RK['problem_params'] = {'imex': True}
+
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 4,
+        }
+        configurations[-1] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            'custom_description': desc_RK,
+        }
+
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 4,
+        }
     elif mode == 'imex':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy, ARKStrategy
 
@@ -1847,12 +1903,12 @@ if __name__ == "__main__":
 
     # aggregate_parallel_efficiency_plot()
 
-    record = True
+    record = False
     for mode in [
         # 'compare_strategies',
-        # 'RK_comp',
+        'RK_comp_high_order',
         # 'step_size_limiting',
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         #'diagonal_SDC',
     ]:
         params = {
@@ -1863,9 +1919,9 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Lorenz,
+            'problem': run_Schroedinger,
         }
-        # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1883,7 +1939,7 @@ if __name__ == "__main__":
 
     for mode in [
         # 'RK_comp',
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
         # 'preconditioners',
