@@ -949,9 +949,9 @@ def get_configs(mode, problem):
             plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(useMPI=True)],
-                'custom_description': desc,
+                'custom_description': desc.copy(),
                 'num_procs': num_procs,
-                'plotting_params': plotting_params,
+                'plotting_params': plotting_params.copy(),
             }
             configurations[num_procs * 100 + 79] = {
                 'custom_description': {'sweeper_class': parallel_sweeper},
@@ -965,11 +965,7 @@ def get_configs(mode, problem):
 
         configurations[num_procs * 200 + 79] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True, newton_inexactness=True, linear_inexactness=True)],
-            'custom_description': {
-                #'sweeper_params': {'QI': 'LU'},
-            },
             'num_procs': 1,
-            #'plotting_params': {'ls': ls.get(1, '-'), 'label': f'{num_procs} x 1 procs'},
         }
 
     elif mode[:13] == 'vdp_stiffness':
@@ -1849,15 +1845,15 @@ if __name__ == "__main__":
     # vdp_stiffness_plot(runs=1, record=False)
     # ERK_stiff_weirdness()
 
-    aggregate_parallel_efficiency_plot()
+    # aggregate_parallel_efficiency_plot()
 
-    record = False
+    record = True
     for mode in [
         # 'compare_strategies',
         # 'RK_comp',
         # 'step_size_limiting',
-        # 'parallel_efficiency',
-        'diagonal_SDC',
+        'parallel_efficiency',
+        #'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
@@ -1867,9 +1863,9 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_quench,
+            'problem': run_Lorenz,
         }
-        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+        # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
     # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
@@ -1878,8 +1874,8 @@ if __name__ == "__main__":
 
     all_params = {
         'record': True,
-        'runs': 1,
-        'work_key': 't',
+        'runs': 5,
+        'work_key': 'restart',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
         #'num_procs': 4,
@@ -1887,7 +1883,7 @@ if __name__ == "__main__":
 
     for mode in [
         # 'RK_comp',
-        # 'parallel_efficiency',
+        'parallel_efficiency',
         # 'compare_adaptivity',
         # 'compare_strategies',
         # 'preconditioners',
