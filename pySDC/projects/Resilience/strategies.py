@@ -1886,6 +1886,8 @@ class AdaptivityPolynomialError(WildRiot):
         rnd_params = super().get_random_params(problem, num_procs)
         if problem.__name__ == "run_quench":
             rnd_params['iteration'] = 1
+        elif problem.__name__ == 'run_Lorenz':
+            rnd_params['iteration'] = 4
         return rnd_params
 
     def get_reference_value(self, problem, key, op, num_procs=1):
