@@ -261,6 +261,7 @@ class FaultStats:
             faults_run = get_sorted(stats, type='bitflip')
 
             if faults:
+                assert len(faults_run) > 0, f"Did not record a fault in run {i} of {strategy.name}!"
                 dat['level'][i] = faults_run[0][1][0]
                 dat['iteration'][i] = faults_run[0][1][1]
                 dat['node'][i] = faults_run[0][1][2]
@@ -1650,7 +1651,7 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_Lorenz,
+        'prob': run_Schroedinger,
         'num_procs': 1,
         'mode': 'default',
         'runs': 5000,
@@ -1672,14 +1673,13 @@ def main():
             HotRodStrategy(**strategy_args),
             AdaptivityPolynomialError(**strategy_args),
         ],
-        # strategies=[AdaptivityPolynomialError()],
         faults=[False, True],
         recovery_thresh=1.15,
         recovery_thresh_abs=RECOVERY_THRESH_ABS.get(kwargs.get('prob', None), 0),
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(AdaptivityPolynomialError(), faults=False, run=0)
+    # stats_analyser.scrutinize(kAdaptivityStrategy(), faults=True, run=0)
     # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
