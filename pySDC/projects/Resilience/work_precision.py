@@ -946,7 +946,9 @@ def get_configs(mode, problem):
         }
 
         for num_procs in [4, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
+            plotting_params = (
+                {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity $N$={num_procs}x1'} if num_procs > 1 else {}
+            )
             configurations[num_procs] = {
                 'strategies': [AdaptivityStrategy(useMPI=True)],
                 'custom_description': desc.copy(),
@@ -960,7 +962,10 @@ def get_configs(mode, problem):
                 ],
                 'num_procs_sweeper': 3,
                 'num_procs': num_procs,
-                'plotting_params': {'ls': ls.get(num_procs * 3, '-'), 'label': f'{num_procs} x 3 procs'},
+                'plotting_params': {
+                    'ls': ls.get(num_procs * 3, '-'),
+                    'label': f'$\Delta tk$ adaptivity $N$={num_procs}x3',
+                },
             }
 
         configurations[num_procs * 200 + 79] = {
@@ -1563,7 +1568,7 @@ def get_fig(x=1, y=1, **kwargs):  # pragma: no cover
 
 
 def save_fig(
-    fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', squares=True, **kwargs
+    fig, name, work_key, precision_key, legend=True, format='pdf', base_path='data', squares=True, ncols=None, **kwargs
 ):  # pragma: no cover
     """
     Save a figure with a legend on the bottom.
@@ -1594,7 +1599,7 @@ def save_fig(
         [handles[i] for i in order],
         [labels[i] for i in order],
         loc='outside lower center',
-        ncols=3 if len(handles) % 3 == 0 else 4,
+        ncols=ncols if ncols else 3 if len(handles) % 3 == 0 else 4,
         frameon=False,
         fancybox=True,
     )
@@ -1652,6 +1657,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             precision_key=shared_params['precision_key'],
             legend=True,
             base_path=base_path,
+            ncols=3 if mode in ['parallel_efficiency'] else None,
         )
 
 
@@ -1929,9 +1935,9 @@ if __name__ == "__main__":
     # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
-        'record': True,
-        'runs': 5,
-        'work_key': 'restart',
+        'record': False,
+        'runs': 1,
+        'work_key': 'k_linear',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
         #'num_procs': 4,

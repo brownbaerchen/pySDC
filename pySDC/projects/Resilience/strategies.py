@@ -417,6 +417,23 @@ class BaseStrategy(Strategy):
         self.precision_parameter = 'dt'
         self.precision_parameter_loc = ['level_params', 'dt']
 
+    # def get_fault_args(self, problem, num_procs):
+    #     '''
+    #     Routine to get arguments for the faults that are exempt from randomization
+
+    #     Args:
+    #         problem: A function that runs a pySDC problem, see imports for available problems
+    #         num_procs (int): Number of processes you intend to run with
+
+    #     Returns:
+    #         dict: Arguments for the faults that are exempt from randomization
+    #     '''
+    #     args = super().get_fault_args(problem, num_procs)
+    #     if problem.__name__ == "run_quench":
+    #         args['time'] = 75.0
+
+    #     return args
+
     @property
     def label(self):
         return r'fixed'

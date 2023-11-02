@@ -321,7 +321,8 @@ class FaultStats:
         Tend_reached = t + lvl.params.dt_initial >= Tend
 
         if Tend_reached:
-            return abs(u - lvl.prob.u_exact(t=t)) / abs(u)
+            u_star = lvl.prob.u_exact(t=t)
+            return abs(u - u_star) / abs(u_star)
         else:
             print(f'Final time was not reached! Code crashed at t={t:.2f} instead of reaching Tend={Tend:.2f}')
             return np.inf
@@ -1678,20 +1679,26 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=4996)
-    return None
-    stats_analyser.run_stats_generation(runs=kwargs['runs'])
+    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=4996)
+    # return None
+    # stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
+    ##################
+    S = kAdaptivityStrategy()
+    stats_analyser.scrutinize(S, run=3, faults=False)
+    mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
+    # stats_analyser.print_faults(mask)
+    return None
     # ##################
     # S = AdaptivityStrategy()
-    # stats_analyser.scrutinize(S, run=4996, faults=True, logger_level=15)
+    # # stats_analyser.scrutinize(S, run=4996, faults=True, logger_level=15)
     # # stats_analyser.scrutinize_visual(S, run=4996, faults=True)
 
     # recoverable = stats_analyser.get_fixable_faults_only(S)
     # mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
-    # # stats_analyser.print_faults(mask, strategy=S)
+    # stats_analyser.print_faults(mask, strategy=S)
     # plt.show()
-    # return None
+    # # return None
     # ##################
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
@@ -1732,7 +1739,7 @@ def main():
 
     fig, ax = plt.subplots(1, 1, figsize=(13, 4))
     stats_analyser.plot_recovery_thresholds(ax=ax, thresh_range=np.logspace(-1, 1, 1000))
-    ax.axvline(stats_analyser.get_thresh(BaseStrategy()), color='grey', ls=':', label='recovery threshold')
+    # ax.axvline(stats_analyser.get_thresh(BaseStrategy()), color='grey', ls=':', label='recovery threshold')
     ax.set_xscale('log')
     ax.legend(frameon=False)
     fig.tight_layout()
