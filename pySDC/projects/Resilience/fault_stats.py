@@ -1650,11 +1650,11 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_quench,
+        'prob': run_Lorenz,
         'num_procs': 1,
         'mode': 'default',
         'runs': 2000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1679,13 +1679,13 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=4996)
+    # stats_analyser.scrutinize(BaseStrategy(), faults=True, run=0)
     # return None
-    # stats_analyser.run_stats_generation(runs=kwargs['runs'])
+    stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     ##################
     S = AdaptivityStrategy()
-    stats_analyser.scrutinize(S, run=3, faults=False)
+    stats_analyser.scrutinize(S, run=3, faults=True)
     mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
     # stats_analyser.print_faults(mask)
     return None
