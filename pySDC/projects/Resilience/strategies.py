@@ -593,6 +593,12 @@ class AdaptivityStrategy(Strategy):
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
+    def get_custom_description_for_faults(self, problem, num_procs, *args, **kwargs):
+        desc = self.get_custom_description(problem, num_procs, *args, **kwargs)
+        if problem.__name__ == "run_quench":
+            desc['problem_params']['direct_solver'] = True
+        return desc
+
 
 class AdaptivityRestartFirstStep(AdaptivityStrategy):
     def __init__(self, **kwargs):

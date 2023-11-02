@@ -1653,7 +1653,7 @@ def main():
         'prob': run_quench,
         'num_procs': 1,
         'mode': 'default',
-        'runs': 5000,
+        'runs': 2000,
         'reload': True,
         **parse_args(),
     }
@@ -1684,7 +1684,7 @@ def main():
     # stats_analyser.run_stats_generation(runs=kwargs['runs'])
 
     ##################
-    S = kAdaptivityStrategy()
+    S = AdaptivityStrategy()
     stats_analyser.scrutinize(S, run=3, faults=False)
     mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
     # stats_analyser.print_faults(mask)
