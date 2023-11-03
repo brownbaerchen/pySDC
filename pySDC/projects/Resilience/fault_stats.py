@@ -1655,7 +1655,7 @@ def main():
         'num_procs': 1,
         'mode': 'default',
         'runs': 2000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1679,8 +1679,10 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=17)
-    return None
+    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=17, logger_level=15)
+    # stats_analyser.scrutinize(BaseStrategy(), faults=True, run=17)
+    # plt.show()
+    # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'], step=12)
 
     # ##################

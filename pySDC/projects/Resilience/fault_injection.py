@@ -295,6 +295,8 @@ class FaultInjector(hooks):
             '''
             _abs_before = abs(L.u[f.node][tuple(f.problem_pos)])
             L.u[f.node][tuple(f.problem_pos)] = self.flip_bit(L.u[f.node][tuple(f.problem_pos)], f.bit)
+            # print(f.problem_pos, abs)
+            # L.u[f.node][14] = self.flip_bit(L.u[f.node][tuple(f.problem_pos)], f.bit)
             L.f[f.node] = L.prob.eval_f(L.u[f.node], L.time + L.dt * L.sweep.coll.nodes[max([0, f.node - 1])])
             L.sweep.compute_residual()
             _abs_after = abs(L.u[f.node][tuple(f.problem_pos)])
@@ -303,7 +305,7 @@ class FaultInjector(hooks):
 
         # log what happened to stats and screen
         self.logger.info(
-            f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node} on rank {f.rank}. Target: {f.target}. Abs: {_abs_before:.4e} -> {_abs_after:.4e}'
+            f'Flipping bit {f.bit} {f.when} iteration {f.iteration} in node {f.node} on rank {f.rank}. Target: {f.target}. Abs: {_abs_before:.12e} -> {_abs_after:.12e}, diff: {_abs_after-_abs_before:.8e}'
         )
         self.add_to_stats(
             process=step.status.slot,

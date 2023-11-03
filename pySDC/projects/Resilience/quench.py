@@ -624,10 +624,10 @@ def check_order(reference_sol_type='scipy'):
 
 if __name__ == '__main__':
     # compare_reference_solutions_single()
-    # for reference_sol_type in ['scipy']:
-    #   check_order(reference_sol_type=reference_sol_type)
+    for reference_sol_type in ['scipy']:
+        check_order(reference_sol_type=reference_sol_type)
     # faults(19)
     # get_crossing_time()
     # compare_imex_full(plotting=True)
-    iteration_counts()
+    # iteration_counts()
     plt.show()
