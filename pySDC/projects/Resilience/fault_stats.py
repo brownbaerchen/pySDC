@@ -142,7 +142,7 @@ class FaultStats:
                 return None
 
         comm = MPI.COMM_WORLD if comm is None else comm
-        step = (runs if step is None else step) if comm.size == 1 else comm.size
+        step = (runs if comm.size == 1 else comm.size) if step is None else step
         _runs_partial = step if _runs_partial == 0 else _runs_partial
         reload = self.reload or _reload
 
@@ -1651,11 +1651,11 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_Schroedinger,
+        'prob': run_quench,
         'num_procs': 1,
         'mode': 'default',
-        'runs': 5000,
-        'reload': False,
+        'runs': 2000,
+        'reload': True,
         **parse_args(),
     }
 
@@ -1679,14 +1679,14 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(kAdaptivityStrategy(), faults=True, run=0)
-    # return None
-    stats_analyser.run_stats_generation(runs=kwargs['runs'])
+    stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=17)
+    return None
+    stats_analyser.run_stats_generation(runs=kwargs['runs'], step=12)
 
-    ##################
-    S = BaseStrategy()
-    stats_analyser.scrutinize(S, run=3, faults=True)
-    mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
+    # ##################
+    # S = BaseStrategy()
+    # stats_analyser.scrutinize(S, run=3, faults=True)
+    # mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
     # stats_analyser.print_faults(mask)
     return None
     # ##################

@@ -598,6 +598,9 @@ class AdaptivityStrategy(Strategy):
         desc = self.get_custom_description(problem, num_procs, *args, **kwargs)
         if problem.__name__ == "run_quench":
             desc['problem_params']['direct_solver'] = True
+            desc['problem_params']['newton_tol'] = 1e-7
+            desc['level_params']['dt'] = 4.0
+            # desc['step_params']['maxiter'] = 3
         return desc
 
 
