@@ -1915,7 +1915,7 @@ if __name__ == "__main__":
         'RK_comp_high_order',
         # 'step_size_limiting',
         # 'parallel_efficiency',
-        #'diagonal_SDC',
+        'diagonal_SDC',
     ]:
         params = {
             'mode': mode,

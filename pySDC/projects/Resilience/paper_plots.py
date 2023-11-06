@@ -156,7 +156,7 @@ def plot_recovery_rate(stats_analyser, **kwargs):  # pragma: no cover
         ax=axs[0],
     )
     plot_recovery_rate_recoverable_only(stats_analyser, fig, axs[1], ylabel='')
-    axs[1].get_legend().remove()
+    axs[0].get_legend().remove()
     axs[0].set_title('All faults')
     axs[1].set_title('Only recoverable faults')
     savefig(fig, 'recovery_rate_compared', **kwargs)
@@ -573,12 +573,12 @@ def make_plots_for_paper():  # pragma: no cover
     # plot_adaptivity_stuff()
     work_precision()
     # plot_vdp_solution()
-    plot_quench_solution()
-    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_quench_solution()
+    plot_recovery_rate(get_stats(run_vdp))
     # plot_fault_vdp(0)
     # plot_fault_vdp(13)
 
-    compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
+    # compare_recovery_rate_problems(num_procs=1, strategy_type='RK')
     for i in [1]:
         compare_recovery_rate_problems(num_procs=i, strategy_type='SDC')
 
