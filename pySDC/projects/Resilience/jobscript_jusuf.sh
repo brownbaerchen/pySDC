@@ -9,7 +9,6 @@
 #SBATCH --mail-user=t.baumann@fz-juelich.de
 #SBATCH -p batch
 #SBATCH -J MarsDirect2023
-#SBATCH --kill-on-bad-exit 1
 
 module --force purge
 module load Stages/2023
