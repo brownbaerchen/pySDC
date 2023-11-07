@@ -86,7 +86,6 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
-        self.precision_range_fac = 1.0
 
     def __str__(self):
         return self.name
@@ -195,7 +194,6 @@ class Strategy:
         '''
         if problem.__name__ == "run_vdp":
             return 11.5
-            # return 2.3752559741400825  # old stuff
         elif problem.__name__ == "run_piline":
             return 20.0
         elif problem.__name__ == "run_Lorenz":
@@ -269,7 +267,7 @@ class Strategy:
         if self.stop_at_nan:
             from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
-            # custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
+            custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
 
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
@@ -324,7 +322,11 @@ class Strategy:
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class WildRiot(Strategy):
+class InexactBaseStrategy(Strategy):
+    """
+    Base class for inexact strategies.
+    """
+
     def __init__(
         self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=16, **kwargs
     ):
@@ -401,23 +403,6 @@ class BaseStrategy(Strategy):
         self.precision_parameter = 'dt'
         self.precision_parameter_loc = ['level_params', 'dt']
 
-    # def get_fault_args(self, problem, num_procs):
-    #     '''
-    #     Routine to get arguments for the faults that are exempt from randomization
-
-    #     Args:
-    #         problem: A function that runs a pySDC problem, see imports for available problems
-    #         num_procs (int): Number of processes you intend to run with
-
-    #     Returns:
-    #         dict: Arguments for the faults that are exempt from randomization
-    #     '''
-    #     args = super().get_fault_args(problem, num_procs)
-    #     if problem.__name__ == "run_quench":
-    #         args['time'] = 75.0
-
-    #     return args
-
     @property
     def label(self):
         return r'fixed'
@@ -474,12 +459,6 @@ class AdaptivityStrategy(Strategy):
     def label(self):
         return r'$\Delta t$ adaptivity'
 
-    # def get_description_for_tolerance(self, problem, param, **kwargs):
-    #     desc = {}
-    #     if problem.__name__ in ['run_quench']:
-    #         desc['problem_params'] = {'newton_tol': min([max([param / 1e2, 1e-11]), 1e-7]), 'lintol': min([max([param / 1e2, 1e-11]), 1e-7]), 'liniter': 29, 'newton_maxiter': 29}
-    #     return desc
-
     def get_fixable_params(self, maxiter, **kwargs):
         """
         Here faults occurring in the last iteration cannot be fixed.
@@ -533,8 +512,6 @@ class AdaptivityStrategy(Strategy):
                 'newton_tol': 1e-9,
                 'lintol': 1e-10,
             }
-            # dt_max = 100.0
-            # dt_slope_max = 4.
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
@@ -882,7 +859,7 @@ class HotRodStrategy(Strategy):
             elif num_procs == 5:
                 HotRod_tol = 9.329361e-05
             else:  # 1 process
-                HotRod_tol = 1.347949e-06  # 5e-7
+                HotRod_tol = 1.347949e-06
             HotRod_tol = 7e-6 if num_procs > 1 else 5e-7
             maxiter = 4
         elif problem.__name__ == "run_Lorenz":
@@ -891,7 +868,7 @@ class HotRodStrategy(Strategy):
             elif num_procs == 4:
                 HotRod_tol = 3.201e-6
             else:
-                HotRod_tol = 7.720589e-07  # 4e-7
+                HotRod_tol = 7.720589e-07
             maxiter = 6
         elif problem.__name__ == "run_Schroedinger":
             if num_procs == 5:
@@ -959,7 +936,7 @@ class HotRodStrategy(Strategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityCollocationStrategy(WildRiot):
+class AdaptivityCollocationStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on collocation as a resilience strategy
     '''
@@ -1027,7 +1004,6 @@ class AdaptivityCollocationStrategy(WildRiot):
  strategy'
             )
 
-        # custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityCollocation: {
                 'e_tol': e_tol,
@@ -1700,7 +1676,7 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityExtrapolationWithinQStrategy(WildRiot):
+class AdaptivityExtrapolationWithinQStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
@@ -1796,7 +1772,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityPolynomialError(WildRiot):
+class AdaptivityPolynomialError(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
@@ -1818,7 +1794,6 @@ class AdaptivityPolynomialError(WildRiot):
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
         self.interpolate_between_restarts = interpolate_between_restarts
         self.use_restol_rel = use_restol_rel
-        # self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1835,10 +1810,6 @@ class AdaptivityPolynomialError(WildRiot):
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
-        # custom_description['sweeper_params'] = {
-        #     'quad_type': 'GAUSS',
-        #     'do_coll_update': True,
-        # }
 
         dt_max = np.inf
         max_slope = 4.0
@@ -1849,13 +1820,11 @@ class AdaptivityPolynomialError(WildRiot):
         if problem.__name__ == "run_vdp":
             e_tol = 6e-4
             level_params['dt'] = 0.1
-            # restol_rel = 1e-3
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
         elif problem.__name__ == "run_Lorenz":
             e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
-            # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
             e_tol = 1e-7
@@ -1875,8 +1844,6 @@ class AdaptivityPolynomialError(WildRiot):
                 'e_tol': e_tol,
                 'restol_rel': restol_rel if self.use_restol_rel else 1e-11,
                 'restol_min': restol_min if self.use_restol_rel else 1e-12,
-                # 'e_tol_rel': 1e-2,
-                # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
                 'factor_if_not_converged': max_slope,
                 'interpolate_between_restarts': self.interpolate_between_restarts,
