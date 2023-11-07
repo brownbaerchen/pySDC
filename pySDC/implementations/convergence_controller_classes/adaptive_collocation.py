@@ -163,7 +163,7 @@ class AdaptiveCollocation(ConvergenceController):
             if any(me is not None for me in uold):
                 u_old_inter = self.matmul(interpolation_matrix, uold)
             else:
-                u_old_inter = [None] * len(uold)
+                u_old_inter = [None] * len(u_inter)
 
             # assign the interpolated values to the nodes in the level
             for i in range(0, len(u_inter)):

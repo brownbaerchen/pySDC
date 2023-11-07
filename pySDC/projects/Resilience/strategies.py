@@ -1106,9 +1106,9 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 1881
+                return 1785
             elif key == 'e_global_post_run' and op == max:
-                return 3.3428689164005654e-06
+                return 1.2448609458259874e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
@@ -1139,9 +1139,9 @@ class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 3421
+                return 2508
             elif key == 'e_global_post_run' and op == max:
-                return 2.1130961994131336e-05
+                return 3.452255036812124e-05
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
