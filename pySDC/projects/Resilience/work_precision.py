@@ -1909,10 +1909,10 @@ if __name__ == "__main__":
 
     # aggregate_parallel_efficiency_plot()
 
-    record = False
+    record = True
     for mode in [
         # 'compare_strategies',
-        'RK_comp_high_order',
+        #'RK_comp_high_order',
         # 'step_size_limiting',
         # 'parallel_efficiency',
         'diagonal_SDC',

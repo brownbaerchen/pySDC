@@ -14,6 +14,9 @@ STRATEGY_NAMES = [
     'DIRK',
     'explicitRK',
     'ESDIRK',
+    'ARK',
+    'AdaptivityPolynomialError',
+    'kAdaptivity',
 ]
 STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
 LOGGER_LEVEL = 30
@@ -22,7 +25,6 @@ LOGGER_LEVEL = 30
 def single_test_vdp(strategy_name, useMPI, num_procs):
     import numpy as np
     from pySDC.helpers.stats_helper import get_sorted
-    from pySDC.projects.Resilience.vdp import run_vdp
     import pySDC.projects.Resilience.strategies as strategies
     from pySDC.implementations.hooks.log_work import LogWork
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
@@ -36,29 +38,35 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
 
     # load the strategy
     avail_strategies = {
-        'adaptivity': strategies.AdaptivityStrategy(useMPI=useMPI),
-        'DIRK': strategies.DIRKStrategy(useMPI=useMPI),
-        'adaptiveHR': strategies.AdaptiveHotRodStrategy(useMPI=useMPI),
-        'iterate': strategies.IterateStrategy(useMPI=useMPI),
-        'HotRod': strategies.HotRodStrategy(useMPI=useMPI),
-        'explicitRK': strategies.ERKStrategy(useMPI=useMPI),
-        'doubleAdaptivity': strategies.DoubleAdaptivityStrategy(useMPI=useMPI),
-        'collocationRefinement': strategies.AdaptivityCollocationRefinementStrategy(useMPI=useMPI),
-        'collocationDerefinement': strategies.AdaptivityCollocationDerefinementStrategy(useMPI=useMPI),
-        'collocationType': strategies.AdaptivityCollocationTypeStrategy(useMPI=useMPI),
-        'adaptivityAvoidRestarts': strategies.AdaptivityAvoidRestartsStrategy(useMPI=useMPI),
-        'adaptivityInterpolation': strategies.AdaptivityInterpolationStrategy(useMPI=useMPI),
-        'adaptivityQExtrapolation': strategies.AdaptivityExtrapolationWithinQStrategy(useMPI=useMPI),
-        'base': strategies.BaseStrategy(useMPI=useMPI),
-        'ESDIRK': strategies.ESDIRKStrategy(useMPI=useMPI),
+        'adaptivity': strategies.AdaptivityStrategy,
+        'DIRK': strategies.DIRKStrategy,
+        'adaptiveHR': strategies.AdaptiveHotRodStrategy,
+        'iterate': strategies.IterateStrategy,
+        'HotRod': strategies.HotRodStrategy,
+        'explicitRK': strategies.ERKStrategy,
+        'doubleAdaptivity': strategies.DoubleAdaptivityStrategy,
+        'collocationRefinement': strategies.AdaptivityCollocationRefinementStrategy,
+        'collocationDerefinement': strategies.AdaptivityCollocationDerefinementStrategy,
+        'collocationType': strategies.AdaptivityCollocationTypeStrategy,
+        'adaptivityAvoidRestarts': strategies.AdaptivityAvoidRestartsStrategy,
+        'adaptivityInterpolation': strategies.AdaptivityInterpolationStrategy,
+        'adaptivityQExtrapolation': strategies.AdaptivityExtrapolationWithinQStrategy,
+        'base': strategies.BaseStrategy,
+        'ESDIRK': strategies.ESDIRKStrategy,
+        'ARK': strategies.ARKStrategy,
+        'AdaptivityPolynomialError': strategies.AdaptivityPolynomialError,
+        'kAdaptivity': strategies.kAdaptivityStrategy,
     }
 
     if strategy_name in avail_strategies.keys():
-        strategy = avail_strategies[strategy_name]
+        strategy = avail_strategies[strategy_name](useMPI=useMPI)
     else:
         raise NotImplementedError(f'Strategy \"{strategy_name}\" not implemented for this test!')
 
-    prob = run_vdp
+    if strategy_name in ['ARK']:
+        from pySDC.projects.Resilience.Schroedinger import run_Schroedinger as prob
+    else:
+        from pySDC.projects.Resilience.vdp import run_vdp as prob
     controller_params = {'logger_level': LOGGER_LEVEL}
     stats, _, Tend = prob(
         custom_description=strategy.get_custom_description(problem=prob, num_procs=num_procs),
