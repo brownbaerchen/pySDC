@@ -964,7 +964,7 @@ def get_configs(mode, problem):
                 'num_procs': num_procs,
                 'plotting_params': {
                     'ls': ls.get(num_procs * 3, '-'),
-                    'label': f'$\Delta tk$ adaptivity $N$={num_procs}x3',
+                    'label': f'$\Delta t$-$k$ adaptivity $N$={num_procs}x3',
                 },
             }
 

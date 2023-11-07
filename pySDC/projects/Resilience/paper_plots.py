@@ -570,7 +570,7 @@ def make_plots_for_paper():  # pragma: no cover
     JOURNAL = 'Springer_Numerical_Algorithms'
     BASE_PATH = 'data/paper'
 
-    # plot_adaptivity_stuff()
+    plot_adaptivity_stuff()
     work_precision()
     # plot_vdp_solution()
     # plot_quench_solution()

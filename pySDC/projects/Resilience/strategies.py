@@ -1917,4 +1917,4 @@ class AdaptivityPolynomialError(WildRiot):
 
     @property
     def label(self):
-        return r'$\Delta tk~\mathrm{adaptivity}$'
+        return r'$\Delta t$-$k~\mathrm{adaptivity}$'
