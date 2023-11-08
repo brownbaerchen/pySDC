@@ -129,8 +129,6 @@ class generic_implicit_efficient(efficient_sweeper, generic_implicit):
     def compute_residual(self, stage=''):
         lvl = self.level
 
-        # print([me - np.mean(me) for me in lvl.u], np.mean(lvl.u[-1]))
-
         if lvl.params.residual_type[:4] == 'full' or stage in self.params.skip_residual_computation:
             super().compute_residual(stage=stage)
             return None
