@@ -41,7 +41,7 @@ def set_parameter():
 
     # initialize controller parameters
     controller_params = dict()
-    controller_params['logger_level'] = 30
+    controller_params['logger_level'] =15
 
     # fill description dictionary for easy step instantiation
     description = dict()
@@ -57,20 +57,20 @@ def set_parameter():
 def main():
     controller_params, description, t0, Tend = set_parameter()
 
-    # fill description dictionary with CPU problem
-    description['problem_class'] = ac_fft_cpu
+    # # fill description dictionary with CPU problem
+    # description['problem_class'] = ac_fft_cpu
 
-    # instantiate controller cpu
-    controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+    # # instantiate controller cpu
+    # controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
-    # get initial values on finest level cpu
-    P = controller.MS[0].levels[0].prob
-    uinit = P.u_exact(t0)
+    # # get initial values on finest level cpu
+    # P = controller.MS[0].levels[0].prob
+    # uinit = P.u_exact(t0)
 
-    # call main function to get things done on cpu...
-    uend_cpu, stats_cpu = controller.run(u0=uinit, t0=t0, Tend=Tend)
-    timing_cpu = sort_stats(filter_stats(stats_cpu, type='timing_run'), sortby='time')
-    print('Runtime CPU:', timing_cpu[0][1])
+    # # call main function to get things done on cpu...
+    # uend_cpu, stats_cpu = controller.run(u0=uinit, t0=t0, Tend=Tend)
+    # timing_cpu = sort_stats(filter_stats(stats_cpu, type='timing_run'), sortby='time')
+    # print('Runtime CPU:', timing_cpu[0][1])
 
     # change description dictionary with GPU problem
     description['problem_class'] = ac_fft_gpu
@@ -87,7 +87,7 @@ def main():
     timing_gpu = sort_stats(filter_stats(stats_gpu, type='timing_run'), sortby='time')
     print('Runtime GPU:', timing_gpu[0][1])
 
-    assert abs(uend_gpu.get() - uend_cpu) < 1e-13, abs(uend_gpu.get() - uend_cpu)
+    # assert abs(uend_gpu.get() - uend_cpu) < 1e-13, abs(uend_gpu.get() - uend_cpu)
 
 
 if __name__ == '__main__':

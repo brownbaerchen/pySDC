@@ -63,6 +63,7 @@ class allencahn2d_imex(ptype):  # pragma: no cover
 
     def __init__(self, nvars=None, nu=2, eps=0.04, radius=0.25, L=1.0, init_type='circle'):
         """Initialization routine"""
+        breakpoint()
 
         if nvars is None:
             nvars = [(256, 256), (64, 64)]
