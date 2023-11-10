@@ -603,14 +603,14 @@ class AdaptiveHotRodStrategy(Strategy):
     Adaptivity + Hot Rod as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
         kwargs['skip_residual_computation'] = 'all'
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
@@ -941,7 +941,7 @@ class AdaptivityCollocationStrategy(InexactBaseStrategy):
     Adaptivity based on collocation as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
@@ -953,7 +953,7 @@ class AdaptivityCollocationStrategy(InexactBaseStrategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
         self.restol = None
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity_coll'
@@ -1017,8 +1017,8 @@ class AdaptivityCollocationStrategy(InexactBaseStrategy):
 
 
 class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.adaptive_coll_params = {
@@ -1053,8 +1053,8 @@ class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[5]
         self.marker = '^'
         self.adaptive_coll_params = {
@@ -1090,8 +1090,8 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
 
 
 class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[6]
         self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [4, 3]}
@@ -1127,13 +1127,13 @@ class DIRKStrategy(AdaptivityStrategy):
     DIRK4(3)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'DIRK'
@@ -1227,13 +1227,13 @@ class ARKStrategy(AdaptivityStrategy):
     ARK5(4)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[7]
         self.marker = 'P'
         self.name = 'ARK'
@@ -1310,13 +1310,13 @@ class ESDIRKStrategy(AdaptivityStrategy):
     ESDIRK5(3)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = 'violet'
         self.marker = '^'
         self.name = 'ESDIRK'
@@ -1418,11 +1418,11 @@ class ERKStrategy(DIRKStrategy):
     Explicit embedded RK using Cash-Karp's method
     """
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[8]
         self.marker = 'x'
         self.name = 'ERK'
