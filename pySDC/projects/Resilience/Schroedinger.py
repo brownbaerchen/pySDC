@@ -69,7 +69,7 @@ def run_Schroedinger(
     hook_class=LogData,
     fault_stuff=None,
     custom_controller_params=None,
-    use_MPI=True,
+    use_MPI=False,
     space_comm=None,
     imex=True,
     **kwargs,
