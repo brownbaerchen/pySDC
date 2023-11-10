@@ -68,8 +68,15 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
     else:
         from pySDC.projects.Resilience.vdp import run_vdp as prob
     controller_params = {'logger_level': LOGGER_LEVEL}
+    custom_description = strategy.get_custom_description(problem=prob, num_procs=num_procs)
+
+    if strategy_name == 'AdaptivityPolynomialError':
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+
+        custom_description['convergence_controllers'][AdaptivityPolynomialError]['e_tol'] = 1e-4
+
     stats, _, Tend = prob(
-        custom_description=strategy.get_custom_description(problem=prob, num_procs=num_procs),
+        custom_description=custom_description,
         hook_class=[LogGlobalErrorPostRun, LogWork],
         use_MPI=useMPI,
         custom_controller_params=controller_params,
@@ -88,7 +95,7 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
 
         assert np.isclose(
             ref, act, rtol=1e-2
-        ), f'Error in \"{strategy.name}\" strategy ({strategy_name})! Expected {key}={ref} but got {act}!'
+        ), f'Error in \"{strategy.name}\" strategy ({strategy_name})! Got {key}={act} but expected {ref}!'
 
     if comm:
         comm.Free()

@@ -1765,9 +1765,9 @@ class AdaptivityExtrapolationWithinQStrategy(InexactBaseStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 3443
+                return 2426
             elif key == 'e_global_post_run' and op == max:
-                return 4.929282266752377e-06
+                return 1.7293825160247245e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
@@ -1899,9 +1899,9 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 2350
+                return 2819
             elif key == 'e_global_post_run' and op == max:
-                return 1.5430391436255242e-06
+                return 1.8147451097405565e-07
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
