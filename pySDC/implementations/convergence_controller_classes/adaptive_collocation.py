@@ -62,6 +62,12 @@ class AdaptiveCollocation(ConvergenceController):
             'vary_keys_level': [],
         }
 
+        if not controller.params.all_to_done:
+            controller.params.all_to_done = True
+            import logging
+
+            logging.getLogger(f"{type(self).__name__}").warning('Set `controller.params.all_to_done = True`!')
+
         # only these keys can be changed by this convergence controller
         self.allowed_sweeper_keys = ['quad_type', 'num_nodes', 'node_type', 'do_coll_update']
         self.allowed_level_keys = ['restol']
@@ -103,7 +109,7 @@ class AdaptiveCollocation(ConvergenceController):
         if self.comm:
             res = [A[i, 0] * b[0] if b[i] is not None else None for i in range(A.shape[0])]
             buf = b[0] * 0.0
-            for i in range(1, A.shape[1]):
+            for i in range(1, A.shape[0]):
                 self.comm.Reduce(A[i, self.comm.rank + 1] * b[self.comm.rank + 1], buf, op=self.MPI_SUM, root=i - 1)
                 if i == self.comm.rank + 1:
                     res[i] += buf
@@ -136,7 +142,8 @@ class AdaptiveCollocation(ConvergenceController):
             P = L.prob
 
             # store solution of current level which will be interpolated to new level
-            u_old = [me.flatten() if me is not None else me for me in L.u]
+            u_prev = [me.flatten() if me is not None else me for me in L.u]
+            uold = [me.flatten() if me is not None else me for me in L.uold]
             nodes_old = L.sweep.coll.nodes.copy()
 
             # change sweeper
@@ -151,7 +158,12 @@ class AdaptiveCollocation(ConvergenceController):
             nodes_new = L.sweep.coll.nodes.copy()
             interpolator = LagrangeApproximation(points=np.append(0, nodes_old))
 
-            u_inter = self.matmul(interpolator.getInterpolationMatrix(np.append(0, nodes_new)), u_old)
+            interpolation_matrix = interpolator.getInterpolationMatrix(np.append(0, nodes_new))
+            u_inter = self.matmul(interpolation_matrix, u_prev)
+            if any(me is not None for me in uold):
+                u_old_inter = self.matmul(interpolation_matrix, uold)
+            else:
+                u_old_inter = [None] * len(uold)
 
             # assign the interpolated values to the nodes in the level
             for i in range(0, len(u_inter)):
@@ -159,6 +171,10 @@ class AdaptiveCollocation(ConvergenceController):
                     me = P.dtype_u(P.init)
                     me[:] = np.reshape(u_inter[i], P.init[0])
                     L.u[i] = me
+                if u_old_inter[i] is not None:
+                    you = P.dtype_u(P.init)
+                    you[:] = np.reshape(u_old_inter[i], P.init[0])
+                    L.uold[i] = you
 
             # reevaluate rhs
             for i in range(L.sweep.coll.num_nodes + 1):
@@ -243,15 +259,13 @@ class AdaptiveCollocation(ConvergenceController):
             bool: Whether the parameters are compatible
             str: The error message
         """
-        if description["level_params"].get("restol", -1.0) <= 1e-16:
+        if (
+            description["level_params"].get("restol", -1.0) <= 1e-16
+            and description["level_params"].get('e_tol', -1) < 1e-16
+        ):
             return (
                 False,
                 "Switching the collocation problems requires solving them to some tolerance that can be reached. Please set attainable `restol` in the level params",
-            )
-        if description["step_params"].get("maxiter", -1.0) < 99:
-            return (
-                False,
-                "Switching the collocation problems requires solving them exactly, which may require many iterations please set `maxiter` to at least 99 in the step params",
             )
 
         return True, ""
