@@ -14,11 +14,11 @@ STRATEGY_NAMES = [
     'DIRK',
     'explicitRK',
     'ESDIRK',
-    'ARK',
     'AdaptivityPolynomialError',
     'kAdaptivity',
 ]
 STRATEGY_NAMES_NONMPIONLY = ['adaptiveHR', 'HotRod']
+STRATEGY_NAMES_MPIONLY = ['ARK']
 LOGGER_LEVEL = 30
 
 
@@ -102,7 +102,7 @@ def single_test_vdp(strategy_name, useMPI, num_procs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('strategy_name', STRATEGY_NAMES)
+@pytest.mark.parametrize('strategy_name', STRATEGY_NAMES + STRATEGY_NAMES_MPIONLY)
 def test_strategy_with_vdp_MPI(strategy_name, num_procs=1):
     single_test_vdp(strategy_name=strategy_name, useMPI=True, num_procs=num_procs)
 
