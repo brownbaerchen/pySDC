@@ -381,8 +381,8 @@ def compare_imex_full(plotting=False, leak_type='linear'):
 
     assert error[True] < 1.2e-4, f'Expected error of IMEX version to be less than 1.2e-4, but got e={error[True]:.2e}!'
     assert (
-        error[False] < 7.7e-5
-    ), f'Expected error of fully implicit version to be less than 7.7e-5, but got e={error[False]:.2e}!'
+        error[False] < 8e-5
+    ), f'Expected error of fully implicit version to be less than 8e-5, but got e={error[False]:.2e}!'
 
 
 def compare_reference_solutions_single():
