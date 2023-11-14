@@ -80,7 +80,7 @@ class cupy_mesh(cp.ndarray):
             float: absolute maximum of all mesh values
         """
         # take absolute values of the mesh values
-        local_absval = float(cp.amax(cp.ndarray.__abs__(self)))
+        local_absval = float(cp.amax(cp.ndarray.__abs__(self)).get())
 
         if self.comm is not None:
             if self.comm.Get_size() > 1:
@@ -105,7 +105,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             request handle
         """
-        return comm.Issend(self[:], dest=dest, tag=tag)
+        return comm.Issend(self.get(), dest=dest, tag=tag)
 
     def irecv(self, source=None, tag=None, comm=None):
         """
@@ -119,7 +119,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             None
         """
-        return comm.Irecv(self[:], source=source, tag=tag)
+        return comm.Irecv(self.get(), source=source, tag=tag)
 
     def bcast(self, root=None, comm=None):
         """
@@ -132,7 +132,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             broadcasted values
         """
-        comm.Bcast(self[:], root=root)
+        comm.Bcast(self.get(), root=root)
         return self
 
 

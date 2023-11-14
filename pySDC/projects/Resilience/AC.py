@@ -1,5 +1,4 @@
 # script to run a quench problem
-from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit, allencahn_semiimplicit
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
 from pySDC.projects.Resilience.hook import hook_collection, LogData
@@ -31,10 +30,11 @@ def run_AC(
         hook_class (pySDC.Hook): A hook to store data
         fault_stuff (dict): A dictionary with information on how to add faults
         custom_controller_params (dict): Overwrite presets
-        imex (bool): Solve the problem IMEX or fully implicit
+        imex (bool): Solve the problem IMEX or fully implicit. IMEX is done with FFT
         u0 (dtype_u): Initial value
         t0 (float): Starting time
         use_MPI (bool): Whether or not to use MPI
+        useGPU (bool): Use GPU version of the problem classes
 
     Returns:
         dict: The stats object
@@ -61,6 +61,8 @@ def run_AC(
 
     problem_params = {
         'newton_tol': 1e-9,
+        'useGPU': False,
+        'nvars': (256, 256),
     }
 
     # initialize step parameters
@@ -76,9 +78,21 @@ def run_AC(
     if custom_controller_params is not None:
         controller_params = {**controller_params, **custom_controller_params}
 
+    if imex:
+        if useGPU:
+            from pySDC.implementations.problem_classes.AllenCahn_2D_FFT_gpu import allencahn2d_imex as problem_class
+        else:
+            from pySDC.implementations.problem_classes.AllenCahn_2D_FFT import allencahn2d_imex as problem_class
+    else:
+        from pySDC.projects.Resilience.GPU.AllenCahn_2D_FD_XPU import allencahn_fullyimplicit_XPU as problem_class
+        # if useGPU:
+        #     from pySDC.implementations.problem_classes.AllenCahn_2D_FD_gpu import allencahn_fullyimplicit as problem_class
+        # else:
+        #     from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit as problem_class
+
     # fill description dictionary for easy step instantiation
     description = {}
-    description['problem_class'] = allencahn_semiimplicit if imex else allencahn_fullyimplicit
+    description['problem_class'] = problem_class
     description['problem_params'] = problem_params
     description['sweeper_class'] = imex_1st_order_efficient if imex else generic_implicit_efficient
     description['sweeper_params'] = sweeper_params
@@ -144,5 +158,5 @@ def plot_solution(stats):  # pragma: no cover
 if __name__ == '__main__':
     from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
 
-    stats, _, _ = run_AC(imex=True, hook_class=LogLocalErrorPostStep)
+    stats, _, _ = run_AC(imex=False, hook_class=LogLocalErrorPostStep, custom_controller_params={'logger_level': 15})
     plot_solution(stats)

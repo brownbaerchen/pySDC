@@ -759,6 +759,8 @@ class IterateStrategy(Strategy):
             restol = 6.5e-7
         elif problem.__name__ == "run_quench":
             restol = 1e-7
+        elif problem.__name__ == 'run_AC':
+            restol = 1e-7
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \

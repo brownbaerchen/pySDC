@@ -9,7 +9,7 @@ import copy
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
-from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
+# from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
 
@@ -26,6 +26,7 @@ MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
     'e_global_rel': ('e_global_rel_post_run', max, False),
     't': ('timing_run', max, False),
+    't_setup': ('timing_setup', max, False),
     # 'e_local_max': ('e_local_post_step', max, False),
     'k_SDC': ('k', sum, None),
     'k_SDC_no_restart': ('k', sum, False),
@@ -295,6 +296,7 @@ def record_work_precision(
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
             param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
+            #param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
@@ -706,6 +708,21 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'num_procs': 1,
         }
+    elif mode == 'GPU':
+        configs = get_configs(mode='RK_comp_serial', problem=problem)
+        for key, value in configs.copy().items():
+            conf = value.copy()
+            conf['custom_description'] = conf.get('custom_description', {}).copy()
+            conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
+            conf['custom_description']['problem_params']['useGPU']=True
+            conf['handle'] = 'GPU'
+            configurations[-key] = conf
+
+            conf_cpu = value.copy()
+            conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()
+            conf_cpu['custom_description']['problem_params'] = conf_cpu['custom_description'].get('problem_params', {})
+            conf_cpu['custom_description']['problem_params']['useGPU']=False
+            configurations[key] = conf_cpu
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
 
@@ -1340,8 +1357,6 @@ def get_configs(mode, problem):
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
         desc['step_params'] = {'maxiter': 5}
 
-        desc_poly = {}
-        desc_poly['sweeper_class'] = parallel_sweeper
 
         ls = {
             1: '-',
@@ -1350,6 +1365,9 @@ def get_configs(mode, problem):
             4: ':',
             5: ':',
         }
+
+        desc_poly = {}
+        desc_poly['sweeper_class'] = parallel_sweeper
 
         desc_RK = {}
         if problem.__name__ in ['run_Schroedinger']:
@@ -1374,6 +1392,61 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'num_procs': 4,
+        }
+    elif mode == 'RK_comp_serial':
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            ERKStrategy,
+            ESDIRKStrategy,
+            ARKStrategy,
+            AdaptivityPolynomialError,
+        )
+
+        if problem.__name__ in ['run_Schroedinger']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
+        desc['step_params'] = {'maxiter': 5}
+
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
+        }
+
+        desc_poly = {}
+
+        desc_RK = {}
+        if problem.__name__ in ['run_Schroedinger']:
+            desc_RK['problem_params'] = {'imex': True}
+
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 1,
+        }
+        configurations[-1] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            'custom_description': desc_RK,
+        }
+
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 1,
         }
     elif mode == 'RK_comp_high_order':
         from pySDC.projects.Resilience.strategies import (
@@ -1909,13 +1982,14 @@ if __name__ == "__main__":
 
     # aggregate_parallel_efficiency_plot()
 
-    record = False
+    record = True
     for mode in [
         # 'compare_strategies',
-        'RK_comp_high_order',
+        'GPU',
+        #'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
-        'diagonal_SDC',
+        # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
@@ -1925,7 +1999,7 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Schroedinger,
+            'problem': run_AC,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
     # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
