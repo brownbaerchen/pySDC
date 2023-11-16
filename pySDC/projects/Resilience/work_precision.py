@@ -709,20 +709,37 @@ def get_configs(mode, problem):
             'num_procs': 1,
         }
     elif mode == 'GPU':
-        configs = get_configs(mode='RK_comp_serial', problem=problem)
+        from pySDC.projects.Resilience.strategies import ARKStrategy, ESDIRKStrategy
+        # configurations[-1] = {
+        #     'strategies': [
+        #         # ERKStrategy(useMPI=True),
+        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+        #     ],
+        #     'num_procs': 1,
+        #     'custom_description': {'problem_params': {'useGPU': True}},
+        # }
+        # configurations[0] = {
+        #     'strategies': [
+        #         # ERKStrategy(useMPI=True),
+        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+        #     ],
+        #     'num_procs': 1,
+        #     'custom_description': {'problem_params': {'useGPU': True}},
+        # }
+        configs = get_configs(mode='RK_comp', problem=problem)
         for key, value in configs.copy().items():
             conf = value.copy()
             conf['custom_description'] = conf.get('custom_description', {}).copy()
             conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
             conf['custom_description']['problem_params']['useGPU']=True
             conf['handle'] = 'GPU'
-            configurations[-key] = conf
+            configurations[-(key * 1e3 + 1)] = conf
 
             conf_cpu = value.copy()
             conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()
             conf_cpu['custom_description']['problem_params'] = conf_cpu['custom_description'].get('problem_params', {})
             conf_cpu['custom_description']['problem_params']['useGPU']=False
-            configurations[key] = conf_cpu
+            configurations[key * 1e3 + 1] = conf_cpu
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
 
@@ -1373,15 +1390,15 @@ def get_configs(mode, problem):
         if problem.__name__ in ['run_Schroedinger']:
             desc_RK['problem_params'] = {'imex': True}
 
-        configurations[3] = {
-            'custom_description': desc_poly,
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'num_procs': 1,
-            'num_procs_sweeper': 3,
-        }
+        # configurations[3] = {
+        #     'custom_description': desc_poly,
+        #     'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        #     'num_procs': 1,
+        #     'num_procs_sweeper': 3,
+        # }
         configurations[-1] = {
             'strategies': [
-                ERKStrategy(useMPI=True),
+                # ERKStrategy(useMPI=True),
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
@@ -1436,7 +1453,7 @@ def get_configs(mode, problem):
         }
         configurations[-1] = {
             'strategies': [
-                ERKStrategy(useMPI=True),
+                # ERKStrategy(useMPI=True),
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,

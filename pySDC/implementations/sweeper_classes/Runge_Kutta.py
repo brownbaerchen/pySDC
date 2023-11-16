@@ -271,7 +271,7 @@ class RungeKutta(sweeper):
 
         for m in range(0, M):
             # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
-            rhs = lvl.u[0]
+            rhs = prob.dtype_u(lvl.u[0])
             for j in range(1, m + 1):
                 rhs += lvl.dt * self.QI[m + 1, j] * self.get_full_f(lvl.f[j])
 
