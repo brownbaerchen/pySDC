@@ -17,7 +17,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 5
 LOG_TO_FILE = False
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
@@ -1396,74 +1396,19 @@ def get_configs(mode, problem):
         #     'num_procs': 1,
         #     'num_procs_sweeper': 3,
         # }
-        configurations[-1] = {
-            'strategies': [
-                # ERKStrategy(useMPI=True),
-                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-            'custom_description': desc_RK,
-        }
+        # configurations[-1] = {
+        #     'strategies': [
+        #         # ERKStrategy(useMPI=True),
+        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+        #     ],
+        #     'num_procs': 1,
+        #     'custom_description': desc_RK,
+        # }
 
         configurations[2] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'num_procs': 4,
-        }
-    elif mode == 'RK_comp_serial':
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityStrategy,
-            ERKStrategy,
-            ESDIRKStrategy,
-            ARKStrategy,
-            AdaptivityPolynomialError,
-        )
-
-        if problem.__name__ in ['run_Schroedinger']:
-            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
-        else:
-            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
-                generic_implicit_MPI as parallel_sweeper,
-            )
-
-        desc = {}
-        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
-        desc['step_params'] = {'maxiter': 5}
-
-
-        ls = {
-            1: '-',
-            2: '--',
-            3: '-.',
-            4: ':',
-            5: ':',
-        }
-
-        desc_poly = {}
-
-        desc_RK = {}
-        if problem.__name__ in ['run_Schroedinger']:
-            desc_RK['problem_params'] = {'imex': True}
-
-        configurations[3] = {
-            'custom_description': desc_poly,
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'num_procs': 1,
-            'num_procs_sweeper': 1,
-        }
-        configurations[-1] = {
-            'strategies': [
-                # ERKStrategy(useMPI=True),
-                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-            'custom_description': desc_RK,
-        }
-
-        configurations[2] = {
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'custom_description': desc,
-            'num_procs': 1,
         }
     elif mode == 'RK_comp_high_order':
         from pySDC.projects.Resilience.strategies import (
