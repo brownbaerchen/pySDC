@@ -144,6 +144,8 @@ class CheckConvergence(ConvergenceController):
             if S.status.force_done:
                 return None
 
+            comm.Barrier()
+
             # recv status
             if not S.status.first and not S.status.prev_done:
                 buff = np.empty(1, dtype=bool)

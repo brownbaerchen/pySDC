@@ -9,6 +9,7 @@ import copy
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
+
 # from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
@@ -17,7 +18,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 5
+LOGGER_LEVEL = 25
 LOG_TO_FILE = False
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)
@@ -296,7 +297,7 @@ def record_work_precision(
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
             param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
-            #param_range = [1e-5][::-1]
+            # param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
@@ -710,6 +711,7 @@ def get_configs(mode, problem):
         }
     elif mode == 'GPU':
         from pySDC.projects.Resilience.strategies import ARKStrategy, ESDIRKStrategy
+
         # configurations[-1] = {
         #     'strategies': [
         #         # ERKStrategy(useMPI=True),
@@ -731,14 +733,15 @@ def get_configs(mode, problem):
             conf = value.copy()
             conf['custom_description'] = conf.get('custom_description', {}).copy()
             conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
-            conf['custom_description']['problem_params']['useGPU']=True
+            conf['custom_description']['problem_params']['useGPU'] = True
             conf['handle'] = 'GPU'
+            conf['plotting_params'] = {'ls': '--'}
             configurations[-(key * 1e3 + 1)] = conf
 
             conf_cpu = value.copy()
             conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()
             conf_cpu['custom_description']['problem_params'] = conf_cpu['custom_description'].get('problem_params', {})
-            conf_cpu['custom_description']['problem_params']['useGPU']=False
+            conf_cpu['custom_description']['problem_params']['useGPU'] = False
             configurations[key * 1e3 + 1] = conf_cpu
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
@@ -1374,7 +1377,6 @@ def get_configs(mode, problem):
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
         desc['step_params'] = {'maxiter': 5}
 
-
         ls = {
             1: '-',
             2: '--',
@@ -1390,20 +1392,22 @@ def get_configs(mode, problem):
         if problem.__name__ in ['run_Schroedinger']:
             desc_RK['problem_params'] = {'imex': True}
 
-        # configurations[3] = {
-        #     'custom_description': desc_poly,
-        #     'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        #     'num_procs': 1,
-        #     'num_procs_sweeper': 3,
-        # }
-        # configurations[-1] = {
-        #     'strategies': [
-        #         # ERKStrategy(useMPI=True),
-        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        #     'custom_description': desc_RK,
-        # }
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+        }
+        configurations[-1] = {
+            'strategies': [
+                # ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True)
+                if problem.__name__ in ['run_Schroedinger']
+                else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            'custom_description': desc_RK,
+        }
 
         configurations[2] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
