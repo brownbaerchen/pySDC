@@ -278,7 +278,7 @@ class Strategy:
             'run_Lorenz': 60,
             'run_Schroedinger': 150,
             'run_quench': 150,
-            'run_AC': 100,
+            'run_AC': 1000,
         }
 
         custom_description['convergence_controllers'][StopAtMaxRuntime] = {
@@ -1921,3 +1921,16 @@ class AdaptivityPolynomialError(WildRiot):
     @property
     def label(self):
         return r'$\Delta tk~\mathrm{adaptivity}$'
+
+class Resolution(AdaptivityPolynomialError):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.precision_parameter = 'nvars'
+        self.precision_parameter_loc = ['problem_params', 'nvars']
+
+    def get_custom_description(self, problem, *args, **kwargs):
+        desc = super().get_custom_description(problem, *args, **kwargs)
+        if problem.__name__ in ['run_AC']:
+            desc['problem_params'] = {'useGPU': True, 'nvars': (512, 512)}
+        return desc
+

@@ -28,6 +28,7 @@ MAPPINGS = {
     'e_global_rel': ('e_global_rel_post_run', max, False),
     't': ('timing_run', max, False),
     't_setup': ('timing_setup', max, False),
+    'time_to_generate_reference_solution': ('time_to_generate_reference_solution', max, False),
     # 'e_local_max': ('e_local_post_step', max, False),
     'k_SDC': ('k', sum, None),
     'k_SDC_no_restart': ('k', sum, False),
@@ -276,12 +277,19 @@ def record_work_precision(
         exponents = [-2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1]
+    elif param == 'nvars':
+        power = 2.0
+        exponents = [-1, 0, 1, 2, 3, 4, 5, 6, 7]
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in exponents] if param_range is None else param_range
+    if param == 'nvars':
+        param_range = [tuple(int(me * power**i) for me in default) for i in exponents] if param_range is None else param_range
+        print(param_range)
+    else:
+        param_range = [default * power**i for i in exponents] if param_range is None else param_range
 
     if problem.__name__ == 'run_quench':
         if param == 'restol':
@@ -296,12 +304,12 @@ def record_work_precision(
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
-            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
+            param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]#[::-1]
             # param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
+        set_parameter(description, where, param_range[i])
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
@@ -314,7 +322,7 @@ def record_work_precision(
             if comm_world.rank == 0:
                 logger.log(
                     24,
-                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}',
+                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]}',
                 )
             single_run(
                 problem,
@@ -709,31 +717,14 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'num_procs': 1,
         }
-    elif mode == 'GPU':
-        from pySDC.projects.Resilience.strategies import ARKStrategy, ESDIRKStrategy
-
-        # configurations[-1] = {
-        #     'strategies': [
-        #         # ERKStrategy(useMPI=True),
-        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        #     'custom_description': {'problem_params': {'useGPU': True}},
-        # }
-        # configurations[0] = {
-        #     'strategies': [
-        #         # ERKStrategy(useMPI=True),
-        #         ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        #     'custom_description': {'problem_params': {'useGPU': True}},
-        # }
-        configs = get_configs(mode='RK_comp', problem=problem)
+    elif mode[:3] == 'GPU':
+        configs = get_configs(mode=mode[3:], problem=problem)
         for key, value in configs.copy().items():
             conf = value.copy()
             conf['custom_description'] = conf.get('custom_description', {}).copy()
             conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
             conf['custom_description']['problem_params']['useGPU'] = True
+            conf['custom_description']['problem_params']['compute_reference_solution_on_GPU'] = True
             conf['handle'] = 'GPU'
             conf['plotting_params'] = {'ls': '--'}
             configurations[-(key * 1e3 + 1)] = conf
@@ -742,7 +733,14 @@ def get_configs(mode, problem):
             conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()
             conf_cpu['custom_description']['problem_params'] = conf_cpu['custom_description'].get('problem_params', {})
             conf_cpu['custom_description']['problem_params']['useGPU'] = False
+            conf_cpu['custom_description']['problem_params']['compute_reference_solution_on_GPU'] = True
             configurations[key * 1e3 + 1] = conf_cpu
+    elif mode == 'resolution':
+        from pySDC.projects.Resilience.strategies import Resolution
+        configurations[0] = {
+            'strategies': [Resolution(useMPI=True)],
+        }
+
     elif mode == 'dynamic_restarts':
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
 
@@ -1951,7 +1949,8 @@ if __name__ == "__main__":
     record = True
     for mode in [
         # 'compare_strategies',
-        'GPU',
+        #'GPURK_comp',
+        'resolution',
         #'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',

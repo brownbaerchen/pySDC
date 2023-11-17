@@ -134,3 +134,11 @@ class ptype(RegisterParams):
         return (
             solve_ivp(eval_rhs, (t_init, t), u_init.flatten(), rtol=tol, atol=tol, **kwargs).y[:, -1].reshape(u_shape)
         )
+
+    def generate_GPU_reference_solution(self, eval_rhs, t, u_init=None, t_init=None, **kwagrs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ESDIRK53
+        description = {}
+        description['problem_params'] = self.params.__dict__
+        description['sweeper_params'] = {}
+        description['sweeper_class'] = ESDIRK53
+

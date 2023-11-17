@@ -46,6 +46,9 @@ def run_AC(
         if 'imex' in problem_params.keys():
             imex = problem_params['imex']
             problem_params.pop('imex', None)
+        if 'useGPU' in problem_params.keys():
+            useGPU = problem_params['useGPU']
+            problem_params.pop('useGPU', None)
 
     # initialize level parameters
     level_params = {}
@@ -61,8 +64,9 @@ def run_AC(
 
     problem_params = {
         'newton_tol': 1e-9,
-        'useGPU': False,
-        'nvars': (256, 256),
+        'nvars': (512, 512),
+        'init_type': 'checkerboard',
+        'order': 6,
     }
 
     # initialize step parameters
@@ -84,7 +88,8 @@ def run_AC(
         else:
             from pySDC.implementations.problem_classes.AllenCahn_2D_FFT import allencahn2d_imex as problem_class
     else:
-        from pySDC.projects.Resilience.GPU.AllenCahn_2D_FD_XPU import allencahn_fullyimplicit_XPU as problem_class
+        from pySDC.projects.Resilience.GPU.AllenCahn_2D_FD_XPU import allencahn_fullyimplicit_XPU
+        problem_class = allencahn_fullyimplicit_XPU.get_XPU_implementation('GPU' if useGPU else 'CPU')
         # if useGPU:
         #     from pySDC.implementations.problem_classes.AllenCahn_2D_FD_gpu import allencahn_fullyimplicit as problem_class
         # else:

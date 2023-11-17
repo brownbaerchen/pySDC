@@ -1,9 +1,7 @@
-import numpy as np
 
 from pySDC.core.Errors import ParameterError, ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.helpers import problem_helper
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, comp2_mesh
 
 
 # noinspection PyUnusedLocal
@@ -60,9 +58,14 @@ class allencahn_fullyimplicit_XPU(ptype):
     lin_ncalls : int
         Number of calls of linear solver.
     """
-
-    dtype_u = mesh
-    dtype_f = mesh
+    @staticmethod
+    def get_XPU_implementation(implementation='CPU'):
+        if implementation == 'CPU':
+            return allencahn_fullyimplicit
+        elif implementation == 'GPU':
+            return allencahn_fullyimplicit_GPU
+        else:
+            raise NotImplementedError
 
     def __init__(
         self,
@@ -76,25 +79,10 @@ class allencahn_fullyimplicit_XPU(ptype):
         inexact_linear_ratio=None,
         radius=0.25,
         order=2,
-        useGPU=False,
+        init_type='checkerboard',
+        compute_reference_solution_on_GPU=False,
     ):
         """Initialization routine"""
-        if useGPU:
-            import cupy as cp
-            import cupyx.scipy.sparse as csp
-            from cupyx.scipy.sparse.linalg import cg
-            from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
-            self.xp = cp
-            self.xsp = csp
-            self.cg = cg
-            self.dtype_u = cupy_mesh
-            self.dtype_f = cupy_mesh
-        else:
-            import scipy.sparse as sp
-            from scipy.sparse.linalg import cg
-            self.xp = np
-            self.xsp = sp
-            self.cg = cg
 
         # we assert that nvars looks very particular here.. this will be necessary for coarsening in space later on
         if len(nvars) != 2:
@@ -112,7 +100,8 @@ class allencahn_fullyimplicit_XPU(ptype):
             'eps',
             'radius',
             'order',
-            'useGPU',
+            'init_type',
+            'compute_reference_solution_on_GPU',
             localVars=locals(),
             readOnly=True,
         )
@@ -136,7 +125,7 @@ class allencahn_fullyimplicit_XPU(ptype):
             size=self.nvars[0],
             dim=2,
             bc='periodic',
-            useGPU=useGPU,
+            useGPU=self.useGPU,
         )
         self.xvalues = self.xp.array([i * self.dx - 0.5 for i in range(self.nvars[0])])
 
@@ -244,6 +233,46 @@ class allencahn_fullyimplicit_XPU(ptype):
         self.work_counters['rhs']()
         return f
 
+    def u_exact(self, t, **kwargs):
+        r"""
+        Return initial conditions
+
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
+
+        Returns
+        -------
+        me : dtype_u
+            The exact solution.
+        """
+        assert t == 0, f'Exact solution is only available at t=0!'
+        me = self.dtype_u(self.init, val=0.0)
+        if self.init_type == 'circle':
+            xv, yv = self.xp.meshgrid(self.xvalues, self.xvalues, indexing='ij')
+            me[:, :] = self.xp.tanh((self.radius - self.xp.sqrt(xv**2 + yv**2)) / (self.xp.sqrt(2) * self.eps))
+        elif self.init_type == 'checkerboard':
+            xv, yv = self.xp.meshgrid(self.xvalues, self.xvalues)
+            me[:, :] = self.xp.sin(2.0 * self.xp.pi * xv) * self.xp.sin(2.0 * self.xp.pi * yv)
+        elif self.init_type == 'random':
+            me[:, :] = self.xp.random.uniform(-1, 1, self.init)
+        else:
+            raise NotImplementedError('type of initial value not implemented, got %s' % self.init_type)
+
+        return me
+
+
+class allencahn_fullyimplicit(allencahn_fullyimplicit_XPU):
+    from pySDC.implementations.datatype_classes.mesh import mesh
+    import numpy as xp
+    import scipy.sparse as xsp
+    from scipy.sparse.linalg import cg as _cg
+    cg = staticmethod(_cg)
+    dtype_u = mesh
+    dtype_f = mesh
+    useGPU = False
+
     def u_exact(self, t, u_init=None, t_init=None):
         r"""
         Routine to compute the exact solution at time :math:`t`.
@@ -263,16 +292,63 @@ class allencahn_fullyimplicit_XPU(ptype):
             def eval_rhs(t, u):
                 return self.eval_f(u.reshape(self.init[0]), t).flatten()
 
-            if self.useGPU:
-                prob = type(self)(**{**self.params, 'useGPU': False})
-                me[:] = self.xp.asarray(prob.u_exact(t, u_init, t_init))
+            if self.compute_reference_solution_on_GPU:
+                me[:] = allencahn_fullyimplicit_GPU(**self.params).u_exact(t, u_init, t_init).get()
             else:
                 me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init)
 
         else:
-            for i in range(self.nvars[0]):
-                for j in range(self.nvars[1]):
-                    r2 = self.xvalues[i] ** 2 + self.xvalues[j] ** 2
-                    me[i, j] = self.xp.tanh((self.radius - self.xp.sqrt(r2)) / (self.xp.sqrt(2) * self.eps))
+            me[:] = super().u_exact(0)[:]
+        return me
 
+class allencahn_fullyimplicit_GPU(allencahn_fullyimplicit_XPU):
+    from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
+    import cupy as xp
+    import cupyx.scipy.sparse as xsp
+    from cupyx.scipy.sparse.linalg import cg as _cg
+    cg = staticmethod(_cg)
+    dtype_u = cupy_mesh
+    dtype_f = cupy_mesh
+    useGPU = True
+
+    def u_exact(self, t, u_init=None, t_init=None):
+        r"""
+        Routine to compute the exact solution at time :math:`t`.
+
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
+
+        Returns
+        -------
+        me : dtype_u
+            The exact solution.
+        """
+        me = self.dtype_u(self.init, val=0.0)
+        if t > 0:
+            from pySDC.implementations.sweeper_classes.Runge_Kutta import ESDIRK53
+            from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
+            from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+            description = {}
+            description['sweeper_class'] = ESDIRK53
+            description['sweeper_params'] = {}
+            description['problem_class'] = type(self)
+            description['problem_params'] = {**self.params, 'newton_tol': 1e-11, 'lin_tol': 1e-11}
+            description['convergence_controllers'] = {AdaptivityRK: {'e_tol': 1e-10}}
+            description['level_params'] = {'dt': 1e-9}
+            description['step_params'] = {'maxiter': 1}
+
+            controller_params = {}
+            controller_params['logger_level'] = 30
+            controller_params['mssdc_jac'] = False
+
+            controller = controller_nonMPI(description=description, controller_params=controller_params, num_procs=1)
+
+            uend, stats = controller.run(u0=u_init if u_init else self.u_exact(t=0), t0=t_init if t_init else 0., Tend=t)
+
+            me[:] = uend[:]
+
+        else:
+            me[:] = super().u_exact(0)[:]
         return me
