@@ -146,7 +146,6 @@ def single_run(
     # record all the metrics
     stats_all = filter_stats(stats, comm=comm_sweep)
     comm_sweep.Free()
-    from pySDC.helpers.stats_helper import get_list_of_types
 
     for key, mapping in MAPPINGS.items():
         if crash:
@@ -296,13 +295,8 @@ def record_work_precision(
     if problem.__name__ == 'run_quench':
         if param == 'restol':
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
-        # elif param == 'e_tol':
-        #     # param_range = [3e-5, 3e-6, 3e-7, 3e-8]
-        #     param_range = np.logspace(-5, -8, 6)
         elif param == 'dt':
-            # param_range = [512 / 2.0**me for me in [6, 7, 8, 9]]
             param_range = [1.25, 2.5, 5.0, 10.0, 20.0][::-1]
-            # param_range = [20.]
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
@@ -490,7 +484,9 @@ def plot_work_precision(
             ax.text(0.1, 0.2, "No sampling!", transform=ax.transAxes)
 
 
-def plot_parallel_efficiency_diagonalSDC(ax, work_key, precision_key, num_procs_sweeper, num_procs=1, **kwargs):
+def plot_parallel_efficiency_diagonalSDC(
+    ax, work_key, precision_key, num_procs_sweeper, num_procs=1, **kwargs
+):  # pragma: no cover
     serial_data = load(
         num_procs=num_procs,
         num_procs_sweeper=1,
@@ -745,24 +741,15 @@ def get_configs(mode, problem):
         }
 
     elif mode == 'dynamic_restarts':
+        """
+        Compare Block Gauss-Seidel SDC with restarting the first step in the block or the first step that exceeded the error threshold.
+        """
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityRestartFirstStep
 
         desc = {}
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
         desc['step_params'] = {'maxiter': 5}
 
-        # configurations[1] = {
-        #    'custom_description': {},
-        #    'handle': 'dynamic restarts',
-        #    'plotting_params': {'label': 'adaptivity (dynamic restarts)', 'ls': '-.'},
-        #    'strategies': [AdaptivityStrategy(useMPI=True)],
-        # }
-        # configurations[2] = {
-        #    'custom_description': {},
-        #    'handle': 'regular',
-        #    'plotting_params': {'label': 'adaptivity'},
-        #    'strategies': [AdaptivityRestartFirstStep(useMPI=True)],
-        # }
         ls = {
             1: '-',
             2: '--',
@@ -785,40 +772,10 @@ def get_configs(mode, problem):
                 'plotting_params': plotting_params,
             }
 
-    elif mode == 'compare_strategies_oldBS_trashfest':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
-
-        description_high_order = {'step_params': {'maxiter': 5}}
-        description_low_order = {'step_params': {'maxiter': 3}}
-        dashed = {'ls': '--'}
-
-        configurations[0] = {
-            'custom_description': description_high_order,
-            'handle': r'high order',
-            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
-        }
-        configurations[1] = {
-            'custom_description': description_low_order,
-            'handle': r'low order',
-            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
-            'plotting_params': dashed,
-        }
-
-        description_large_step = {'level_params': {'dt': 5.0 if problem.__name__ == 'run_quench' else 3e-2}}
-        description_small_step = {'level_params': {'dt': 1.0 if problem.__name__ == 'run_quench' else 1e-2}}
-
-        configurations[2] = {
-            'custom_description': description_large_step,
-            'handle': r'large step',
-            'strategies': [IterateStrategy(useMPI=True)],
-            'plotting_params': dashed,
-        }
-        configurations[3] = {
-            'custom_description': description_small_step,
-            'handle': r'small step',
-            'strategies': [IterateStrategy(useMPI=True)],
-        }
     elif mode == 'compare_strategies':
+        """
+        Compare the different SDC strategies.
+        """
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             kAdaptivityStrategy,
@@ -842,6 +799,9 @@ def get_configs(mode, problem):
         }
 
     elif mode == 'interpolate_between_restarts':
+        """
+        Compare adaptivity with interpolation between restarts and without
+        """
         from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
         i = 0
@@ -856,83 +816,10 @@ def get_configs(mode, problem):
                 'handle': handle,
             }
             i += 1
-
-    elif mode == 'RK':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, DIRKStrategy, ERKStrategy
-
-        # from pySDC.implementations.sweeper_classes.explicit import explicit
-        # configurations[3] = {
-        #    'custom_description': {
-        #        'step_params': {'maxiter': 5},
-        #        'sweeper_params': {'QE': 'EE'},
-        #        'sweeper_class': explicit,
-        #    },
-        #    'handle': 'explicit order 4',
-        #    'strategies': [AdaptivityStrategy(useMPI=True)],
-        #    'plotting_params': {'ls': ':', 'label': 'explicit SDC5(4)'},
-        # }
-        configurations[0] = {
-            'strategies': [ERKStrategy(useMPI=True), DIRKStrategy(useMPI=True)],
-            'num_procs': 1,
-        }
-        configurations[1] = {
-            'custom_description': {'step_params': {'maxiter': 5}},
-            'handle': 'order 5',
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'label': 'SDC5(4)'},
-        }
-        configurations[2] = {
-            'custom_description': {'step_params': {'maxiter': 4}},
-            'handle': 'order 4',
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'plotting_params': {'ls': '--', 'label': 'SDC4(3)'},
-        }
-    elif mode == 'parallel_efficiency_old_trashfest':
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityStrategy,
-            BaseStrategy,
-            IterateStrategy,
-        )
-
-        desc = {}
-        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
-        desc['step_params'] = {'maxiter': 5}
-
-        descIterate = {}
-        descIterate['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
-
-        ls = {
-            1: '-',
-            2: '--',
-            3: '-.',
-            4: ':',
-            5: ':',
-        }
-
-        for num_procs in [4, 2, 1]:
-            plotting_params = {'ls': ls[num_procs], 'label': fr'$\Delta t$ adaptivity {num_procs} procs'}
-            configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(useMPI=True)],
-                'custom_description': desc,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-            }
-            plotting_params = {'ls': ls[num_procs], 'label': fr'$k$ adaptivity {num_procs} procs'}
-            configurations[num_procs + 100] = {
-                'strategies': [IterateStrategy(useMPI=True)],
-                'custom_description': descIterate,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-            }
-
-            # plotting_params = {'ls': ls[num_procs], 'label': fr'fixed {num_procs} procs'}
-            # configurations[num_procs + 999] = {
-            #     'strategies': [BaseStrategy(True)],
-            #     'custom_description': desc,
-            #     'num_procs': num_procs,
-            #     'plotting_params': plotting_params,
-            # }
     elif mode == 'diagonal_SDC':
+        """
+        Run diagonal SDC with different number of nodes and ranks. You can use this to compute a speedup, but it's not strong scaling!
+        """
         from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
         if problem.__name__ in ['run_Schroedinger']:
@@ -961,6 +848,9 @@ def get_configs(mode, problem):
                 }
 
     elif mode == 'parallel_efficiency':
+        """
+        Compare parallel runs of the step size adaptive SDC
+        """
         from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityPolynomialError
 
         if problem.__name__ in ['run_Schroedinger']:
@@ -1002,7 +892,7 @@ def get_configs(mode, problem):
                 'num_procs': num_procs,
                 'plotting_params': {
                     'ls': ls.get(num_procs * 3, '-'),
-                    'label': f'$\Delta tk$ adaptivity $N$={num_procs}x3',
+                    'label': rf'$\Delta t$-$k$ adaptivity $N$={num_procs}x3',
                 },
             }
 
@@ -1012,7 +902,10 @@ def get_configs(mode, problem):
         }
 
     elif mode[:13] == 'vdp_stiffness':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, DIRKStrategy, ESDIRKStrategy
+        """
+        Run van der Pol with different parameter for the nonlinear term, which controls the stiffness.
+        """
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, ESDIRKStrategy
 
         mu = float(mode[14:])
 
@@ -1055,15 +948,7 @@ def get_configs(mode, problem):
             'handle': mode,
             'plotting_params': {'label': 'CP5(4)'},
             'custom_description': problem_desc,
-            #'param_range': [1e-2],
         }
-        # configurations[3] = {
-        #     'strategies': [DIRKStrategy(useMPI=True)],
-        #     'num_procs': 1,
-        #     'handle': mode,
-        #     'plotting_params': {'label': 'DIRK4(3)'},
-        #     'custom_description': problem_desc,
-        # }
         configurations[4] = {
             'strategies': [ESDIRKStrategy(useMPI=True)],
             'num_procs': 1,
@@ -1071,87 +956,11 @@ def get_configs(mode, problem):
             'plotting_params': {'label': 'ESDIRK5(3)'},
             'custom_description': problem_desc,
         }
-
-    elif mode == 'parallelSweeper':
-        # TODO: configurations not final!
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityCollocationTypeStrategy,
-            AdaptivityStrategy,
-            AdaptivityExtrapolationWithinQStrategy,
-            ERKStrategy,
-        )
-        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
-
-        strategies = [
-            AdaptivityCollocationTypeStrategy(useMPI=True),
-            AdaptivityExtrapolationWithinQStrategy(useMPI=True),
-        ]
-
-        restol = None
-        for strategy in strategies:
-            strategy.restol = restol
-
-        custom_description = {
-            'step_params': {'maxiter': 99},
-            'level_params': {'restol': 1e-11},
-            'sweeper_params': {'QI': 'MIN'},
-        }
-        base_desc = {'sweeper_params': {'num_nodes': 3, 'QI': 'IE'}, 'step_params': {'maxiter': 5}}
-
-        configurations[-1] = {
-            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-            'num_procs_sweeper': 1,
-            'num_procs': 4,
-            'plotting_params': {
-                'ls': '-.',
-                'label': '4-1',
-            },
-            'strategies': strategies,
-        }
-        configurations[1] = {
-            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-            'num_procs_sweeper': 3,
-            'num_procs': 4,
-            'plotting_params': {
-                'ls': '-',
-                'label': '4-3',
-            },
-            'strategies': strategies,
-        }
-        configurations[0] = {
-            'custom_description': {**custom_description, 'sweeper_class': generic_implicit_MPI},
-            'num_procs_sweeper': 3,
-            'num_procs': 1,
-            'strategies': strategies,
-            'plotting_params': {
-                'ls': '--',
-                'label': '1-3',
-            },
-        }
-        configurations[2] = {
-            'custom_description': {**custom_description, 'sweeper_params': {'QI': 'LU'}},
-            'num_procs_sweeper': 1,
-            'num_procs': 1,
-            'plotting_params': {
-                'ls': ':',
-                'label': '1-1',
-            },
-            'strategies': strategies,
-        }
-        configurations[8] = {
-            'strategies': [
-                ERKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-            # 'custom_description': desc_RK,
-        }
-        configurations[3] = {
-            'strategies': [AdaptivityStrategy(useMPI=True)],
-            'custom_description': base_desc,
-        }
     elif mode == 'inexactness':
+        """
+        Compare inexact SDC to exact SDC
+        """
         from pySDC.projects.Resilience.strategies import (
-            AdaptivityCollocationTypeStrategy,
             AdaptivityPolynomialError,
         )
 
@@ -1177,12 +986,6 @@ def get_configs(mode, problem):
             'use_restol_rel': False,
         }
 
-        # configurations[0] = {
-        #     'custom_description': {'sweeper_class': parallel_sweeper},
-        #     'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-        #     'num_procs_sweeper': 3,
-        #     'plotting_params': {'ls': '-', 'label': 'inexact'},
-        # }
         configurations[1] = {
             'custom_description': {'sweeper_class': parallel_sweeper},
             'strategies': [me(useMPI=True, **no_inexactness) for me in strategies],
@@ -1197,14 +1000,16 @@ def get_configs(mode, problem):
             'num_procs_sweeper': 3,
         }
     elif mode == 'compare_adaptivity':
+        """
+        Compare various modes of adaptivity
+        """
         # TODO: configurations not final!
         from pySDC.projects.Resilience.strategies import (
-            AdaptivityCollocationTypeStrategy,
-            AdaptivityCollocationRefinementStrategy,
+            # AdaptivityCollocationTypeStrategy,
+            # AdaptivityCollocationRefinementStrategy,
             AdaptivityStrategy,
-            AdaptivityExtrapolationWithinQStrategy,
+            # AdaptivityExtrapolationWithinQStrategy,
             ESDIRKStrategy,
-            ERKStrategy,
             ARKStrategy,
             AdaptivityPolynomialError,
         )
@@ -1216,7 +1021,7 @@ def get_configs(mode, problem):
                 generic_implicit_MPI as parallel_sweeper,
             )
 
-        wild_params = {
+        inexactness_params = {
             # 'double_adaptivity': True,
             'newton_inexactness': True,
             'linear_inexactness': True,
@@ -1234,17 +1039,18 @@ def get_configs(mode, problem):
 
         configurations[1] = {
             'custom_description': {'sweeper_class': parallel_sweeper},
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
+            'strategies': [me(useMPI=True, **inexactness_params) for me in strategies],
             'handle': 'parallel',
             'num_procs_sweeper': 3,
             'plotting_params': {'ls': '-', 'label': '3 procs'},
         }
         configurations[2] = {
-            'strategies': [me(useMPI=True, **wild_params) for me in strategies],
-            # 'custom_description': {
-            #     #'sweeper_params': {'QI': 'LU'},
-            # },
+            'strategies': [me(useMPI=True, **inexactness_params) for me in strategies],
             'plotting_params': {'ls': '--'},
+        }
+        configurations[4] = {
+            'custom_description': {'step_params': {'maxiter': 5}},
+            'strategies': [AdaptivityStrategy(useMPI=True)],
         }
         if True:
             configurations[4] = {
@@ -1266,52 +1072,19 @@ def get_configs(mode, problem):
                 'custom_description': desc_RK,
             }
 
-        # strategies2 = [AdaptivityCollocationTypeStrategy(useMPI=True), AdaptivityCollocationRefinementStrategy(useMPI=True)]
-        # restol = 1e-6
-        # for strategy in strategies2:
-        #    strategy.restol = restol
-        # configurations[3] = {'strategies':strategies2, 'handle': 'low restol', 'plotting_params': {'ls': '--'}}
-
-    elif mode == 'quench':
-        from pySDC.projects.Resilience.strategies import (
-            AdaptivityStrategy,
-            DoubleAdaptivityStrategy,
-            IterateStrategy,
-            BaseStrategy,
-        )
-
-        dumbledoresarmy = DoubleAdaptivityStrategy(useMPI=True)
-        # dumbledoresarmy.residual_e_tol_ratio = 1e2
-        dumbledoresarmy.residual_e_tol_abs = 1e-3
-
-        strategies = [
-            AdaptivityStrategy(useMPI=True),
-            IterateStrategy(useMPI=True),
-            BaseStrategy(useMPI=True),
-            dumbledoresarmy,
-        ]
-        configurations[1] = {'strategies': strategies}
-        configurations[2] = {
-            'strategies': strategies,
-            'problem_args': {'imex': True},
-            'handle': 'IMEX',
-            'plotting_params': {'ls': '--'},
+        desc_RK = {}
+        configurations[-1] = {
+            'strategies': [
+                ARKStrategy(useMPI=True) if problem.__name__ == 'run_Schroedinger' else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+            'custom_description': desc_RK,
         }
-        inexact = {'problem_params': {'newton_iter': 30}}
-        configurations[3] = {
-            'strategies': strategies,
-            'custom_description': inexact,
-            'handle': 'inexact',
-            'plotting_params': {'ls': ':'},
-        }
-        LU = {'sweeper_params': {'QI': 'LU'}}
-        configurations[4] = {
-            'strategies': strategies,
-            'custom_description': LU,
-            'handle': 'LU',
-            'plotting_params': {'ls': '-.'},
-        }
+
     elif mode == 'preconditioners':
+        """
+        Compare different preconditioners
+        """
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             IterateStrategy,
@@ -1350,15 +1123,10 @@ def get_configs(mode, problem):
                 'plotting_params': {'ls': ls[i]},
             }
 
-        # configurations[-1] = {
-        #     'strategies': [
-        #         ERKStrategy(useMPI=True),
-        #         ESDIRKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        # }
-
     elif mode == 'RK_comp':
+        """
+        Compare parallel adaptive SDC to Runge-Kutta
+        """
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             ERKStrategy,
@@ -1378,6 +1146,9 @@ def get_configs(mode, problem):
         desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
         desc['step_params'] = {'maxiter': 5}
 
+        desc_poly = {}
+        desc_poly['sweeper_class'] = parallel_sweeper
+
         ls = {
             1: '-',
             2: '--',
@@ -1385,9 +1156,6 @@ def get_configs(mode, problem):
             4: ':',
             5: ':',
         }
-
-        desc_poly = {}
-        desc_poly['sweeper_class'] = parallel_sweeper
 
         desc_RK = {}
         if problem.__name__ in ['run_Schroedinger']:
@@ -1398,13 +1166,12 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
             'num_procs': 1,
             'num_procs_sweeper': 3,
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
         }
         configurations[-1] = {
             'strategies': [
-                # ERKStrategy(useMPI=True),
-                ARKStrategy(useMPI=True)
-                if problem.__name__ in ['run_Schroedinger']
-                else ESDIRKStrategy(useMPI=True),
+                ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
             'custom_description': desc_RK,
@@ -1414,8 +1181,12 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'num_procs': 4,
+            'plotting_params': {'label': r'$\Delta t$ adaptivity $N$=4x1'},
         }
     elif mode == 'RK_comp_high_order':
+        """
+        Compare higher order SDC than we can get with RKM to RKM
+        """
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             ERKStrategy,
@@ -1463,7 +1234,6 @@ def get_configs(mode, problem):
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
-            'custom_description': desc_RK,
         }
 
         configurations[2] = {
@@ -1471,70 +1241,10 @@ def get_configs(mode, problem):
             'custom_description': desc,
             'num_procs': 4,
         }
-    elif mode == 'imex':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ESDIRKStrategy, ARKStrategy
-
-        desc = {}
-        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE'}
-        desc['step_params'] = {'maxiter': 5}
-
-        ls = {
-            1: '-',
-            2: '--',
-            3: '-.',
-            4: ':',
-            5: ':',
-        }
-
-        desc_RK = {}
-        desc_RK['problem_params'] = {'imex': False}
-        configurations[-2] = {
-            'strategies': [ARKStrategy(useMPI=True)],
-            'num_procs': 1,
-        }
-        # configurations[-1] = {
-        #     'strategies': [
-        #         ESDIRKStrategy(useMPI=True),
-        #     ],
-        #     'num_procs': 1,
-        #     'custom_description': desc_RK,
-        # }
-        i = 10
-        # for imex, label, ls in zip([True, False], ['IMEX', 'fully implicit'], ['-', ':']):
-        #     desc['problem_params'] = {'imex': imex}
-        #     plotting_params = {'ls': ls, 'label': f'{label} SDC'}
-        #     configurations[i] = {
-        #         'strategies': [AdaptivityStrategy(True)],
-        #         'custom_description': copy.deepcopy(desc),
-        #         'num_procs': 1,
-        #         'plotting_params': plotting_params,
-        #         'handle': label,
-        #     }
-        #     i += 1
-    elif mode == 'newton_tol':
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, BaseStrategy, IterateStrategy
-
-        tol_range = [1e-7, 1e-9, 1e-11]
-        ls = ['-', '--', '-.', ':']
-        for i in range(len(tol_range)):
-            configurations[i] = {
-                'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
-                'custom_description': {
-                    'problem_params': {'newton_tol': tol_range[i]},
-                    'step_params': {'maxiter': 5},
-                },
-                'handle': f"Newton tol={tol_range[i]:.1e}",
-                'plotting_params': {'ls': ls[i]},
-            }
-            configurations[i + len(tol_range)] = {
-                'strategies': [IterateStrategy(useMPI=True)],
-                'custom_description': {
-                    'problem_params': {'newton_tol': tol_range[i]},
-                },
-                'handle': f"Newton tol={tol_range[i]:.1e}",
-                'plotting_params': {'ls': ls[i]},
-            }
     elif mode == 'avoid_restarts':
+        """
+        Test how well avoiding restarts works.
+        """
         from pySDC.projects.Resilience.strategies import (
             AdaptivityStrategy,
             AdaptivityAvoidRestartsStrategy,
@@ -1821,85 +1531,47 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
         )
 
 
-def ERK_stiff_weirdness():
-    from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostStep, LogLocalErrorPostStep
-    from pySDC.projects.Resilience.strategies import ERKStrategy, AdaptivityStrategy
-    from pySDC.implementations.convergence_controller_classes.step_size_limiter import (
-        StepSizeLimiter,
-        StepSizeSlopeLimiter,
-    )
-    import matplotlib.pyplot as plt
-    from pySDC.projects.Resilience.Schroedinger import live_plotting, log_number_of_waves
+def aggregate_parallel_efficiency_plot():  # pragma: no cover
+    """
+    Make a "weak scaling" plot for diagonal SDC
+    """
+    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
 
-    fig, axs = plt.subplots(4, 1, sharex=True)
+    fig, axs = plt.subplots(2, 2)
 
-    strategy = AdaptivityStrategy(True)
-    # strategy = ERKStrategy(True)
+    _fig, _ax = plt.subplots(1, 1)
+    num_procs = 1
+    num_procs_sweeper = 2
+    problem = run_quench
 
-    problem = run_Schroedinger
-    # epsilons = [1e-1, 1e-3, 1e-5, 1e-7, 1e-8]
-    epsilons = [1e-2, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
-    # epsilons = [1e-2, 1e-8]
-    Tend = 0.1
+    num_procs_sweeper_list = [2, 3, 4]
 
-    data = {}
-    desc = strategy.get_custom_description(problem, 1)
-    where = strategy.precision_parameter_loc
-    # desc['problem_params'] = {'mu': 30}
-    # desc['problem_params'] = {'imex': False}
-    desc['level_params'] = {'dt': Tend * 1e-3}
-    desc['sweeper_params']['QI'] = 'EE'
-    # desc['convergence_controllers'][StepSizeLimiter]= {'dt_slope_max': 10., 'dt_max': 5e-4}
+    for problem, ax in zip([run_vdp, run_Lorenz, run_quench], axs.flatten()):
+        speedup = []
+        for num_procs_sweeper in num_procs_sweeper_list:
+            s, e = plot_parallel_efficiency_diagonalSDC(
+                ax=_ax,
+                work_key='t',
+                precision_key='e_global_rel',
+                num_procs=num_procs,
+                num_procs_sweeper=num_procs_sweeper,
+                problem=problem,
+                strategy=AdaptivityPolynomialError(),
+                mode='diagonal_SDC',
+                handle=f'{num_procs_sweeper} nodes',
+            )
+            speedup += [s]
+            decorate_panel(ax, problem, work_key='nprocs', precision_key='')
 
-    from pySDC.projects.Resilience.strategies import cmap
-
-    for eps, color in zip(epsilons, list(cmap.values())):
-        set_parameter(desc, where, eps)
-        data[eps] = {key: [] for key in MAPPINGS.keys()}
-        data[eps]['stats'] = single_run(
-            strategy=strategy,
-            data=data[eps],
-            hooks=[LogLocalErrorPostStep, log_number_of_waves],
-            problem=problem,
-            custom_description=desc,
-            num_procs=1,
-            comm_world=MPI.COMM_WORLD,
-            Tend=Tend,
+        ax.plot(num_procs_sweeper_list, speedup, label='speedup')
+        ax.plot(
+            num_procs_sweeper_list,
+            [speedup[i] / num_procs_sweeper_list[i] for i in range(len(speedup))],
+            label='parallel efficiency',
         )
-        stats = data[eps]['stats']
-        #        e = get_sorted(stats, type='e_global_post_step', recomputed=False)
-        #        axs[0].plot([me[0] for me in e], [me[1] for me in e])
-        #
-        e = get_sorted(stats, type='e_local_post_step', recomputed=False)
-        axs[0].plot(
-            [me[0] for me in e], [me[1] for me in e], ls='-', label=rf'$\epsilon_\mathrm{{TOL}} = {{{eps:.0e}}}$'
-        )
-        axs[0].set_ylabel('local error')
 
-        dt = get_sorted(stats, type='dt', recomputed=False)
-        axs[1].plot([me[0] for me in dt], [me[1] for me in dt], ls='-')
-        axs[1].set_ylabel('dt')
-        axs[1].set_yscale('log')
-
-        rhs = get_sorted(stats, type='work_rhs', recomputed=None)
-
-        axs[2].plot([me[0] for me in rhs], np.cumsum([me[1] for me in rhs]), ls='-')
-        axs[2].set_ylabel('rhs evaluations')
-
-        nwaves = get_sorted(stats, type='fastest_wave', recomputed=False)
-        axs[3].plot([me[0] for me in nwaves], [me[1] for me in nwaves], ls='-', color=color)
-        slowest_wave = get_sorted(stats, type='slowest_wave', recomputed=False)
-        # print(slowest_wave)
-        axs[3].plot([me[0] for me in slowest_wave], [me[1] for me in slowest_wave], ls='--', color=color)
-        axs[3].set_ylabel('waves')
-        # axs[3].set_yscale('log')
-
-    axs[0].set_yscale('log')
-    axs[2].set_yscale('log')
-    axs[-1].set_xlabel('t')
-    axs[0].legend(frameon=False)
-    # print([(eps, data[eps]['t']) for eps in epsilons])
-    plt.show()
+    fig.tight_layout()
+    save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
 
 
 def aggregate_parallel_efficiency_plot():
@@ -1944,16 +1616,14 @@ def aggregate_parallel_efficiency_plot():
 
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-    # vdp_stiffness_plot(runs=1, record=False)
-    # ERK_stiff_weirdness()
 
     # aggregate_parallel_efficiency_plot()
 
     record = True
     for mode in [
         # 'compare_strategies',
-        #'GPURK_comp',
-        'resolution',
+        'GPURK_comp',
+        # 'resolution',
         #'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',

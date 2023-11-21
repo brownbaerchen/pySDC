@@ -100,6 +100,10 @@ class StopAtNan(CrashBase):
 
 
 class StopAtMaxRuntime(CrashBase):
+    """
+    Abort the code when the problem has exceeded a maximum runtime.
+    """
+
     def setup(self, controller, params, description, **kwargs):
         """
         Define parameters here.

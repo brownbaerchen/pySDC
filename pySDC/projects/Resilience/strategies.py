@@ -86,7 +86,6 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
-        self.precision_range_fac = 1.0
 
     def __str__(self):
         return self.name
@@ -195,7 +194,6 @@ class Strategy:
         '''
         if problem.__name__ == "run_vdp":
             return 11.5
-            # return 2.3752559741400825  # old stuff
         elif problem.__name__ == "run_piline":
             return 20.0
         elif problem.__name__ == "run_Lorenz":
@@ -269,7 +267,7 @@ class Strategy:
         if self.stop_at_nan:
             from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
-            # custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
+            custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
 
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
@@ -325,7 +323,11 @@ class Strategy:
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class WildRiot(Strategy):
+class InexactBaseStrategy(Strategy):
+    """
+    Base class for inexact strategies.
+    """
+
     def __init__(
         self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=16, **kwargs
     ):
@@ -335,16 +337,9 @@ class WildRiot(Strategy):
         self.newton_inexactness = newton_inexactness
         self.linear_inexactness = linear_inexactness
         self.SDC_maxiter = SDC_maxiter
-        # self.restol = -1
 
     def get_controller_params(self, **kwargs):
         return {'all_to_done': True}
-
-    # def get_description_for_tolerance(self, problem, param, **kwargs):
-    #     desc = {}
-    #     if problem.__name__ in ['run_quench']:
-    #         desc['level_params'] = {'restol': max([1e-9, param / 1e2])}
-    #     return desc
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
@@ -370,7 +365,6 @@ class WildRiot(Strategy):
             if problem.__name__ == 'run_quench':
                 inexactness_params['ratio'] = 1e-1
                 inexactness_params['min_tol'] = 1e-11
-                # inexactness_params['max_tol'] = 1e-3
                 inexactness_params['maxiter'] = 5
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
 
@@ -378,19 +372,11 @@ class WildRiot(Strategy):
             desc['problem_params']['stop_at_nan'] = False
 
         if self.linear_inexactness and problem.__name__ in ['run_AC', 'run_quench']:
-            # from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
-
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
                 desc['problem_params']['direct_solver'] = False
                 desc['problem_params']['liniter'] = 9
                 desc['problem_params']['min_lintol'] = 1e-11
-
-        # if self.double_adaptivity:
-        #     from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
-
-        #     desc['step_params']['maxiter'] = 10
-        #     desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
 
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
@@ -417,23 +403,6 @@ class BaseStrategy(Strategy):
         self.bar_plot_x_label = 'base'
         self.precision_parameter = 'dt'
         self.precision_parameter_loc = ['level_params', 'dt']
-
-    # def get_fault_args(self, problem, num_procs):
-    #     '''
-    #     Routine to get arguments for the faults that are exempt from randomization
-
-    #     Args:
-    #         problem: A function that runs a pySDC problem, see imports for available problems
-    #         num_procs (int): Number of processes you intend to run with
-
-    #     Returns:
-    #         dict: Arguments for the faults that are exempt from randomization
-    #     '''
-    #     args = super().get_fault_args(problem, num_procs)
-    #     if problem.__name__ == "run_quench":
-    #         args['time'] = 75.0
-
-    #     return args
 
     @property
     def label(self):
@@ -478,7 +447,8 @@ class AdaptivityStrategy(Strategy):
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(skip_residual_computation='all', **kwargs)
+        kwargs['skip_residual_computation'] = 'all'
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity'
@@ -489,12 +459,6 @@ class AdaptivityStrategy(Strategy):
     @property
     def label(self):
         return r'$\Delta t$ adaptivity'
-
-    # def get_description_for_tolerance(self, problem, param, **kwargs):
-    #     desc = {}
-    #     if problem.__name__ in ['run_quench']:
-    #         desc['problem_params'] = {'newton_tol': min([max([param / 1e2, 1e-11]), 1e-7]), 'lintol': min([max([param / 1e2, 1e-11]), 1e-7]), 'liniter': 29, 'newton_maxiter': 29}
-    #     return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
         """
@@ -549,8 +513,6 @@ class AdaptivityStrategy(Strategy):
                 'newton_tol': 1e-9,
                 'lintol': 1e-10,
             }
-            # dt_max = 100.0
-            # dt_slope_max = 4.
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
@@ -642,13 +604,14 @@ class AdaptiveHotRodStrategy(Strategy):
     Adaptivity + Hot Rod as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(useMPI=useMPI, skip_residual_computation='all', **kwargs)
+        kwargs['skip_residual_computation'] = 'all'
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.name = 'adaptive Hot Rod'
@@ -724,7 +687,8 @@ class IterateStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super().__init__(skip_residual_computation='most', **kwargs)
+        kwargs['skip_residual_computation'] = 'most'
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[2]
         self.marker = 'v'
         self.name = 'iterate'
@@ -759,8 +723,6 @@ class IterateStrategy(Strategy):
         elif problem.__name__ == "run_Schroedinger":
             restol = 6.5e-7
         elif problem.__name__ == "run_quench":
-            restol = 1e-7
-        elif problem.__name__ == 'run_AC':
             restol = 1e-7
         else:
             raise NotImplementedError(
@@ -838,6 +800,27 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['level_params']['dt'] = 5.0
         return desc
 
+    def get_reference_value(self, problem, key, op, num_procs=1):
+        """
+        Get a reference value for a given problem for testing in CI.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            key (str): The name of the variable you want to compare
+            op (function): The operation you want to apply to the data
+            num_procs (int): Number of processes
+
+        Returns:
+            The reference value
+        """
+        if problem.__name__ == "run_vdp":
+            if key == 'work_newton' and op == sum:
+                return 13241
+            elif key == 'e_global_post_run' and op == max:
+                return 1.0505165626284452e-08
+
+        raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
 
 class HotRodStrategy(Strategy):
     '''
@@ -848,7 +831,8 @@ class HotRodStrategy(Strategy):
         '''
         Initialization routine
         '''
-        super().__init__(skip_residual_computation='all', **kwargs)
+        kwargs['skip_residual_computation'] = 'all'
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[3]
         self.marker = '^'
         self.name = 'Hot Rod'
@@ -876,7 +860,7 @@ class HotRodStrategy(Strategy):
             elif num_procs == 5:
                 HotRod_tol = 9.329361e-05
             else:  # 1 process
-                HotRod_tol = 1.347949e-06  # 5e-7
+                HotRod_tol = 1.347949e-06
             HotRod_tol = 7e-6 if num_procs > 1 else 5e-7
             maxiter = 4
         elif problem.__name__ == "run_Lorenz":
@@ -885,7 +869,7 @@ class HotRodStrategy(Strategy):
             elif num_procs == 4:
                 HotRod_tol = 3.201e-6
             else:
-                HotRod_tol = 7.720589e-07  # 4e-7
+                HotRod_tol = 7.720589e-07
             maxiter = 6
         elif problem.__name__ == "run_Schroedinger":
             if num_procs == 5:
@@ -953,12 +937,12 @@ class HotRodStrategy(Strategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityCollocationStrategy(WildRiot):
+class AdaptivityCollocationStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on collocation as a resilience strategy
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
@@ -970,7 +954,7 @@ class AdaptivityCollocationStrategy(WildRiot):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityCollocation
 
         self.restol = None
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[1]
         self.marker = '*'
         self.name = 'adaptivity_coll'
@@ -1021,7 +1005,6 @@ class AdaptivityCollocationStrategy(WildRiot):
  strategy'
             )
 
-        # custom_description['level_params'] = {'restol': e_tol / 10 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityCollocation: {
                 'e_tol': e_tol,
@@ -1035,8 +1018,8 @@ class AdaptivityCollocationStrategy(WildRiot):
 
 
 class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[4]
         self.marker = '.'
         self.adaptive_coll_params = {
@@ -1063,16 +1046,16 @@ class AdaptivityCollocationTypeStrategy(AdaptivityCollocationStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 2694
+                return 1954
             elif key == 'e_global_post_run' and op == max:
-                return 2.1707816100224875e-06
+                return 1.1341277847964903e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
 class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[5]
         self.marker = '^'
         self.adaptive_coll_params = {
@@ -1100,16 +1083,16 @@ class AdaptivityCollocationRefinementStrategy(AdaptivityCollocationStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 1881
+                return 1785
             elif key == 'e_global_post_run' and op == max:
-                return 3.3428689164005654e-06
+                return 1.2448609458259874e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
 class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
-    def __init__(self, useMPI=False, **kwargs):
-        super().__init__(useMPI=useMPI, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[6]
         self.marker = '^'
         self.adaptive_coll_params = {'num_nodes': [4, 3]}
@@ -1133,9 +1116,9 @@ class AdaptivityCollocationDerefinementStrategy(AdaptivityCollocationStrategy):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 3421
+                return 2508
             elif key == 'e_global_post_run' and op == max:
-                return 2.1130961994131336e-05
+                return 3.452255036812124e-05
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
@@ -1145,13 +1128,13 @@ class DIRKStrategy(AdaptivityStrategy):
     DIRK4(3)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'DIRK'
@@ -1245,13 +1228,13 @@ class ARKStrategy(AdaptivityStrategy):
     ARK5(4)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[7]
         self.marker = 'P'
         self.name = 'ARK'
@@ -1301,19 +1284,40 @@ class ARKStrategy(AdaptivityStrategy):
 
         return custom_description
 
+    def get_reference_value(self, problem, key, op, num_procs=1):
+        """
+        Get a reference value for a given problem for testing in CI.
+
+        Args:
+            problem: A function that runs a pySDC problem, see imports for available problems
+            key (str): The name of the variable you want to compare
+            op (function): The operation you want to apply to the data
+            num_procs (int): Number of processes
+
+        Returns:
+            The reference value
+        """
+        if problem.__name__ == "run_Schroedinger":
+            if key == 'work_newton' and op == sum:
+                return 0
+            elif key == 'e_global_post_run' and op == max:
+                return 2.444605657738645e-07
+
+        raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
+
 
 class ESDIRKStrategy(AdaptivityStrategy):
     '''
     ESDIRK5(3)
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityRK
 
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = 'violet'
         self.marker = '^'
         self.name = 'ESDIRK'
@@ -1415,11 +1419,11 @@ class ERKStrategy(DIRKStrategy):
     Explicit embedded RK using Cash-Karp's method
     """
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
-        super().__init__(useMPI=useMPI, **kwargs)
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[8]
         self.marker = 'x'
         self.name = 'ERK'
@@ -1485,13 +1489,14 @@ class DoubleAdaptivityStrategy(AdaptivityStrategy):
     Adaptivity based both on embedded estimate and on residual
     '''
 
-    def __init__(self, useMPI=False, **kwargs):
+    def __init__(self, **kwargs):
         '''
         Initialization routine
         '''
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-        super().__init__(useMPI=useMPI, skip_residual_computation='all', **kwargs)
+        kwargs['skip_residual_computation'] = 'all'
+        super().__init__(**kwargs)
         self.color = list(cmap.values())[7]
         self.marker = '^'
         self.name = 'double_adaptivity'
@@ -1672,7 +1677,7 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityExtrapolationWithinQStrategy(WildRiot):
+class AdaptivityExtrapolationWithinQStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
@@ -1735,23 +1740,15 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
  strategy'
             )
 
-        # if problem.__name__ in ['run_Schroedinger']:
-        #     from pySDC.projects.Resilience.sweepers import imex_1st_order as sweeper_class
-        # else:
-        #     from pySDC.projects.Resilience.sweepers import generic_implicit as sweeper_class
-
-        # custom_description['level_params'] = {'restol': 1e-7 if self.restol is None else self.restol}
         custom_description['convergence_controllers'] = {
             AdaptivityExtrapolationWithinQ: {
                 'e_tol': e_tol,
                 'dt_min': dt_min,
                 'dt_max': dt_max,
                 'restol_rel': 1e-2,
-                # 'e_tol_rel': 1e-2,
                 'restart_at_maxiter': True,
             }
         }
-        # custom_description['sweeper_class'] = sweeper_class
         return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -1769,14 +1766,14 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 2259
+                return 2426
             elif key == 'e_global_post_run' and op == max:
-                return 9.319882663172407e-06
+                return 1.7293825160247245e-06
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityPolynomialError(WildRiot):
+class AdaptivityPolynomialError(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
@@ -1798,7 +1795,6 @@ class AdaptivityPolynomialError(WildRiot):
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
         self.interpolate_between_restarts = interpolate_between_restarts
         self.use_restol_rel = use_restol_rel
-        # self.precision_range_fac = 1e1
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1815,10 +1811,6 @@ class AdaptivityPolynomialError(WildRiot):
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
         custom_description = {}
-        # custom_description['sweeper_params'] = {
-        #     'quad_type': 'GAUSS',
-        #     'do_coll_update': True,
-        # }
 
         dt_max = np.inf
         max_slope = 4.0
@@ -1829,13 +1821,11 @@ class AdaptivityPolynomialError(WildRiot):
         if problem.__name__ == "run_vdp":
             e_tol = 6e-4
             level_params['dt'] = 0.1
-            # restol_rel = 1e-3
         elif problem.__name__ == "run_piline":
             e_tol = 1e-7
         elif problem.__name__ == "run_Lorenz":
             e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
-            # restol_rel = 1e-3
             e_tol = 3e-4
         elif problem.__name__ == "run_quench":
             e_tol = 1e-7
@@ -1855,8 +1845,6 @@ class AdaptivityPolynomialError(WildRiot):
                 'e_tol': e_tol,
                 'restol_rel': restol_rel if self.use_restol_rel else 1e-11,
                 'restol_min': restol_min if self.use_restol_rel else 1e-12,
-                # 'e_tol_rel': 1e-2,
-                # 'restol_max': 1e-4,
                 'restart_at_maxiter': True,
                 'factor_if_not_converged': max_slope,
                 'interpolate_between_restarts': self.interpolate_between_restarts,
@@ -1912,25 +1900,12 @@ class AdaptivityPolynomialError(WildRiot):
         """
         if problem.__name__ == "run_vdp":
             if key == 'work_newton' and op == sum:
-                return 2677
+                return 2819
             elif key == 'e_global_post_run' and op == max:
-                return 4.375184403937471e-06
+                return 1.8147451097405565e-07
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
     @property
     def label(self):
-        return r'$\Delta tk~\mathrm{adaptivity}$'
-
-class Resolution(AdaptivityPolynomialError):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.precision_parameter = 'nvars'
-        self.precision_parameter_loc = ['problem_params', 'nvars']
-
-    def get_custom_description(self, problem, *args, **kwargs):
-        desc = super().get_custom_description(problem, *args, **kwargs)
-        if problem.__name__ in ['run_AC']:
-            desc['problem_params'] = {'useGPU': True, 'nvars': (512, 512)}
-        return desc
-
+        return r'$\Delta t$-$k~\mathrm{adaptivity}$'

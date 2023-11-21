@@ -459,7 +459,6 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         default_params = {
             'Taylor_order': 2 * num_nodes,
             'n': num_nodes,
-            'high_Taylor_order': False,
             'recompute_coefficients': False,
             **params,
         }
@@ -488,7 +487,7 @@ class EstimateExtrapolationErrorWithinQ(EstimateExtrapolationErrorBase):
         t_eval = S.time + nodes_[-1]
 
         dts = np.append(nodes_[0], nodes_[1:] - nodes_[:-1])
-        self.params.Taylor_order = len(nodes) * 2 if self.params.high_Taylor_order else len(nodes)
+        self.params.Taylor_order = len(nodes)
         self.params.n = len(nodes)
 
         # compute the extrapolation coefficients

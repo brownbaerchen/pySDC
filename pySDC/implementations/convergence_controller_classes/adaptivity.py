@@ -221,7 +221,6 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
         return defaults
 
     def determine_restart(self, controller, S, **kwargs):
-        # print(self.res_last_iter, S.levels[0].status.residual, S.status.iter, self.get_convergence(controller, S, **kwargs))
         if self.get_convergence(controller, S, **kwargs):
             self.res_last_iter = np.inf
 
@@ -250,7 +249,6 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             )
         if self.params.interpolate_between_restarts:
             self.interpolator.status.skip_interpolation = True
-        # print('restarting', S.levels[0].status.residual, S.levels[0].params.restol)
 
 
 class Adaptivity(AdaptivityBase):

@@ -1,4 +1,3 @@
-from mpi4py import MPI
 import numpy as np
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
@@ -197,6 +196,8 @@ def run_Schroedinger(
 
 
 def main():
+    from mpi4py import MPI
+
     stats, _, _ = run_Schroedinger(space_comm=MPI.COMM_WORLD, hook_class=live_plotting, imex=False)
     plt.show()
 
