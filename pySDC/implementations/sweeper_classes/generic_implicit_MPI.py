@@ -5,7 +5,7 @@ from pySDC.core.Sweeper import sweeper
 import logging
 
 
-class SweeperMPI(sweeper):
+class SweeperMPI(generic_implicit):
     """
     MPI based sweeper where each rank administers one collocation node. Adapt sweepers to MPI by use of multiple inheritance.
     See for example the `generic_implicit_MPI` sweeper, which has a class definition:
@@ -65,9 +65,47 @@ class SweeperMPI(sweeper):
                 L.uend[:] = L.u[-1]
             self.comm.Bcast(L.uend, root=root)
         else:
-            raise NotImplementedError('require last node to be identical with right interval boundary')
+            self.extrapolate_to_end_point()
 
         return None
+
+    def extrapolate_to_end_point(self):
+        raise NotImplementedError('Please implement a rule for extrapolating to the end point in this sweeper!')
+
+    def add_initial_conditions(self, rhs):
+        rhs[self.rank] += self.level.u[0]
+
+    def add_tau_correction(self, rhs):
+        if self.level.tau[self.rank] is not None:
+            rhs[self.rank] += self.level.tau[self.rank]
+
+    def update_nodes(self):
+        # only if the level has been touched before
+        assert self.level.status.unlocked
+        rhs = self.build_right_hand_side()
+        self.sweep(rhs, self.rank)
+        self.level.status.updated = True
+
+    def initialize_right_hand_side_buffer(self):
+        problem = self.level.prob
+        buff = [None for _ in range(self.coll.num_nodes)]
+        buff[self.rank] = problem.dtype_u(problem.init, val=0.0)
+
+        return buff
+
+    def integrate(self, last_only=False):
+        """
+        Integrates the right-hand side
+
+        Returns:
+            list of dtype_u: containing the integral as values
+        """
+        integral = self.initialize_right_hand_side_buffer()
+        if last_only:
+            self.add_integral_of_right_hand_side_at_last_node_only(integral)
+        else:
+            self.add_matrix_times_f_evaluations_to(self.coll.Qmat, integral)
+        return integral
 
     def compute_residual(self, stage=None):
         """
@@ -91,7 +129,7 @@ class SweeperMPI(sweeper):
         # compute the residual for each node
 
         # build QF(u)
-        res = self.integrate(last_only=L.params.residual_type[:4] == 'last')
+        res = self.integrate(last_only=L.params.residual_type[:4] == 'last')[self.rank]
         res += L.u[0] - L.u[self.rank + 1]
         # add tau if associated
         if L.tau[self.rank] is not None:
@@ -151,98 +189,42 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
         rank (int): MPI rank
     """
 
-    def integrate(self, last_only=False):
-        """
-        Integrates the right-hand side
+    def add_matrix_times_f_evaluations_to(self, matrix, rhs):
+        lvl = self.level
+        P = lvl.prob
 
-        Args:
-            last_only (bool): Integrate only the last node for the residual or all of them
-
-        Returns:
-            list of dtype_u: containing the integral as values
-        """
-        L = self.level
-        P = L.prob
-
-        me = P.dtype_u(P.init, val=0.0)
-        for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
-            recvBuf = me if m == self.rank else None
+        buffer = P.dtype_u(P.init, val=0.0)
+        for m in range(self.coll.num_nodes):
+            recvBuf = buffer if m == self.rank else None
             self.comm.Reduce(
-                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
+                self.level.dt * matrix[m + 1, self.rank + 1] * lvl.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
             )
+        rhs[self.rank] += buffer[:]
 
-        return me
+    def add_integral_of_right_hand_side_at_last_node_only(self, integral):
+        lvl = self.level
+        P = lvl.prob
 
-    def update_nodes(self):
-        """
-        Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
-
-        Returns:
-            None
-        """
-
-        L = self.level
-        P = L.prob
-
-        # only if the level has been touched before
-        assert L.status.unlocked
-
-        # get number of collocation nodes for easier access
-
-        # gather all terms which are known already (e.g. from the previous iteration)
-        # this corresponds to u0 + QF(u^k) - QdF(u^k) + tau
-
-        # get QF(u^k)
-        rhs = self.integrate()
-
-        rhs -= L.dt * self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1]
-
-        # add initial value
-        rhs += L.u[0]
-        # add tau if associated
-        if L.tau[self.rank] is not None:
-            rhs += L.tau[self.rank]
-
-        # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
-
-        # implicit solve with prefactor stemming from the diagonal of Qd
-        L.u[self.rank + 1] = P.solve_system(
-            rhs,
-            L.dt * self.QI[self.rank + 1, self.rank + 1],
-            L.u[self.rank + 1],
-            L.time + L.dt * self.coll.nodes[self.rank],
+        recvBuf = P.dtype_u(P.init, val=0.0) if self.rank == self.coll.num_nodes - 1 else None
+        self.comm.Reduce(
+            self.level.dt * self.coll.Qmat[-1, self.rank + 1] * lvl.f[self.rank + 1],
+            recvBuf,
+            root=self.coll.num_nodes - 1,
+            op=MPI.SUM,
         )
-        # update function values
-        L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
 
-        # indicate presence of new values at this level
-        L.status.updated = True
+        if self.rank == self.coll.num_nodes - 1:
+            integral[self.rank] += recvBuf
 
-        return None
-
-    def compute_end_point(self):
-        """
-        Compute u at the right point of the interval
-
-        The value uend computed here is a full evaluation of the Picard formulation unless do_full_update==False
-
-        Returns:
-            None
-        """
-
+    def extrapolate_to_end_point(self):
         L = self.level
-        P = L.prob
-        L.uend = P.dtype_u(P.init, val=0.0)
 
-        # check if Mth node is equal to right point and do_coll_update is false, perform a simple copy
-        if self.coll.right_is_node and not self.params.do_coll_update:
-            super().compute_end_point()
-        else:
-            L.uend = P.dtype_u(L.u[0])
-            self.comm.Allreduce(L.dt * self.coll.weights[self.rank] * L.f[self.rank + 1], L.uend, op=MPI.SUM)
-            L.uend += L.u[0]
+        self.comm.Allreduce(L.dt * self.coll.weights[self.rank] * L.f[self.rank + 1], L.uend, op=MPI.SUM)
+        L.uend += L.u[0]
 
-            # add up tau correction of the full interval (last entry)
-            if L.tau[-1] is not None:
-                L.uend += L.tau[-1]
-        return None
+        # add up tau correction of the full interval (last entry)
+        if L.tau[-1] is not None:
+            L.uend += L.tau[-1]
+
+    def add_new_information_from_forward_substitution(self, rhs, current_node):
+        pass
