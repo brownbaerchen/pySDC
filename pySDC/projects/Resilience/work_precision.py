@@ -286,8 +286,10 @@ def record_work_precision(
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
     if param == 'nvars':
-        param_range = [tuple(int(me * power**i) for me in default) for i in exponents] if param_range is None else param_range
-        print(param_range)
+        param_range = (
+            [tuple(int(me * power**i) for me in default) for i in exponents] if param_range is None else param_range
+        )
+        param_range = [(2000, 2000)]
     else:
         param_range = [default * power**i for i in exponents] if param_range is None else param_range
 
@@ -304,7 +306,7 @@ def record_work_precision(
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
-            param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]#[::-1]
+            param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # [::-1]
             # param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
@@ -322,7 +324,7 @@ def record_work_precision(
             if comm_world.rank == 0:
                 logger.log(
                     24,
-                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]}',
+                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i][0] if type(param_range[i]) in [tuple] else param_range[i]:.2e}',
                 )
             single_run(
                 problem,
@@ -348,7 +350,7 @@ def record_work_precision(
                     k_type = "k_SDC"
                 logger.log(
                     25,
-                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, {k_type}={data[param_range[i]][k_type][-1]}',
+                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i][0] if type(param_range[i]) in [tuple] else param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, {k_type}={data[param_range[i]][k_type][-1]}',
                 )
 
     if comm_world.rank == 0:
@@ -737,6 +739,7 @@ def get_configs(mode, problem):
             configurations[key * 1e3 + 1] = conf_cpu
     elif mode == 'resolution':
         from pySDC.projects.Resilience.strategies import Resolution
+
         configurations[0] = {
             'strategies': [Resolution(useMPI=True)],
         }
