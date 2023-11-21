@@ -2,15 +2,26 @@ import pytest
 
 
 @pytest.mark.mpi4py
-def test_main():
-    from pySDC.projects.parallelSDC.AllenCahn_parallel import main
+@pytest.mark.parametrize("variant", ['sl_parallel', 'ml_parallel'])
+def test_parallel_variants(variant):
+    import os
+    import subprocess
 
-    # try to import MPI here, will fail if things go wrong (and not in the subprocess part)
-    try:
-        import mpi4py
+    my_env = os.environ.copy()
+    my_env['PYTHONPATH'] = '../../..:.'
+    my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
+    cmd = (
+        "mpirun -np 3 python -c \"from pySDC.projects.parallelSDC.AllenCahn_parallel import *; "
+        f"run_variant(\'{variant}');\""
+    )
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True, shell=True)
+    p.wait()
+    assert p.returncode == 0, 'ERROR: did not get return code 0, got %s' % (p.returncode)
 
-        del mpi4py
-    except ImportError:
-        raise ImportError('petsc tests need mpi4py')
 
-    main()
+@pytest.mark.base
+@pytest.mark.parametrize("variant", ['sl_serial', 'ml_serial'])
+def test_serial_variants(variant):
+    from pySDC.projects.parallelSDC.AllenCahn_parallel import run_variant
+
+    run_variant(variant=variant)

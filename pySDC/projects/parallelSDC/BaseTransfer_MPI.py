@@ -126,10 +126,10 @@ class base_transfer_MPI(object):
         G.f[SG.rank + 1] = PG.eval_f(G.u[SG.rank + 1], G.time + G.dt * SG.coll.nodes[SG.rank])
 
         # build coarse level tau correction part
-        tauG = G.sweep.integrate()
+        tauG = G.sweep.integrate()[SG.rank]
 
         # build fine level tau correction part
-        tauF = F.sweep.integrate()
+        tauF = F.sweep.integrate()[SF.rank]
 
         # restrict fine level tau correction part in space
         tauFG = self.space_transfer.restrict(tauF)
