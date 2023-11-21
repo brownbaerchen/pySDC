@@ -19,7 +19,7 @@ def test_parallel_variants(variant):
     assert p.returncode == 0, 'ERROR: did not get return code 0, got %s' % (p.returncode)
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize("variant", ['sl_serial', 'ml_serial'])
 def test_serial_variants(variant):
     from pySDC.projects.parallelSDC.AllenCahn_parallel import run_variant
