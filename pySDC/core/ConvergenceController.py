@@ -33,6 +33,8 @@ class ConvergenceController(object):
     count and time step size.
     """
 
+    xp = None
+
     def __init__(self, controller, params, description, **kwargs):
         """
         Initialization routine
@@ -42,6 +44,7 @@ class ConvergenceController(object):
             params (dict): The params passed for this specific convergence controller
             description (dict): The description object used to instantiate the controller
         """
+        self.prepareXPU(description)
         self.params = Pars(self.setup(controller, params, description))
         params_ok, msg = self.check_parameters(controller, params, description)
         assert params_ok, f'{type(self).__name__} -- {msg}'
@@ -69,6 +72,11 @@ class ConvergenceController(object):
         self.MPI_INT = MPI.INT
         self.MPI_DOUBLE = MPI.DOUBLE
         self.MPI_BOOL = MPI.BOOL
+
+    def prepareXPU(self, description):
+        from pySDC.helpers.setup_helper import get_xp_module
+
+        self.xp = get_xp_module(description)
 
     def log(self, msg, S, level=15, **kwargs):
         """

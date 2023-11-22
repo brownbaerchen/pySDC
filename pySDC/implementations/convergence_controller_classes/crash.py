@@ -1,6 +1,5 @@
 from pySDC.core.ConvergenceController import ConvergenceController
 from pySDC.core.Errors import ConvergenceError
-import numpy as np
 import time
 
 
@@ -61,7 +60,7 @@ class StopAtNan(CrashBase):
         self.comm = description['sweeper_params'].get('comm', None)
         defaults = {
             "control_order": 94,
-            "thresh": np.inf,
+            "thresh": self.xp.inf,
         }
 
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
@@ -85,7 +84,7 @@ class StopAtNan(CrashBase):
             for u in lvl.u:
                 if u is None:
                     break
-                isfinite = all(np.isfinite(u.flatten()))
+                isfinite = all(self.xp.isfinite(u.flatten()))
 
                 below_limit = abs(u) < self.params.thresh
 
@@ -122,7 +121,7 @@ class StopAtMaxRuntime(CrashBase):
         self.comm = description['sweeper_params'].get('comm', None)
         defaults = {
             "control_order": 94,
-            "max_runtime": np.inf,
+            "max_runtime": self.xp.inf,
         }
         self.t0 = time.perf_counter()
 

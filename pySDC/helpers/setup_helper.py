@@ -45,7 +45,7 @@ def generate_description(problem_class, **kwargs):
     return description
 
 
-def get_xpy_module(description):
+def get_xp_module(description):
     import logging
 
     logger = logging.getLogger('setup helper')
