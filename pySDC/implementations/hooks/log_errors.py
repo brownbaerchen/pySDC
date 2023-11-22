@@ -169,11 +169,15 @@ class LogGlobalErrorPostRun(hooks):
         super().post_run(step, level_number)
         self._hooks__num_restarts = self.num_restarts
 
+        from time import perf_counter
+
         if level_number == 0 and step.status.last:
             L = step.levels[level_number]
 
             u_num = L.uend
+            t0 = perf_counter()
             u_ref = L.prob.u_exact(t=self.t_last_solution)
+            t1 = perf_counter()
 
             self.logger.info(f'Finished with a global error of e={abs(u_num-u_ref):.2e}')
 
@@ -196,6 +200,16 @@ class LogGlobalErrorPostRun(hooks):
                 sweep=L.status.sweep,
                 type='e_global_rel_post_run',
                 value=abs(u_num - u_ref) / abs(u_ref),
+            )
+            self.add_to_stats(
+                process=step.status.slot,
+                process_sweeper=L.sweep.rank,
+                time=self.t_last_solution,
+                level=L.level_index,
+                iter=step.status.iter,
+                sweep=L.status.sweep,
+                type='time_to_generate_reference_solution',
+                value=abs(t1 - t0),
             )
 
 

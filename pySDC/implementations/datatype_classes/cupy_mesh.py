@@ -80,11 +80,12 @@ class cupy_mesh(cp.ndarray):
             float: absolute maximum of all mesh values
         """
         # take absolute values of the mesh values
-        local_absval = float(cp.amax(cp.ndarray.__abs__(self)))
+        local_absval = float(cp.amax(cp.ndarray.__abs__(self)).get())
 
         if self.comm is not None:
             if self.comm.Get_size() > 1:
                 global_absval = 0.0
+                cp.cuda.get_current_stream().synchronize()
                 global_absval = max(self.comm.allreduce(sendobj=local_absval, op=MPI.MAX), global_absval)
             else:
                 global_absval = local_absval
@@ -105,6 +106,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             request handle
         """
+        cp.cuda.get_current_stream().synchronize()
         return comm.Issend(self[:], dest=dest, tag=tag)
 
     def irecv(self, source=None, tag=None, comm=None):
@@ -119,6 +121,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             None
         """
+        cp.cuda.get_current_stream().synchronize()
         return comm.Irecv(self[:], source=source, tag=tag)
 
     def bcast(self, root=None, comm=None):
@@ -132,6 +135,7 @@ class cupy_mesh(cp.ndarray):
         Returns:
             broadcasted values
         """
+        cp.cuda.get_current_stream().synchronize()
         comm.Bcast(self[:], root=root)
         return self
 

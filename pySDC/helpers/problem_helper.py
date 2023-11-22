@@ -89,7 +89,7 @@ def get_finite_difference_matrix(
     size=None,
     dim=None,
     bc=None,
-    cupy=False,
+    useGPU=False,
     bc_params=None,
 ):
     """
@@ -105,13 +105,13 @@ def get_finite_difference_matrix(
         size (int): Number of degrees of freedom per dimension
         dim (int): Number of dimensions
         bc (str): Boundary conditions for both sides
-        cupy (bool): Construct a GPU ready matrix if yes
+        useGPU (bool): Construct a GPU ready matrix if yes
 
     Returns:
         Sparse matrix: Finite difference matrix
         numpy.ndarray: Vector containing information about the boundary conditions
     """
-    if cupy:
+    if useGPU:
         import cupyx.scipy.sparse as sp
     else:
         import scipy.sparse as sp

@@ -43,3 +43,28 @@ def generate_description(problem_class, **kwargs):
             raise ValueError(f'Don\'t know what parameter \"{key}\" is for!')
 
     return description
+
+
+def get_xpy_module(description):
+    import logging
+
+    logger = logging.getLogger('setup helper')
+
+    dtype = description['problem_class'].dtype_u.__name__
+    use_cupy = description['problem_params'].get('useGPU', False)
+
+    if dtype in ['cupy_mesh'] or use_cupy:
+        logger.debug('Selected cupy module in order to run on GPU')
+        import cupy
+
+        return cupy
+    if dtype in ['mesh']:
+        logger.debug(f'Selected numpy module in order to run on CPU based on \"{dtype}\" datatype')
+        import numpy
+
+        return numpy
+    else:
+        logger.warning(f'Don\'t know whether to use numpy or cupy, defaulting to numpy')
+        import numpy
+
+        return numpy

@@ -30,6 +30,7 @@ class EstimatePolynomialError(ConvergenceController):
         """
         from pySDC.implementations.hooks.log_embedded_error_estimate import LogEmbeddedErrorEstimate
         from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
+        from pySDC.helpers.setup_helper import get_xpy_module
 
         sweeper_params = description['sweeper_params']
         num_nodes = sweeper_params['num_nodes']
@@ -41,6 +42,7 @@ class EstimatePolynomialError(ConvergenceController):
             **super().setup(controller, params, description, **kwargs),
         }
         self.comm = description['sweeper_params'].get('comm', None)
+        self.xpy = get_xpy_module(description)
 
         if self.comm:
             from mpi4py import MPI
@@ -99,6 +101,7 @@ class EstimatePolynomialError(ConvergenceController):
         Returns:
             List: Axb
         """
+        A = self.xpy.asarray(A)
         if self.comm:
             res = [A[i, 0] * b[0] if b[i] is not None else None for i in range(A.shape[0])]
             buf = b[0] * 0.0
@@ -107,13 +110,13 @@ class EstimatePolynomialError(ConvergenceController):
                 send_buf = (
                     (A[i, index] * b[index])
                     if self.comm.rank != self.params.estimate_on_node - 1
-                    else np.zeros_like(res[0])
+                    else self.xpy.zeros_like(res[0])
                 )
                 self.comm.Allreduce(send_buf, buf, op=self.MPI_SUM)
                 res[i] += buf
             return res
         else:
-            return A @ np.asarray(b)
+            return A @ self.xpy.asarray(b)
 
     def post_iteration_processing(self, controller, S, **kwargs):
         """
@@ -159,11 +162,16 @@ class EstimatePolynomialError(ConvergenceController):
                 L.status.order_embedded_estimate = coll.num_nodes * 1
 
             if self.comm:
-                buf = np.array(abs(u_inter - high_order_sol) if self.comm.rank == rank else 0.0)
+                buf = self.xpy.array(abs(u_inter - high_order_sol) if self.comm.rank == rank else 0.0)
                 self.comm.Bcast(buf, root=rank)
-                L.status.error_embedded_estimate = buf
+                L.status.error_embedded_estimate = float(abs(buf))
             else:
-                L.status.error_embedded_estimate = abs(u_inter - high_order_sol)
+                L.status.error_embedded_estimate = float(abs(u_inter - high_order_sol))
+
+            self.debug(
+                f'Obtained error estimate: {L.status.error_embedded_estimate:.2e} of order {L.status.order_embedded_estimate}',
+                S,
+            )
 
             self.debug(
                 f'Obtained error estimate: {L.status.error_embedded_estimate:.2e} of order {L.status.order_embedded_estimate}',

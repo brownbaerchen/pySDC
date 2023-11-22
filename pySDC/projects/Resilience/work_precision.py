@@ -9,8 +9,10 @@ import copy
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
-from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
+
+# from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
+from pySDC.projects.Resilience.AC import run_AC
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -25,6 +27,8 @@ MAPPINGS = {
     'e_global': ('e_global_post_run', max, False),
     'e_global_rel': ('e_global_rel_post_run', max, False),
     't': ('timing_run', max, False),
+    't_setup': ('timing_setup', max, False),
+    'time_to_generate_reference_solution': ('time_to_generate_reference_solution', max, False),
     # 'e_local_max': ('e_local_post_step', max, False),
     'k_SDC': ('k', sum, None),
     'k_SDC_no_restart': ('k', sum, False),
@@ -132,6 +136,7 @@ def single_run(
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm_time,
+        use_hook_collection=False,
         **problem_args,
     )
 
@@ -272,12 +277,21 @@ def record_work_precision(
         exponents = [-2, -1, 0, 1, 2, 3]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1]
+    elif param == 'nvars':
+        power = 2.0
+        exponents = [-1, 0, 1, 2, 3, 4, 5, 6, 7]
     else:
         raise NotImplementedError(f"I don't know how to get default value for parameter \"{param}\"")
 
     where = strategy.precision_parameter_loc
     default = get_parameter(description, where)
-    param_range = [default * power**i for i in exponents] if param_range is None else param_range
+    if param == 'nvars':
+        param_range = (
+            [tuple(int(me * power**i) for me in default) for i in exponents] if param_range is None else param_range
+        )
+        param_range = [(2000, 2000)]
+    else:
+        param_range = [default * power**i for i in exponents] if param_range is None else param_range
 
     if problem.__name__ == 'run_quench':
         if param == 'restol':
@@ -287,11 +301,12 @@ def record_work_precision(
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
-            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
+            # param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # [::-1]
+            param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
+        set_parameter(description, where, param_range[i])
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
@@ -304,7 +319,7 @@ def record_work_precision(
             if comm_world.rank == 0:
                 logger.log(
                     24,
-                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}',
+                    f'Starting: {problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i][0] if type(param_range[i]) in [tuple] else param_range[i]:.2e}',
                 )
             single_run(
                 problem,
@@ -330,7 +345,7 @@ def record_work_precision(
                     k_type = "k_SDC"
                 logger.log(
                     25,
-                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, {k_type}={data[param_range[i]][k_type][-1]}',
+                    f'{problem.__name__}: {strategy} {handle} {num_procs}-{num_procs_sweeper} procs, {param}={param_range[i][0] if type(param_range[i]) in [tuple] else param_range[i]:.2e}: e={data[param_range[i]]["e_global"][-1]}, t={data[param_range[i]]["t"][-1]}, {k_type}={data[param_range[i]][k_type][-1]}',
                 )
 
     if comm_world.rank == 0:
@@ -701,6 +716,40 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'num_procs': 1,
         }
+    elif mode[:3] == 'GPU':
+        configs = get_configs(mode=mode[3:], problem=problem)
+        for key, value in configs.copy().items():
+            conf = value.copy()
+            conf['custom_description'] = conf.get('custom_description', {}).copy()
+            conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
+            conf['custom_description']['problem_params']['useGPU'] = True
+            conf['custom_description']['problem_params']['compute_reference_solution_on_GPU'] = True
+            conf['custom_description']['sweeper_params'] = conf['custom_description'].get('sweeper_params', {})
+            conf['custom_description']['sweeper_params']['multiGPU'] = False
+            conf['handle'] = 'GPU'
+            conf['plotting_params'] = {'ls': '--'}
+            configurations[-(key * 1e3 + 1)] = conf
+
+            # conf_mGPU = conf.copy()
+            # conf_mGPU['custom_description']['sweeper_params'] = conf_mGPU['custom_description'].get('sweeper_params', {}).copy()
+            # conf_mGPU['custom_description']['sweeper_params']['multiGPU'] = True
+            # conf_mGPU['handle'] = 'multi GPU'
+            # conf_mGPU['plotting_params'] = {'ls': '-.'}
+            # configurations[-(key * 1e9 + 1)] = conf_mGPU
+
+            conf_cpu = value.copy()
+            conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()
+            conf_cpu['custom_description']['problem_params'] = conf_cpu['custom_description'].get('problem_params', {})
+            conf_cpu['custom_description']['problem_params']['useGPU'] = False
+            conf_cpu['custom_description']['problem_params']['compute_reference_solution_on_GPU'] = True
+            configurations[key * 1e3 + 1] = conf_cpu
+    elif mode == 'resolution':
+        from pySDC.projects.Resilience.strategies import Resolution
+
+        configurations[0] = {
+            'strategies': [Resolution(useMPI=True)],
+        }
+
     elif mode == 'dynamic_restarts':
         """
         Compare Block Gauss-Seidel SDC with restarting the first step in the block or the first step that exceeded the error threshold.
@@ -1013,6 +1062,25 @@ def get_configs(mode, problem):
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
+        if True:
+            configurations[4] = {
+                'custom_description': {'step_params': {'maxiter': 5}},
+                'strategies': [AdaptivityStrategy(useMPI=True)],
+            }
+            desc_RK = {}
+            DIRK_strategy = ESDIRKStrategy
+            if problem.__name__ in ['run_Schroedinger']:
+                # desc_RK['problem_params'] = {'imex': False}
+                DIRK_strategy = ARKStrategy
+
+            configurations[-1] = {
+                'strategies': [
+                    # ERKStrategy(useMPI=True),
+                    DIRK_strategy(useMPI=True),
+                ],
+                'num_procs': 1,
+                'custom_description': desc_RK,
+            }
 
         desc_RK = {}
         configurations[-1] = {
@@ -1176,7 +1244,6 @@ def get_configs(mode, problem):
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
-            'custom_description': desc_RK,
         }
 
         configurations[2] = {
@@ -1212,6 +1279,26 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'param_range': param_range,
+        }
+    elif mode == 'parallelSDC':
+        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
+        from pySDC.projects.Resilience.strategies import AdaptivityExtrapolationWithinQStrategy
+
+        num_nodes = 3
+        comm_world = MPI.COMM_WORLD
+        strategies = [AdaptivityExtrapolationWithinQStrategy(useMPI=True)]
+
+        desc_par = {}
+        desc_par['sweeper_class'] = generic_implicit_MPI
+        desc_par['sweeper_params'] = {'num_nodes': num_nodes, 'comm': comm_world.Split(comm_world.rank < num_nodes)}
+
+        if comm_world.rank > num_nodes:
+            return None
+
+        configurations[0] = {
+            'strategies': strategies,
+            'num_procs': 1,
+            'custom_description': desc_par,
         }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
@@ -1319,6 +1406,8 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             configurations=get_configs(mode, problems[i]),
             mode=mode,
         )
+        # if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
+        #     axs.flatten()[i].set_xticks([4.0, 10.0], minor=True)
 
     if plotting and shared_params['comm_world'].rank == 0:
         save_fig(
@@ -1495,16 +1584,60 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
     save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
 
 
+def aggregate_parallel_efficiency_plot():
+    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
+
+    fig, axs = plt.subplots(2, 2)
+
+    _fig, _ax = plt.subplots(1, 1)
+    num_procs = 1
+    num_procs_sweeper = 2
+    problem = run_quench
+
+    num_procs_sweeper_list = [2, 3, 4]
+
+    for problem, ax in zip([run_vdp, run_Lorenz, run_quench], axs.flatten()):
+        speedup = []
+        for num_procs_sweeper in num_procs_sweeper_list:
+            s, e = plot_parallel_efficiency_diagonalSDC(
+                ax=_ax,
+                work_key='t',
+                precision_key='e_global_rel',
+                num_procs=num_procs,
+                num_procs_sweeper=num_procs_sweeper,
+                problem=problem,
+                strategy=AdaptivityPolynomialError(),
+                mode='diagonal_SDC',
+                handle=f'{num_procs_sweeper} nodes',
+            )
+            speedup += [s]
+            decorate_panel(ax, problem, work_key='nprocs', precision_key='')
+
+        ax.plot(num_procs_sweeper_list, speedup, label='speedup')
+        ax.plot(
+            num_procs_sweeper_list,
+            [speedup[i] / num_procs_sweeper_list[i] for i in range(len(speedup))],
+            label='parallel efficiency',
+        )
+
+    fig.tight_layout()
+    save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
+
+
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
+
+    # aggregate_parallel_efficiency_plot()
 
     record = True
     for mode in [
         # 'compare_strategies',
-        #'RK_comp_high_order',
+        'GPURK_comp',
+        # 'resolution',
+        #'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
-        'diagonal_SDC',
+        # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
@@ -1514,9 +1647,14 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Schroedinger,
+            'problem': run_AC,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # single_problem(**params_single, work_key='param', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='k_linear', precision_key='e_global', record=False)
+    # single_problem(**params_single, work_key='k_SDC', precision_key='e_global', record=False) # single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=False)
+    # single_problem(**params_single, work_key='dt_mean', precision_key='e_global_rel', record=False)
+    # single_problem(**params_single, work_key='e_global', precision_key='restart', record=False)
 
     all_params = {
         'record': False,
