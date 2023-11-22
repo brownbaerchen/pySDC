@@ -76,7 +76,6 @@ class allencahn_fullyimplicit(ptype):  # pragma: no cover
         newton_tol=100,
         lin_tol=1e-8,
         lin_maxiter=100,
-        inexact_linear_ratio=None,
         radius=0.25,
     ):
         """Initialization routine"""
@@ -94,18 +93,13 @@ class allencahn_fullyimplicit(ptype):  # pragma: no cover
             'nvars',
             'nu',
             'eps',
-            'radius',
-            localVars=locals(),
-            readOnly=True,
-        )
-        self._makeAttributeAndRegister(
             'newton_maxiter',
             'newton_tol',
             'lin_tol',
             'lin_maxiter',
-            'inexact_linear_ratio',
+            'radius',
             localVars=locals(),
-            readOnly=False,
+            readOnly=True,
         )
 
         # compute dx and get discretization matrix A
@@ -191,10 +185,6 @@ class allencahn_fullyimplicit(ptype):  # pragma: no cover
 
             # assemble dg
             dg = Id - factor * (self.A + 1.0 / eps2 * csp.diags((1.0 - (nu + 1) * u**nu), offsets=0))
-
-            # do inexactness in the linear solver
-            if self.inexact_linear_ratio:
-                self.lin_tol = res * self.inexact_linear_ratio
 
             # newton update: u1 = u0 - g/dg
             # u -= spsolve(dg, g)

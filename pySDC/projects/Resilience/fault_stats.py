@@ -1679,29 +1679,7 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    # stats_analyser.scrutinize(AdaptivityStrategy(), faults=False, run=17, logger_level=15)
-    # stats_analyser.scrutinize(BaseStrategy(), faults=True, run=17)
-    # plt.show()
-    # return None
     stats_analyser.run_stats_generation(runs=kwargs['runs'], step=12)
-
-    # ##################
-    # S = BaseStrategy()
-    # stats_analyser.scrutinize(S, run=3, faults=True)
-    # mask = stats_analyser.get_mask(strategy=S, key='bit', val=10, op='lt')
-    # stats_analyser.print_faults(mask)
-    return None
-    # ##################
-    # S = AdaptivityStrategy()
-    # # stats_analyser.scrutinize(S, run=4996, faults=True, logger_level=15)
-    # # stats_analyser.scrutinize_visual(S, run=4996, faults=True)
-
-    # recoverable = stats_analyser.get_fixable_faults_only(S)
-    # mask = stats_analyser.get_mask(S, key='recovered', val=False, old_mask=recoverable)
-    # stats_analyser.print_faults(mask, strategy=S)
-    # plt.show()
-    # # return None
-    # ##################
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None

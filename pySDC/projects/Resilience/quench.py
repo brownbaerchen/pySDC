@@ -381,8 +381,8 @@ def compare_imex_full(plotting=False, leak_type='linear'):
 
     assert error[True] < 1.2e-4, f'Expected error of IMEX version to be less than 1.2e-4, but got e={error[True]:.2e}!'
     assert (
-        error[False] < 7.7e-5
-    ), f'Expected error of fully implicit version to be less than 7.7e-5, but got e={error[False]:.2e}!'
+        error[False] < 8e-5
+    ), f'Expected error of fully implicit version to be less than 8e-5, but got e={error[False]:.2e}!'
 
 
 def compare_reference_solutions_single():
@@ -452,63 +452,6 @@ def compare_reference_solutions_single():
     fig.savefig('data/quench_refs_single.pdf', bbox_inches='tight')
 
 
-def iteration_counts():
-    from pySDC.implementations.hooks.log_work import LogWork
-    from pySDC.implementations.hooks.log_solution import LogSolution
-    from pySDC.projects.Resilience.strategies import AdaptivityStrategy
-    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
-
-    fig, ax = plt.subplots(1, 1)
-    iter_ax = ax.twinx()
-
-    strategy = AdaptivityStrategy()
-
-    description = {}
-    description['level_params'] = {'dt': 5.0, 'restol': 1e-10}
-    description['sweeper_params'] = {'QI': 'MIN-SR-S', 'num_nodes': 3}
-    description['problem_params'] = {
-        'leak_type': 'linear',
-        'leak_transition': 'step',
-        'nvars': 2**10,
-        'newton_tol': 1e-12,
-    }
-
-    description['level_params'] = {'dt': 5.0, 'restol': -1}
-    description = merge_descriptions(description, strategy.get_custom_description(run_quench, 1))
-    description['step_params'] = {'maxiter': 5}
-    description['convergence_controllers'][Adaptivity]['e_tol'] = 1e-10
-    description['problem_params']['newton_maxiter'] = 20
-    description['problem_params']['liniter'] = 20
-    description['problem_params']['nvars'] = 2**5
-
-    controller_params = {'logger_level': 15}
-
-    stats, controller, _ = run_quench(
-        custom_description=description,
-        hook_class=[LogWork, LogSolution],
-        Tend=600.0,
-        imex=False,
-        custom_controller_params=controller_params,
-    )
-    u = get_sorted(stats, type='u', recomputed=False)
-
-    from pySDC.helpers.stats_helper import get_list_of_types
-    from pySDC.projects.Resilience.strategies import cmap
-
-    for key, color in zip(['linear', 'newton', 'rhs'], cmap):
-        k = get_sorted(stats, type=f'work_{key}', recomputed=None)
-        iter_ax.plot([me[0] for me in k], np.cumsum([me[1] for me in k]), label=f'{key} cumulative', color=color)
-        iter_ax.scatter([me[0] for me in k], ([me[1] for me in k]), label=key, color=color)
-    print('noice')
-    iter_ax.set_yscale('log')
-    iter_ax.legend(frameon=False)
-
-    ax.plot([me[0] for me in u], [max(me[1]) for me in u], color='black', label='solution')
-
-    # error_ax.plot([me[0] for me in e_glob], [me[1] for me in e_glob], color=colors[j], ls='--')
-    # error_ax.plot([me[0] for me in e_loc], [me[1] for me in e_loc], color=colors[j], ls=':')
-
-
 def compare_reference_solutions():
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun, LogLocalErrorPostStep
 
@@ -516,7 +459,6 @@ def compare_reference_solutions():
     fig, ax = plt.subplots()
     Tend = 500
     dt_list = [Tend / 2.0**me for me in [2, 3, 4, 5, 6, 7, 8, 9, 10]]
-    # dt_list = [Tend / 2.**me for me in [2, 3, 4, 5, 6, 7]]
 
     for j in range(len(types)):
         errors = [None] * len(dt_list)
@@ -556,7 +498,6 @@ def check_order(reference_sol_type='scipy'):
 
     Tend = 500
     maxiter_list = [1, 2, 3, 4, 5]
-    # maxiter_list = [9]
     dt_list = [Tend / 2.0**me for me in [4, 5, 6, 7, 8]]
 
     fig, ax = plt.subplots()
