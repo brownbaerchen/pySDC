@@ -1952,8 +1952,8 @@ if __name__ == "__main__":
     record = True
     for mode in [
         # 'compare_strategies',
-        #'GPURK_comp',
-        'resolution',
+        'GPURK_comp',
+        # 'resolution',
         #'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',

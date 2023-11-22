@@ -124,21 +124,12 @@ class ptype(RegisterParams):
         """
         import numpy as np
         from scipy.integrate import solve_ivp
+
         tol = 100 * np.finfo(float).eps
-
         u_init = self.u_exact(t=0) if u_init is None else u_init * 1.0
-
         t_init = 0 if t_init is None else t_init
 
         u_shape = u_init.shape
         return (
             solve_ivp(eval_rhs, (t_init, t), u_init.flatten(), rtol=tol, atol=tol, **kwargs).y[:, -1].reshape(u_shape)
         )
-
-    def generate_GPU_reference_solution(self, eval_rhs, t, u_init=None, t_init=None, **kwagrs):
-        from pySDC.implementations.sweeper_classes.Runge_Kutta import ESDIRK53
-        description = {}
-        description['problem_params'] = self.params.__dict__
-        description['sweeper_params'] = {}
-        description['sweeper_class'] = ESDIRK53
-

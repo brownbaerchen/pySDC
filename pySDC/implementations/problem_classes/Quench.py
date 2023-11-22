@@ -350,7 +350,6 @@ class Quench(ptype):
                     atol=0,
                     callback=self.work_counters['linear'],
                 )
-                # print(self.lintol, self.liniter, self.newton_tol, self.newton_maxiter)
 
             if not np.isfinite(delta).all():
                 break

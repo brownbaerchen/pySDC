@@ -41,6 +41,7 @@ def run_AC(
         controller: The controller
         bool: If the code crashed
     """
+    useGPU=False
     if custom_description is not None:
         problem_params = custom_description.get('problem_params', {})
         if 'imex' in problem_params.keys():
