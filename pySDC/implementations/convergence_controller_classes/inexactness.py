@@ -1,7 +1,7 @@
 from pySDC.core.ConvergenceController import ConvergenceController
 
 
-class Inexactness(ConvergenceController):
+class NewtonInexactness(ConvergenceController):
     """
     Gradually refine Newton tolerance based on SDC residual.
     Be aware that the problem needs a parameter called "newton_tol" which controls the tolerance for the Newton solver for this to work!
@@ -81,23 +81,7 @@ class Inexactness(ConvergenceController):
             self.log(f'Changed tolerance to {tol:.2e}', step)
 
     def set_tolerance(self, lvl, tol):
-        raise NotImplementedError
-
-    def set_maxiter(self, description, maxiter):
-        raise NotImplementedError
-
-
-class NewtonInexactness(Inexactness):
-    def set_tolerance(self, lvl, tol):
         lvl.prob.newton_tol = tol
 
     def set_maxiter(self, description, maxiter):
         description['problem_params']['newton_maxiter'] = maxiter
-
-
-class LinearInexactness(Inexactness):
-    def set_tolerance(self, lvl, tol):
-        lvl.prob.lin_tol = tol
-
-    def set_maxiter(self, description, maxiter):
-        description['problem_params']['lin_maxiter'] = maxiter
