@@ -267,7 +267,7 @@ class Strategy:
         if self.stop_at_nan:
             from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
-            # custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
+            custom_description['convergence_controllers'][StopAtNan] = {'thresh': 1e20}
 
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 

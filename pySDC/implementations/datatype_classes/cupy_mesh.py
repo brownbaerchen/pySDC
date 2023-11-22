@@ -67,7 +67,7 @@ class cupy_mesh(cp.ndarray):
                 comm = input_.comm
             else:
                 args.append(input_)
-        results = super(cupy_mesh, self).__array_ufunc__(ufunc, method, *args, **kwargs).view(cupy_mesh)
+        results = super().__array_ufunc__(ufunc, method, *args, **kwargs).view(cupy_mesh)
         if not method == 'reduce':
             results._comm = comm
         return results
@@ -93,6 +93,9 @@ class cupy_mesh(cp.ndarray):
             global_absval = local_absval
 
         return float(global_absval)
+
+    def __all__(self):
+        raise
 
     def isend(self, dest=None, tag=None, comm=None):
         """

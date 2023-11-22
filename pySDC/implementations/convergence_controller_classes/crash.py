@@ -81,13 +81,12 @@ class StopAtNan(CrashBase):
         crash = False
 
         for lvl in S.levels:
-            for u in lvl.u:
+            for u in lvl.u[1:]:
                 if u is None:
                     break
-                isfinite = all(self.xp.isfinite(u.flatten()))
 
+                isfinite = self.xp.all(self.xp.isfinite(u))
                 below_limit = abs(u) < self.params.thresh
-
                 crash = not (isfinite and below_limit)
 
                 if crash:

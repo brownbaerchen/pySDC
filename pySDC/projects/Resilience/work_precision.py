@@ -9,7 +9,6 @@ import copy
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
-
 # from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
@@ -1062,25 +1061,6 @@ def get_configs(mode, problem):
             'custom_description': {'step_params': {'maxiter': 5}},
             'strategies': [AdaptivityStrategy(useMPI=True)],
         }
-        if True:
-            configurations[4] = {
-                'custom_description': {'step_params': {'maxiter': 5}},
-                'strategies': [AdaptivityStrategy(useMPI=True)],
-            }
-            desc_RK = {}
-            DIRK_strategy = ESDIRKStrategy
-            if problem.__name__ in ['run_Schroedinger']:
-                # desc_RK['problem_params'] = {'imex': False}
-                DIRK_strategy = ARKStrategy
-
-            configurations[-1] = {
-                'strategies': [
-                    # ERKStrategy(useMPI=True),
-                    DIRK_strategy(useMPI=True),
-                ],
-                'num_procs': 1,
-                'custom_description': desc_RK,
-            }
 
         desc_RK = {}
         configurations[-1] = {
@@ -1280,26 +1260,6 @@ def get_configs(mode, problem):
             'custom_description': desc,
             'param_range': param_range,
         }
-    elif mode == 'parallelSDC':
-        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI
-        from pySDC.projects.Resilience.strategies import AdaptivityExtrapolationWithinQStrategy
-
-        num_nodes = 3
-        comm_world = MPI.COMM_WORLD
-        strategies = [AdaptivityExtrapolationWithinQStrategy(useMPI=True)]
-
-        desc_par = {}
-        desc_par['sweeper_class'] = generic_implicit_MPI
-        desc_par['sweeper_params'] = {'num_nodes': num_nodes, 'comm': comm_world.Split(comm_world.rank < num_nodes)}
-
-        if comm_world.rank > num_nodes:
-            return None
-
-        configurations[0] = {
-            'strategies': strategies,
-            'num_procs': 1,
-            'custom_description': desc_par,
-        }
     else:
         raise NotImplementedError(f'Don\'t know the mode "{mode}"!')
 
@@ -1406,8 +1366,6 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
             configurations=get_configs(mode, problems[i]),
             mode=mode,
         )
-        # if problems[i] == run_quench and mode in ['parallel_efficiency', 'RK_comp']:
-        #     axs.flatten()[i].set_xticks([4.0, 10.0], minor=True)
 
     if plotting and shared_params['comm_world'].rank == 0:
         save_fig(
@@ -1541,93 +1499,8 @@ def vdp_stiffness_plot(base_path='data', format='pdf', **kwargs):  # pragma: no 
         )
 
 
-def aggregate_parallel_efficiency_plot():  # pragma: no cover
-    """
-    Make a "weak scaling" plot for diagonal SDC
-    """
-    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
-
-    fig, axs = plt.subplots(2, 2)
-
-    _fig, _ax = plt.subplots(1, 1)
-    num_procs = 1
-    num_procs_sweeper = 2
-    problem = run_quench
-
-    num_procs_sweeper_list = [2, 3, 4]
-
-    for problem, ax in zip([run_vdp, run_Lorenz, run_quench], axs.flatten()):
-        speedup = []
-        for num_procs_sweeper in num_procs_sweeper_list:
-            s, e = plot_parallel_efficiency_diagonalSDC(
-                ax=_ax,
-                work_key='t',
-                precision_key='e_global_rel',
-                num_procs=num_procs,
-                num_procs_sweeper=num_procs_sweeper,
-                problem=problem,
-                strategy=AdaptivityPolynomialError(),
-                mode='diagonal_SDC',
-                handle=f'{num_procs_sweeper} nodes',
-            )
-            speedup += [s]
-            decorate_panel(ax, problem, work_key='nprocs', precision_key='')
-
-        ax.plot(num_procs_sweeper_list, speedup, label='speedup')
-        ax.plot(
-            num_procs_sweeper_list,
-            [speedup[i] / num_procs_sweeper_list[i] for i in range(len(speedup))],
-            label='parallel efficiency',
-        )
-
-    fig.tight_layout()
-    save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
-
-
-def aggregate_parallel_efficiency_plot():
-    from pySDC.projects.Resilience.strategies import AdaptivityPolynomialError
-
-    fig, axs = plt.subplots(2, 2)
-
-    _fig, _ax = plt.subplots(1, 1)
-    num_procs = 1
-    num_procs_sweeper = 2
-    problem = run_quench
-
-    num_procs_sweeper_list = [2, 3, 4]
-
-    for problem, ax in zip([run_vdp, run_Lorenz, run_quench], axs.flatten()):
-        speedup = []
-        for num_procs_sweeper in num_procs_sweeper_list:
-            s, e = plot_parallel_efficiency_diagonalSDC(
-                ax=_ax,
-                work_key='t',
-                precision_key='e_global_rel',
-                num_procs=num_procs,
-                num_procs_sweeper=num_procs_sweeper,
-                problem=problem,
-                strategy=AdaptivityPolynomialError(),
-                mode='diagonal_SDC',
-                handle=f'{num_procs_sweeper} nodes',
-            )
-            speedup += [s]
-            decorate_panel(ax, problem, work_key='nprocs', precision_key='')
-
-        ax.plot(num_procs_sweeper_list, speedup, label='speedup')
-        ax.plot(
-            num_procs_sweeper_list,
-            [speedup[i] / num_procs_sweeper_list[i] for i in range(len(speedup))],
-            label='parallel efficiency',
-        )
-
-    fig.tight_layout()
-    save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
-
-
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
-
-    # aggregate_parallel_efficiency_plot()
 
     record = True
     for mode in [
