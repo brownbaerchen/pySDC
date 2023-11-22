@@ -136,6 +136,7 @@ def single_run(
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm_time,
+        use_hook_collection=False,
         **problem_args,
     )
 
@@ -300,8 +301,8 @@ def record_work_precision(
 
     elif problem.__name__ == 'run_AC':
         if param == 'e_tol':
-            param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # [::-1]
-            # param_range = [1e-5][::-1]
+            #param_range = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7]  # [::-1]
+            param_range = [1e-5][::-1]
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
@@ -723,9 +724,18 @@ def get_configs(mode, problem):
             conf['custom_description']['problem_params'] = conf['custom_description'].get('problem_params', {})
             conf['custom_description']['problem_params']['useGPU'] = True
             conf['custom_description']['problem_params']['compute_reference_solution_on_GPU'] = True
+            conf['custom_description']['sweeper_params'] = conf['custom_description'].get('sweeper_params', {})
+            conf['custom_description']['sweeper_params']['multiGPU'] = False
             conf['handle'] = 'GPU'
             conf['plotting_params'] = {'ls': '--'}
             configurations[-(key * 1e3 + 1)] = conf
+
+            # conf_mGPU = conf.copy()
+            # conf_mGPU['custom_description']['sweeper_params'] = conf_mGPU['custom_description'].get('sweeper_params', {}).copy()
+            # conf_mGPU['custom_description']['sweeper_params']['multiGPU'] = True
+            # conf_mGPU['handle'] = 'multi GPU'
+            # conf_mGPU['plotting_params'] = {'ls': '-.'}
+            # configurations[-(key * 1e9 + 1)] = conf_mGPU
 
             conf_cpu = value.copy()
             conf_cpu['custom_description'] = conf_cpu.get('custom_description', {}).copy()

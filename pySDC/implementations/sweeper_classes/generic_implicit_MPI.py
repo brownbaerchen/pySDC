@@ -28,7 +28,14 @@ class SweeperMPI(sweeper):
         if 'comm' not in params.keys():
             params['comm'] = MPI.COMM_WORLD
             self.logger.debug('Using MPI.COMM_WORLD for the communicator because none was supplied in the params.')
+
+        if 'multiGPU' not in params.keys():
+            params['multiGPU'] = False
+
         super().__init__(params)
+
+        if self.params.multiGPU:
+            self.setupMultiGPUDistribution()
 
         if self.params.comm.size != self.coll.num_nodes:
             raise NotImplementedError(
@@ -42,6 +49,12 @@ class SweeperMPI(sweeper):
     @property
     def rank(self):
         return self.comm.rank
+
+    def setupMultiGPUDistribution(self):
+        import cupy as cp
+        cp.cuda.Device(self.rank).use()
+        self.logger.debug(f'Rank {self.rank} switches to CUDA device {self.rank}')
+
 
     def compute_end_point(self):
         """

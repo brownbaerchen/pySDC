@@ -5,6 +5,7 @@ from pySDC.projects.Resilience.hook import hook_collection, LogData
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient, generic_implicit_efficient
 import numpy as np
+from pySDC.projects.Resilience.GPU_hooks import MonitorGPUMemoryUsage
 
 from pySDC.core.Errors import ConvergenceError
 
@@ -20,6 +21,7 @@ def run_AC(
     u0=None,
     t0=None,
     use_MPI=False,
+    use_hook_collection=True,
     **kwargs,
 ):
     """
@@ -78,8 +80,11 @@ def run_AC(
     # initialize controller parameters
     controller_params = {}
     controller_params['logger_level'] = 30
-    controller_params['hook_class'] = hook_collection + (hook_class if type(hook_class) == list else [hook_class])
+    controller_params['hook_class'] = (hook_class if type(hook_class) == list else [hook_class]) + [MonitorGPUMemoryUsage]
     controller_params['mssdc_jac'] = False
+
+    if use_hook_collection:
+        controller_params['hook_class'] += hook_collection
 
     if custom_controller_params is not None:
         controller_params = {**controller_params, **custom_controller_params}
