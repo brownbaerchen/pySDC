@@ -18,7 +18,7 @@ from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 
 setup_mpl(reset=True)
-LOGGER_LEVEL = 25
+LOGGER_LEVEL = 5
 LOG_TO_FILE = False
 
 logging.getLogger('matplotlib.texmanager').setLevel(90)

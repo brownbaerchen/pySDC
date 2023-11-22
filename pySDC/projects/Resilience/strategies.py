@@ -86,7 +86,6 @@ class Strategy:
         # stuff for work-precision diagrams
         self.precision_parameter = None
         self.precision_parameter_loc = []
-        self.precision_range_fac = 1.0
 
     def __str__(self):
         return self.name
@@ -195,7 +194,6 @@ class Strategy:
         '''
         if problem.__name__ == "run_vdp":
             return 11.5
-            # return 2.3752559741400825  # old stuff
         elif problem.__name__ == "run_piline":
             return 20.0
         elif problem.__name__ == "run_Lorenz":
@@ -325,7 +323,10 @@ class Strategy:
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class WildRiot(Strategy):
+class InexactBaseStrategy(Strategy):
+    """
+    Base class for inexact strategies.
+    """
     def __init__(
         self, double_adaptivity=False, newton_inexactness=True, linear_inexactness=True, SDC_maxiter=16, **kwargs
     ):
@@ -335,16 +336,9 @@ class WildRiot(Strategy):
         self.newton_inexactness = newton_inexactness
         self.linear_inexactness = linear_inexactness
         self.SDC_maxiter = SDC_maxiter
-        # self.restol = -1
 
     def get_controller_params(self, **kwargs):
         return {'all_to_done': True}
-
-    # def get_description_for_tolerance(self, problem, param, **kwargs):
-    #     desc = {}
-    #     if problem.__name__ in ['run_quench']:
-    #         desc['level_params'] = {'restol': max([1e-9, param / 1e2])}
-    #     return desc
 
     def get_custom_description(self, problem, num_procs=1):
         from pySDC.implementations.convergence_controller_classes.inexactness import NewtonInexactness
@@ -370,7 +364,6 @@ class WildRiot(Strategy):
             if problem.__name__ == 'run_quench':
                 inexactness_params['ratio'] = 1e-1
                 inexactness_params['min_tol'] = 1e-11
-                # inexactness_params['max_tol'] = 1e-3
                 inexactness_params['maxiter'] = 5
             desc['convergence_controllers'][NewtonInexactness] = inexactness_params
 
@@ -378,19 +371,12 @@ class WildRiot(Strategy):
             desc['problem_params']['stop_at_nan'] = False
 
         if self.linear_inexactness and problem.__name__ in ['run_AC', 'run_quench']:
-            # from pySDC.implementations.convergence_controller_classes.inexactness import LinearInexactness
 
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
                 desc['problem_params']['direct_solver'] = False
                 desc['problem_params']['liniter'] = 9
                 desc['problem_params']['min_lintol'] = 1e-11
-
-        # if self.double_adaptivity:
-        #     from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityResidual
-
-        #     desc['step_params']['maxiter'] = 10
-        #     desc['convergence_controllers'][AdaptivityResidual] = {'use_restol': True}
 
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
 
@@ -417,23 +403,6 @@ class BaseStrategy(Strategy):
         self.bar_plot_x_label = 'base'
         self.precision_parameter = 'dt'
         self.precision_parameter_loc = ['level_params', 'dt']
-
-    # def get_fault_args(self, problem, num_procs):
-    #     '''
-    #     Routine to get arguments for the faults that are exempt from randomization
-
-    #     Args:
-    #         problem: A function that runs a pySDC problem, see imports for available problems
-    #         num_procs (int): Number of processes you intend to run with
-
-    #     Returns:
-    #         dict: Arguments for the faults that are exempt from randomization
-    #     '''
-    #     args = super().get_fault_args(problem, num_procs)
-    #     if problem.__name__ == "run_quench":
-    #         args['time'] = 75.0
-
-    #     return args
 
     @property
     def label(self):
@@ -489,12 +458,6 @@ class AdaptivityStrategy(Strategy):
     @property
     def label(self):
         return r'$\Delta t$ adaptivity'
-
-    # def get_description_for_tolerance(self, problem, param, **kwargs):
-    #     desc = {}
-    #     if problem.__name__ in ['run_quench']:
-    #         desc['problem_params'] = {'newton_tol': min([max([param / 1e2, 1e-11]), 1e-7]), 'lintol': min([max([param / 1e2, 1e-11]), 1e-7]), 'liniter': 29, 'newton_maxiter': 29}
-    #     return desc
 
     def get_fixable_params(self, maxiter, **kwargs):
         """
@@ -953,7 +916,7 @@ class HotRodStrategy(Strategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityCollocationStrategy(WildRiot):
+class AdaptivityCollocationStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on collocation as a resilience strategy
     '''
@@ -1672,7 +1635,7 @@ class AdaptivityInterpolationStrategy(AdaptivityStrategy):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityExtrapolationWithinQStrategy(WildRiot):
+class AdaptivityExtrapolationWithinQStrategy(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
@@ -1776,7 +1739,7 @@ class AdaptivityExtrapolationWithinQStrategy(WildRiot):
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
 
-class AdaptivityPolynomialError(WildRiot):
+class AdaptivityPolynomialError(InexactBaseStrategy):
     '''
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
