@@ -94,9 +94,6 @@ class cupy_mesh(cp.ndarray):
 
         return float(global_absval)
 
-    def __all__(self):
-        raise
-
     def isend(self, dest=None, tag=None, comm=None):
         """
         Routine for sending data forward in time (non-blocking)

@@ -276,6 +276,7 @@ class Strategy:
             'run_Lorenz': 60,
             'run_Schroedinger': 150,
             'run_quench': 150,
+            'run_AC': 1000,
         }
 
         custom_description['convergence_controllers'][StopAtMaxRuntime] = {
