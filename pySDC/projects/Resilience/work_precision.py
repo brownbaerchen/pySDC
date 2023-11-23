@@ -11,6 +11,7 @@ from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
+from pySDC.projects.Resilience.AC import run_AC
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -291,7 +292,7 @@ def record_work_precision(
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
+        set_parameter(description, where, param_range[i])
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
@@ -1500,11 +1501,12 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        # 'compare_strategies',
-        #'RK_comp_high_order',
+        'compare_strategies',
+        # 'RK_comp_high_order',
         # 'step_size_limiting',
-        # 'parallel_efficiency',
-        'diagonal_SDC',
+        'parallel_efficiency',
+        'RK_comp',
+        # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
@@ -1514,7 +1516,7 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Schroedinger,
+            'problem': run_AC,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
