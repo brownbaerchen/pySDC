@@ -1099,24 +1099,19 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        desc_RK = {}
-        if problem.__name__ in ['run_Schroedinger']:
-            desc_RK['problem_params'] = {'imex': True}
-
-        configurations[3] = {
-            'custom_description': desc_poly,
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'num_procs': 1,
-            'num_procs_sweeper': 3,
-            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
-        }
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
-            'custom_description': desc_RK,
+        }
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
         }
 
         configurations[2] = {
@@ -1503,18 +1498,18 @@ if __name__ == "__main__":
         # 'compare_strategies',
         'RK_comp',
         # 'step_size_limiting',
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
-            'runs': 5,
+            'runs': 1,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }
         params_single = {
             **params,
-            'problem': run_quench,
+            'problem': run_Schroedinger,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
