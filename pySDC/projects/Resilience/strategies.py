@@ -258,7 +258,7 @@ class Strategy:
         elif problem.__name__ == "run_AC":
             custom_description['level_params'] = {'restol': -1, 'dt': 8e-4}
             custom_description['step_params'] = {'maxiter': 5}
-            custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-8}
+            custom_description['problem_params'] = {'newton_maxiter': 49, 'newton_tol': 1e-9}
 
         custom_description['convergence_controllers'] = {
             # StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
@@ -506,7 +506,7 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_Lorenz":
             e_tol = 2e-5
         elif problem.__name__ == "run_Schroedinger":
-            e_tol = 4e-6
+            e_tol = 4e-7
         elif problem.__name__ == "run_quench":
             e_tol = 1e-8
             custom_description['problem_params'] = {
@@ -725,7 +725,7 @@ class IterateStrategy(Strategy):
         elif problem.__name__ == "run_quench":
             restol = 1e-7
         elif problem.__name__ == "run_AC":
-            restol = 1e-6
+            restol = 1e-8
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \
@@ -1828,7 +1828,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
         elif problem.__name__ == "run_Lorenz":
             e_tol = 7e-4
         elif problem.__name__ == "run_Schroedinger":
-            e_tol = 3e-4
+            e_tol = 3e-5
         elif problem.__name__ == "run_quench":
             e_tol = 1e-7
             level_params['dt'] = 50.0

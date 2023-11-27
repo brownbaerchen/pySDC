@@ -741,11 +741,11 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[1] = {
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        }
         configurations[2] = {
             'strategies': [kAdaptivityStrategy(useMPI=True)],
+        }
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
 
         configurations[0] = {
@@ -1493,9 +1493,9 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = False
+    record = True
     for mode in [
-        'compare_strategies',
+        # 'compare_strategies',
         # 'parallel_efficiency',
         'RK_comp',
     ]:
@@ -1507,13 +1507,13 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_AC,
+            'problem': run_Schroedinger,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': False,
-        'runs': 1,
+        'runs': 5,
         'work_key': 'k_linear',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
