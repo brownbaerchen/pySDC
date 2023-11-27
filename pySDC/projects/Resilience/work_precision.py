@@ -292,7 +292,7 @@ def record_work_precision(
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
+        set_parameter(description, where, param_range[i])
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
@@ -1498,10 +1498,9 @@ if __name__ == "__main__":
     record = True
     for mode in [
         # 'compare_strategies',
-        #'RK_comp_high_order',
+        'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
-        'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
