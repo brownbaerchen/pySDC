@@ -81,6 +81,7 @@ class allencahn_fullyimplicit(ptype):
         inexact_linear_ratio=None,
         radius=0.25,
         order=2,
+        init_type='circle',
     ):
         """Initialization routine"""
         # we assert that nvars looks very particular here.. this will be necessary for coarsening in space later on
@@ -99,6 +100,7 @@ class allencahn_fullyimplicit(ptype):
             'eps',
             'radius',
             'order',
+            'init_type',
             localVars=locals(),
             readOnly=True,
         )
@@ -263,7 +265,7 @@ class allencahn_fullyimplicit(ptype):
         self.work_counters['rhs']()
         return f
 
-    def u_exact(self, t, u_init=None, t_init=None):
+    def u_exact(self, t, u_init=None, t_init=None, **kwargs):
         r"""
         Routine to compute the exact solution at time :math:`t`.
 
@@ -283,13 +285,19 @@ class allencahn_fullyimplicit(ptype):
             def eval_rhs(t, u):
                 return self.eval_f(u.reshape(self.init[0]), t).flatten()
 
-            me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init)
+            me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init, **kwargs)
 
         else:
-            for i in range(self.nvars[0]):
-                for j in range(self.nvars[1]):
-                    r2 = self.xvalues[i] ** 2 + self.xvalues[j] ** 2
-                    me[i, j] = np.tanh((self.radius - np.sqrt(r2)) / (np.sqrt(2) * self.eps))
+            if self.init_type == 'circle':
+                xv, yv = np.meshgrid(self.xvalues, self.xvalues, indexing='ij')
+                me[:, :] = np.tanh((self.radius - np.sqrt(xv**2 + yv**2)) / (np.sqrt(2) * self.eps))
+            elif self.init_type == 'checkerboard':
+                xv, yv = np.meshgrid(self.xvalues, self.xvalues)
+                me[:, :] = np.sin(2.0 * np.pi * xv) * np.sin(2.0 * np.pi * yv)
+            elif self.init_type == 'random':
+                me[:, :] = np.random.uniform(-1, 1, self.init)
+            else:
+                raise NotImplementedError('type of initial value not implemented, got %s' % self.init_type)
 
         return me
 

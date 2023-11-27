@@ -61,6 +61,9 @@ def run_AC(
 
     problem_params = {
         'newton_tol': 1e-9,
+        'nvars': (256, 256),
+        'init_type': 'checkerboard',
+        'order': 8,
     }
 
     # initialize step parameters
@@ -119,8 +122,8 @@ def run_AC(
     crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
-    except ConvergenceError:
-        print('Warning: Premature termination!')
+    except ConvergenceError as e:
+        print(f'Warning: Premature termination!: {e}')
         stats = controller.return_stats()
         crash = True
     return stats, controller, crash
@@ -141,8 +144,41 @@ def plot_solution(stats):  # pragma: no cover
     plt.show()
 
 
-if __name__ == '__main__':
-    from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+def scipy_reference():
+    from pySDC.projects.Resilience.strategies import ERKStrategy
+    from time import perf_counter
+    import matplotlib.pyplot as plt
 
-    stats, _, _ = run_AC(imex=True, hook_class=LogLocalErrorPostStep)
-    plot_solution(stats)
+    problem_params = ERKStrategy().get_base_parameters(run_AC)['problem_params']
+    description = ERKStrategy().get_custom_description(run_AC)
+    problem_params = {**problem_params, **description.get('problem_params', {})}
+
+    Tend = 1e-2
+    prob = allencahn_fullyimplicit(**problem_params)
+    u_exact = prob.u_exact(t=Tend)
+
+    errors = []
+    timings = []
+
+    tols = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
+    for tol in tols:
+        t0 = perf_counter()
+
+        errors += [abs(prob.u_exact(t=Tend, rtol=tol, atol=tol, method='RK45') - u_exact) / abs(u_exact)]
+        timings += [perf_counter() - t0]
+        print(errors[-1], timings[-1])
+    plt.plot(timings, errors)
+    plt.xlabel('t / s')
+    plt.ylabel('error')
+    plt.yscale('log')
+    plt.title('Scipy RK45')
+    plt.show()
+    # _, controller, _ = run_AC(Tend=0.)
+
+
+if __name__ == '__main__':
+    scipy_reference()
+    # from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+
+    # stats, _, _ = run_AC(imex=True, hook_class=LogLocalErrorPostStep)
+    # plot_solution(stats)

@@ -256,7 +256,7 @@ class Strategy:
                 'order': 6,
             }
         elif problem.__name__ == "run_AC":
-            custom_description['level_params'] = {'restol': -1, 'dt': 1e-4}
+            custom_description['level_params'] = {'restol': -1, 'dt': 8e-4}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {'newton_maxiter': 99, 'newton_tol': 1e-11}
 
@@ -519,7 +519,7 @@ class AdaptivityStrategy(Strategy):
                 'max_restarts': 99,
             }
         elif problem.__name__ == "run_AC":
-            e_tol = 1e-4
+            e_tol = 1e-6
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -723,6 +723,8 @@ class IterateStrategy(Strategy):
             restol = 6.5e-7
         elif problem.__name__ == "run_quench":
             restol = 1e-7
+        elif problem.__name__ == "run_AC":
+            restol = 1e-6
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \

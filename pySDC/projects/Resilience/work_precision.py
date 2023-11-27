@@ -286,10 +286,6 @@ def record_work_precision(
         elif param == 'dt':
             param_range = [1.25, 2.5, 5.0, 10.0, 20.0][::-1]
 
-    elif problem.__name__ == 'run_AC':
-        if param == 'e_tol':
-            param_range = [1e-4, 1e-5, 1e-6, 1e-7, 1e-8][::-1]
-
     # run multiple times with different parameters
     for i in range(len(param_range)):
         set_parameter(description, where, param_range[i])
@@ -757,7 +753,10 @@ def get_configs(mode, problem):
                 'step_params': {'maxiter': 5},
                 'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
             },
-            'strategies': [AdaptivityStrategy(useMPI=True), BaseStrategy(useMPI=True)],
+            'strategies': [
+                AdaptivityStrategy(useMPI=True),
+                BaseStrategy(useMPI=True),
+            ],
         }
 
     elif mode == 'interpolate_between_restarts':
@@ -1100,24 +1099,19 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        desc_RK = {}
-        if problem.__name__ in ['run_Schroedinger']:
-            desc_RK['problem_params'] = {'imex': True}
-
-        configurations[3] = {
-            'custom_description': desc_poly,
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'num_procs': 1,
-            'num_procs_sweeper': 3,
-            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
-        }
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
-            'custom_description': desc_RK,
+        }
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
         }
 
         configurations[2] = {
@@ -1502,11 +1496,8 @@ if __name__ == "__main__":
     record = True
     for mode in [
         'compare_strategies',
-        # 'RK_comp_high_order',
-        # 'step_size_limiting',
-        'parallel_efficiency',
+        # 'parallel_efficiency',
         'RK_comp',
-        # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
