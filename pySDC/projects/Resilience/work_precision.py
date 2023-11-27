@@ -1493,7 +1493,7 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = True
+    record = False
     for mode in [
         'compare_strategies',
         # 'parallel_efficiency',
