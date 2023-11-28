@@ -1496,8 +1496,8 @@ if __name__ == "__main__":
     record = True
     for mode in [
         # 'compare_strategies',
-        # 'parallel_efficiency',
         'RK_comp',
+        # 'parallel_efficiency',
     ]:
         params = {
             'mode': mode,
