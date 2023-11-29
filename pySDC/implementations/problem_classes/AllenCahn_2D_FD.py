@@ -82,6 +82,7 @@ class allencahn_fullyimplicit(ptype):
         radius=0.25,
         order=2,
         init_type='circle',
+        num_blobs=5,
     ):
         """Initialization routine"""
         # we assert that nvars looks very particular here.. this will be necessary for coarsening in space later on
@@ -101,6 +102,7 @@ class allencahn_fullyimplicit(ptype):
             'radius',
             'order',
             'init_type',
+            'num_blobs',
             localVars=locals(),
             readOnly=True,
         )
@@ -296,6 +298,29 @@ class allencahn_fullyimplicit(ptype):
                 me[:, :] = np.sin(2.0 * np.pi * xv) * np.sin(2.0 * np.pi * yv)
             elif self.init_type == 'random':
                 me[:, :] = np.random.uniform(-1, 1, self.init)
+            elif self.init_type == 'circle_rand':
+                ndim = len(me.shape)
+                num_blobs = self.num_blobs
+
+                X, Y = np.meshgrid(self.xvalues + 0.5, self.xvalues + 0.5)
+                L = max(self.xvalues) - min(self.xvalues) + self.dx
+
+                # get random radii for circles/spheres
+                np.random.seed(1)
+                lbound = 3.0 * self.eps
+                ubound = L / (2 * num_blobs + 4) - self.eps
+                rand_radii = (ubound - lbound) * np.random.random_sample(size=tuple([num_blobs] * ndim)) + lbound
+
+                # distribute circles/spheres
+                for i in range(0, num_blobs):
+                    for j in range(0, num_blobs):
+                        # build radius
+                        r2 = (X - (i + 1) / (num_blobs + 1) * L) ** 2 + (Y - (j + 1) / (num_blobs + 1) * L) ** 2
+                        # add this blob, shifted by 1 to avoid issues with adding up negative contributions
+                        me += np.tanh((rand_radii[i, j] - np.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
+                # normalize to [0,1]
+                me *= 0.5
+                assert np.all(me <= 1.0)
             else:
                 raise NotImplementedError('type of initial value not implemented, got %s' % self.init_type)
 

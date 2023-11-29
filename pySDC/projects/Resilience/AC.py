@@ -5,6 +5,7 @@ from pySDC.core.Hooks import hooks
 from pySDC.projects.Resilience.hook import hook_collection, LogData
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient, generic_implicit_efficient
+import matplotlib.pyplot as plt
 import numpy as np
 
 from pySDC.core.Errors import ConvergenceError
@@ -21,6 +22,7 @@ def run_AC(
     u0=None,
     t0=None,
     use_MPI=False,
+    live_plot=False,
     **kwargs,
 ):
     """
@@ -61,7 +63,7 @@ def run_AC(
 
     problem_params = {
         'newton_tol': 1e-9,
-        'nvars': (256, 256),
+        'nvars': (128, 128),
         'init_type': 'checkerboard',
         'order': 8,
     }
@@ -73,7 +75,9 @@ def run_AC(
     # initialize controller parameters
     controller_params = {}
     controller_params['logger_level'] = 30
-    controller_params['hook_class'] = hook_collection + (hook_class if type(hook_class) == list else [hook_class])
+    controller_params['hook_class'] = (
+        hook_collection + (hook_class if type(hook_class) == list else [hook_class]) + ([LivePlot] if live_plot else [])
+    )
     controller_params['mssdc_jac'] = False
 
     if custom_controller_params is not None:
@@ -174,6 +178,19 @@ def scipy_reference():
     plt.title('Scipy RK45')
     plt.show()
     # _, controller, _ = run_AC(Tend=0.)
+
+
+class LivePlot(hooks):
+    def __init__(self):
+        super().__init__()
+        self.fig, self.ax = plt.subplots()
+
+    def post_step(self, step, level_number):
+        super().post_step(step, level_number)
+        self.ax.cla()
+        self.ax.imshow(step.levels[level_number].uend, vmin=0.0, vmax=1.0)
+        self.ax.set_title(f't = {step.time:.2e}')
+        plt.pause(1e-9)
 
 
 if __name__ == '__main__':

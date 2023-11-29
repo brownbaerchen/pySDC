@@ -267,7 +267,7 @@ def record_work_precision(
             exponents = [-4, -3, -2, -1, 0, 1, 2]
     elif param == 'dt':
         power = 2.0
-        exponents = [-1, 0, 1, 2, 3]
+        exponents = [-1, 0, 1, 2, 3][::-1]
     elif param == 'restol':
         power = 10.0
         exponents = [-2, -1, 0, 1, 2, 3]
@@ -534,6 +534,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'e_local_max': 'max. local error',
         'restart': 'restarts',
         'dt_max': r'$\Delta t_\mathrm{max}$',
+        'dt_min': r'$\Delta t_\mathrm{min}$',
         'dt_mean': r'$\bar{\Delta t}$',
         'param': 'parameter',
         'u0_increment_max': r'$\| \Delta u_0 \|_{\infty} $',
@@ -741,13 +742,9 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
-        }
         configurations[1] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
-
         configurations[0] = {
             'custom_description': {
                 'step_params': {'maxiter': 5},
@@ -757,6 +754,9 @@ def get_configs(mode, problem):
                 AdaptivityStrategy(useMPI=True),
                 BaseStrategy(useMPI=True),
             ],
+        }
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
 
     elif mode == 'interpolate_between_restarts':
@@ -1495,7 +1495,7 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        # 'compare_strategies',
+        #'compare_strategies',
         'RK_comp',
         # 'parallel_efficiency',
     ]:
@@ -1507,7 +1507,7 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Schroedinger,
+            'problem': run_AC,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
