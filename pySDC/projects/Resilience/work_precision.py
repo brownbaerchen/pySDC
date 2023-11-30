@@ -743,22 +743,22 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[1] = {
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        }
-        configurations[0] = {
-            'custom_description': {
-                'step_params': {'maxiter': 5},
-                'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
-            },
-            'strategies': [
-                AdaptivityStrategy(useMPI=True),
-                BaseStrategy(useMPI=True),
-            ],
-        }
         configurations[2] = {
             'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
+        # configurations[0] = {
+        #     'custom_description': {
+        #         'step_params': {'maxiter': 5},
+        #         'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
+        #     },
+        #     'strategies': [
+        #         AdaptivityStrategy(useMPI=True),
+        #         BaseStrategy(useMPI=True),
+        #     ],
+        # }
+        # configurations[1] = {
+        #     'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        # }
 
     elif mode == 'interpolate_between_restarts':
         """
@@ -1497,7 +1497,7 @@ if __name__ == "__main__":
     record = True
     for mode in [
         'compare_strategies',
-        'RK_comp',
+        # 'RK_comp',
         # 'parallel_efficiency',
     ]:
         params = {
@@ -1510,11 +1510,11 @@ if __name__ == "__main__":
             **params,
             'problem': run_AC,
         }
-        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+        single_problem(**params_single, work_key='k_SDC', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': False,
-        'runs': 5,
+        'runs': 1,
         'work_key': 'k_linear',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,

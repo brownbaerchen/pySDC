@@ -260,7 +260,7 @@ class Strategy:
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
                 'newton_maxiter': 29,
-                'newton_tol': 1e-10,
+                'newton_tol': 1e-9,
                 'lin_tol': 1e-10,
                 'lin_maxiter': 29,
                 'nvars': (128, 128),
@@ -735,7 +735,7 @@ class IterateStrategy(Strategy):
         elif problem.__name__ == "run_quench":
             restol = 1e-7
         elif problem.__name__ == "run_AC":
-            restol = 1e-8
+            restol = 1e-7
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \
@@ -804,6 +804,10 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['problem_params']['newton_tol'] = 1e-9
             desc['problem_params']['lintol'] = 1e-9
             desc['level_params']['dt'] = 2.5
+        elif problem.__name__ == "run_AC":
+            desc['level_params']['restol'] = 1e-6
+            desc['problem_params']['newton_tol'] = 1e-7
+            desc['problem_params']['lin_tol'] = 1e-8
         return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
