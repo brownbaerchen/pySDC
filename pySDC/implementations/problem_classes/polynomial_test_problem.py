@@ -20,7 +20,7 @@ class polynomial_testequation(ptype):
         super().__init__(init=(1, None, np.dtype('float64')))
 
         self.rng = np.random.RandomState(seed=seed)
-        self.poly = np.polynomial.Polynomial(self.rng.rand(degree))
+        self.poly = np.polynomial.Polynomial(self.rng.rand(degree) - 0.5)
         self._makeAttributeAndRegister('degree', 'seed', localVars=locals(), readOnly=True)
 
     def eval_f(self, u, t):
