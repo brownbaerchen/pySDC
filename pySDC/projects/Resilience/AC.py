@@ -189,7 +189,7 @@ class LivePlot(hooks):
         super().post_step(step, level_number)
         self.ax.cla()
         self.ax.imshow(step.levels[level_number].uend, vmin=0.0, vmax=1.0)
-        self.ax.set_title(f't = {step.time:.2e}')
+        self.ax.set_title(f't = {step.time + step.dt:.2e}')
         plt.pause(1e-9)
 
 

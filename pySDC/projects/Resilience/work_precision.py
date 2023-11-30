@@ -37,6 +37,7 @@ MAPPINGS = {
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
     'dt_min': ('dt', min, False),
+    'dt_sigma': ('dt', np.std, False),
     'e_embedded_max': ('error_embedded_estimate', max, False),
     'u0_increment_max': ('u0_increment', max, None),
     'u0_increment_mean': ('u0_increment', np.mean, None),
@@ -1495,13 +1496,13 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        #'compare_strategies',
+        'compare_strategies',
         'RK_comp',
         # 'parallel_efficiency',
     ]:
         params = {
             'mode': mode,
-            'runs': 1,
+            'runs': 5,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }

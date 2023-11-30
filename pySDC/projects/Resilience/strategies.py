@@ -203,7 +203,7 @@ class Strategy:
         elif problem.__name__ == "run_quench":
             return 500.0
         elif problem.__name__ == "run_AC":
-            return 1e-2  # 3e-4
+            return 0.032  # 3e-4
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -256,17 +256,18 @@ class Strategy:
                 'order': 6,
             }
         elif problem.__name__ == "run_AC":
-            custom_description['level_params'] = {'restol': -1, 'dt': 8e-5}
+            custom_description['level_params'] = {'restol': -1, 'dt': 5e-4}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
                 'newton_maxiter': 29,
                 'newton_tol': 1e-10,
                 'lin_tol': 1e-10,
                 'lin_maxiter': 29,
-                'nvars': (64, 64),
+                'nvars': (128, 128),
                 'init_type': 'circle',
-                'eps': 1e-2,
-                'num_blobs': 2,
+                'eps': 0.04,
+                'radius': 0.25,
+                'nu': 2,
             }
 
         custom_description['convergence_controllers'] = {
