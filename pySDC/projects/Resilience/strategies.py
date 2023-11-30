@@ -263,7 +263,7 @@ class Strategy:
                 'newton_tol': 1e-9,
                 'lin_tol': 1e-10,
                 'lin_maxiter': 29,
-                'nvars': (128, 128),
+                'nvars': (256, 256),
                 'init_type': 'circle',
                 'eps': 0.04,
                 'radius': 0.25,
@@ -286,7 +286,7 @@ class Strategy:
             'run_Lorenz': 60,
             'run_Schroedinger': 150,
             'run_quench': 150,
-            'run_AC': 1000,
+            'run_AC': 300,
         }
 
         custom_description['convergence_controllers'][StopAtMaxRuntime] = {
@@ -520,8 +520,8 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_quench":
             e_tol = 1e-8
             custom_description['problem_params'] = {
-                'newton_tol': 1e-9,
-                'lintol': 1e-10,
+                'newton_tol': 1e-10,
+                'lintol': 1e-11,
             }
 
             from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestarting
@@ -531,6 +531,11 @@ class AdaptivityStrategy(Strategy):
             }
         elif problem.__name__ == "run_AC":
             e_tol = 1e-6
+            custom_description['problem_params'] = {
+                'newton_tol': 1e-9,
+                'lin_tol': 1e-10,
+            }
+
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -1449,6 +1454,7 @@ class ERKStrategy(DIRKStrategy):
         desc = {}
         if problem.__name__ == 'run_Schroedinger':
             desc['problem_params'] = {'lintol': param}
+
         return desc
 
     @property
@@ -1476,6 +1482,9 @@ class ERKStrategy(DIRKStrategy):
 
         desc = super().get_custom_description(problem, num_procs)
         desc['sweeper_class'] = Cash_Karp
+
+        if problem.__name__ == "run_AC":
+            desc['level_params']['dt'] = 1e-7
         return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):

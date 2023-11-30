@@ -536,6 +536,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'restart': 'restarts',
         'dt_max': r'$\Delta t_\mathrm{max}$',
         'dt_min': r'$\Delta t_\mathrm{min}$',
+        'dt_sigma': r'$\sigma(\Delta t)$',
         'dt_mean': r'$\bar{\Delta t}$',
         'param': 'parameter',
         'u0_increment_max': r'$\| \Delta u_0 \|_{\infty} $',
@@ -746,19 +747,19 @@ def get_configs(mode, problem):
         configurations[2] = {
             'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
-        # configurations[0] = {
-        #     'custom_description': {
-        #         'step_params': {'maxiter': 5},
-        #         'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
-        #     },
-        #     'strategies': [
-        #         AdaptivityStrategy(useMPI=True),
-        #         BaseStrategy(useMPI=True),
-        #     ],
-        # }
-        # configurations[1] = {
-        #     'strategies': [AdaptivityPolynomialError(useMPI=True)],
-        # }
+        configurations[0] = {
+            'custom_description': {
+                'step_params': {'maxiter': 5},
+                'sweeper_params': {'num_nodes': 3, 'quad_type': 'RADAU-RIGHT'},
+            },
+            'strategies': [
+                AdaptivityStrategy(useMPI=True),
+                BaseStrategy(useMPI=True),
+            ],
+        }
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        }
 
     elif mode == 'interpolate_between_restarts':
         """
@@ -1100,19 +1101,19 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        configurations[-1] = {
-            'strategies': [
-                ERKStrategy(useMPI=True),
-                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
-            ],
-            'num_procs': 1,
-        }
         configurations[3] = {
             'custom_description': desc_poly,
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
             'num_procs': 1,
             'num_procs_sweeper': 3,
             'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
+        }
+        configurations[-1] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
         }
 
         configurations[2] = {
@@ -1496,13 +1497,13 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        'compare_strategies',
-        # 'RK_comp',
+        # 'compare_strategies',
+        'RK_comp',
         # 'parallel_efficiency',
     ]:
         params = {
             'mode': mode,
-            'runs': 5,
+            'runs': 1,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }
@@ -1510,7 +1511,7 @@ if __name__ == "__main__":
             **params,
             'problem': run_AC,
         }
-        single_problem(**params_single, work_key='k_SDC', precision_key='e_global_rel', record=record)
+        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
         'record': False,
