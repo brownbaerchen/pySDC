@@ -18,6 +18,21 @@ class LogSolutionAllNodes(hooks):
         )
 
 
+class LogErrorPostIter(hooks):
+    def post_iteration(self, step, level_number):
+        super().post_iteration(step, level_number)
+        L = step.levels[level_number]
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
+            type='e',
+            value=abs(L.u[-1] - L.prob.u_exact(L.time + L.dt)),
+        )
+
+
 def getController(dt, num_nodes, quad_type, degree, prob='poly'):
     """
     Get a step prepared for polynomial test equation
@@ -42,6 +57,8 @@ def getController(dt, num_nodes, quad_type, degree, prob='poly'):
         )
     elif prob == 'vdp':
         from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol as problem_class
+    elif prob == 'test':
+        from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
 
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
@@ -61,16 +78,19 @@ def getController(dt, num_nodes, quad_type, degree, prob='poly'):
         problem_params['degree'] = degree
     elif prob == 'vdp':
         problem_params['mu'] = 0.0
+    elif prob == 'test':
+        problem_params['lambdas'] = [[-2.0 + 0j]]
+        problem_params['u0'] = 1.0
 
     # initialize step parameters
     step_params = {}
-    step_params['maxiter'] = 5
+    step_params['maxiter'] = 10
 
     # initialize controller parameters
     controller_params = {}
     controller_params['logger_level'] = 30
     controller_params['mssdc_jac'] = False
-    controller_params['hook_class'] = LogSolutionAllNodes
+    controller_params['hook_class'] = [LogSolutionAllNodes, LogErrorPostIter]
 
     # fill description dictionary for easy step instantiation
     description = {}
@@ -99,47 +119,39 @@ def plot_embedded_error(**kwargs):  # pragma: no cover
     # prepare figure
     fig, ax = plt.subplots(figsize=figsize_by_journal('JSC_beamer', 0.5, 0.75))
 
-    args = {
-        'num_nodes': 3,
-        'quad_type': 'RADAU-RIGHT',
-        'dt': 5.0,
-        'degree': 6,
-        'prob': 'vdp',
-        **kwargs,
-    }
+    ks = [1, 2, 3, 4, 5, 6]
+    dts = [1e-1, 5e-2, 1e-2, 8e-3, 1e-3]
+    errors = {k: [] for k in ks}
 
-    # prepare variables
-    controller = getController(**args)
-    step = controller.MS[0]
-    level = step.levels[0]
-    prob = level.prob
-    nodes = np.append([0], level.sweep.coll.nodes) * args['dt']
+    def single_run(dt, ks, dts, errors):
+        args = {
+            'num_nodes': 3,
+            'quad_type': 'RADAU-RIGHT',
+            'dt': dt,
+            'degree': 6,
+            'prob': 'test',
+            **kwargs,
+        }
 
-    u_0 = prob.u_exact(t=0)
-    _, stats = controller.run(u0=u_0, t0=0, Tend=args['dt'])
+        # prepare variables
+        controller = getController(**args)
+        step = controller.MS[0]
+        level = step.levels[0]
+        prob = level.prob
+        nodes = np.append([0], level.sweep.coll.nodes) * args['dt']
 
-    u = get_sorted(stats, sortby='iter', type='u')
+        u_0 = prob.u_exact(t=0)
+        _, stats = controller.run(u0=u_0, t0=0, Tend=args['dt'])
 
-    # initialize variables
-    M = len(level.u)
-    interpolate_on_node = (
-        M - 2
-    )  # M = coll.num_nodes + 1, so this is shifted wrt to the implementation in the convergence controller
+        e = get_sorted(stats, sortby='iter', type='e')
+        for k in ks:
+            errors[k] += [e[k - 1][1]]
 
-    # plot exact solution
-    _coll = CollBase(100, 0, args['dt'], quad_type='LOBATTO')
-    t = _coll.nodes
-    u_exact = [prob.u_exact(me) for me in t]
-    ax.plot(t, [me[0] for me in u_exact], label=f'Exact solution', color=CMAP[0])
+    for dt in dts:
+        single_run(dt, ks, dts, errors)
 
-    # plot SDC interpolated polynomial
-    for k, ls in zip([4, 5], ['-.', '--']):
-        u_k = np.array(u[k - 1][1]).T[0]
-        interpolator = LagrangeApproximation(points=nodes)
-        interpolation_matrix = interpolator.getInterpolationMatrix(t)
-        u_SDC = interpolation_matrix @ u_k
-        ax.plot(t, u_SDC, label=rf'Degree {k} SDC approximation', color=CMAP[k], ls=ls)
-        ax.scatter(nodes, u_k, color=CMAP[k])
+    for k in ks:
+        ax.loglog(dts, errors[k], label=rf'$k$={k}')
 
     # # plot error
     # u_reduced_at_node = u_reduced[np.argmin((t - nodes[interpolate_on_node]) ** 2)]
@@ -152,8 +164,10 @@ def plot_embedded_error(**kwargs):  # pragma: no cover
     #     ls=':',
     # )
 
+    ax.set_xlim(ax.get_xlim()[::-1])
+    ax.set_xlabel(r'$\Delta t$')
+    ax.set_ylabel(r'local error')
     ax.legend(frameon=False)
-    ax.set_xlabel(r'$t$')
     fig.tight_layout()
     fig.savefig('data/paper/embedded_error.pdf')
     plt.show()
@@ -212,7 +226,7 @@ def plot_interpolation_error(**kwargs):  # pragma: no cover
     interpolator = LagrangeApproximation(points=nodes)
     interpolation_matrix = interpolator.getInterpolationMatrix(t)
     u_SDC = interpolation_matrix @ u
-    ax.plot(t, u_SDC, label=rf'Degree {level.sweep.coll.order} SDC approximation', color=CMAP[1], ls='--')
+    ax.plot(t, u_SDC, label=rf'Degree {len(nodes)-1} SDC approximation', color=CMAP[1], ls='--')
     ax.scatter(nodes, u, color=CMAP[1])
 
     # plot secondary interpolation

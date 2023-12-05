@@ -1065,6 +1065,50 @@ def get_configs(mode, problem):
                 'plotting_params': {'ls': ls[i]},
             }
 
+    elif mode == 'RK_comp_serial':
+        """
+        Compare parallel adaptive SDC to Runge-Kutta
+        """
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            ERKStrategy,
+            ESDIRKStrategy,
+            ARKStrategy,
+            AdaptivityPolynomialError,
+        )
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': "EE"}
+        desc['step_params'] = {'maxiter': 5}
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
+        }
+
+        configurations[-1] = {
+            'strategies': [
+                ERKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+            ],
+            'num_procs': 1,
+        }
+        configurations[3] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 1,
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
+        }
+
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 1,
+            'plotting_params': {'label': r'$\Delta t$ adaptivity $N$=4x1'},
+        }
     elif mode == 'RK_comp':
         """
         Compare parallel adaptive SDC to Runge-Kutta
@@ -1493,7 +1537,7 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = True
+    record = False
     for mode in [
         # 'compare_strategies',
         'RK_comp',
@@ -1509,7 +1553,7 @@ if __name__ == "__main__":
         }
         params_single = {
             **params,
-            'problem': run_Schroedinger,
+            'problem': run_vdp,
         }
         single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
