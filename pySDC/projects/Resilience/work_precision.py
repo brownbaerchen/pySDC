@@ -1081,7 +1081,7 @@ def get_configs(mode, problem):
             AdaptivityPolynomialError,
         )
 
-        if problem.__name__ in ['run_Schroedinger']:
+        if problem.__name__ in ['run_Schroedinger', 'run_AC']:
             from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
         else:
             from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
@@ -1113,7 +1113,9 @@ def get_configs(mode, problem):
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
-                ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
+                ARKStrategy(useMPI=True)
+                if problem.__name__ in ['run_Schroedinger', 'run_AC']
+                else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
         }

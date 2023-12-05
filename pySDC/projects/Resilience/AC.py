@@ -1,5 +1,6 @@
 # script to run an Allen-Cahn problem
 from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit, allencahn_semiimplicit
+from pySDC.implementations.problem_classes.AllenCahn_2D_FFT import allencahn2d_imex
 from pySDC.implementations.problem_classes.AllenCahn_1D_FD import allencahn_front_fullyimplicit
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
@@ -63,10 +64,10 @@ def run_AC(
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
-        'newton_tol': 1e-9,
+        # 'newton_tol': 1e-9,
         'nvars': (128, 128),
         'init_type': 'circle',
-        'order': 2,
+        # 'order': 2,
     }
 
     # initialize step parameters
@@ -86,10 +87,11 @@ def run_AC(
 
     # fill description dictionary for easy step instantiation
     description = {}
-    description['problem_class'] = allencahn_semiimplicit if imex else allencahn_fullyimplicit
+    # description['problem_class'] = allencahn_semiimplicit if imex else allencahn_fullyimplicit
+    description['problem_class'] = allencahn2d_imex
     # description['problem_class'] = allencahn_front_fullyimplicit
     description['problem_params'] = problem_params
-    description['sweeper_class'] = imex_1st_order_efficient if imex else generic_implicit_efficient
+    description['sweeper_class'] = imex_1st_order_efficient  #  if imex else generic_implicit_efficient
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params

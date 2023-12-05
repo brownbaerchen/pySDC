@@ -59,7 +59,19 @@ class allencahn2d_imex(ptype):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, nvars=None, nu=2, eps=0.04, radius=0.25, L=1.0, init_type='circle'):
+    def __init__(
+        self,
+        nvars=None,
+        nu=2,
+        eps=0.04,
+        radius=0.25,
+        L=1.0,
+        init_type='circle',
+        newton_tol=None,
+        inexact_linear_ratio=None,
+        newton_maxiter=None,
+        lin_tol=None,
+    ):
         """Initialization routine"""
 
         if nvars is None:

@@ -268,13 +268,13 @@ class Strategy:
             custom_description['level_params'] = {'restol': -1, 'dt': 5e-5}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
-                'newton_maxiter': 29,
-                'newton_tol': 1e-11,
-                'lin_tol': 1e-10,
-                'lin_maxiter': 29,
+                # 'newton_maxiter': 29,
+                # 'newton_tol': 1e-11,
+                # 'lin_tol': 1e-10,
+                # 'lin_maxiter': 29,
                 # 'nvars': 127,
                 'nvars': (128,) * 2,
-                'order': 2,
+                #'order': 2,
                 #'init_type': 'checkerboard',
                 'eps': 4e-2,
                 #'radius': 0.25,
