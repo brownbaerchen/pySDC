@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import cg, spsolve
 
 from pySDC.core.Errors import ParameterError, ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
@@ -83,6 +83,7 @@ class allencahn_fullyimplicit(ptype):
         order=2,
         init_type='circle',
         num_blobs=5,
+        direct_solver=False,
     ):
         """Initialization routine"""
         # we assert that nvars looks very particular here.. this will be necessary for coarsening in space later on
@@ -112,6 +113,7 @@ class allencahn_fullyimplicit(ptype):
             'lin_tol',
             'lin_maxiter',
             'inexact_linear_ratio',
+            'direct_solver',
             localVars=locals(),
             readOnly=False,
         )
@@ -223,13 +225,20 @@ class allencahn_fullyimplicit(ptype):
             dg = Id - factor * (self.A + 1.0 / eps2 * sp.diags((1.0 - (nu + 1) * u**nu), offsets=0))
 
             # newton update: u1 = u0 - g/dg
-            # u -= spsolve(dg, g)
-            u -= cg(
-                dg, g, x0=z, tol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
-            )[0]
+            if self.direct_solver:
+                u -= spsolve(dg, g)
+            else:
+                u -= cg(
+                    dg,
+                    g,
+                    x0=z,
+                    tol=self.lin_tol,
+                    maxiter=self.lin_maxiter,
+                    atol=0,
+                    callback=self.work_counters['linear'],
+                )[0]
             # increase iteration count
             n += 1
-            # print(n, res)
 
             self.work_counters['newton']()
 
@@ -284,10 +293,19 @@ class allencahn_fullyimplicit(ptype):
         me = self.dtype_u(self.init, val=0.0)
         if t > 0:
 
-            def eval_rhs(t, u):
-                return self.eval_f(u.reshape(self.init[0]), t).flatten()
+            def jac(_t, u):
+                return self.A + 1.0 / self.eps**2 * sp.diags((1.0 - (self.nu + 1) * u**self.nu), offsets=0)
 
-            me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init, **kwargs)
+            def eval_rhs(_t, u):
+                return self.eval_f(u.reshape(self.init[0]), _t).flatten()
+
+            kwargs = {
+                'method': 'BDF',
+                'max_step': self.eps**2,
+                **kwargs,
+            }
+
+            me[:] = self.generate_scipy_reference_solution(eval_rhs, t, u_init, t_init, jac=jac, **kwargs)
 
         else:
             if self.init_type == 'circle':

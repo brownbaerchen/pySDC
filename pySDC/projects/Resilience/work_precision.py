@@ -33,6 +33,7 @@ MAPPINGS = {
     'k_linear': ('work_linear', sum, None),
     'k_Newton_no_restart': ('work_newton', sum, False),
     'k_rhs': ('work_rhs', sum, None),
+    'num_steps': ('dt', len, None),
     'restart': ('restart', sum, None),
     'dt_mean': ('dt', np.mean, False),
     'dt_max': ('dt', max, False),
@@ -126,11 +127,12 @@ def single_run(
         **strategy.get_controller_params(),
     }
     problem_args = {} if problem_args is None else problem_args
+    error_hook = strategy.get_hook_class(problem)
 
     stats, controller, crash = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
-        hook_class=[LogData, LogWork, LogGlobalErrorPostRun] + hooks,
+        hook_class=[LogData, LogWork, error_hook] + hooks,
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm_time,
@@ -744,8 +746,8 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
         configurations[0] = {
             'custom_description': {
@@ -757,8 +759,8 @@ def get_configs(mode, problem):
                 BaseStrategy(useMPI=True),
             ],
         }
-        configurations[1] = {
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
 
     elif mode == 'interpolate_between_restarts':
@@ -1115,13 +1117,13 @@ def get_configs(mode, problem):
             ],
             'num_procs': 1,
         }
-
         configurations[2] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'num_procs': 4,
             'plotting_params': {'label': r'$\Delta t$ adaptivity $N$=4x1'},
         }
+
     elif mode == 'RK_comp_high_order':
         """
         Compare higher order SDC than we can get with RKM to RKM
@@ -1497,7 +1499,7 @@ if __name__ == "__main__":
 
     record = True
     for mode in [
-        # 'compare_strategies',
+        #'compare_strategies',
         'RK_comp',
         # 'parallel_efficiency',
     ]:

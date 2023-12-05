@@ -90,6 +90,15 @@ class Strategy:
     def __str__(self):
         return self.name
 
+    @staticmethod
+    def get_hook_class(problem):
+        if problem.__name__ == "run_AC" and False:
+            from pySDC.projects.Resilience.AC import LogRadius as errorhook
+        else:
+            from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun as errorhook
+
+        return errorhook
+
     def get_controller_params(self, **kwargs):
         return {'all_to_done': False}
 
@@ -203,7 +212,7 @@ class Strategy:
         elif problem.__name__ == "run_quench":
             return 500.0
         elif problem.__name__ == "run_AC":
-            return 0.032  # 3e-4
+            return 0.025  # 3e-4
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -256,18 +265,23 @@ class Strategy:
                 'order': 6,
             }
         elif problem.__name__ == "run_AC":
-            custom_description['level_params'] = {'restol': -1, 'dt': 5e-4}
+            custom_description['level_params'] = {'restol': -1, 'dt': 5e-5}
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
                 'newton_maxiter': 29,
-                'newton_tol': 1e-9,
+                'newton_tol': 1e-11,
                 'lin_tol': 1e-10,
                 'lin_maxiter': 29,
-                'nvars': (256, 256),
-                'init_type': 'circle',
-                'eps': 0.04,
-                'radius': 0.25,
-                'nu': 2,
+                # 'nvars': 127,
+                'nvars': (128,) * 2,
+                'order': 2,
+                #'init_type': 'checkerboard',
+                'eps': 4e-2,
+                #'radius': 0.25,
+                #'nu': 2,
+                #'num_blobs': 3,
+                # 'bc': 'periodic',
+                #'direct_solver': True,
             }
 
         custom_description['convergence_controllers'] = {
@@ -503,6 +517,7 @@ class AdaptivityStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
+        base_params = super().get_custom_description(problem, num_procs)
         custom_description = {}
         custom_description['convergence_controllers'] = {}
 
@@ -531,6 +546,7 @@ class AdaptivityStrategy(Strategy):
             }
         elif problem.__name__ == "run_AC":
             e_tol = 1e-6
+            dt_max = base_params['problem_params']['eps'] ** 2
             custom_description['problem_params'] = {
                 'newton_tol': 1e-9,
                 'lin_tol': 1e-10,
@@ -549,7 +565,7 @@ class AdaptivityStrategy(Strategy):
         custom_description['convergence_controllers'][StepSizeLimiter] = {
             'dt_max': dt_max,
         }
-        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+        return merge_descriptions(base_params, custom_description)
 
     def get_reference_value(self, problem, key, op, num_procs=1):
         """
@@ -1484,7 +1500,7 @@ class ERKStrategy(DIRKStrategy):
         desc['sweeper_class'] = Cash_Karp
 
         if problem.__name__ == "run_AC":
-            desc['level_params']['dt'] = 1e-7
+            desc['level_params']['dt'] = 2e-5
         return desc
 
     def get_reference_value(self, problem, key, op, num_procs=1):
@@ -1835,6 +1851,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
+        base_params = super().get_custom_description(problem, num_procs)
         custom_description = {}
 
         dt_max = np.inf
@@ -1859,6 +1876,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
             restol_rel = 1e-1
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
+            dt_max = base_params['problem_params']['eps'] ** 2
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
@@ -1880,7 +1898,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
             },
         }
         custom_description['level_params'] = level_params
-        return merge_descriptions(super().get_custom_description(problem, num_procs), custom_description)
+        return merge_descriptions(base_params, custom_description)
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
