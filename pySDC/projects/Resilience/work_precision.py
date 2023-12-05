@@ -291,7 +291,7 @@ def record_work_precision(
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
-        set_parameter(description, where, param_range[i] * strategy.precision_range_fac)
+        set_parameter(description, where, param_range[i])
 
         data[param_range[i]] = {key: [] for key in MAPPINGS.keys()}
         data[param_range[i]]['param'] = [param_range[i]]
@@ -1099,24 +1099,19 @@ def get_configs(mode, problem):
             5: ':',
         }
 
-        desc_RK = {}
-        if problem.__name__ in ['run_Schroedinger']:
-            desc_RK['problem_params'] = {'imex': True}
-
-        configurations[3] = {
-            'custom_description': desc_poly,
-            'strategies': [AdaptivityPolynomialError(useMPI=True)],
-            'num_procs': 1,
-            'num_procs_sweeper': 3,
-            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
-        }
         configurations[-1] = {
             'strategies': [
                 ERKStrategy(useMPI=True),
                 ARKStrategy(useMPI=True) if problem.__name__ in ['run_Schroedinger'] else ESDIRKStrategy(useMPI=True),
             ],
             'num_procs': 1,
-            'custom_description': desc_RK,
+        }
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
         }
 
         configurations[2] = {
@@ -1501,10 +1496,10 @@ if __name__ == "__main__":
     record = True
     for mode in [
         # 'compare_strategies',
-        #'RK_comp_high_order',
+        'RK_comp',
         # 'step_size_limiting',
         # 'parallel_efficiency',
-        'diagonal_SDC',
+        # 'diagonal_SDC',
     ]:
         params = {
             'mode': mode,
