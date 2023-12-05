@@ -1100,14 +1100,14 @@ def get_configs(mode, problem):
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
             'num_procs': 1,
             'num_procs_sweeper': 1,
-            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity $N$=1x3'},
+            'plotting_params': {'label': r'$\Delta t$-$k$ adaptivity'},
         }
 
         configurations[2] = {
             'strategies': [AdaptivityStrategy(useMPI=True)],
             'custom_description': desc,
             'num_procs': 1,
-            'plotting_params': {'label': r'$\Delta t$ adaptivity $N$=4x1'},
+            'plotting_params': {'label': r'$\Delta t$ adaptivity'},
         }
     elif mode == 'RK_comp':
         """
@@ -1540,7 +1540,7 @@ if __name__ == "__main__":
     record = False
     for mode in [
         # 'compare_strategies',
-        'RK_comp',
+        'RK_comp_serial',
         # 'step_size_limiting',
         # 'parallel_efficiency',
         # 'diagonal_SDC',
