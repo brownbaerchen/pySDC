@@ -58,7 +58,7 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
         problem (function): A problem to run
         strategy (Strategy): SDC strategy
     """
-    if strategy.__name__ == 'ERK':
+    if strategy.name == 'ERK':
         if problem.__name__ in ['run_quench', 'run_Schroedinger', 'run_AC']:
             return True
 
@@ -743,6 +743,9 @@ def get_configs(mode, problem):
             BaseStrategy,
         )
 
+        configurations[2] = {
+            'strategies': [kAdaptivityStrategy(useMPI=True)],
+        }
         configurations[1] = {
             'strategies': [AdaptivityPolynomialError(useMPI=True)],
         }
@@ -755,9 +758,6 @@ def get_configs(mode, problem):
                 AdaptivityStrategy(useMPI=True),
                 BaseStrategy(useMPI=True),
             ],
-        }
-        configurations[2] = {
-            'strategies': [kAdaptivityStrategy(useMPI=True)],
         }
 
     elif mode == 'interpolate_between_restarts':
@@ -1504,7 +1504,7 @@ if __name__ == "__main__":
     ]:
         params = {
             'mode': mode,
-            'runs': 1,
+            'runs': 5,
             #'num_procs': 1,  # min(comm_world.size, 5),
             'plotting': comm_world.rank == 0,
         }

@@ -427,7 +427,7 @@ class BaseStrategy(Strategy):
     def get_custom_description(self, problem, num_procs):
         desc = super().get_custom_description(problem, num_procs)
         if problem.__name__ == "run_AC":
-            desc['level_params']['dt'] = 0.9 * desc['problem_params']['eps'] ** 2 / 8.0
+            desc['level_params']['dt'] = 0.8 * desc['problem_params']['eps'] ** 2 / 8.0
         return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
@@ -544,7 +544,7 @@ class AdaptivityStrategy(Strategy):
             }
         elif problem.__name__ == "run_AC":
             e_tol = 1e-6
-            dt_max = 0.9 * base_params['problem_params']['eps'] ** 2
+            dt_max = 0.8 * base_params['problem_params']['eps'] ** 2
 
         else:
             raise NotImplementedError(
@@ -820,7 +820,8 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['problem_params']['lintol'] = 1e-9
             desc['level_params']['dt'] = 2.5
         elif problem.__name__ == "run_AC":
-            desc['level_params']['dt'] = 0.9 * desc['problem_params']['eps'] ** 2 / 8.0
+            desc['level_params']['restol'] = 1e-11
+            desc['level_params']['dt'] = 0.8 * desc['problem_params']['eps'] ** 2 / 8.0
         return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
