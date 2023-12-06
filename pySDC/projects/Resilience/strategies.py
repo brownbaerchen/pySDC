@@ -212,7 +212,7 @@ class Strategy:
         elif problem.__name__ == "run_quench":
             return 500.0
         elif problem.__name__ == "run_AC":
-            return 0.025  # 3e-4
+            return 0.025
         else:
             raise NotImplementedError('I don\'t have a final time for your problem!')
 
@@ -268,20 +268,11 @@ class Strategy:
             eps = 4e-2
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
-                # 'newton_maxiter': 29,
-                # 'newton_tol': 1e-11,
-                # 'lin_tol': 1e-10,
-                # 'lin_maxiter': 29,
-                # 'nvars': 127,
                 'nvars': (128,) * 2,
-                #'order': 2,
-                #'init_type': 'checkerboard',
+                'init_type': 'circle',
                 'eps': eps,
-                #'radius': 0.25,
-                #'nu': 2,
-                #'num_blobs': 3,
-                # 'bc': 'periodic',
-                #'direct_solver': True,
+                'radius': 0.25,
+                'nu': 2,
             }
             custom_description['level_params'] = {'restol': -1, 'dt': 0.5 * eps**2}
 
@@ -554,10 +545,6 @@ class AdaptivityStrategy(Strategy):
         elif problem.__name__ == "run_AC":
             e_tol = 1e-6
             dt_max = 0.9 * base_params['problem_params']['eps'] ** 2
-            # custom_description['problem_params'] = {
-            #     'newton_tol': 1e-9,
-            #     'lin_tol': 1e-10,
-            # }
 
         else:
             raise NotImplementedError(
@@ -834,9 +821,6 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['level_params']['dt'] = 2.5
         elif problem.__name__ == "run_AC":
             desc['level_params']['dt'] = 0.9 * desc['problem_params']['eps'] ** 2 / 8.0
-            # desc['level_params']['restol'] = 1e-6
-            # desc['problem_params']['newton_tol'] = 1e-7
-            # desc['problem_params']['lin_tol'] = 1e-8
         return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
@@ -1884,7 +1868,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
             restol_rel = 1e-1
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
-            dt_max = 0.9 * base_params['problem_params']['eps'] ** 2
+            dt_max = 0.8 * base_params['problem_params']['eps'] ** 2
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\

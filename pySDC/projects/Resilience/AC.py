@@ -89,7 +89,6 @@ def run_AC(
     description = {}
     # description['problem_class'] = allencahn_semiimplicit if imex else allencahn_fullyimplicit
     description['problem_class'] = allencahn2d_imex
-    # description['problem_class'] = allencahn_front_fullyimplicit
     description['problem_params'] = problem_params
     description['sweeper_class'] = imex_1st_order_efficient  #  if imex else generic_implicit_efficient
     description['sweeper_params'] = sweeper_params
