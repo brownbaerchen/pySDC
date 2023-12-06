@@ -771,7 +771,7 @@ def get_configs(mode, problem):
 
         i = 0
         for interpolate_between_restarts, handle, ls in zip(
-            [True, False], ['Interpolation bewteen restarts', 'regular'], ['--', '-']
+            [True, False], ['Interpolation between restarts', 'regular'], ['--', '-']
         ):
             configurations[i] = {
                 'strategies': [
@@ -1499,11 +1499,11 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = True
+    record = False
     for mode in [
-        #'compare_strategies',
+        'compare_strategies',
         'RK_comp',
-        # 'parallel_efficiency',
+        'parallel_efficiency',
     ]:
         params = {
             'mode': mode,

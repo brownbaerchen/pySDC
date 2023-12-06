@@ -67,10 +67,6 @@ class allencahn2d_imex(ptype):
         radius=0.25,
         L=1.0,
         init_type='circle',
-        newton_tol=None,
-        inexact_linear_ratio=None,
-        newton_maxiter=None,
-        lin_tol=None,
     ):
         """Initialization routine"""
 

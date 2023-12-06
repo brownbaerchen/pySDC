@@ -265,7 +265,7 @@ class Strategy:
                 'order': 6,
             }
         elif problem.__name__ == "run_AC":
-            custom_description['level_params'] = {'restol': -1, 'dt': 5e-5}
+            eps = 4e-2
             custom_description['step_params'] = {'maxiter': 5}
             custom_description['problem_params'] = {
                 # 'newton_maxiter': 29,
@@ -276,13 +276,14 @@ class Strategy:
                 'nvars': (128,) * 2,
                 #'order': 2,
                 #'init_type': 'checkerboard',
-                'eps': 4e-2,
+                'eps': eps,
                 #'radius': 0.25,
                 #'nu': 2,
                 #'num_blobs': 3,
                 # 'bc': 'periodic',
                 #'direct_solver': True,
             }
+            custom_description['level_params'] = {'restol': -1, 'dt': 0.5 * eps**2}
 
         custom_description['convergence_controllers'] = {
             # StepSizeLimiter: {'dt_min': self.get_Tend(problem=problem, num_procs=num_procs) / self.max_steps}
@@ -385,7 +386,7 @@ class InexactBaseStrategy(Strategy):
             'maxiter': 15,
         }
 
-        if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger']:
+        if self.newton_inexactness and problem.__name__ not in ['run_Schroedinger', 'run_AC']:
             if problem.__name__ == 'run_quench':
                 inexactness_params['ratio'] = 1e-1
                 inexactness_params['min_tol'] = 1e-11
@@ -395,7 +396,7 @@ class InexactBaseStrategy(Strategy):
         if problem.__name__ in ['run_vdp']:
             desc['problem_params']['stop_at_nan'] = False
 
-        if self.linear_inexactness and problem.__name__ in ['run_AC', 'run_quench']:
+        if self.linear_inexactness and problem.__name__ in ['run_quench']:
             desc['problem_params']['inexact_linear_ratio'] = 1e-1
             if problem.__name__ in ['run_quench']:
                 desc['problem_params']['direct_solver'] = False
@@ -431,6 +432,12 @@ class BaseStrategy(Strategy):
     @property
     def label(self):
         return r'fixed'
+
+    def get_custom_description(self, problem, num_procs):
+        desc = super().get_custom_description(problem, num_procs)
+        if problem.__name__ == "run_AC":
+            desc['level_params']['dt'] = 0.9 * desc['problem_params']['eps'] ** 2 / 8.0
+        return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
@@ -546,11 +553,11 @@ class AdaptivityStrategy(Strategy):
             }
         elif problem.__name__ == "run_AC":
             e_tol = 1e-6
-            dt_max = base_params['problem_params']['eps'] ** 2
-            custom_description['problem_params'] = {
-                'newton_tol': 1e-9,
-                'lin_tol': 1e-10,
-            }
+            dt_max = 0.9 * base_params['problem_params']['eps'] ** 2
+            # custom_description['problem_params'] = {
+            #     'newton_tol': 1e-9,
+            #     'lin_tol': 1e-10,
+            # }
 
         else:
             raise NotImplementedError(
@@ -756,7 +763,7 @@ class IterateStrategy(Strategy):
         elif problem.__name__ == "run_quench":
             restol = 1e-7
         elif problem.__name__ == "run_AC":
-            restol = 1e-7
+            restol = 1e-11
         else:
             raise NotImplementedError(
                 'I don\'t have a residual tolerance for your problem. Please add one to the \
@@ -826,9 +833,10 @@ class kAdaptivityStrategy(IterateStrategy):
             desc['problem_params']['lintol'] = 1e-9
             desc['level_params']['dt'] = 2.5
         elif problem.__name__ == "run_AC":
-            desc['level_params']['restol'] = 1e-6
-            desc['problem_params']['newton_tol'] = 1e-7
-            desc['problem_params']['lin_tol'] = 1e-8
+            desc['level_params']['dt'] = 0.9 * desc['problem_params']['eps'] ** 2 / 8.0
+            # desc['level_params']['restol'] = 1e-6
+            # desc['problem_params']['newton_tol'] = 1e-7
+            # desc['problem_params']['lin_tol'] = 1e-8
         return desc
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
@@ -1876,7 +1884,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
             restol_rel = 1e-1
         elif problem.__name__ == "run_AC":
             e_tol = 1e-4
-            dt_max = base_params['problem_params']['eps'] ** 2
+            dt_max = 0.9 * base_params['problem_params']['eps'] ** 2
         else:
             raise NotImplementedError(
                 'I don\'t have a tolerance for adaptivity for your problem. Please add one to the\
