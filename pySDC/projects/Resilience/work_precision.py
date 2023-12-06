@@ -561,6 +561,7 @@ def decorate_panel(ax, problem, work_key, precision_key, num_procs=1, title_only
         'run_Lorenz': 'Lorenz attractor',
         'run_Schroedinger': r'Schr\"odinger',
         'run_quench': 'Quench',
+        'run_AC': 'Allen-Cahn',
     }
     ax.set_title(titles.get(problem.__name__, ''))
 
