@@ -1305,7 +1305,7 @@ def all_problems(mode='compare_strategies', plotting=True, base_path='data', **k
         **kwargs,
     }
 
-    problems = [run_vdp, run_Lorenz, run_Schroedinger, run_quench]
+    problems = [run_vdp, run_quench, run_Schroedinger, run_AC]
 
     logger.log(26, f"Doing for all problems {mode}")
     for i in range(len(problems)):

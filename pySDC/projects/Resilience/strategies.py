@@ -888,7 +888,7 @@ class HotRodStrategy(Strategy):
         from pySDC.implementations.convergence_controller_classes.hotrod import HotRod
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingNonMPI
 
-        desc = super().get_custom_description(problem, num_procs)
+        base_params = super().get_custom_description(problem, num_procs)
         if problem.__name__ == "run_vdp":
             if num_procs == 4:
                 HotRod_tol = 1.800804e-04
@@ -943,12 +943,11 @@ class HotRodStrategy(Strategy):
                 },
             },
             'step_params': {'maxiter': maxiter},
+            'level_params': {},
         }
         if problem.__name__ == "run_AC":
-            custom_description['level_params']['dt'] = 0.8 * desc['problem_params']['eps'] ** 2 / 8.0
-        return desc
-
-        return merge_descriptions(desc, custom_description)
+            custom_description['level_params']['dt'] = 0.8 * base_params['problem_params']['eps'] ** 2 / 8.0
+        return merge_descriptions(base_params, custom_description)
 
     def get_custom_description_for_faults(self, problem, *args, **kwargs):
         desc = self.get_custom_description(problem, *args, **kwargs)
