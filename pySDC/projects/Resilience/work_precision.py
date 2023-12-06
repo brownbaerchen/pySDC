@@ -58,12 +58,8 @@ def get_forbidden_combinations(problem, strategy, **kwargs):
         problem (function): A problem to run
         strategy (Strategy): SDC strategy
     """
-    if problem.__name__ == 'run_quench':
-        if strategy.name in ['ERK']:
-            return True
-
-    if problem.__name__ == 'run_Schroedinger':
-        if strategy.name in ['ERK']:
+    if strategy.__name__ == 'ERK':
+        if problem.__name__ in ['run_quench', 'run_Schroedinger', 'run_AC']:
             return True
 
     return False
@@ -1500,10 +1496,10 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = True
+    record = False
     for mode in [
-        # 'compare_strategies',
-        # 'RK_comp',
+        'compare_strategies',
+        'RK_comp',
         'parallel_efficiency',
     ]:
         params = {
