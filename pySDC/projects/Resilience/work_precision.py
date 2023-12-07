@@ -1495,44 +1495,38 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    record = False
-    for mode in [
-        'compare_strategies',
-        'RK_comp',
-        'parallel_efficiency',
-    ]:
-        params = {
-            'mode': mode,
-            'runs': 5,
-            #'num_procs': 1,  # min(comm_world.size, 5),
-            'plotting': comm_world.rank == 0,
-        }
-        params_single = {
-            **params,
-            'problem': run_AC,
-        }
-        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    # record = False
+    # for mode in [
+    #     'compare_strategies',
+    #     'RK_comp',
+    #     'parallel_efficiency',
+    # ]:
+    #     params = {
+    #         'mode': mode,
+    #         'runs': 5,
+    #         'plotting': comm_world.rank == 0,
+    #     }
+    #     params_single = {
+    #         **params,
+    #         'problem': run_AC,
+    #     }
+    #     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
 
     all_params = {
-        'record': False,
-        'runs': 1,
-        'work_key': 'k_linear',
+        'record': True,
+        'runs': 5,
+        'work_key': 't',
         'precision_key': 'e_global_rel',
         'plotting': comm_world.rank == 0,
-        #'num_procs': 4,
     }
 
     for mode in [
-        # 'RK_comp',
-        # 'parallel_efficiency',
-        # 'compare_adaptivity',
-        # 'compare_strategies',
-        # 'preconditioners',
-        # 'diagonal_SDC',
+        'RK_comp',
+        'parallel_efficiency',
+        'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
 
     if comm_world.rank == 0:
-        # parallel_efficiency(**params_single, work_key='k_SDC', precision_key='e_global_rel')
         plt.show()
