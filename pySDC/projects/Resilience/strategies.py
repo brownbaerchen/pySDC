@@ -1332,7 +1332,7 @@ class ARKStrategy(AdaptivityStrategy):
             if key == 'work_newton' and op == sum:
                 return 0
             elif key == 'e_global_post_run' and op == max:
-                return 2.444605657738645e-07
+                return 3.1786601531890356e-08
 
         raise NotImplementedError('The reference value you are looking for is not implemented for this strategy!')
 
