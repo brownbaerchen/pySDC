@@ -90,15 +90,6 @@ class Strategy:
     def __str__(self):
         return self.name
 
-    @staticmethod
-    def get_hook_class(problem):
-        if problem.__name__ == "run_AC" and False:
-            from pySDC.projects.Resilience.AC import LogRadius as errorhook
-        else:
-            from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun as errorhook
-
-        return errorhook
-
     def get_controller_params(self, **kwargs):
         return {'all_to_done': False}
 
@@ -294,7 +285,7 @@ class Strategy:
             'run_Lorenz': 60,
             'run_Schroedinger': 150,
             'run_quench': 150,
-            'run_AC': 300,
+            'run_AC': 150,
         }
 
         custom_description['convergence_controllers'][StopAtMaxRuntime] = {

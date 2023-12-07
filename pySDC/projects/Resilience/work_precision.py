@@ -123,12 +123,11 @@ def single_run(
         **strategy.get_controller_params(),
     }
     problem_args = {} if problem_args is None else problem_args
-    error_hook = strategy.get_hook_class(problem)
 
     stats, controller, crash = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
-        hook_class=[LogData, LogWork, error_hook] + hooks,
+        hook_class=[LogData, LogWork, LogGlobalErrorPostRun] + hooks,
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm_time,

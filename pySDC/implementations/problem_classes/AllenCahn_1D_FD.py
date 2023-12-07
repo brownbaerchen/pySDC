@@ -70,10 +70,6 @@ class allencahn_front_fullyimplicit(ptype):
         newton_tol=1e-12,
         interval=(-0.5, 0.5),
         stop_at_nan=True,
-        order=2,
-        bc='dirichlet-zero',
-        lin_tol=1e-9,  # TODO: implement or remove
-        inexact_linear_ratio=1.0,  # TODO: remove
     ):
         # we assert that nvars looks very particular here.. this will be necessary for coarsening in space later on
         if (nvars + 1) % 2:
@@ -85,18 +81,12 @@ class allencahn_front_fullyimplicit(ptype):
             'nvars',
             'dw',
             'eps',
-            'interval',
-            'stop_at_nan',
-            'order',
-            'bc',
-            localVars=locals(),
-            readOnly=True,
-        )
-        self._makeAttributeAndRegister(
             'newton_maxiter',
             'newton_tol',
+            'interval',
+            'stop_at_nan',
             localVars=locals(),
-            readOnly=False,
+            readOnly=True,
         )
 
         # compute dx and get discretization matrix A
@@ -105,12 +95,12 @@ class allencahn_front_fullyimplicit(ptype):
 
         self.A, _ = problem_helper.get_finite_difference_matrix(
             derivative=2,
-            order=order,
+            order=2,
             stencil_type='center',
             dx=self.dx,
             size=self.nvars + 2,
             dim=1,
-            bc=bc,
+            bc='dirichlet-zero',
         )
         self.uext = self.dtype_u((self.init[0] + 2, self.init[1], self.init[2]), val=0.0)
 
@@ -234,7 +224,7 @@ class allencahn_front_fullyimplicit(ptype):
         self.work_counters['rhs']()
         return f
 
-    def u_exact(self, t, **kwargs):
+    def u_exact(self, t):
         r"""
         Routine to compute the exact solution at time :math:`t`.
 
@@ -248,8 +238,9 @@ class allencahn_front_fullyimplicit(ptype):
         me : dtype_u
             The exact solution.
         """
-        me = self.dtype_u(self.init, val=0.0)
+
         v = 3.0 * np.sqrt(2) * self.eps * self.dw
+        me = self.dtype_u(self.init, val=0.0)
         me[:] = 0.5 * (1 + np.tanh((self.xvalues - v * t) / (np.sqrt(2) * self.eps)))
         return me
 

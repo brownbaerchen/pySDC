@@ -1,7 +1,6 @@
 # script to run an Allen-Cahn problem
 from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit, allencahn_semiimplicit
 from pySDC.implementations.problem_classes.AllenCahn_2D_FFT import allencahn2d_imex
-from pySDC.implementations.problem_classes.AllenCahn_1D_FD import allencahn_front_fullyimplicit
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
 from pySDC.projects.Resilience.hook import hook_collection, LogData
@@ -25,6 +24,7 @@ def run_AC(
     t0=None,
     use_MPI=False,
     live_plot=False,
+    FFT=True,
     **kwargs,
 ):
     """
@@ -50,31 +50,46 @@ def run_AC(
         if 'imex' in problem_params.keys():
             imex = problem_params['imex']
             problem_params.pop('imex', None)
+        if 'FFT' in problem_params.keys():
+            FFT = problem_params['FFT']
+            problem_params.pop('FFT', None)
 
-    # initialize level parameters
+    # import problem and sweeper class
+    if FFT:
+        from pySDC.implementations.problem_classes.AllenCahn_2D_FFT import allencahn2d_imex as problem_class
+        from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient as sweeper_class
+    elif imex:
+        from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_semiimplicit as problem_class
+        from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient as sweeper_class
+    else:
+        from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit as problem_class
+        from pySDC.projects.Resilience.sweepers import generic_implicit_efficient as sweeper_class
+
     level_params = {}
     level_params['dt'] = 1e-4
     level_params['restol'] = 1e-8
 
-    # initialize sweeper parameters
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
+    # problem params
+    fd_params = {
+        'newton_tol': 1e-9,
+        'order': 2,
+    }
     problem_params = {
-        # 'newton_tol': 1e-9,
         'nvars': (128, 128),
         'init_type': 'circle',
-        # 'order': 2,
     }
+    if not FFT:
+        problem_params = {**problem_params, **fd_params}
 
-    # initialize step parameters
     step_params = {}
     step_params['maxiter'] = 5
 
-    # initialize controller parameters
     controller_params = {}
     controller_params['logger_level'] = 30
     controller_params['hook_class'] = (
@@ -85,12 +100,10 @@ def run_AC(
     if custom_controller_params is not None:
         controller_params = {**controller_params, **custom_controller_params}
 
-    # fill description dictionary for easy step instantiation
     description = {}
-    # description['problem_class'] = allencahn_semiimplicit if imex else allencahn_fullyimplicit
-    description['problem_class'] = allencahn2d_imex
+    description['problem_class'] = problem_class
     description['problem_params'] = problem_params
-    description['sweeper_class'] = imex_1st_order_efficient  #  if imex else generic_implicit_efficient
+    description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -98,10 +111,8 @@ def run_AC(
     if custom_description is not None:
         description = merge_descriptions(description, custom_description)
 
-    # set time parameters
     t0 = 0.0 if t0 is None else t0
 
-    # instantiate controller
     controller_args = {
         'controller_params': controller_params,
         'description': description,
@@ -119,13 +130,11 @@ def run_AC(
 
     uinit = P.u_exact(t0) if u0 is None else u0
 
-    # insert faults
     if fault_stuff is not None:
         from pySDC.projects.Resilience.fault_injection import prepare_controller_for_faults
 
         prepare_controller_for_faults(controller, fault_stuff)
 
-    # call main function to get things done...
     crash = False
     try:
         uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
@@ -151,39 +160,7 @@ def plot_solution(stats):  # pragma: no cover
     plt.show()
 
 
-def scipy_reference():
-    from pySDC.projects.Resilience.strategies import ERKStrategy
-    from time import perf_counter
-    import matplotlib.pyplot as plt
-
-    problem_params = ERKStrategy().get_base_parameters(run_AC)['problem_params']
-    description = ERKStrategy().get_custom_description(run_AC)
-    problem_params = {**problem_params, **description.get('problem_params', {})}
-
-    Tend = 1e-2
-    prob = allencahn_fullyimplicit(**problem_params)
-    u_exact = prob.u_exact(t=Tend)
-
-    errors = []
-    timings = []
-
-    tols = [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
-    for tol in tols:
-        t0 = perf_counter()
-
-        errors += [abs(prob.u_exact(t=Tend, rtol=tol, atol=tol, method='RK45') - u_exact) / abs(u_exact)]
-        timings += [perf_counter() - t0]
-        print(errors[-1], timings[-1])
-    plt.plot(timings, errors)
-    plt.xlabel('t / s')
-    plt.ylabel('error')
-    plt.yscale('log')
-    plt.title('Scipy RK45')
-    plt.show()
-    # _, controller, _ = run_AC(Tend=0.)
-
-
-class LivePlot(hooks):
+class LivePlot(hooks):  # pragma: no cover
     def __init__(self):
         super().__init__()
         self.fig, self.axs = plt.subplots(1, 3, figsize=(12, 4))
@@ -363,8 +340,7 @@ class LogRadius(hooks):
 
 
 if __name__ == '__main__':
-    scipy_reference()
-    # from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
+    from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep
 
-    # stats, _, _ = run_AC(imex=True, hook_class=LogLocalErrorPostStep)
-    # plot_solution(stats)
+    stats, _, _ = run_AC(imex=True, hook_class=LogLocalErrorPostStep)
+    plot_solution(stats)
