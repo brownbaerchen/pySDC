@@ -28,12 +28,20 @@ class SweeperMPI(sweeper):
         if 'comm' not in params.keys():
             params['comm'] = MPI.COMM_WORLD
             self.logger.debug('Using MPI.COMM_WORLD for the communicator because none was supplied in the params.')
+
+        if 'node' not in params.keys():
+            params['node'] = params['comm'].rank + 1
+            self.logger.debug('Rank {params["comm"]} defaulting to administer node {params["node"]}.')
+
         super().__init__(params)
 
-        if self.params.comm.size != self.coll.num_nodes:
-            raise NotImplementedError(
-                f'The communicator in the {type(self).__name__} sweeper needs to have one rank for each node as of now! That means we need {self.coll.num_nodes} nodes, but got {self.params.comm.size} processes.'
-            )
+        self.check_all_nodes_are_accounted_for()
+
+    def check_all_nodes_are_accounted_for(self):
+        nodes = self.comm.allgather(self.node)
+
+        for node in range(1, self.coll.num_nodes + 1):
+            assert node in nodes, f'No rank was assigned to handle collocation node {node}!'
 
     @property
     def comm(self):
@@ -42,6 +50,16 @@ class SweeperMPI(sweeper):
     @property
     def rank(self):
         return self.comm.rank
+
+    @property
+    def node(self):
+        """
+        Get the index of the node that this instance of the sweeper administers
+
+        Returns:
+            int: Administered node
+        """
+        return self.params.node
 
     def compute_end_point(self):
         """
@@ -61,7 +79,7 @@ class SweeperMPI(sweeper):
         if self.coll.right_is_node and not self.params.do_coll_update:
             # a copy is sufficient
             root = self.comm.Get_size() - 1
-            if self.comm.rank == root:
+            if self.node - 1 == root:
                 L.uend[:] = L.u[-1]
             self.comm.Bcast(L.uend, root=root)
         else:
@@ -92,10 +110,10 @@ class SweeperMPI(sweeper):
 
         # build QF(u)
         res = self.integrate(last_only=L.params.residual_type[:4] == 'last')
-        res += L.u[0] - L.u[self.rank + 1]
+        res += L.u[0] - L.u[self.node]
         # add tau if associated
-        if L.tau[self.rank] is not None:
-            res += L.tau[self.rank]
+        if L.tau[self.node - 1] is not None:
+            res += L.tau[self.node - 1]
         # use abs function from data type here
         res_norm = abs(res)
 
@@ -131,11 +149,11 @@ class SweeperMPI(sweeper):
         L.f[0] = P.eval_f(L.u[0], L.time)
 
         if self.params.initial_guess == 'spread':
-            L.u[self.rank + 1] = P.dtype_u(L.u[0])
-            L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+            L.u[self.node] = P.dtype_u(L.u[0])
+            L.f[self.node] = P.eval_f(L.u[self.node], L.time + L.dt * self.coll.nodes[self.node - 1])
         else:
-            L.u[self.rank + 1] = P.dtype_u(init=P.init, val=0.0)
-            L.f[self.rank + 1] = P.dtype_f(init=P.init, val=0.0)
+            L.u[self.node] = P.dtype_u(init=P.init, val=0.0)
+            L.f[self.node] = P.dtype_f(init=P.init, val=0.0)
 
         # indicate that this level is now ready for sweeps
         L.status.unlocked = True
@@ -166,10 +184,8 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
 
         me = P.dtype_u(P.init, val=0.0)
         for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
-            recvBuf = me if m == self.rank else None
-            self.comm.Reduce(
-                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1], recvBuf, root=m, op=MPI.SUM
-            )
+            recvBuf = me if m == self.node - 1 else None
+            self.comm.Reduce(L.dt * self.coll.Qmat[m + 1, self.node] * L.f[self.node], recvBuf, root=m, op=MPI.SUM)
 
         return me
 
@@ -195,25 +211,25 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
         # get QF(u^k)
         rhs = self.integrate()
 
-        rhs -= L.dt * self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1]
+        rhs -= L.dt * self.QI[self.node, self.node] * L.f[self.node]
 
         # add initial value
         rhs += L.u[0]
         # add tau if associated
-        if L.tau[self.rank] is not None:
-            rhs += L.tau[self.rank]
+        if L.tau[self.node - 1] is not None:
+            rhs += L.tau[self.node - 1]
 
         # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
 
         # implicit solve with prefactor stemming from the diagonal of Qd
-        L.u[self.rank + 1] = P.solve_system(
+        L.u[self.node] = P.solve_system(
             rhs,
-            L.dt * self.QI[self.rank + 1, self.rank + 1],
-            L.u[self.rank + 1],
-            L.time + L.dt * self.coll.nodes[self.rank],
+            L.dt * self.QI[self.node, self.node],
+            L.u[self.node],
+            L.time + L.dt * self.coll.nodes[self.node - 1],
         )
         # update function values
-        L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+        L.f[self.node] = P.eval_f(L.u[self.node], L.time + L.dt * self.coll.nodes[self.node - 1])
 
         # indicate presence of new values at this level
         L.status.updated = True
@@ -239,7 +255,7 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
             super().compute_end_point()
         else:
             L.uend = P.dtype_u(L.u[0])
-            self.comm.Allreduce(L.dt * self.coll.weights[self.rank] * L.f[self.rank + 1], L.uend, op=MPI.SUM)
+            self.comm.Allreduce(L.dt * self.coll.weights[self.node - 1] * L.f[self.node], L.uend, op=MPI.SUM)
             L.uend += L.u[0]
 
             # add up tau correction of the full interval (last entry)

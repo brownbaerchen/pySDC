@@ -26,9 +26,9 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
 
         me = P.dtype_u(P.init, val=0.0)
         for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
-            recvBuf = me if m == self.rank else None
+            recvBuf = me if m == self.node - 1 else None
             self.comm.Reduce(
-                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * (L.f[self.rank + 1].impl + L.f[self.rank + 1].expl),
+                L.dt * self.coll.Qmat[m + 1, self.node] * (L.f[self.node].impl + L.f[self.node].expl),
                 recvBuf,
                 root=m,
                 op=MPI.SUM,
@@ -59,23 +59,23 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         rhs = self.integrate()
 
         # subtract QdF(u^k)
-        rhs -= L.dt * (self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1].impl)
+        rhs -= L.dt * (self.QI[self.node, self.node] * L.f[self.node].impl)
 
         # add initial conditions
         rhs += L.u[0]
         # add tau if associated
-        if L.tau[self.rank] is not None:
-            rhs += L.tau[self.rank]
+        if L.tau[self.node - 1] is not None:
+            rhs += L.tau[self.node - 1]
 
         # implicit solve with prefactor stemming from the diagonal of Qd
-        L.u[self.rank + 1] = P.solve_system(
+        L.u[self.node] = P.solve_system(
             rhs,
-            L.dt * self.QI[self.rank + 1, self.rank + 1],
-            L.u[self.rank + 1],
-            L.time + L.dt * self.coll.nodes[self.rank],
+            L.dt * self.QI[self.node, self.node],
+            L.u[self.node],
+            L.time + L.dt * self.coll.nodes[self.node - 1],
         )
         # update function values
-        L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+        L.f[self.node] = P.eval_f(L.u[self.node], L.time + L.dt * self.coll.nodes[self.node - 1])
 
         # indicate presence of new values at this level
         L.status.updated = True
@@ -100,7 +100,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         else:
             L.uend = P.dtype_u(L.u[0])
             self.comm.Allreduce(
-                L.dt * self.coll.weights[self.rank] * (L.f[self.rank + 1].impl + L.f[self.rank + 1].expl),
+                L.dt * self.coll.weights[self.node - 1] * (L.f[self.node].impl + L.f[self.node].expl),
                 L.uend,
                 op=MPI.SUM,
             )
