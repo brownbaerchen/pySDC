@@ -43,9 +43,9 @@ def get_stats(problem, path='data/stats-jusuf', num_procs=1, strategy_type='SDC'
         FaultStats: Object to analyse resilience statistics from
     """
     if strategy_type == 'SDC':
-        strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy()]
+        strategies = [BaseStrategy(), AdaptivityStrategy(), IterateStrategy(), AdaptivityPolynomialError()]
         if JOURNAL not in ['JSC_beamer']:
-            strategies += [HotRodStrategy(), AdaptivityPolynomialError()]
+            strategies += [HotRodStrategy()]
     elif strategy_type == 'RK':
         strategies = [DIRKStrategy()]
         if problem.__name__ in ['run_Lorenz', 'run_vdp']:
@@ -127,6 +127,23 @@ def compare_strategies(stats_analyser, **kwargs):  # pragma: no cover
     fig, ax = plt.subplots(figsize=(TEXTWIDTH, 5 * cm))
     stats_analyser.compare_strategies(ax=ax)
     savefig(fig, 'compare_strategies', **kwargs)
+
+
+def plot_recovery_rate_Lorenz(**kwargs):  # pragma: no cover
+    """
+    Make a plot showing recovery rate for Lorenz attractor
+
+    Args:
+        stats_analyser (FaultStats): Fault stats object, which contains some stats
+
+    Returns:
+        None
+    """
+    my_setup_mpl()
+    fig, ax = plt.subplots(1, 1, figsize=(7 * cm, 5 * cm))
+    stats_analyser = get_stats(run_Lorenz)
+    plot_recovery_rate_recoverable_only(stats_analyser, fig, ax)
+    savefig(fig, 'recovery_rate_Lorenz', **kwargs)
 
 
 def plot_recovery_rate(stats_analyser, **kwargs):  # pragma: no cover
@@ -599,6 +616,7 @@ def make_plots_for_notes():  # pragma: no cover
 
 
 if __name__ == "__main__":
+    # plot_recovery_rate_Lorenz()
     # make_plots_for_notes()
     # make_plots_for_SIAM_CSE23()
     # make_plots_for_TIME_X_website()
