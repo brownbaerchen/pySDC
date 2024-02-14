@@ -1,7 +1,7 @@
 import numpy as np
 
 from pySDC.implementations.problem_classes.generic_ND_FD import GenericNDimFinDiff
-from pySDC.implementations.datatype_classes.mesh import imex_mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 class heatNd_unforced(GenericNDimFinDiff):
