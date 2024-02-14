@@ -5,7 +5,8 @@ from mpi4py_fft import PFFT
 
 from pySDC.core.Errors import ProblemError
 from pySDC.core.Problem import ptype
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, comp2_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh, comp2_mesh
 
 from mpi4py_fft import newDistArray
 

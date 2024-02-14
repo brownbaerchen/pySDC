@@ -2,7 +2,8 @@ import numpy as np
 
 from pySDC.core.Errors import ParameterError, ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 class battery_n_capacitors(ptype):

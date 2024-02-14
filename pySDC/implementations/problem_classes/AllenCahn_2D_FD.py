@@ -5,7 +5,8 @@ from scipy.sparse.linalg import cg
 from pySDC.core.Errors import ParameterError, ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.helpers import problem_helper
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, comp2_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh, comp2_mesh
 
 
 # http://www.personal.psu.edu/qud2/Res/Pre/dz09sisc.pdf
