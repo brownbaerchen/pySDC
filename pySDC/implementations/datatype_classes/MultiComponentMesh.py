@@ -24,13 +24,6 @@ class MultiComponentMesh(mesh):
 
         return results
 
-    # def __array_finalize__(self, obj):
-    #     if obj is None:
-    #         return
-    #     super().__array_finalize__(self, obj)
-    #     for comp, i in zip(self.components, range(len(self.components))):
-    #         self.__dict__[comp] = obj.__dict__.get(comp, None)
-
 
 class imex_mesh(MultiComponentMesh):
     components = ['impl', 'expl']

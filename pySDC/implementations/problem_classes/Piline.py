@@ -2,7 +2,8 @@ import numpy as np
 from scipy.integrate import solve_ivp
 
 from pySDC.core.Problem import ptype
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 # noinspection PyUnusedLocal

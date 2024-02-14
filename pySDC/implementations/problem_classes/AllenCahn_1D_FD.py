@@ -5,7 +5,8 @@ from scipy.sparse.linalg import spsolve
 from pySDC.core.Errors import ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.helpers import problem_helper
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, comp2_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh, comp2_mesh
 
 
 class allencahn_front_fullyimplicit(ptype):
@@ -762,7 +763,9 @@ class allencahn_periodic_semiimplicit(allencahn_periodic_fullyimplicit):
         f = self.dtype_f(self.init)
         f.impl[:] = self.A.dot(u)
         f.expl[:] = (
-            -2.0 / self.eps**2 * u * (1.0 - u) * (1.0 - 2.0 * u) - 6.0 * self.dw * u * (1.0 - u) + 0.0 / self.eps**2 * u
+            -2.0 / self.eps**2 * u * (1.0 - u) * (1.0 - 2.0 * u)
+            - 6.0 * self.dw * u * (1.0 - u)
+            + 0.0 / self.eps**2 * u
         )
         self.work_counters['rhs']()
         return f
@@ -847,7 +850,9 @@ class allencahn_periodic_multiimplicit(allencahn_periodic_fullyimplicit):
         f = self.dtype_f(self.init)
         f.comp1[:] = self.A.dot(u)
         f.comp2[:] = (
-            -2.0 / self.eps**2 * u * (1.0 - u) * (1.0 - 2.0 * u) - 6.0 * self.dw * u * (1.0 - u) + 0.0 / self.eps**2 * u
+            -2.0 / self.eps**2 * u * (1.0 - u) * (1.0 - 2.0 * u)
+            - 6.0 * self.dw * u * (1.0 - u)
+            + 0.0 / self.eps**2 * u
         )
         self.work_counters['rhs']()
         return f

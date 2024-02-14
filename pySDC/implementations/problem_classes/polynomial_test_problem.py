@@ -1,7 +1,8 @@
 import numpy as np
 
 from pySDC.core.Problem import ptype
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 class polynomial_testequation(ptype):
