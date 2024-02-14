@@ -1,5 +1,4 @@
 from pySDC.implementations.datatype_classes.mesh import mesh
-import numpy as np
 
 
 class MultiComponentMesh(mesh):
