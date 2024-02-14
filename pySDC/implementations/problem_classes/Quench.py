@@ -6,7 +6,8 @@ from scipy.linalg import inv
 from pySDC.core.Errors import ProblemError
 from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.helpers import problem_helper
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 # noinspection PyUnusedLocal
