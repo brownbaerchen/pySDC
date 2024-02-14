@@ -3,7 +3,8 @@ from scipy.special import factorial
 
 from pySDC.core.ConvergenceController import ConvergenceController, Status
 from pySDC.core.Errors import DataError
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 from pySDC.implementations.hooks.log_extrapolated_error_estimate import LogExtrapolationErrorEstimate
 
 

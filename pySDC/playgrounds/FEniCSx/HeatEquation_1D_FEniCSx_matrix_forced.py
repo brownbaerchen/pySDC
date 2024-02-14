@@ -11,7 +11,9 @@ import numpy as np
 
 from pySDC.core.Errors import ParameterError
 from pySDC.core.Problem import ptype
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
+
 
 # noinspection PyUnusedLocal
 class fenicsx_heat(ptype):
@@ -58,13 +60,18 @@ class fenicsx_heat(ptype):
         nx = len(tmp.x.array)
 
         # invoke super init, passing number of dofs, dtype_u and dtype_f
-        super(fenicsx_heat, self).__init__((nx, problem_params['comm'], np.dtype('float64')), dtype_u, dtype_f, problem_params)
+        super(fenicsx_heat, self).__init__(
+            (nx, problem_params['comm'], np.dtype('float64')), dtype_u, dtype_f, problem_params
+        )
 
         # Create boundary condition
         fdim = domain.topology.dim - 1
         boundary_facets = dfx.mesh.locate_entities_boundary(
-            domain, fdim, lambda x: np.full(x.shape[1], True, dtype=bool))
-        self.bc = dfx.fem.dirichletbc(PETSc.ScalarType(0), dfx.fem.locate_dofs_topological(self.V, fdim, boundary_facets), self.V)
+            domain, fdim, lambda x: np.full(x.shape[1], True, dtype=bool)
+        )
+        self.bc = dfx.fem.dirichletbc(
+            PETSc.ScalarType(0), dfx.fem.locate_dofs_topological(self.V, fdim, boundary_facets), self.V
+        )
 
         # Stiffness term (Laplace) and mass term
         u = ufl.TrialFunction(self.V)
@@ -82,7 +89,9 @@ class fenicsx_heat(ptype):
         # set forcing term
         self.g = dfx.fem.Function(self.V)
         t = self.params.t0
-        self.g.interpolate(lambda x: -np.sin(2 * np.pi*x[0]) * (np.sin(t) - 4 * self.params.nu*np.pi*np.pi*np.cos(t)))
+        self.g.interpolate(
+            lambda x: -np.sin(2 * np.pi * x[0]) * (np.sin(t) - 4 * self.params.nu * np.pi * np.pi * np.cos(t))
+        )
 
         self.tmp_u = dfx.fem.Function(self.V)
         self.tmp_f = dfx.fem.Function(self.V)
@@ -129,7 +138,6 @@ class fenicsx_heat(ptype):
         return u
 
     def apply_mass_matrix(self, u):
-
         self.convert_to_fenicsx_vector(input=u, output=self.tmp_u)
         self.M.mult(self.tmp_u.vector, self.tmp_f.vector)
         uM = self.dtype_u(self.init)
@@ -154,12 +162,13 @@ class fenicsx_heat(ptype):
         self.convert_to_fenicsx_vector(input=u, output=self.tmp_u)
         self.K.mult(self.tmp_u.vector, b.vector)
 
-
         self.solver.setOperators(self.M)
         self.solver.solve(b.vector, self.tmp_f.vector)
         self.convert_from_fenicsx_vector(input=self.tmp_f, output=f.impl)
 
-        self.g.interpolate(lambda x: -np.sin(2 * np.pi * x[0]) * (np.sin(t) - self.params.nu * np.pi * np.pi * 4 * np.cos(t)))
+        self.g.interpolate(
+            lambda x: -np.sin(2 * np.pi * x[0]) * (np.sin(t) - self.params.nu * np.pi * np.pi * 4 * np.cos(t))
+        )
         # self.M.mult(self.g.vector, self.tmp_f.vector)
         # self.convert_from_fenicsx_vector(input=self.tmp_f, output=f.expl)
         self.convert_from_fenicsx_vector(input=self.g, output=f.expl)
@@ -186,7 +195,7 @@ class fenicsx_heat(ptype):
         return me
 
 
-#noinspection PyUnusedLocal
+# noinspection PyUnusedLocal
 class fenicsx_heat_mass(fenicsx_heat):
     """
     Example implementing the forced 1D heat equation with Dirichlet-0 BC in [0,1], expects mass matrix sweeper
@@ -238,7 +247,9 @@ class fenicsx_heat_mass(fenicsx_heat):
         self.K.mult(self.tmp_u.vector, self.tmp_f.vector)
         self.convert_from_fenicsx_vector(input=self.tmp_f, output=f.impl)
 
-        self.g.interpolate(lambda x: -np.sin(2 * np.pi * x[0]) * (np.sin(t) - self.params.nu * np.pi * np.pi * 4 * np.cos(t)))
+        self.g.interpolate(
+            lambda x: -np.sin(2 * np.pi * x[0]) * (np.sin(t) - self.params.nu * np.pi * np.pi * 4 * np.cos(t))
+        )
         self.M.mult(self.g.vector, self.tmp_f.vector)
         self.convert_from_fenicsx_vector(input=self.tmp_f, output=f.expl)
 

@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_fullyimplicit, allencahn_semiimplicit
 
 
@@ -12,7 +13,6 @@ from pySDC.implementations.problem_classes.AllenCahn_2D_FD import allencahn_full
 
 
 def setup_problem():
-
     problem_params = dict()
     problem_params['nu'] = 2
     problem_params['nvars'] = (128, 128)
@@ -44,7 +44,6 @@ def run_implicit_Euler(t0, dt, Tend):
     startt = time.perf_counter()
     t = t0
     for n in range(nsteps):
-
         u_new = problem.solve_system(rhs=u, factor=dt, u0=u, t=t)
 
         u = u_new
@@ -86,7 +85,6 @@ def run_imex_Euler(t0, dt, Tend):
     startt = time.perf_counter()
     t = t0
     for n in range(nsteps):
-
         f = problem.eval_f(u, t)
         rhs = u + dt * f.expl
         u_new = problem.solve_system(rhs=rhs, factor=dt, u0=u, t=t)
@@ -130,7 +128,6 @@ def run_CrankNicholson(t0, dt, Tend):
     startt = time.perf_counter()
     t = t0
     for n in range(nsteps):
-
         rhs = u + dt / 2 * problem.eval_f(u, t)
         u_new = problem.solve_system(rhs=rhs, factor=dt / 2, u0=u, t=t)
 
@@ -156,7 +153,6 @@ def run_CrankNicholson(t0, dt, Tend):
 
 
 def compute_radius(u, dx, t, init_radius):
-
     c = np.count_nonzero(u >= 0.0)
     radius = np.sqrt(c / np.pi) * dx
 
@@ -166,7 +162,6 @@ def compute_radius(u, dx, t, init_radius):
 
 
 def plot_radius(xcoords, exact_radius, radii):
-
     fig, ax = plt.subplots()
     plt.plot(xcoords, exact_radius, color='k', linestyle='--', linewidth=1, label='exact')
 
@@ -210,7 +205,6 @@ def main_radius(cwd=''):
 
 
 def main_error(cwd=''):
-
     t0 = 0
     Tend = 0.032
 

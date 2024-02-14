@@ -1,6 +1,7 @@
 from pySDC.core.Errors import TransferError
 from pySDC.core.SpaceTransfer import space_transfer
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 class mesh_to_mesh(space_transfer):
