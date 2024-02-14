@@ -2,7 +2,8 @@ import numpy as np
 
 from pySDC.core.Errors import ParameterError, ProblemError
 from pySDC.core.Problem import ptype
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.MultiComponentMesh import imex_mesh
 
 
 # noinspection PyUnusedLocal
@@ -69,7 +70,7 @@ class monodomain2d_imex(ptype):
         ky[:] = 2 * np.pi / self.params.L * np.arange(0, self.init[0][1] // 2 + 1)
 
         xv, yv = np.meshgrid(kx, ky, indexing='ij')
-        self.lap = -xv**2 - yv**2
+        self.lap = -(xv**2) - yv**2
 
     def eval_f(self, u, t):
         """
@@ -87,7 +88,9 @@ class monodomain2d_imex(ptype):
         v = u.flatten()
         tmp = self.params.kappa * self.lap * np.fft.rfft2(u)
         f.impl[:] = np.fft.irfft2(tmp)
-        f.expl[:] = -(self.params.a * (v - self.params.rest) * (v - self.params.thresh) * (v - self.params.depol)).reshape(self.params.nvars)
+        f.expl[:] = -(
+            self.params.a * (v - self.params.rest) * (v - self.params.thresh) * (v - self.params.depol)
+        ).reshape(self.params.nvars)
         return f
 
     def solve_system(self, rhs, factor, u0, t):
@@ -129,11 +132,15 @@ class monodomain2d_imex(ptype):
         if t == 0:
             if self.params.init_type == 'tanh':
                 xv, yv = np.meshgrid(self.xvalues, self.xvalues, indexing='ij')
-                me[:, :] = 0.5 * (1 + np.tanh((self.params.radius - np.sqrt(xv**2 + yv**2)) / (np.sqrt(2) * self.params.eps)))
+                me[:, :] = 0.5 * (
+                    1 + np.tanh((self.params.radius - np.sqrt(xv**2 + yv**2)) / (np.sqrt(2) * self.params.eps))
+                )
                 me[:, :] = me[:, :] * self.params.depol + (1 - me[:, :]) * self.params.rest
             elif self.params.init_type == 'plateau':
                 xv, yv = np.meshgrid(self.xvalues, self.xvalues, indexing='ij')
-                me[:, :] = np.where(np.sqrt(xv**2 + yv**2) < self.params.radius * self.params.L, self.params.depol, self.params.rest)
+                me[:, :] = np.where(
+                    np.sqrt(xv**2 + yv**2) < self.params.radius * self.params.L, self.params.depol, self.params.rest
+                )
                 # me[:, :] = me[:, :] * self.params.depol + (1 - me[:, :]) * self.params.rest
             else:
                 raise NotImplementedError('type of initial value not implemented, got %s' % self.params.init_type)
