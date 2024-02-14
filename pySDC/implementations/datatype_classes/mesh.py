@@ -149,7 +149,7 @@ class mesh(np.ndarray):
         return self
 
 
-class imex_mesh(object):
+class imex_mesh_old(object):
     """
     RHS data type for meshes with implicit and explicit components
 
@@ -187,7 +187,18 @@ class imex_mesh(object):
             raise DataError('something went wrong during %s initialization' % type(self))
 
 
-class comp2_mesh(object):
+from pySDC.implementations.datatype_classes.MultiComponentMesh import MultiComponentMesh
+
+
+class imex_mesh(MultiComponentMesh):
+    components = ['impl', 'expl']
+
+
+class comp2_mesh(MultiComponentMesh):
+    components = ['comp1', 'comp2']
+
+
+class comp2_mesh_old(object):
     """
     RHS data type for meshes with 2 components
 
