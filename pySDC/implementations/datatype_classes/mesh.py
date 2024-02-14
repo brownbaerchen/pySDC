@@ -80,7 +80,7 @@ class mesh(np.ndarray):
             else:
                 args.append(input_)
 
-        results = super(mesh, self).__array_ufunc__(ufunc, method, *args, **kwargs).view(mesh)
+        results = super().__array_ufunc__(ufunc, method, *args, **kwargs).view(type(self))
         if type(self) == type(results):
             results._comm = comm
         return results
