@@ -6,7 +6,8 @@ class MultiComponentMesh(mesh):
 
     def __new__(cls, init, *args, **kwargs):
         if isinstance(init, tuple):
-            obj = super().__new__(cls, ((len(cls.components), *init[0]), *init[1:]), *args, **kwargs)
+            shape = (init[0],) if type(init[0]) is int else init[0]
+            obj = super().__new__(cls, ((len(cls.components), *shape), *init[1:]), *args, **kwargs)
         else:
             obj = super().__new__(cls, init, *args, **kwargs)
 
