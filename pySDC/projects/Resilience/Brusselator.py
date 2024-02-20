@@ -1,5 +1,5 @@
 # script to run a Brusselator problem
-from pySDC.implementations.problem_classes.Brusselator import Brusselator
+from pySDC.implementations.problem_classes.Brusselator import Brusselator, BrusselatorFD
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.core.Hooks import hooks
 from pySDC.projects.Resilience.hook import hook_collection, LogData
@@ -45,7 +45,7 @@ def run_Brusselator(
     """
 
     level_params = {}
-    level_params['dt'] = 1e-1
+    level_params['dt'] = 1e-2
     level_params['restol'] = 1e-8
 
     sweeper_params = {}
@@ -59,7 +59,7 @@ def run_Brusselator(
     }
 
     step_params = {}
-    step_params['maxiter'] = 9
+    step_params['maxiter'] = 99
 
     controller_params = {}
     controller_params['logger_level'] = 30
@@ -70,7 +70,7 @@ def run_Brusselator(
         controller_params = {**controller_params, **custom_controller_params}
 
     description = {}
-    description['problem_class'] = Brusselator
+    description['problem_class'] = BrusselatorFD
     description['problem_params'] = problem_params
     description['sweeper_class'] = imex_1st_order_efficient
     description['sweeper_params'] = sweeper_params
@@ -79,6 +79,14 @@ def run_Brusselator(
 
     if custom_description is not None:
         description = merge_descriptions(description, custom_description)
+
+    imex = description['problem_params'].get('imex', None)
+    if imex is not None:
+        if imex:
+            from pySDC.projects.Resilience.sweepers import imex_1st_order_efficient as sweeper_class
+        else:
+            from pySDC.projects.Resilience.sweepers import generic_implicit_efficient as sweeper_class
+        description['sweeper_class'] = sweeper_class
 
     t0 = 0.0 if t0 is None else t0
 
@@ -127,6 +135,8 @@ def live_plot():
     description['problem_params'] = {
         'alpha': 1e-1,
         'nvars': (128,) * 2,
+        'imex': False,
+        'solver_type': 'cg',
     }
 
     controller_params = {'logger_level': 15}
