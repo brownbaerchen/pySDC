@@ -12,6 +12,7 @@ from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
+from pySDC.projects.Resilience.Brusselator import run_Brusselator
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -76,6 +77,8 @@ def single_run(
     hooks=None,
     Tend=None,
     num_procs_sweeper=1,
+    error_type='Hook',
+    tmp_file=None,
 ):
     """
     Make a single run of a particular problem with a certain strategy.
@@ -98,6 +101,9 @@ def single_run(
     from pySDC.projects.Resilience.hook import LogData
 
     hooks = hooks if hooks else []
+    hooks += [LogData, LogWork]
+    if error_type == 'Hook':
+        hooks += [LogGlobalErrorPostRun]
 
     t_last = perf_counter()
 
@@ -127,7 +133,7 @@ def single_run(
     stats, controller, crash = problem(
         custom_description=description,
         Tend=strategy.get_Tend(problem, num_procs) if Tend is None else Tend,
-        hook_class=[LogData, LogWork, LogGlobalErrorPostRun] + hooks,
+        hook_class=hooks,
         custom_controller_params=controller_params,
         use_MPI=True,
         comm=comm_time,
@@ -151,6 +157,25 @@ def single_run(
             data[key] += [np.nan]
         else:
             data[key] += [mapping[1]([you[1] for you in me])]
+
+    if error_type == 'reference' and tmp_file is not None:
+        try:
+            u_prev = pickle.load(file=open(tmp_file.name, 'rb'))
+        except EOFError:
+            u_prev = None
+
+        u = get_sorted(stats, type='u', comm=comm_time, recomputed=False)[-1]
+        pickle.dump(u, file=open(tmp_file.name, 'wb'))
+
+        if u_prev:
+            print(u_prev[0], u[0])
+            print(u_prev[1], u[1])
+            breakpoint()
+            error = abs(u_prev[1] - u[1])
+            error_rel = error / abs(u)
+            print('WOOOOOOOOOOOOOOOOOOOW', error)
+            data['e_global'] += [error]
+            data['e_global_rel'] += [error_rel]
 
     t_now = perf_counter()
     logger.debug(f'Recorded all data after {t_now - t_last:.2e} s')
@@ -283,6 +308,18 @@ def record_work_precision(
             param_range = [1e-5, 1e-6, 1e-7, 1e-8, 1e-9]
         elif param == 'dt':
             param_range = [1.25, 2.5, 5.0, 10.0, 20.0][::-1]
+    elif problem.__name__ == 'run_Brusselator':
+        if param == 'dt':
+            param_range = [0.02, 0.01][::-1]
+
+    if problem.__name__ == 'run_Brusselator':
+        error_type = 'reference'
+        import tempfile
+
+        tmp_file = tempfile.NamedTemporaryFile()
+    else:
+        error_type = 'Hook'
+        tmp_file = None
 
     # run multiple times with different parameters
     for i in range(len(param_range)):
@@ -312,6 +349,8 @@ def record_work_precision(
                 hooks=hooks,
                 Tend=Tend,
                 num_procs_sweeper=num_procs_sweeper,
+                error_type=error_type,
+                tmp_file=tmp_file,
             )
 
             comm_world.Barrier()
@@ -329,6 +368,12 @@ def record_work_precision(
                 )
 
     if comm_world.rank == 0:
+        if error_type == 'reference' and tmp_file is not None and False:
+            print(data)
+            key = data.keys()[-1]
+            data['e_global'] += [np.nan]
+            data['e_global_rel'] += [np.nan]
+
         import socket
         import time
 
@@ -431,6 +476,10 @@ def plot_work_precision(
     )
 
     work, precision = extract_data(data, work_key, precision_key)
+    if work_key[0] == 'k':
+        work = [me / (num_procs * num_procs_sweeper) for me in work]
+    if precision_key[0] == 'k':
+        precision = [me / (num_procs * num_procs_sweeper) for me in precision]
     keys = [key for key in data.keys() if key not in ['meta']]
 
     for key in [work_key, precision_key]:
@@ -807,6 +856,96 @@ def get_configs(mode, problem):
                         # **{'color': 'grey' if parallel else None},
                     },
                 }
+
+    elif mode == 'dt_k_adaptivity_parallel':
+        """
+        Compare parallel runs of the step size adaptive SDC
+        """
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityPolynomialError
+
+        if problem.__name__ in ['run_Schroedinger', 'run_AC']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        desc_poly = {}
+        desc_poly['sweeper_class'] = parallel_sweeper
+
+        ls = {
+            1: '--',
+            2: '--',
+            3: '-',
+            4: '-',
+            5: ':',
+            12: ':',
+        }
+        from matplotlib.colors import TABLEAU_COLORS
+
+        color = {
+            1: list(TABLEAU_COLORS.values())[1],
+            3: list(TABLEAU_COLORS.values())[0],
+        }
+
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 3,
+            'plotting_params': {'label': r'$\Delta t$-$k$-adaptivity $N$=3', 'color': color[3], 'ls': ls[3]},
+        }
+        configurations[1] = {
+            'strategies': [AdaptivityPolynomialError(useMPI=True)],
+            'num_procs': 1,
+            'num_procs_sweeper': 1,
+            'plotting_params': {'label': r'$\Delta t$-$k$-adaptivity $N$=1', 'color': color[1], 'ls': ls[1]},
+        }
+
+    elif mode == 'dt_adaptivity_parallel':
+        """
+        Compare parallel runs of the step size adaptive SDC
+        """
+        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, AdaptivityPolynomialError
+
+        if problem.__name__ in ['run_Schroedinger', 'run_AC']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 3, 'QI': 'IE', 'QE': 'EE'}
+        desc['step_params'] = {'maxiter': 5}
+
+        ls = {
+            1: '--',
+            2: '--',
+            3: '-',
+            4: '-',
+            5: ':',
+            12: ':',
+        }
+        from matplotlib.colors import TABLEAU_COLORS
+
+        color = {
+            1: list(TABLEAU_COLORS.values())[1],
+            4: list(TABLEAU_COLORS.values())[0],
+        }
+
+        for num_procs in [4, 1]:
+            plotting_params = {
+                'ls': ls[num_procs],
+                'label': fr'$\Delta t$-adaptivity $N$={num_procs}',
+                'color': color[num_procs],
+            }
+            configurations[num_procs] = {
+                'strategies': [AdaptivityStrategy(useMPI=True)],
+                'custom_description': desc.copy(),
+                'num_procs': num_procs,
+                'plotting_params': plotting_params.copy(),
+            }
 
     elif mode == 'parallel_efficiency':
         """
@@ -1495,41 +1634,93 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
     save_fig(fig, 'parallel_efficiency', 'nprocs', 'speedup')
 
 
+def comparison_figure(mode, record=False):
+
+    fig, axs = get_fig(4, 1, figsize=(6, 2.5), sharey=True)
+
+    shared_params = {
+        'precision_key': 'e_global_rel',
+        'num_procs': 1,
+        'runs': 5,
+        'comm_world': MPI.COMM_WORLD,
+        'record': record,
+        'plotting': True,
+    }
+
+    work_keys = ['k_rhs', 'k_Newton', 'k_linear', 't']
+    problem = run_quench
+    # mode = 'RK_comp'
+    # mode = 'dt_adaptivity_parallel'
+    # mode = 'dt_k_adaptivity_parallel'
+
+    logger.log(26, f"Doing for all problems {mode}")
+    for i in range(len(work_keys)):
+        execute_configurations(
+            **shared_params,
+            work_key=work_keys[i],
+            problem=problem,
+            ax=axs.flatten()[i],
+            decorate=True,
+            configurations=get_configs(mode, problem),
+            mode=mode,
+        )
+    for ax in axs[1:]:
+        ax.set_ylabel('')
+    for ax in [axs[0], axs[2]]:
+        ax.set_title('')
+    for ax in axs[:-1]:
+        ax.set_xlabel(ax.get_xlabel() + r' / $N$')
+
+    save_fig(
+        fig=fig,
+        name=mode,
+        work_key='lala',
+        precision_key=shared_params['precision_key'],
+        legend=True,
+        base_path='data',
+        ncols=3 if mode in ['parallel_efficiency'] else None,
+    )
+    return None
+
+
 if __name__ == "__main__":
-    comm_world = MPI.COMM_WORLD
+    for mode in ['RK_comp', 'dt_adaptivity_parallel', 'dt_k_adaptivity_parallel']:
+        comparison_figure(mode=mode, record=False)
+    plt.show()
+    # comm_world = MPI.COMM_WORLD
 
     # record = False
     # for mode in [
-    #     'compare_strategies',
+    #     # 'compare_strategies',
     #     'RK_comp',
-    #     'parallel_efficiency',
+    #     # 'parallel_efficiency',
     # ]:
     #     params = {
     #         'mode': mode,
-    #         'runs': 5,
+    #         'runs': 1,
     #         'plotting': comm_world.rank == 0,
     #     }
     #     params_single = {
     #         **params,
-    #         'problem': run_AC,
+    #         'problem': run_quench,
     #     }
-    #     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    #     single_problem(**params_single, work_key='e_global_rel', precision_key='e_global_rel', record=record)
 
-    all_params = {
-        'record': True,
-        'runs': 5,
-        'work_key': 't',
-        'precision_key': 'e_global_rel',
-        'plotting': comm_world.rank == 0,
-    }
+    # all_params = {
+    #     'record': False,
+    #     'runs': 5,
+    #     'work_key': 't',
+    #     'precision_key': 'e_global_rel',
+    #     'plotting': comm_world.rank == 0,
+    # }
 
-    for mode in [
-        'RK_comp',
-        'parallel_efficiency',
-        'compare_strategies',
-    ]:
-        all_problems(**all_params, mode=mode)
-        comm_world.Barrier()
+    # for mode in [
+    #     # 'RK_comp',
+    #     # 'parallel_efficiency',
+    #     # 'compare_strategies',
+    # ]:
+    #     all_problems(**all_params, mode=mode)
+    #     comm_world.Barrier()
 
-    if comm_world.rank == 0:
-        plt.show()
+    # if comm_world.rank == 0:
+    #     plt.show()
