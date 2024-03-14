@@ -12,7 +12,6 @@ from pySDC.projects.Resilience.vdp import run_vdp
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
-from pySDC.projects.Resilience.Brusselator import run_Brusselator
 
 from pySDC.helpers.stats_helper import get_sorted, filter_stats
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
@@ -1684,8 +1683,8 @@ def comparison_figure(mode, record=False):
 
 
 if __name__ == "__main__":
-    for mode in ['RK_comp', 'dt_adaptivity_parallel', 'dt_k_adaptivity_parallel']:
-        comparison_figure(mode=mode, record=False)
+    for mode in ['dt_k_adaptivity_parallel']:
+        comparison_figure(mode=mode, record=True)
     plt.show()
     # comm_world = MPI.COMM_WORLD
 
