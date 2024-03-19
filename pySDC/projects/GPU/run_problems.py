@@ -4,6 +4,7 @@ from pySDC.helpers.NCCL_communicator import NCCLComm
 from pySDC.helpers.stats_helper import get_sorted
 import pickle
 
+
 def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None):
     comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
     _comm = comm_world if _comm is None else _comm
@@ -12,27 +13,48 @@ def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None
     if len(n_procs_list) > 0:
         color = _tot_rank + _rank // n_procs_list[0]
         new_comm = comm_world.Split(color)
-        return [new_comm] + get_comms(n_procs_list[1:], comm_world, _comm=new_comm, _tot_rank=_tot_rank + _comm.size * new_comm.rank, _rank=_comm.rank // new_comm.size)
+        return [new_comm] + get_comms(
+            n_procs_list[1:],
+            comm_world,
+            _comm=new_comm,
+            _tot_rank=_tot_rank + _comm.size * new_comm.rank,
+            _rank=_comm.rank // new_comm.size,
+        )
     else:
         return []
 
- 
-class RunProblem:
-    default_Tend = 0.
 
-    def __init__(self, custom_description=None, custom_controller_params=None, num_procs=None, comm_world=None, imex=False, useGPU=True):
-        num_procs = [1,] * 3 if num_procs is None else num_procs
+class RunProblem:
+    default_Tend = 0.0
+
+    def __init__(
+        self,
+        custom_description=None,
+        custom_controller_params=None,
+        num_procs=None,
+        comm_world=None,
+        imex=False,
+        useGPU=True,
+    ):
+        num_procs = (
+            [
+                1,
+            ]
+            * 3
+            if num_procs is None
+            else num_procs
+        )
         assert len(num_procs) == 3
 
         custom_description = {} if custom_description is None else custom_description
         custom_controller_params = {} if custom_controller_params is None else custom_controller_params
 
-        self.useGPU=useGPU
+        self.useGPU = useGPU
         self.num_procs = num_procs
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(num_procs, comm_world=comm_world)
         self.get_description(custom_description, imex)
         self.get_controller_params(custom_controller_params)
-        
+
     def get_default_description(self):
         description = {
             'step_params': {},
@@ -41,7 +63,7 @@ class RunProblem:
             'sweeper_class': None,
             'problem_params': {},
             'problem_class': None,
-            'convergence_controllers': {}
+            'convergence_controllers': {},
         }
         description['problem_params']['useGPU'] = self.useGPU
         return description
@@ -70,11 +92,8 @@ class RunProblem:
 
     def get_default_controller_params(self):
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
-        controller_params = {
-            'logger_level': 30,
-            'mssdc_jac': False,
-            'hook_class': [LogGlobalErrorPostRun]
-        }
+
+        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):
@@ -88,7 +107,9 @@ class RunProblem:
         from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
 
         Tend = self.default_Tend if Tend is None else Tend
-        controller = controller_MPI(description=self.description, controller_params=self.controller_params, comm=self.comm_steps)
+        controller = controller_MPI(
+            description=self.description, controller_params=self.controller_params, comm=self.comm_steps
+        )
         prob = controller.S.levels[0].prob
         u_init = prob.u_exact(0)
         u_end, stats = controller.run(u0=u_init, t0=0, Tend=Tend)
@@ -110,6 +131,7 @@ class RunProblem:
         if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0:
             with open(self.get_path(name=name), 'wb') as file:
                 pickle.dump({'errors': errors, 'times': times}, file)
+            print(f'Stored file {self.get_path(name=name)!r}')
 
     def get_path(self, name=''):
         base_path = '/p/project/ccstma/baumann7/pySDC/pySDC/projects/GPU/out'
@@ -117,6 +139,7 @@ class RunProblem:
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
         return f'{base_path}/{prob}_{procs}_{gpu}{name}.pickle'
+
 
 class RunAllenCahn(RunProblem):
     default_Tend = 1e-2
@@ -126,19 +149,20 @@ class RunAllenCahn(RunProblem):
 
     def get_default_description(self):
         from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex
+
         description = super().get_default_description()
 
         description['step_params']['maxiter'] = 5
 
         description['level_params']['dt'] = 1e-4
         description['level_params']['restol'] = 1e-8
-                
+
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         description['sweeper_params']['num_nodes'] = 3
         description['sweeper_params']['QI'] = 'MIN-SR-S'
         description['sweeper_params']['QE'] = 'PIC'
 
-        description['problem_params']['nvars'] = (2**10, ) * 2
+        description['problem_params']['nvars'] = (2**10,) * 2
         description['problem_params']['init_type'] = 'circle_rand'
         description['problem_params']['L'] = 16
         description['problem_params']['spectral'] = False
@@ -148,27 +172,29 @@ class RunAllenCahn(RunProblem):
 
         return description
 
+
 class RunSchroedinger(RunProblem):
-    default_Tend = 1.
+    default_Tend = 1.0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
 
     def get_default_description(self):
         from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import nonlinearschroedinger_imex
+
         description = super().get_default_description()
 
         description['step_params']['maxiter'] = 9
 
         description['level_params']['dt'] = 1e-2
         description['level_params']['restol'] = 1e-8
-                
+
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         description['sweeper_params']['num_nodes'] = 4
         description['sweeper_params']['QI'] = 'MIN-SR-S'
         description['sweeper_params']['QE'] = 'PIC'
 
-        description['problem_params']['nvars'] = (2**13, ) * 2
+        description['problem_params']['nvars'] = (2**13,) * 2
         description['problem_params']['spectral'] = False
         description['problem_params']['comm'] = self.comm_space
 
@@ -176,11 +202,13 @@ class RunSchroedinger(RunProblem):
 
         return description
 
+
 def cast_to_bool(arg):
     if arg == 'False':
         return False
     else:
         return True
+
 
 def parse_args():
     import sys
@@ -191,29 +219,34 @@ def parse_args():
         'Nspace': int,
         'num_runs': int,
         'useGPU': cast_to_bool,
+        'space_resolution': int,
     }
 
     args = {}
     for me in sys.argv[1:]:
         for key, cast in allowed_args.items():
             if key in me:
-                args[key] = cast(me[len(key)+1:])
+                args[key] = cast(me[len(key) + 1 :])
 
     return args
 
 
-def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5):
-    resolution = (2**13, ) * 2
-    description = {'problem_params': {'nvars': resolution}}
+def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5, space_resolution=2**13):
+    description = {'problem_params': {'nvars': (space_resolution,) * 2}}
     prob = problem(num_procs=num_procs, useGPU=useGPU, custom_description=description)
-    prob.record_timing(num_runs=num_runs, name='single_gpu')
-
+    prob.record_timing(num_runs=num_runs, name=f'single_gpu_{space_resolution:d}')
 
 
 if __name__ == '__main__':
-    problem=RunSchroedinger
+    problem = RunSchroedinger
     args = parse_args()
 
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
 
-    single_gpu_experiments(problem, num_procs=num_procs, num_runs=args.get('num_runs', 5), useGPU=args.get('useGPU', True))
+    single_gpu_experiments(
+        problem,
+        num_procs=num_procs,
+        num_runs=args.get('num_runs', 5),
+        useGPU=args.get('useGPU', True),
+        space_resolution=args.get('space_resolution', 2**13),
+    )
