@@ -1,8 +1,9 @@
+import numpy as np
 from mpi4py import MPI
 from pySDC.projects.Resilience.strategies import merge_descriptions
-from pySDC.helpers.NCCL_communicator import NCCLComm
 from pySDC.helpers.stats_helper import get_sorted
 import pickle
+import matplotlib.pyplot as plt
 
 
 def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None):
@@ -81,6 +82,8 @@ class RunProblem:
         self.description['sweeper_class'] = sweeper_class
         if useMPI:
             if self.useGPU:
+                from pySDC.helpers.NCCL_communicator import NCCLComm
+
                 self.description['sweeper_params']['comm'] = NCCLComm(self.comm_sweep)
             else:
                 self.description['sweeper_params']['comm'] = self.comm_sweep
@@ -134,11 +137,27 @@ class RunProblem:
             print(f'Stored file {self.get_path(name=name)!r}')
 
     def get_path(self, name=''):
-        base_path = '/p/project/ccstma/baumann7/pySDC/pySDC/projects/GPU/out'
+        import socket
+
+        if socket.gethostname() == 'thomas-work':
+            base_path = '/Users/thomasbaumann/Documents/pySDC/pySDC/projects/GPU/out'
+        else:
+            base_path = '/p/project/ccstma/baumann7/pySDC/pySDC/projects/GPU/out'
         procs = f'{self.num_procs[0]}x{self.num_procs[1]}x{self.num_procs[2]}'
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
         return f'{base_path}/{prob}_{procs}_{gpu}{name}.pickle'
+
+    def get_data(self, name=''):
+        with open(self.get_path(name=name), 'rb') as file:
+            data = pickle.load(file)
+
+        results = {}
+        for key, values in data.items():
+            results[key] = np.median(values)
+            if np.std(values) / np.median(values) > 1e-2:
+                print(f'Warning! Standard deviation too large in {key!r}!')
+        return results
 
 
 class RunAllenCahn(RunProblem):
@@ -237,16 +256,55 @@ def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5, space_re
     prob.record_timing(num_runs=num_runs, name=f'single_gpu_{space_resolution:d}')
 
 
+def plot_single_gpu_experiments(problem):
+    useGPU = True
+    num_procs = [1, 1, 4]
+
+    procs_parallel_sweeper = [[1, 4, 1], [1, 4, 4], [1, 4, 8], [1, 4, 16], [1, 4, 32], [1, 4, 64]]
+    procs_serial_sweeper = [[1, 1, 4], [1, 1, 16], [1, 1, 32], [1, 1, 64], [1, 1, 128], [1, 1, 256]]
+
+    procs_parallel_sweeper_CPU = [[1, 4, 384]]
+    procs_serial_sweeper_CPU = [[1, 1, 384], [1, 1, 1536]]
+
+    def get_multiple_data(num_procs_list, useGPU):
+        times = {}
+        for num_procs in num_procs_list:
+            prob = problem(num_procs=num_procs, useGPU=useGPU)
+            data = prob.get_data('single_gpu')
+            fac = 4 if useGPU else 96
+            times[np.prod(num_procs) / fac] = data['times']
+        return times
+
+    times_parallel_sweeper = get_multiple_data(procs_parallel_sweeper, True)
+    times_serial_sweeper = get_multiple_data(procs_serial_sweeper, True)
+    times_parallel_sweeper_CPU = get_multiple_data(procs_parallel_sweeper_CPU, False)
+    times_serial_sweeper_CPU = get_multiple_data(procs_serial_sweeper_CPU, False)
+
+    print(times_parallel_sweeper)
+    print(times_serial_sweeper)
+
+    fig, ax = plt.subplots()
+    for times, labels in zip([times_parallel_sweeper, times_serial_sweeper], ['parallel sweeper', 'serial sweeper']):
+        ax.loglog([me for me in times.keys()], [me for me in times.values()], label=f'{labels} GPU', marker='x')
+    # for times, labels in zip([times_parallel_sweeper_CPU, times_serial_sweeper_CPU], ['parallel sweeper', 'serial sweeper']):
+    #     ax.plot([me for me in times.keys()], [me for me in times.values()], label=f'{labels} CPU', marker='x')
+    ax.legend(frameon=False)
+    ax.set_xlabel('Nodes')
+    ax.set_ylabel('wall time / s')
+    plt.show()
+
+
 if __name__ == '__main__':
     problem = RunSchroedinger
     args = parse_args()
 
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
 
-    single_gpu_experiments(
-        problem,
-        num_procs=num_procs,
-        num_runs=args.get('num_runs', 5),
-        useGPU=args.get('useGPU', True),
-        space_resolution=args.get('space_resolution', 2**13),
-    )
+    # single_gpu_experiments(
+    #     problem,
+    #     num_procs=num_procs,
+    #     num_runs=args.get('num_runs', 5),
+    #     useGPU=args.get('useGPU', True),
+    #     space_resolution=args.get('space_resolution', 2**13),
+    # )
+    plot_single_gpu_experiments(problem)
