@@ -420,8 +420,8 @@ class PlotSingleGPUStrongScaling(PlotExperiments):
 
 class PlotAdaptivityStrongScaling(PlotExperiments):
     experiment_cls = AdaptivityExperiment
-    num_nodes_parallel_gpu = [1, 2, 4]
-    num_nodes_serial_gpu = [1, 2, 4]
+    num_nodes_parallel_gpu = [1, 2, 4, 8, 16]
+    num_nodes_serial_gpu = [1, 2, 4, 8, 16]
     num_nodes_parallel_cpu = []
     num_nodes_serial_cpu = []
 
