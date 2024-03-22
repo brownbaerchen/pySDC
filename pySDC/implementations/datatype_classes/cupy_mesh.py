@@ -47,6 +47,13 @@ class cupy_mesh(cp.ndarray):
         """
         return self._comm
 
+    @property
+    def xp(self):
+        '''
+        Use this to infer what numerical library to use with this data.
+        '''
+        return cp
+
     def __array_finalize__(self, obj):
         """
         Finalizing the datatype. Without this, new datatypes do not 'inherit' the communicator.

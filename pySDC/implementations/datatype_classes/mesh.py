@@ -53,6 +53,13 @@ class mesh(np.ndarray):
         return obj
 
     @property
+    def xp(self):
+        '''
+        Use this to infer what numerical library to use with this data.
+        '''
+        return np
+
+    @property
     def comm(self):
         """
         Getter for the communicator

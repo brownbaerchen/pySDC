@@ -134,7 +134,7 @@ class RunProblem:
     def get_default_controller_params(self):
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
-        controller_params = {'logger_level': 15, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
+        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):
@@ -308,7 +308,7 @@ class Experiment:
         self, problem, num_procs=None, useGPU=True, num_runs=5, space_resolution=None, custom_description=None
     ):
         self.problem = problem
-        self.num_runs = (num_runs,)
+        self.num_runs = num_runs
 
         self.prob_args = {
             'num_procs': num_procs if num_procs else [1, 1, 1],
@@ -431,4 +431,5 @@ if __name__ == '__main__':
         'problem': RunSchroedinger,
     }
     experiment = AdaptivityExperiment(**kwargs)
+    experiment.run()
     # experiment.plot()
