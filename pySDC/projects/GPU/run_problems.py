@@ -4,6 +4,9 @@ from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.helpers.stats_helper import get_sorted
 import pickle
 import matplotlib.pyplot as plt
+from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
+
+setup_mpl()
 
 
 def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None):
@@ -256,41 +259,90 @@ def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5, space_re
     prob.record_timing(num_runs=num_runs, name=f'single_gpu_{space_resolution:d}')
 
 
+def get_multiple_data(vary_keys, useGPU=True, name='single_gpu'):
+    times = {}
+    num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
+
+    for i in range(min(num_items)):
+        kwargs = {key: vary_keys[key][i] for key in vary_keys.keys()}
+
+        _name = f'{name}'
+        space_resolution = kwargs.pop('space_resolution', None)
+        if space_resolution:
+            _name = f'{_name}_{space_resolution}'
+
+        prob = problem(**kwargs, useGPU=useGPU)
+        data = prob.get_data(_name)
+        fac = 4 if useGPU else 48
+        times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
+    return times
+
+
 def plot_single_gpu_experiments(problem):
-    useGPU = True
-    num_procs = [1, 1, 4]
 
-    procs_parallel_sweeper = [[1, 4, 1], [1, 4, 4], [1, 4, 8], [1, 4, 16], [1, 4, 32], [1, 4, 64]]
-    procs_serial_sweeper = [[1, 1, 4], [1, 1, 16], [1, 1, 32], [1, 1, 64], [1, 1, 128], [1, 1, 256]]
+    procs_parallel_sweeper = [[1, 4, me] for me in [1, 4, 8, 16, 32, 64, 128]]
+    procs_serial_sweeper = [[1, 1, 4 * me] for me in [1, 4, 8, 16, 32, 64]]
+    resolution = [8192 for _ in procs_parallel_sweeper]
 
-    procs_parallel_sweeper_CPU = [[1, 4, 384]]
-    procs_serial_sweeper_CPU = [[1, 1, 384], [1, 1, 1536]]
+    # num_procs_tot = [4, 16, 64]
+    # procs_parallel_sweeper = [[1, 4, int(me/4)] for me in num_procs_tot]
+    # procs_serial_sweeper = [[1, 1, me] for me in num_procs_tot]
+    # resolution = [8192, 16384, 32768]
 
-    def get_multiple_data(num_procs_list, useGPU):
-        times = {}
-        for num_procs in num_procs_list:
-            prob = problem(num_procs=num_procs, useGPU=useGPU)
-            data = prob.get_data('single_gpu')
-            fac = 4 if useGPU else 96
-            times[np.prod(num_procs) / fac] = data['times']
-        return times
+    procs_parallel_sweeper_CPU = [[1, 4, me] for me in [48, 96, 192]]
+    procs_serial_sweeper_CPU = [[1, 1, me] for me in [48, 192, 384, 768]]
+    resolution_CPU = [8192 for _ in procs_serial_sweeper]
+    # resolution_CPU = [8912, 8192]
 
-    times_parallel_sweeper = get_multiple_data(procs_parallel_sweeper, True)
-    times_serial_sweeper = get_multiple_data(procs_serial_sweeper, True)
-    times_parallel_sweeper_CPU = get_multiple_data(procs_parallel_sweeper_CPU, False)
-    times_serial_sweeper_CPU = get_multiple_data(procs_serial_sweeper_CPU, False)
+    timings = {
+        ('GPU', 'parallel'): get_multiple_data(
+            {'num_procs': procs_parallel_sweeper, 'space_resolution': resolution}, True
+        ),
+        ('GPU', 'serial'): get_multiple_data({'num_procs': procs_serial_sweeper, 'space_resolution': resolution}, True),
+        ('CPU', 'parallel'): get_multiple_data(
+            {'num_procs': procs_parallel_sweeper_CPU, 'space_resolution': resolution_CPU}, False
+        ),
+        ('CPU', 'serial'): get_multiple_data(
+            {'num_procs': procs_serial_sweeper_CPU, 'space_resolution': resolution_CPU}, False
+        ),
+    }
 
-    print(times_parallel_sweeper)
-    print(times_serial_sweeper)
+    ls = {
+        'parallel': '-',
+        'serial': '--',
+    }
+    marker = {
+        'CPU': '^',
+        'GPU': 'x',
+    }
+    label = {
+        'parallel': 'space-time-parallel',
+        'serial': 'space-parallel',
+    }
 
-    fig, ax = plt.subplots()
-    for times, labels in zip([times_parallel_sweeper, times_serial_sweeper], ['parallel sweeper', 'serial sweeper']):
-        ax.loglog([me for me in times.keys()], [me for me in times.values()], label=f'{labels} GPU', marker='x')
-    # for times, labels in zip([times_parallel_sweeper_CPU, times_serial_sweeper_CPU], ['parallel sweeper', 'serial sweeper']):
-    #     ax.plot([me for me in times.keys()], [me for me in times.values()], label=f'{labels} CPU', marker='x')
-    ax.legend(frameon=False)
-    ax.set_xlabel('Nodes')
+    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
+    fig, ax = plt.subplots(figsize=figsize)
+    for XPU in ['GPU', 'CPU']:
+        for parallel in ['parallel', 'serial']:
+            ax.loglog(
+                [me for me in timings[(XPU, parallel)].keys()],
+                [me for me in timings[(XPU, parallel)].values()],
+                label=f'{label[parallel]} {XPU}',
+                marker=marker[XPU],
+                ls=ls[parallel],
+                markersize=7,
+            )
+
+    num_nodes = [1, 128]
+    ax.plot(num_nodes, [1e3 / me for me in num_nodes], color='black', ls=':', label='perfect scaling')
+    ax.legend(frameon=True)
+    ax.set_xlabel('Nodes on JUWELS Booster')
     ax.set_ylabel('wall time / s')
+    ax.set_title(r'100 time steps of nonlinear Schrödinger')
+
+    fig.tight_layout()
+    fig.savefig(f'/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+
     plt.show()
 
 
