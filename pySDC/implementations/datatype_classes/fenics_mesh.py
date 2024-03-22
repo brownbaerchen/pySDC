@@ -205,3 +205,6 @@ class rhs_fenics_mesh(object):
             return me
         else:
             raise DataError("Type error: cannot multiply %s to %s" % (type(other), type(self)))
+
+    def sum_components(self):
+        return self.impl + self.expl
