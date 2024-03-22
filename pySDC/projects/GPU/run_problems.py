@@ -39,6 +39,7 @@ class RunProblem:
         comm_world=None,
         imex=False,
         useGPU=True,
+        space_resolution=None,
     ):
         num_procs = (
             [
@@ -58,6 +59,8 @@ class RunProblem:
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(num_procs, comm_world=comm_world)
         self.get_description(custom_description, imex)
         self.get_controller_params(custom_controller_params)
+        if space_resolution:
+            self.set_space_resolution(space_resolution)
 
     def get_default_description(self):
         description = {
@@ -71,6 +74,35 @@ class RunProblem:
         }
         description['problem_params']['useGPU'] = self.useGPU
         return description
+
+    def set_space_resolution(self, resolution):
+        current_resolution = self.get_space_resolution()
+        self.description['problem_params']['nvars'] = (int(resolution), ) * len(current_resolution)
+
+    def get_space_resolution(self):
+        return self.description['problem_params']['nvars']
+
+    @property
+    def get_poly_adaptivity_default_params(self):
+        defaults = {
+            'restol_rel': None,
+            'e_tol_rel': None,
+            'restart_at_maxiter': True,
+            'restol_min': 1e-12,
+            'restol_max': 1e-5,
+            'factor_if_not_converged': 4.0,
+            'residual_max_tol': 1e9,
+            'maxiter': self.description['sweeper_params'].get('maxiter', 99),
+            'interpolate_between_restarts': True,
+            'abort_at_growing_residual': True,
+        }
+        return defaults
+
+    def add_polynomial_adaptivity(self, params=None):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+        params = params if params else {}
+        self.description['convergence_controllers'][AdaptivityPolynomialError] = {**self.get_poly_adaptivity_default_params, **params}
+
 
     def get_sweeper(self, imex):
         useMPI = self.comm_sweep.size > 1
@@ -99,7 +131,7 @@ class RunProblem:
     def get_default_controller_params(self):
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
-        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
+        controller_params = {'logger_level': 15, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):
@@ -149,7 +181,8 @@ class RunProblem:
         procs = f'{self.num_procs[0]}x{self.num_procs[1]}x{self.num_procs[2]}'
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
-        return f'{base_path}/{prob}_{procs}_{gpu}{name}.pickle'
+        space_resolution = f'{self.get_space_resolution():d}'
+        return f'{base_path}/{prob}_{procs}_{gpu}{name}_{space_resolution}.pickle'
 
     def get_data(self, name=''):
         with open(self.get_path(name=name), 'rb') as file:
@@ -194,6 +227,12 @@ class RunAllenCahn(RunProblem):
 
         return description
 
+    @property
+    def get_poly_adaptivity_default_params(self):
+        defaults = super().get_poly_adaptivity_default_params
+        defaults['e_tol'] = 1e-7
+        return defaults
+
 
 class RunSchroedinger(RunProblem):
     default_Tend = 1.0
@@ -224,6 +263,12 @@ class RunSchroedinger(RunProblem):
 
         return description
 
+    @property
+    def get_poly_adaptivity_default_params(self):
+        defaults = super().get_poly_adaptivity_default_params
+        defaults['e_tol'] = 1e-7
+        return defaults
+
 
 def cast_to_bool(arg):
     if arg == 'False':
@@ -253,10 +298,44 @@ def parse_args():
     return args
 
 
+class Experiment:
+    name = None
+    def __init__(self, problem, num_procs=None, useGPU=True, num_runs=5, space_resolution=None, custom_description=None):
+        self.problem = problem
+        self.num_procs = num_procs if num_procs else [1, 1, 1]
+        self.useGPU = useGPU
+        self.num_runs = num_runs
+        self.custom_description = custom_description if custom_description else {}
+        self.space_resolution = space_resolution
+
+        self.prob = problem(num_procs=self.num_procs, useGPU=useGPU, custom_description=self.custom_description, space_resolution=space_resolution)
+
+
+    def run(self):
+        self.prob.record_timing(num_runs=self.num_runs, name=self.name)
+
+
+class SingleGPUExperiment(Experiment):
+    name = 'single_gpu'
+
+
+class AdaptivityExperiment(Experiment):
+    name = 'adaptivity'
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.prob.add_polynomial_adaptivity()
+
+
+
 def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5, space_resolution=2**13):
     description = {'problem_params': {'nvars': (space_resolution,) * 2}}
     prob = problem(num_procs=num_procs, useGPU=useGPU, custom_description=description)
     prob.record_timing(num_runs=num_runs, name=f'single_gpu_{space_resolution:d}')
+
+def adaptivity_experiment(problem, num_procs, useGPU=True, num_runs=5, space_resolution=2**13):
+    description = {'problem_params': {'nvars': (space_resolution,) * 2}}
+    prob = problem(num_procs=num_procs, useGPU=useGPU, custom_description=description)
+    prob.record_timing(num_runs=num_runs, name=f'adaptivity_{space_resolution:d}')
 
 
 def get_multiple_data(vary_keys, useGPU=True, name='single_gpu'):
@@ -352,6 +431,15 @@ if __name__ == '__main__':
 
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
 
+    kwargs = {
+            'num_procs': num_procs,
+            'num_runs':args.get('num_runs', 5),
+            'useGPU':args.get('useGPU', True),
+            'space_resolution':args.get('space_resolution', 2**13),
+            'problem': RunSchroedinger
+    }
+    experiment = AdaptivityExperiment(**kwargs)
+
     # single_gpu_experiments(
     #     problem,
     #     num_procs=num_procs,
@@ -359,4 +447,4 @@ if __name__ == '__main__':
     #     useGPU=args.get('useGPU', True),
     #     space_resolution=args.get('space_resolution', 2**13),
     # )
-    plot_single_gpu_experiments(problem)
+    # plot_single_gpu_experiments(problem)
