@@ -77,7 +77,7 @@ class RunProblem:
 
     def set_space_resolution(self, resolution):
         current_resolution = self.get_space_resolution()
-        self.description['problem_params']['nvars'] = (int(resolution), ) * len(current_resolution)
+        self.description['problem_params']['nvars'] = (int(resolution),) * len(current_resolution)
 
     def get_space_resolution(self):
         return self.description['problem_params']['nvars']
@@ -100,9 +100,12 @@ class RunProblem:
 
     def add_polynomial_adaptivity(self, params=None):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
-        params = params if params else {}
-        self.description['convergence_controllers'][AdaptivityPolynomialError] = {**self.get_poly_adaptivity_default_params, **params}
 
+        params = params if params else {}
+        self.description['convergence_controllers'][AdaptivityPolynomialError] = {
+            **self.get_poly_adaptivity_default_params,
+            **params,
+        }
 
     def get_sweeper(self, imex):
         useMPI = self.comm_sweep.size > 1
@@ -181,7 +184,7 @@ class RunProblem:
         procs = f'{self.num_procs[0]}x{self.num_procs[1]}x{self.num_procs[2]}'
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
-        space_resolution = f'{self.get_space_resolution():d}'
+        space_resolution = f'{self.get_space_resolution()[0]:d}'
         return f'{base_path}/{prob}_{procs}_{gpu}{name}_{space_resolution}.pickle'
 
     def get_data(self, name=''):
@@ -300,129 +303,118 @@ def parse_args():
 
 class Experiment:
     name = None
-    def __init__(self, problem, num_procs=None, useGPU=True, num_runs=5, space_resolution=None, custom_description=None):
+
+    def __init__(
+        self, problem, num_procs=None, useGPU=True, num_runs=5, space_resolution=None, custom_description=None
+    ):
         self.problem = problem
-        self.num_procs = num_procs if num_procs else [1, 1, 1]
-        self.useGPU = useGPU
-        self.num_runs = num_runs
-        self.custom_description = custom_description if custom_description else {}
-        self.space_resolution = space_resolution
+        self.num_runs = (num_runs,)
 
-        self.prob = problem(num_procs=self.num_procs, useGPU=useGPU, custom_description=self.custom_description, space_resolution=space_resolution)
+        self.prob_args = {
+            'num_procs': num_procs if num_procs else [1, 1, 1],
+            'useGPU': useGPU,
+            'custom_description': custom_description if custom_description else {},
+            'space_resolution': space_resolution,
+        }
 
+        self.prob = problem(**self.prob_args)
 
     def run(self):
         self.prob.record_timing(num_runs=self.num_runs, name=self.name)
+
+    def get_multiple_data(self, vary_keys, prob_args=None):
+        times = {}
+        num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
+        prob_args = {**self.prob_args, **prob_args} if prob_args else self.prob_args
+
+        for i in range(min(num_items)):
+            kwargs = {**prob_args, **{key: vary_keys[key][i] for key in vary_keys.keys()}}
+            prob = problem(**kwargs)
+            data = prob.get_data(self.name)
+            fac = 4 if kwargs['useGPU'] else 48
+            times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
+        return times
 
 
 class SingleGPUExperiment(Experiment):
     name = 'single_gpu'
 
+    def plot(self):
+        procs_parallel_sweeper = [[1, 4, me] for me in [1, 4, 8, 16, 32, 64, 128]]
+        procs_serial_sweeper = [[1, 1, 4 * me] for me in [1, 4, 8, 16, 32, 64]]
+        resolution = [8192 for _ in procs_parallel_sweeper]
+        prob_args_gpu = {'useGPU': True}
+
+        # num_procs_tot = [4, 16, 64]
+        # procs_parallel_sweeper = [[1, 4, int(me/4)] for me in num_procs_tot]
+        # procs_serial_sweeper = [[1, 1, me] for me in num_procs_tot]
+        # resolution = [8192, 16384, 32768]
+
+        procs_parallel_sweeper_CPU = [[1, 4, me] for me in [48, 96, 192]]
+        procs_serial_sweeper_CPU = [[1, 1, me] for me in [48, 192, 384, 768]]
+        resolution_CPU = [8192 for _ in procs_serial_sweeper]
+        prob_args_cpu = {'useGPU': False}
+
+        timings = {
+            ('GPU', 'parallel'): self.get_multiple_data(
+                {'num_procs': procs_parallel_sweeper, 'space_resolution': resolution}, prob_args_gpu
+            ),
+            ('GPU', 'serial'): self.get_multiple_data(
+                {'num_procs': procs_serial_sweeper, 'space_resolution': resolution}, prob_args_gpu
+            ),
+            ('CPU', 'parallel'): self.get_multiple_data(
+                {'num_procs': procs_parallel_sweeper_CPU, 'space_resolution': resolution_CPU}, prob_args_cpu
+            ),
+            ('CPU', 'serial'): self.get_multiple_data(
+                {'num_procs': procs_serial_sweeper_CPU, 'space_resolution': resolution_CPU}, prob_args_cpu
+            ),
+        }
+
+        ls = {
+            'parallel': '-',
+            'serial': '--',
+        }
+        marker = {
+            'CPU': '^',
+            'GPU': 'x',
+        }
+        label = {
+            'parallel': 'space-time-parallel',
+            'serial': 'space-parallel',
+        }
+
+        figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
+        fig, ax = plt.subplots(figsize=figsize)
+        for XPU in ['GPU', 'CPU']:
+            for parallel in ['parallel', 'serial']:
+                ax.loglog(
+                    [me for me in timings[(XPU, parallel)].keys()],
+                    [me for me in timings[(XPU, parallel)].values()],
+                    label=f'{label[parallel]} {XPU}',
+                    marker=marker[XPU],
+                    ls=ls[parallel],
+                    markersize=7,
+                )
+
+        num_nodes = [1, 128]
+        ax.plot(num_nodes, [1e3 / me for me in num_nodes], color='black', ls=':', label='perfect scaling')
+        ax.legend(frameon=True)
+        ax.set_xlabel('Nodes on JUWELS Booster')
+        ax.set_ylabel('wall time / s')
+        ax.set_title(r'100 time steps of nonlinear Schrödinger')
+
+        fig.tight_layout()
+        fig.savefig(f'/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+
+        plt.show()
+
 
 class AdaptivityExperiment(Experiment):
     name = 'adaptivity'
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.prob.add_polynomial_adaptivity()
-
-
-
-def single_gpu_experiments(problem, num_procs, useGPU=True, num_runs=5, space_resolution=2**13):
-    description = {'problem_params': {'nvars': (space_resolution,) * 2}}
-    prob = problem(num_procs=num_procs, useGPU=useGPU, custom_description=description)
-    prob.record_timing(num_runs=num_runs, name=f'single_gpu_{space_resolution:d}')
-
-def adaptivity_experiment(problem, num_procs, useGPU=True, num_runs=5, space_resolution=2**13):
-    description = {'problem_params': {'nvars': (space_resolution,) * 2}}
-    prob = problem(num_procs=num_procs, useGPU=useGPU, custom_description=description)
-    prob.record_timing(num_runs=num_runs, name=f'adaptivity_{space_resolution:d}')
-
-
-def get_multiple_data(vary_keys, useGPU=True, name='single_gpu'):
-    times = {}
-    num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
-
-    for i in range(min(num_items)):
-        kwargs = {key: vary_keys[key][i] for key in vary_keys.keys()}
-
-        _name = f'{name}'
-        space_resolution = kwargs.pop('space_resolution', None)
-        if space_resolution:
-            _name = f'{_name}_{space_resolution}'
-
-        prob = problem(**kwargs, useGPU=useGPU)
-        data = prob.get_data(_name)
-        fac = 4 if useGPU else 48
-        times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
-    return times
-
-
-def plot_single_gpu_experiments(problem):
-
-    procs_parallel_sweeper = [[1, 4, me] for me in [1, 4, 8, 16, 32, 64, 128]]
-    procs_serial_sweeper = [[1, 1, 4 * me] for me in [1, 4, 8, 16, 32, 64]]
-    resolution = [8192 for _ in procs_parallel_sweeper]
-
-    # num_procs_tot = [4, 16, 64]
-    # procs_parallel_sweeper = [[1, 4, int(me/4)] for me in num_procs_tot]
-    # procs_serial_sweeper = [[1, 1, me] for me in num_procs_tot]
-    # resolution = [8192, 16384, 32768]
-
-    procs_parallel_sweeper_CPU = [[1, 4, me] for me in [48, 96, 192]]
-    procs_serial_sweeper_CPU = [[1, 1, me] for me in [48, 192, 384, 768]]
-    resolution_CPU = [8192 for _ in procs_serial_sweeper]
-    # resolution_CPU = [8912, 8192]
-
-    timings = {
-        ('GPU', 'parallel'): get_multiple_data(
-            {'num_procs': procs_parallel_sweeper, 'space_resolution': resolution}, True
-        ),
-        ('GPU', 'serial'): get_multiple_data({'num_procs': procs_serial_sweeper, 'space_resolution': resolution}, True),
-        ('CPU', 'parallel'): get_multiple_data(
-            {'num_procs': procs_parallel_sweeper_CPU, 'space_resolution': resolution_CPU}, False
-        ),
-        ('CPU', 'serial'): get_multiple_data(
-            {'num_procs': procs_serial_sweeper_CPU, 'space_resolution': resolution_CPU}, False
-        ),
-    }
-
-    ls = {
-        'parallel': '-',
-        'serial': '--',
-    }
-    marker = {
-        'CPU': '^',
-        'GPU': 'x',
-    }
-    label = {
-        'parallel': 'space-time-parallel',
-        'serial': 'space-parallel',
-    }
-
-    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    fig, ax = plt.subplots(figsize=figsize)
-    for XPU in ['GPU', 'CPU']:
-        for parallel in ['parallel', 'serial']:
-            ax.loglog(
-                [me for me in timings[(XPU, parallel)].keys()],
-                [me for me in timings[(XPU, parallel)].values()],
-                label=f'{label[parallel]} {XPU}',
-                marker=marker[XPU],
-                ls=ls[parallel],
-                markersize=7,
-            )
-
-    num_nodes = [1, 128]
-    ax.plot(num_nodes, [1e3 / me for me in num_nodes], color='black', ls=':', label='perfect scaling')
-    ax.legend(frameon=True)
-    ax.set_xlabel('Nodes on JUWELS Booster')
-    ax.set_ylabel('wall time / s')
-    ax.set_title(r'100 time steps of nonlinear Schrödinger')
-
-    fig.tight_layout()
-    fig.savefig(f'/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
-
-    plt.show()
 
 
 if __name__ == '__main__':
@@ -432,19 +424,11 @@ if __name__ == '__main__':
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
 
     kwargs = {
-            'num_procs': num_procs,
-            'num_runs':args.get('num_runs', 5),
-            'useGPU':args.get('useGPU', True),
-            'space_resolution':args.get('space_resolution', 2**13),
-            'problem': RunSchroedinger
+        'num_procs': num_procs,
+        'num_runs': args.get('num_runs', 5),
+        'useGPU': args.get('useGPU', True),
+        'space_resolution': args.get('space_resolution', 2**13),
+        'problem': RunSchroedinger,
     }
     experiment = AdaptivityExperiment(**kwargs)
-
-    # single_gpu_experiments(
-    #     problem,
-    #     num_procs=num_procs,
-    #     num_runs=args.get('num_runs', 5),
-    #     useGPU=args.get('useGPU', True),
-    #     space_resolution=args.get('space_resolution', 2**13),
-    # )
-    # plot_single_gpu_experiments(problem)
+    # experiment.plot()
