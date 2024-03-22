@@ -138,8 +138,8 @@ class swfw_scalar(ptype):
         """
 
         f = self.dtype_f(self.init)
-        f.impl = self.__eval_fimpl(u, t)
-        f.expl = self.__eval_fexpl(u, t)
+        f.impl[:] = self.__eval_fimpl(u, t)
+        f.expl[:] = self.__eval_fexpl(u, t)
         return f
 
     def u_exact(self, t):

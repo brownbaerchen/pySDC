@@ -28,7 +28,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         for m in [self.coll.num_nodes - 1] if last_only else range(self.coll.num_nodes):
             recvBuf = me if m == self.rank else None
             self.comm.Reduce(
-                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * (L.f[self.rank + 1].impl + L.f[self.rank + 1].expl),
+                L.dt * self.coll.Qmat[m + 1, self.rank + 1] * L.f[self.rank + 1].sum_components(),
                 recvBuf,
                 root=m,
                 op=MPI.SUM,
@@ -100,7 +100,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         else:
             L.uend = P.dtype_u(L.u[0])
             self.comm.Allreduce(
-                L.dt * self.coll.weights[self.rank] * (L.f[self.rank + 1].impl + L.f[self.rank + 1].expl),
+                L.dt * self.coll.weights[self.rank] * L.f[self.rank + 1].sum_components(),
                 L.uend,
                 op=MPI.SUM,
             )

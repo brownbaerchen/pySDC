@@ -49,10 +49,10 @@ class imex_1st_order(sweeper):
 
         # integrate RHS over all collocation nodes
         for m in range(1, self.coll.num_nodes + 1):
-            me.append(L.dt * self.coll.Qmat[m, 1] * (L.f[1].impl + L.f[1].expl))
+            me.append(L.dt * self.coll.Qmat[m, 1] * L.f[1].sum_components())
             # new instance of dtype_u, initialize values with 0
             for j in range(2, self.coll.num_nodes + 1):
-                me[m - 1] += L.dt * self.coll.Qmat[m, j] * (L.f[j].impl + L.f[j].expl)
+                me[m - 1] += L.dt * self.coll.Qmat[m, j] * L.f[j].sum_components()
 
         return me
 
@@ -131,7 +131,7 @@ class imex_1st_order(sweeper):
             # start with u0 and add integral over the full interval (using coll.weights)
             L.uend = P.dtype_u(L.u[0])
             for m in range(self.coll.num_nodes):
-                L.uend += L.dt * self.coll.weights[m] * (L.f[m + 1].impl + L.f[m + 1].expl)
+                L.uend += L.dt * self.coll.weights[m] * L.f[m + 1].sum_components()
             # add up tau correction of the full interval (last entry)
             if L.tau[-1] is not None:
                 L.uend += L.tau[-1]

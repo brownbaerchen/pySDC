@@ -205,6 +205,12 @@ class MultiComponentMesh(mesh):
         else:
             raise AttributeError(f"{type(self)!r} does not have attribute {name!r}!")
 
+    def sum_components(self):
+        if self.shape[0] == len(self.components):
+            return self.sum(axis=0)
+        else:
+            raise DataError('You are trying to sum components of something that is itself a component!')
+
 
 class imex_mesh(MultiComponentMesh):
     components = ['impl', 'expl']
