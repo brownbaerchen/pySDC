@@ -322,91 +322,9 @@ class Experiment:
     def run(self):
         self.prob.record_timing(num_runs=self.num_runs, name=self.name)
 
-    def get_multiple_data(self, vary_keys, prob_args=None):
-        times = {}
-        num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
-        prob_args = {**self.prob_args, **prob_args} if prob_args else self.prob_args
-
-        for i in range(min(num_items)):
-            kwargs = {**prob_args, **{key: vary_keys[key][i] for key in vary_keys.keys()}}
-            prob = problem(**kwargs)
-            data = prob.get_data(self.name)
-            fac = 4 if kwargs['useGPU'] else 48
-            times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
-        return times
-
 
 class SingleGPUExperiment(Experiment):
     name = 'single_gpu'
-
-    def plot(self):
-        procs_parallel_sweeper = [[1, 4, me] for me in [1, 4, 8, 16, 32, 64, 128]]
-        procs_serial_sweeper = [[1, 1, 4 * me] for me in [1, 4, 8, 16, 32, 64]]
-        resolution = [8192 for _ in procs_parallel_sweeper]
-        prob_args_gpu = {'useGPU': True}
-
-        # num_procs_tot = [4, 16, 64]
-        # procs_parallel_sweeper = [[1, 4, int(me/4)] for me in num_procs_tot]
-        # procs_serial_sweeper = [[1, 1, me] for me in num_procs_tot]
-        # resolution = [8192, 16384, 32768]
-
-        procs_parallel_sweeper_CPU = [[1, 4, me] for me in [48, 96, 192]]
-        procs_serial_sweeper_CPU = [[1, 1, me] for me in [48, 192, 384, 768]]
-        resolution_CPU = [8192 for _ in procs_serial_sweeper]
-        prob_args_cpu = {'useGPU': False}
-
-        timings = {
-            ('GPU', 'parallel'): self.get_multiple_data(
-                {'num_procs': procs_parallel_sweeper, 'space_resolution': resolution}, prob_args_gpu
-            ),
-            ('GPU', 'serial'): self.get_multiple_data(
-                {'num_procs': procs_serial_sweeper, 'space_resolution': resolution}, prob_args_gpu
-            ),
-            ('CPU', 'parallel'): self.get_multiple_data(
-                {'num_procs': procs_parallel_sweeper_CPU, 'space_resolution': resolution_CPU}, prob_args_cpu
-            ),
-            ('CPU', 'serial'): self.get_multiple_data(
-                {'num_procs': procs_serial_sweeper_CPU, 'space_resolution': resolution_CPU}, prob_args_cpu
-            ),
-        }
-
-        ls = {
-            'parallel': '-',
-            'serial': '--',
-        }
-        marker = {
-            'CPU': '^',
-            'GPU': 'x',
-        }
-        label = {
-            'parallel': 'space-time-parallel',
-            'serial': 'space-parallel',
-        }
-
-        figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-        fig, ax = plt.subplots(figsize=figsize)
-        for XPU in ['GPU', 'CPU']:
-            for parallel in ['parallel', 'serial']:
-                ax.loglog(
-                    [me for me in timings[(XPU, parallel)].keys()],
-                    [me for me in timings[(XPU, parallel)].values()],
-                    label=f'{label[parallel]} {XPU}',
-                    marker=marker[XPU],
-                    ls=ls[parallel],
-                    markersize=7,
-                )
-
-        num_nodes = [1, 128]
-        ax.plot(num_nodes, [1e3 / me for me in num_nodes], color='black', ls=':', label='perfect scaling')
-        ax.legend(frameon=True)
-        ax.set_xlabel('Nodes on JUWELS Booster')
-        ax.set_ylabel('wall time / s')
-        ax.set_title(r'100 time steps of nonlinear Schrödinger')
-
-        fig.tight_layout()
-        fig.savefig(f'/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
-
-        plt.show()
 
 
 class AdaptivityExperiment(Experiment):
@@ -415,6 +333,97 @@ class AdaptivityExperiment(Experiment):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.prob.add_polynomial_adaptivity()
+
+
+class PlotExperiments:
+    experiment_cls = None
+    num_nodes_parallel_gpu = []
+    num_nodes_serial_gpu = []
+    num_nodes_parallel_cpu = []
+    num_nodes_serial_cpu = []
+
+    def __init__(self, **kwargs):
+        self.experiment = self.experiment_cls(**kwargs)
+
+    def get_multiple_data(self, vary_keys, prob_args=None):
+        times = {}
+        num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
+        prob_args = {**self.experiment.prob_args, **prob_args} if prob_args else self.experiment.prob_args
+
+        for i in range(min(num_items)):
+            kwargs = {**prob_args, **{key: vary_keys[key][i] for key in vary_keys.keys()}}
+            prob = problem(**kwargs)
+            data = prob.get_data(self.experiment.name)
+            fac = 4 if kwargs['useGPU'] else 48
+            times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
+        return times
+
+    def get_vary_keys(self, parallel_sweeper, useGPU):
+        vary_keys = {}
+        if parallel_sweeper and useGPU:
+            vary_keys['num_procs'] = [[1, 4, me] for me in self.num_nodes_parallel_gpu]
+        elif not parallel_sweeper and useGPU:
+            vary_keys['num_procs'] = [[1, 1, 4 * me] for me in self.num_nodes_serial_gpu]
+        elif parallel_sweeper and not useGPU:
+            vary_keys['num_procs'] = [[1, 4, me * 12] for me in self.num_nodes_parallel_cpu]
+        elif not parallel_sweeper and not useGPU:
+            vary_keys['num_procs'] = [[1, 1, me * 48] for me in self.num_nodes_serial_cpu]
+        else:
+            raise NotImplementedError
+        return vary_keys
+
+    def plot(self, ax):
+        for useGPU in [True, False]:
+            for parallel_sweeper in [True, False]:
+                self.plot_single(ax, parallel_sweeper, useGPU)
+
+    def plot_single(self, ax, parallel_sweeper, useGPU):
+
+        ls = {
+            True: '-',
+            False: '--',
+        }
+        marker = {
+            False: '^',
+            True: 'x',
+        }
+        label = {
+            True: 'space-time-parallel',
+            False: 'space-parallel',
+        }
+        label_GPU = {
+            True: 'GPU',
+            False: 'CPU',
+        }
+
+        timings = self.get_multiple_data(self.get_vary_keys(parallel_sweeper, useGPU), prob_args={'useGPU': useGPU})
+        ax.loglog(
+            timings.keys(),
+            timings.values(),
+            label=f'{label[parallel_sweeper]} {label_GPU[useGPU]}',
+            marker=marker[useGPU],
+            ls=ls[parallel_sweeper],
+            markersize=7,
+        )
+        ax.legend(frameon=True)
+        ax.set_xlabel('Nodes on JUWELS Booster')
+        ax.set_ylabel('wall time / s')
+
+
+class PlotSingleGPUStrongScaling(PlotExperiments):
+    experiment_cls = SingleGPUExperiment
+    num_nodes_parallel_gpu = [1, 4, 8, 16, 32, 64, 128]
+    num_nodes_serial_gpu = [1, 4, 8, 16, 32, 64]
+    num_nodes_parallel_cpu = [4, 8, 16]
+    num_nodes_serial_cpu = [1, 4, 8, 16]
+
+
+class PlotAdaptivityStrongScaling(PlotExperiments):
+    experiment_cls = AdaptivityExperiment
+    num_nodes_parallel_gpu = [1, 2, 4]
+    num_nodes_serial_gpu = [1, 2, 4]
+    num_nodes_parallel_cpu = []
+    num_nodes_serial_cpu = []
 
 
 if __name__ == '__main__':
@@ -431,5 +440,14 @@ if __name__ == '__main__':
         'problem': RunSchroedinger,
     }
     experiment = AdaptivityExperiment(**kwargs)
-    experiment.run()
-    # experiment.plot()
+    # experiment.run()
+
+    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
+    fig, ax = plt.subplots(figsize=figsize)
+    # plotter = PlotSingleGPUStrongScaling(**kwargs)
+    plotter = PlotAdaptivityStrongScaling(**kwargs)
+    plotter.plot(ax)
+    fig.tight_layout()
+    fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+
+    plt.show()
