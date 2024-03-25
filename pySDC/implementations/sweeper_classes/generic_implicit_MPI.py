@@ -3,6 +3,7 @@ from mpi4py import MPI
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.core.Sweeper import sweeper, ParameterError
 import logging
+import numpy as np
 
 
 class SweeperMPI(sweeper):
@@ -93,18 +94,18 @@ class SweeperMPI(sweeper):
         # add tau if associated
         if L.tau[self.rank] is not None:
             res += L.tau[self.rank]
+
         # use abs function from data type here
-        res_norm = abs(res)
+        sendbuf = np.array(abs(res) / (abs(L.u[0]) if 'rel' in L.params.residual_type else 1.0))
 
         # find maximal residual over the nodes
-        if L.params.residual_type == 'full_abs':
-            L.status.residual = self.comm.allreduce(res_norm, op=MPI.MAX)
-        elif L.params.residual_type == 'last_abs':
-            L.status.residual = self.comm.bcast(res_norm, root=self.comm.size - 1)
-        elif L.params.residual_type == 'full_rel':
-            L.status.residual = self.comm.allreduce(res_norm / abs(L.u[0]), op=MPI.MAX)
-        elif L.params.residual_type == 'last_rel':
-            L.status.residual = self.comm.bcast(res_norm / abs(L.u[0]), root=self.comm.size - 1)
+        if 'full' in L.params.residual_type:
+            recvbuf = np.empty(1)
+            self.comm.Allreduce(sendbuf, recvbuf, op=MPI.MAX)
+            L.status.residual = recvbuf[0]
+        elif 'last' in L.params.residual_type:
+            self.comm.Bcast(sendbuf, root=self.comm.size - 1)
+            L.status.residual = sendbuf[0]
         else:
             raise NotImplementedError(f'residual type \"{L.params.residual_type}\" not implemented!')
 

@@ -157,19 +157,19 @@ class RunProblem:
 
         return stats
 
-    def record_timing(self, num_runs=5, name=''):
+    def record_timing(self, num_runs=5, name='', Tend=None):
         errors = []
         times = []
 
         for _ in range(num_runs):
-            stats = self.run()
+            stats = self.run(Tend=Tend)
 
             errors += [max(me[1] for me in get_sorted(stats, type='e_global_post_run'))]
             times += [max(me[1] for me in get_sorted(stats, type='timing_run'))]
             if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0:
                 print(f'Needed {times[-1]:.2e}s with error {errors[-1]:.2e}', flush=True)
 
-        if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0:
+        if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0 and Tend is None:
             with open(self.get_path(name=name), 'wb') as file:
                 pickle.dump({'errors': errors, 'times': times}, file)
             print(f'Stored file {self.get_path(name=name)!r}')
@@ -290,6 +290,7 @@ def parse_args():
         'num_runs': int,
         'useGPU': cast_to_bool,
         'space_resolution': int,
+        'Tend': float,
     }
 
     args = {}
@@ -319,8 +320,8 @@ class Experiment:
 
         self.prob = problem(**self.prob_args)
 
-    def run(self):
-        self.prob.record_timing(num_runs=self.num_runs, name=self.name)
+    def run(self, Tend=None):
+        self.prob.record_timing(num_runs=self.num_runs, name=self.name, Tend=Tend)
 
 
 class SingleGPUExperiment(Experiment):
@@ -378,7 +379,6 @@ class PlotExperiments:
                 self.plot_single(ax, parallel_sweeper, useGPU)
 
     def plot_single(self, ax, parallel_sweeper, useGPU):
-
         ls = {
             True: '-',
             False: '--',
@@ -439,15 +439,17 @@ if __name__ == '__main__':
         'space_resolution': args.get('space_resolution', 2**13),
         'problem': RunSchroedinger,
     }
+
+    # experiment = SingleGPUExperiment(**kwargs)
     experiment = AdaptivityExperiment(**kwargs)
     # experiment.run()
 
-    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    fig, ax = plt.subplots(figsize=figsize)
-    # plotter = PlotSingleGPUStrongScaling(**kwargs)
-    plotter = PlotAdaptivityStrongScaling(**kwargs)
-    plotter.plot(ax)
-    fig.tight_layout()
-    fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+    # figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
+    # fig, ax = plt.subplots(figsize=figsize)
+    # # plotter = PlotSingleGPUStrongScaling(**kwargs)
+    # plotter = PlotAdaptivityStrongScaling(**kwargs)
+    # plotter.plot(ax)
+    # fig.tight_layout()
+    # fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
 
-    plt.show()
+    # plt.show()
