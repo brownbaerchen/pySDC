@@ -412,16 +412,16 @@ class PlotExperiments:
 
 class PlotSingleGPUStrongScaling(PlotExperiments):
     experiment_cls = SingleGPUExperiment
-    num_nodes_parallel_gpu = [1, 4, 8, 16, 32, 64, 128]
-    num_nodes_serial_gpu = [1, 4, 8, 16, 32, 64]
+    num_nodes_parallel_gpu = [1, 2, 4, 8, 16, 32, 64, 128]
+    num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
     num_nodes_parallel_cpu = [4, 8, 16]
     num_nodes_serial_cpu = [1, 4, 8, 16]
 
 
 class PlotAdaptivityStrongScaling(PlotExperiments):
     experiment_cls = AdaptivityExperiment
-    num_nodes_parallel_gpu = [1, 2, 4, 8, 16]
-    num_nodes_serial_gpu = [1, 2, 4, 8, 16]
+    num_nodes_parallel_gpu = [1, 2, 4, 8, 16, 32, 64]
+    num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
     num_nodes_parallel_cpu = []
     num_nodes_serial_cpu = []
 
@@ -444,12 +444,12 @@ if __name__ == '__main__':
     experiment = AdaptivityExperiment(**kwargs)
     # experiment.run()
 
-    # figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    # fig, ax = plt.subplots(figsize=figsize)
-    # # plotter = PlotSingleGPUStrongScaling(**kwargs)
+    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
+    fig, ax = plt.subplots(figsize=figsize)
+    plotter = PlotSingleGPUStrongScaling(**kwargs)
     # plotter = PlotAdaptivityStrongScaling(**kwargs)
-    # plotter.plot(ax)
-    # fig.tight_layout()
-    # fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+    plotter.plot(ax)
+    fig.tight_layout()
+    fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
 
-    # plt.show()
+    plt.show()
