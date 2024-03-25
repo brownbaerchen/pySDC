@@ -173,6 +173,9 @@ class imex_cupy_mesh(object):
         else:
             raise DataError('something went wrong during %s initialization' % type(self))
 
+    def sum_components(self):
+        return self.impl + self.expl
+
 
 class comp2_cupy_mesh(object):
     """
