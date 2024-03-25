@@ -114,7 +114,7 @@ class RunBrusselator(RunProblem):
         super().__init__(*args, **kwargs, imex=True)
 
     def get_default_description(self):
-        from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import nonlinearschroedinger_imex
+        from pySDC.implementations.problem_classes.Brusselator import Brusselator
 
         description = super().get_default_description()
 
@@ -131,7 +131,7 @@ class RunBrusselator(RunProblem):
         description['problem_params']['nvars'] = (2**13,) * 2
         description['problem_params']['comm'] = self.comm_space
 
-        description['problem_class'] = nonlinearschroedinger_imex
+        description['problem_class'] = Brusselator
 
         return description
 
