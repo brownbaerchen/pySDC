@@ -96,3 +96,10 @@ class NCCLComm(object):
         self.commNCCL.allReduce(
             sendbuf=sendbuf.data.ptr, recvbuf=recvbuf.data.ptr, count=count, datatype=dtype, op=op, stream=stream.ptr
         )
+
+    def Bcast(self, buf, root=0):
+        dtype = self.get_dtype(buf)
+        count = self.get_count(buf)
+        stream = cp.cuda.get_current_stream()
+
+        self.commNCCL.bcast(buff=buf.data.ptr, count=count, datatype=dtype, root=root, stream=stream.ptr)
