@@ -3,10 +3,6 @@ from mpi4py import MPI
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.helpers.stats_helper import get_sorted
 import pickle
-import matplotlib.pyplot as plt
-from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
-
-setup_mpl()
 
 
 def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None):
@@ -199,109 +195,6 @@ class RunProblem:
         return results
 
 
-class RunAllenCahn(RunProblem):
-    default_Tend = 1e-2
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, imex=True)
-
-    def get_default_description(self):
-        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex
-
-        description = super().get_default_description()
-
-        description['step_params']['maxiter'] = 5
-
-        description['level_params']['dt'] = 1e-4
-        description['level_params']['restol'] = 1e-8
-
-        description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
-        description['sweeper_params']['num_nodes'] = 3
-        description['sweeper_params']['QI'] = 'MIN-SR-S'
-        description['sweeper_params']['QE'] = 'PIC'
-
-        description['problem_params']['nvars'] = (2**10,) * 2
-        description['problem_params']['init_type'] = 'circle_rand'
-        description['problem_params']['L'] = 16
-        description['problem_params']['spectral'] = False
-        description['problem_params']['comm'] = self.comm_space
-
-        description['problem_class'] = allencahn_imex
-
-        return description
-
-    @property
-    def get_poly_adaptivity_default_params(self):
-        defaults = super().get_poly_adaptivity_default_params
-        defaults['e_tol'] = 1e-7
-        return defaults
-
-
-class RunSchroedinger(RunProblem):
-    default_Tend = 1.0
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs, imex=True)
-
-    def get_default_description(self):
-        from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import nonlinearschroedinger_imex
-
-        description = super().get_default_description()
-
-        description['step_params']['maxiter'] = 9
-
-        description['level_params']['dt'] = 1e-2
-        description['level_params']['restol'] = 1e-8
-
-        description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
-        description['sweeper_params']['num_nodes'] = 4
-        description['sweeper_params']['QI'] = 'MIN-SR-S'
-        description['sweeper_params']['QE'] = 'PIC'
-
-        description['problem_params']['nvars'] = (2**13,) * 2
-        description['problem_params']['spectral'] = False
-        description['problem_params']['comm'] = self.comm_space
-
-        description['problem_class'] = nonlinearschroedinger_imex
-
-        return description
-
-    @property
-    def get_poly_adaptivity_default_params(self):
-        defaults = super().get_poly_adaptivity_default_params
-        defaults['e_tol'] = 1e-7
-        return defaults
-
-
-def cast_to_bool(arg):
-    if arg == 'False':
-        return False
-    else:
-        return True
-
-
-def parse_args():
-    import sys
-
-    allowed_args = {
-        'Nsteps': int,
-        'Nsweep': int,
-        'Nspace': int,
-        'num_runs': int,
-        'useGPU': cast_to_bool,
-        'space_resolution': int,
-        'Tend': float,
-    }
-
-    args = {}
-    for me in sys.argv[1:]:
-        for key, cast in allowed_args.items():
-            if key in me:
-                args[key] = cast(me[len(key) + 1 :])
-
-    return args
-
-
 class Experiment:
     name = None
 
@@ -324,110 +217,9 @@ class Experiment:
         self.prob.record_timing(num_runs=self.num_runs, name=self.name, Tend=Tend)
 
 
-class SingleGPUExperiment(Experiment):
-    name = 'single_gpu'
-
-
-class AdaptivityExperiment(Experiment):
-    name = 'adaptivity'
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.prob.add_polynomial_adaptivity()
-
-
-class PlotExperiments:
-    experiment_cls = None
-    num_nodes_parallel_gpu = []
-    num_nodes_serial_gpu = []
-    num_nodes_parallel_cpu = []
-    num_nodes_serial_cpu = []
-
-    def __init__(self, **kwargs):
-        self.experiment = self.experiment_cls(**kwargs)
-
-    def get_multiple_data(self, vary_keys, prob_args=None):
-        times = {}
-        num_items = [len(vary_keys[key]) for key in vary_keys.keys()]
-        prob_args = {**self.experiment.prob_args, **prob_args} if prob_args else self.experiment.prob_args
-
-        for i in range(min(num_items)):
-            kwargs = {**prob_args, **{key: vary_keys[key][i] for key in vary_keys.keys()}}
-            prob = problem(**kwargs)
-            data = prob.get_data(self.experiment.name)
-            fac = 4 if kwargs['useGPU'] else 48
-            times[np.prod(vary_keys['num_procs'][i]) / fac] = data['times']
-        return times
-
-    def get_vary_keys(self, parallel_sweeper, useGPU):
-        vary_keys = {}
-        if parallel_sweeper and useGPU:
-            vary_keys['num_procs'] = [[1, 4, me] for me in self.num_nodes_parallel_gpu]
-        elif not parallel_sweeper and useGPU:
-            vary_keys['num_procs'] = [[1, 1, 4 * me] for me in self.num_nodes_serial_gpu]
-        elif parallel_sweeper and not useGPU:
-            vary_keys['num_procs'] = [[1, 4, me * 12] for me in self.num_nodes_parallel_cpu]
-        elif not parallel_sweeper and not useGPU:
-            vary_keys['num_procs'] = [[1, 1, me * 48] for me in self.num_nodes_serial_cpu]
-        else:
-            raise NotImplementedError
-        return vary_keys
-
-    def plot(self, ax):
-        for useGPU in [True, False]:
-            for parallel_sweeper in [True, False]:
-                self.plot_single(ax, parallel_sweeper, useGPU)
-
-    def plot_single(self, ax, parallel_sweeper, useGPU):
-        ls = {
-            True: '-',
-            False: '--',
-        }
-        marker = {
-            False: '^',
-            True: 'x',
-        }
-        label = {
-            True: 'space-time-parallel',
-            False: 'space-parallel',
-        }
-        label_GPU = {
-            True: 'GPU',
-            False: 'CPU',
-        }
-
-        timings = self.get_multiple_data(self.get_vary_keys(parallel_sweeper, useGPU), prob_args={'useGPU': useGPU})
-        ax.loglog(
-            timings.keys(),
-            timings.values(),
-            label=f'{label[parallel_sweeper]} {label_GPU[useGPU]}',
-            marker=marker[useGPU],
-            ls=ls[parallel_sweeper],
-            markersize=7,
-        )
-        ax.legend(frameon=True)
-        ax.set_xlabel('Nodes on JUWELS Booster')
-        ax.set_ylabel('wall time / s')
-
-
-class PlotSingleGPUStrongScaling(PlotExperiments):
-    experiment_cls = SingleGPUExperiment
-    num_nodes_parallel_gpu = [1, 2, 4, 8, 16, 32, 64, 128]
-    num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
-    num_nodes_parallel_cpu = [4, 8, 16]
-    num_nodes_serial_cpu = [1, 4, 8, 16]
-
-
-class PlotAdaptivityStrongScaling(PlotExperiments):
-    experiment_cls = AdaptivityExperiment
-    num_nodes_parallel_gpu = [1, 2, 4, 8, 16, 32, 64]
-    num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
-    num_nodes_parallel_cpu = []
-    num_nodes_serial_cpu = []
-
-
 if __name__ == '__main__':
-    problem = RunSchroedinger
+    from pySDC.projects.GPU.configs import AdaptivityExperiment, RunSchroedinger, parse_args
+
     args = parse_args()
 
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
@@ -437,19 +229,7 @@ if __name__ == '__main__':
         'num_runs': args.get('num_runs', 5),
         'useGPU': args.get('useGPU', True),
         'space_resolution': args.get('space_resolution', 2**13),
-        'problem': RunSchroedinger,
+        'problem': args.get('problem', RunSchroedinger),
     }
-
-    # experiment = SingleGPUExperiment(**kwargs)
-    experiment = AdaptivityExperiment(**kwargs)
-    # experiment.run()
-
-    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    fig, ax = plt.subplots(figsize=figsize)
-    plotter = PlotSingleGPUStrongScaling(**kwargs)
-    # plotter = PlotAdaptivityStrongScaling(**kwargs)
-    plotter.plot(ax)
-    fig.tight_layout()
-    fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
-
-    plt.show()
+    experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
+    experiment.run()
