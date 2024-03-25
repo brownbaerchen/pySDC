@@ -107,6 +107,41 @@ class RunSchroedinger(RunProblem):
         return defaults
 
 
+class RunBrusselator(RunProblem):
+    default_Tend = 10.0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, imex=True)
+
+    def get_default_description(self):
+        from pySDC.implementations.problem_classes.NonlinearSchroedinger_MPIFFT import nonlinearschroedinger_imex
+
+        description = super().get_default_description()
+
+        description['step_params']['maxiter'] = 9
+
+        description['level_params']['dt'] = 1e-2
+        description['level_params']['restol'] = 1e-8
+
+        description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
+        description['sweeper_params']['num_nodes'] = 4
+        description['sweeper_params']['QI'] = 'MIN-SR-S'
+        description['sweeper_params']['QE'] = 'PIC'
+
+        description['problem_params']['nvars'] = (2**13,) * 2
+        description['problem_params']['comm'] = self.comm_space
+
+        description['problem_class'] = nonlinearschroedinger_imex
+
+        return description
+
+    @property
+    def get_poly_adaptivity_default_params(self):
+        defaults = super().get_poly_adaptivity_default_params
+        defaults['e_tol'] = 1e-7
+        return defaults
+
+
 class SingleGPUExperiment(Experiment):
     name = 'single_gpu'
 
@@ -123,6 +158,7 @@ def get_problem(name):
     probs = {
         'Schroedinger': RunSchroedinger,
         'AC': RunAllenCahn,
+        'Brusselator': RunBrusselator,
     }
     return probs[name]
 
