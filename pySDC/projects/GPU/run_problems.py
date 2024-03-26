@@ -231,21 +231,5 @@ if __name__ == '__main__':
         'space_resolution': args.get('space_resolution', 2**13),
         'problem': args.get('problem', RunSchroedinger),
     }
-<<<<<<< Updated upstream
     experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
     experiment.run()
-=======
-
-    for ex in [SingleGPUExperiment(**kwargs), AdaptivityExperiment(**kwargs)]:
-        ex.run()
-
-    # figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    # fig, ax = plt.subplots(figsize=figsize)
-    # plotter = PlotSingleGPUStrongScaling(**kwargs)
-    # # plotter = PlotAdaptivityStrongScaling(**kwargs)
-    # plotter.plot(ax)
-    # fig.tight_layout()
-    # fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
-
-    # plt.show()
->>>>>>> Stashed changes
