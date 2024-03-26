@@ -10,6 +10,7 @@ from pySDC.core.Problem import ptype, WorkCounter
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 from mpi4py_fft import newDistArray
+import nvtx
 
 
 class nonlinearschroedinger_imex(ptype):
@@ -93,7 +94,15 @@ class nonlinearschroedinger_imex(ptype):
         # Creating FFT structure
         self.ndim = len(nvars)
         axes = tuple(range(self.ndim))
-        self.fft = PFFT(comm, list(nvars), axes=axes, dtype=np.complex128, collapse=True, backend=self.fft_backend, comm_backend=self.fft_comm_backend)
+        self.fft = PFFT(
+            comm,
+            list(nvars),
+            axes=axes,
+            dtype=np.complex128,
+            collapse=True,
+            backend=self.fft_backend,
+            comm_backend=self.fft_comm_backend,
+        )
 
         # get test data to figure out type and dimensions
         tmp_u = newDistArray(self.fft, spectral)
@@ -131,6 +140,7 @@ class nonlinearschroedinger_imex(ptype):
         # work counters
         self.work_counters['rhs'] = WorkCounter()
 
+    @nvtx.annotate('eval_f', color='green')
     def eval_f(self, u, t):
         """
         Routine to evaluate the right-hand side of the problem.
@@ -165,6 +175,7 @@ class nonlinearschroedinger_imex(ptype):
         self.work_counters['rhs']()
         return f
 
+    @nvtx.annotate('solve_system', color='green')
     def solve_system(self, rhs, factor, u0, t):
         """
         Simple FFT solver for the diffusion part.
@@ -197,6 +208,7 @@ class nonlinearschroedinger_imex(ptype):
 
         return me
 
+    @nvtx.annotate('u_exact', color='green')
     def u_exact(self, t, **kwargs):
         r"""
         Routine to compute the exact solution at time :math:`t`, see (1.3) https://arxiv.org/pdf/nlin/0702010.pdf for details

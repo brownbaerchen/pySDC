@@ -2,6 +2,9 @@ from mpi4py import MPI
 from pySDC.implementations.sweeper_classes.generic_implicit_MPI import SweeperMPI
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 
+import nvtx
+from cupy.cuda.nvtx import RangePush, RangePop
+
 
 class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
     def __init__(self, params):
@@ -10,6 +13,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
             self.params.QE == 'PIC'
         ), f"Only Picard is implemented for explicit precondioner so far in {type(self).__name__}! You chose \"{self.params.QE}\""
 
+    @nvtx.annotate('integrate', color='red')
     def integrate(self, last_only=False):
         """
         Integrates the right-hand side (here impl + expl)
@@ -36,6 +40,7 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
 
         return me
 
+    @nvtx.annotate('update_nodes', color='red')
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
@@ -59,7 +64,9 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
         rhs = self.integrate()
 
         # subtract QdF(u^k)
+        RangePush('subtract forward substitution')
         rhs -= L.dt * (self.QI[self.rank + 1, self.rank + 1] * L.f[self.rank + 1].impl)
+        RangePop()
 
         # add initial conditions
         rhs += L.u[0]
@@ -68,20 +75,25 @@ class imex_1st_order_MPI(SweeperMPI, imex_1st_order):
             rhs += L.tau[self.rank]
 
         # implicit solve with prefactor stemming from the diagonal of Qd
+        RangePush('Solve system')
         L.u[self.rank + 1] = P.solve_system(
             rhs,
             L.dt * self.QI[self.rank + 1, self.rank + 1],
             L.u[self.rank + 1],
             L.time + L.dt * self.coll.nodes[self.rank],
         )
+        RangePop()
         # update function values
+        RangePush('eval_f')
         L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+        RangePop()
 
         # indicate presence of new values at this level
         L.status.updated = True
 
         return None
 
+    @nvtx.annotate('compute_end_point', color='red')
     def compute_end_point(self):
         """
         Compute u at the right point of the interval

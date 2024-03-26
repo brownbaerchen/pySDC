@@ -4,6 +4,8 @@ from pySDC.implementations.sweeper_classes.generic_implicit import generic_impli
 from pySDC.core.Sweeper import sweeper, ParameterError
 import logging
 import numpy as np
+import nvtx
+from cupy.cuda.nvtx import RangePush, RangePop
 
 
 class SweeperMPI(sweeper):
@@ -70,6 +72,7 @@ class SweeperMPI(sweeper):
 
         return None
 
+    @nvtx.annotate('compute_residual', color='red')
     def compute_residual(self, stage=None):
         """
         Computation of the residual using the collocation matrix Q
@@ -114,6 +117,7 @@ class SweeperMPI(sweeper):
 
         return None
 
+    @nvtx.annotate('predict', color='red')
     def predict(self):
         """
         Predictor to fill values at nodes before first sweep
@@ -159,6 +163,7 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
         rank (int): MPI rank
     """
 
+    @nvtx.annotate('integrate', color='red')
     def integrate(self, last_only=False):
         """
         Integrates the right-hand side
@@ -181,6 +186,7 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
 
         return me
 
+    @nvtx.annotate('update_nodes', color='red')
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
@@ -214,20 +220,25 @@ class generic_implicit_MPI(SweeperMPI, generic_implicit):
         # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
 
         # implicit solve with prefactor stemming from the diagonal of Qd
+        RangePush('Solve system')
         L.u[self.rank + 1] = P.solve_system(
             rhs,
             L.dt * self.QI[self.rank + 1, self.rank + 1],
             L.u[self.rank + 1],
             L.time + L.dt * self.coll.nodes[self.rank],
         )
+        RangePop()
+        RangePush('eval_f')
         # update function values
         L.f[self.rank + 1] = P.eval_f(L.u[self.rank + 1], L.time + L.dt * self.coll.nodes[self.rank])
+        RangePop()
 
         # indicate presence of new values at this level
         L.status.updated = True
 
         return None
 
+    @nvtx.annotate('compute_end_point', color='red')
     def compute_end_point(self):
         """
         Compute u at the right point of the interval
