@@ -1,19 +1,15 @@
 import numpy as np
-from scipy.optimize import newton_krylov, root
+from scipy.optimize import newton_krylov
 from scipy.optimize.nonlin import NoConvergence
-import scipy.sparse as sp
-from mpi4py import MPI
-from mpi4py_fft import PFFT
 
 from pySDC.core.Errors import ProblemError
-from pySDC.core.Problem import ptype, WorkCounter
+from pySDC.core.Problem import WorkCounter
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
-
-from mpi4py_fft import newDistArray
 import nvtx
+from pySDC.implementations.problem_classes.generic_MPIFFT_Laplacian import IMEX_Laplacian_MPIFFT
 
 
-class nonlinearschroedinger_imex(ptype):
+class nonlinearschroedinger_imex(IMEX_Laplacian_MPIFFT):
     r"""
     Example implementing the :math:`N`-dimensional nonlinear Schrödinger equation with periodic boundary conditions
 
@@ -56,157 +52,18 @@ class nonlinearschroedinger_imex(ptype):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    fft_backend = 'fftw'
-    fft_comm_backend = 'MPI'
-
-    @classmethod
-    def setup_GPU(cls):
-        """switch to GPU modules"""
-        import cupy as cp
-        from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh, imex_cupy_mesh
-
-        cls.xp = cp
-
-        cls.dtype_u = cupy_mesh
-        cls.dtype_f = imex_cupy_mesh
-
-        cls.fft_backend = 'cupy'
-        cls.fft_comm_backend = 'NCCL'
-
-    def __init__(self, nvars=None, spectral=False, L=2 * np.pi, c=1.0, comm=MPI.COMM_WORLD, useGPU=False):
+    def __init__(self, c=1.0, **kwargs):
         """Initialization routine"""
-
-        if useGPU:
-            self.setup_GPU()
-
-        if nvars is None:
-            nvars = (128, 128)
-
-        if not L == 2.0 * np.pi:
-            raise ProblemError(f'Setup not implemented, L has to be 2pi, got {L}')
+        super().__init__(L=2 * np.pi, alpha=1j, dtype='D', **kwargs)
 
         if not (c == 0.0 or c == 1.0):
             raise ProblemError(f'Setup not implemented, c has to be 0 or 1, got {c}')
+        self._makeAttributeAndRegister('c', localVars=locals(), readOnly=True)
 
-        if not (isinstance(nvars, tuple) and len(nvars) > 1):
-            raise ProblemError('Need at least two dimensions')
-
-        # Creating FFT structure
-        self.ndim = len(nvars)
-        axes = tuple(range(self.ndim))
-        self.fft = PFFT(
-            comm,
-            list(nvars),
-            axes=axes,
-            dtype=np.complex128,
-            collapse=True,
-            backend=self.fft_backend,
-            comm_backend=self.fft_comm_backend,
-        )
-
-        # get test data to figure out type and dimensions
-        tmp_u = newDistArray(self.fft, spectral)
-
-        L = np.array([L] * self.ndim, dtype=float)
-
-        # invoke super init, passing the communicator and the local dimensions as init
-        super().__init__(init=(tmp_u.shape, comm, tmp_u.dtype))
-        self._makeAttributeAndRegister('nvars', 'spectral', 'L', 'c', 'comm', localVars=locals(), readOnly=True)
-
-        # get local mesh
-        X = self.xp.ogrid[self.fft.local_slice(False)]
-        N = self.fft.global_shape()
-        for i in range(len(N)):
-            X[i] = X[i] * self.L[i] / N[i]
-        self.X = [self.xp.broadcast_to(x, self.fft.shape(False)) for x in X]
-
-        # get local wavenumbers and Laplace operator
-        s = self.fft.local_slice()
-        N = self.fft.global_shape()
-        k = [self.xp.fft.fftfreq(n, 1.0 / n).astype(int) for n in N]
-        K = [ki[si] for ki, si in zip(k, s)]
-        Ks = self.xp.meshgrid(*K, indexing='ij', sparse=True)
-        Lp = 2 * np.pi / self.L
-        for i in range(self.ndim):
-            Ks[i] = (Ks[i] * Lp[i]).astype(float)
-        K = [self.xp.broadcast_to(k, self.fft.shape(True)) for k in Ks]
-        K = self.xp.array(K).astype(float)
-        self.K2 = self.xp.sum(K * K, 0, dtype=float)
-
-        # Need this for diagnostics
-        self.dx = self.L / nvars[0]
-        self.dy = self.L / nvars[1]
-
-        # work counters
-        self.work_counters['rhs'] = WorkCounter()
-
-    @nvtx.annotate('eval_f', color='green')
-    def eval_f(self, u, t):
-        """
-        Routine to evaluate the right-hand side of the problem.
-
-        Parameters
-        ----------
-        u : dtype_u
-            Current values of the numerical solution.
-        t : float
-            Current time at which the numerical solution is computed.
-
-        Returns
-        -------
-        f : dtype_f
-            The right-hand side of the problem.
-        """
-
-        f = self.dtype_f(self.init)
-
-        if self.spectral:
-            f.impl = -self.K2 * 1j * u
-            tmp = self.fft.backward(u)
-            tmpf = self.ndim * self.c * 2j * self.xp.absolute(tmp) ** 2 * tmp
-            f.expl[:] = self.fft.forward(tmpf)
-
-        else:
-            u_hat = self.fft.forward(u)
-            lap_u_hat = -self.K2 * 1j * u_hat
-            f.impl[:] = self.fft.backward(lap_u_hat, f.impl)
-            f.expl = self.ndim * self.c * 2j * self.xp.absolute(u) ** 2 * u
-
-        self.work_counters['rhs']()
-        return f
-
-    @nvtx.annotate('solve_system', color='green')
-    def solve_system(self, rhs, factor, u0, t):
-        """
-        Simple FFT solver for the diffusion part.
-
-        Parameters
-        ----------
-        rhs : dtype_f
-            Right-hand side for the linear system.
-        factor : float
-            Abbrev. for the node-to-node stepsize (or any other factor required).
-        u0 : dtype_u
-            Initial guess for the iterative solver (not used here so far).
-        t : float
-            Current time (e.g. for time-dependent BCs).
-
-        Returns
-        -------
-        me : dtype_u
-            The solution as mesh.
-        """
-
-        if self.spectral:
-            me = rhs / (1.0 + factor * self.K2 * 1j)
-
-        else:
-            me = self.dtype_u(self.init)
-            rhs_hat = self.fft.forward(rhs)
-            rhs_hat /= 1.0 + factor * self.K2 * 1j
-            me[:] = self.fft.backward(rhs_hat)
-
-        return me
+    @nvtx.annotate('eval_f_explicit', color='green')
+    def _eval_explicit_part(self, u, t, f_expl):
+        f_expl[:] = self.ndim * self.c * 2j * self.xp.absolute(u) ** 2 * u
+        return f_expl
 
     @nvtx.annotate('u_exact', color='green')
     def u_exact(self, t, **kwargs):
@@ -296,13 +153,13 @@ class nonlinearschroedinger_fully_implicit(nonlinearschroedinger_imex):
 
         if self.spectral:
             tmp = self.fft.backward(u)
-            tmpf = self.ndim * self.c * 2j * np.absolute(tmp) ** 2 * tmp
+            tmpf = self.ndim * self.c * 2j * self.xp.absolute(tmp) ** 2 * tmp
             f[:] = -self.K2 * 1j * u + self.fft.forward(tmpf)
 
         else:
             u_hat = self.fft.forward(u)
             lap_u_hat = -self.K2 * 1j * u_hat
-            f[:] = self.fft.backward(lap_u_hat) + self.ndim * self.c * 2j * np.absolute(u) ** 2 * u
+            f[:] = self.fft.backward(lap_u_hat) + self.ndim * self.c * 2j * self.xp.absolute(u) ** 2 * u
 
         self.work_counters['rhs']()
         return f
