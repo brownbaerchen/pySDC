@@ -154,6 +154,16 @@ class AdaptivityExperiment(Experiment):
         self.prob.add_polynomial_adaptivity()
 
 
+# class CUDASweeperExperiment(Experiment):
+#     name = 'CUDA'
+#     def __init__(self, **kwargs):
+#         from pySDC.projects.GPU.sweepers.imex_CUDA import IMEX_CUDA, imex_1st_orderCUDA, IMEX_diag_streams
+#         description = {
+#                 'sweeper_class': IMEX_diag_streams,
+#         }
+#         super().__init__(custom_description=description, **kwargs)
+
+
 def get_problem(name):
     probs = {
         'Schroedinger': RunSchroedinger,
@@ -167,5 +177,6 @@ def get_experiment(name):
     ex = {
         'singleGPU': SingleGPUExperiment,
         'adaptivity': AdaptivityExperiment,
+        # 'CUDA': CUDASweeperExperiment,
     }
     return ex[name]
