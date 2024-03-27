@@ -1,8 +1,6 @@
 import numpy as np
 
 from pySDC.core.Sweeper import sweeper
-import nvtx
-from cupy.cuda.nvtx import RangePush, RangePop
 
 
 class imex_1st_order(sweeper):
@@ -36,7 +34,6 @@ class imex_1st_order(sweeper):
         self.QI = self.get_Qdelta_implicit(coll=self.coll, qd_type=self.params.QI)
         self.QE = self.get_Qdelta_explicit(coll=self.coll, qd_type=self.params.QE)
 
-    @nvtx.annotate('integrate', color='red')
     def integrate(self):
         """
         Integrates the right-hand side (here impl + expl)
@@ -59,7 +56,6 @@ class imex_1st_order(sweeper):
 
         return me
 
-    @nvtx.annotate('update_nodes', color='red')
     def update_nodes(self):
         """
         Update the u- and f-values at the collocation nodes -> corresponds to a single sweep over all nodes
@@ -83,7 +79,6 @@ class imex_1st_order(sweeper):
 
         # get QF(u^k)
         integral = self.integrate()
-        RangePush('subtract forward substitution')
         for m in range(M):
             # subtract QIFI(u^k)_m + QEFE(u^k)_m
             for j in range(1, M + 1):
@@ -93,37 +88,27 @@ class imex_1st_order(sweeper):
             # add tau if associated
             if L.tau[m] is not None:
                 integral[m] += L.tau[m]
-        RangePop()
 
         # do the sweep
-        RangePush('sweeps')
         for m in range(0, M):
             # build rhs, consisting of the known values from above and new values from previous nodes (at k+1)
-            RangePush('Prepare rhs for solver')
             rhs = P.dtype_u(integral[m])
             for j in range(1, m + 1):
                 rhs += L.dt * (self.QI[m + 1, j] * L.f[j].impl + self.QE[m + 1, j] * L.f[j].expl)
-            RangePop()
 
-            RangePush('solve')
             # implicit solve with prefactor stemming from QI
             L.u[m + 1] = P.solve_system(
                 rhs, L.dt * self.QI[m + 1, m + 1], L.u[m + 1], L.time + L.dt * self.coll.nodes[m]
             )
-            RangePop()
 
             # update function values
-            RangePush('evaluate f')
             L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
-            RangePop()
-        RangePop()
 
         # indicate presence of new values at this level
         L.status.updated = True
 
         return None
 
-    @nvtx.annotate('compute_end_point', color='red')
     def compute_end_point(self):
         """
         Compute u at the right point of the interval

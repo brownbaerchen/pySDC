@@ -130,6 +130,7 @@ class LogToFile(hooks):
 
             with open(path, 'wb') as file:
                 pickle.dump(data, file)
+            self.logger.info(f'Stored file {path!r}')
 
             self.counter += 1
 

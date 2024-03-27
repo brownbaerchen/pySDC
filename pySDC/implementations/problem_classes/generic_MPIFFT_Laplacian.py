@@ -45,6 +45,7 @@ class IMEX_Laplacian_MPIFFT(ptype):
     dtype_u = mesh
     dtype_f = imex_mesh
 
+    xp = np
     fft_backend = 'fftw'
     fft_comm_backend = 'MPI'
 
@@ -62,7 +63,9 @@ class IMEX_Laplacian_MPIFFT(ptype):
         cls.fft_backend = 'cupy'
         cls.fft_comm_backend = 'NCCL'
 
-    def __init__(self, nvars=None, spectral=False, L=2 * np.pi, alpha=1.0, comm=MPI.COMM_WORLD, dtype='d', useGPU=False):
+    def __init__(
+        self, nvars=None, spectral=False, L=2 * np.pi, alpha=1.0, comm=MPI.COMM_WORLD, dtype='d', useGPU=False
+    ):
         """Initialization routine"""
 
         if useGPU:
@@ -77,7 +80,12 @@ class IMEX_Laplacian_MPIFFT(ptype):
         # Creating FFT structure
         self.ndim = len(nvars)
         axes = tuple(range(self.ndim))
-        self.fft = PFFT(comm, list(nvars), axes=axes, dtype=dtype, collapse=True, 
+        self.fft = PFFT(
+            comm,
+            list(nvars),
+            axes=axes,
+            dtype=dtype,
+            collapse=True,
             backend=self.fft_backend,
             comm_backend=self.fft_comm_backend,
         )

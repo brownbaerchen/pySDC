@@ -139,6 +139,7 @@ class RunBrusselator(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-7
+        defaults['interpolate_between_restarts'] = False
         return defaults
 
 
@@ -164,6 +165,53 @@ class AdaptivityExperiment(Experiment):
 #         super().__init__(custom_description=description, **kwargs)
 
 
+class Visualisation(AdaptivityExperiment):
+    name = 'visualisation'
+
+    def __init__(self, **kwargs):
+        from pySDC.implementations.hooks.log_solution import LogToFile
+        from pySDC.projects.GPU.run_problems import get_comms
+        from pySDC.projects.GPU.hooks.LogGrid import LogGrid
+
+        comm_steps, comm_sweep, comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
+        rank_path = f'{comm_steps.rank}_{comm_sweep.rank}_{comm_space.rank}'
+
+        prob_name = kwargs['problem'].__name__
+
+        LogToFile.path = './simulation_output'
+        LogToFile.file_name = f'solution_{prob_name}_{rank_path}'
+        if kwargs['useGPU']:
+            import numpy as np
+
+            LogToFile.process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.get().view(np.ndarray)}
+        self.logger_hook = LogToFile
+
+        LogGrid.file_logger = LogToFile
+        LogGrid.file_name = f'grid_{prob_name}_{rank_path}'
+        self.log_grid = LogGrid
+
+        if comm_sweep.rank == comm_sweep.size - 1:
+            controller_params = {'hook_class': [LogToFile, LogGrid], 'logger_level': 15}
+        else:
+            controller_params = {}
+        super().__init__(custom_controller_params=controller_params, **kwargs)
+
+    def run(self, Tend=None):
+        self.prob.run(Tend=Tend)
+
+    def plot(self, ax, ranks, idx):
+        self.logger_hook.file_name = f'solution_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
+        self.log_grid.file_name = f'grid_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
+        data = self.logger_hook.load(idx)
+        grid = self.log_grid.load()
+
+        ax.pcolormesh(grid[0], grid[1], data['u'][0], vmin=0, vmax=7.0)
+        # ax.set_xlim(0, 1)
+        # ax.set_ylim(0, 1)
+        ax.set_aspect(1.0)
+        ax.set_title(data['t'])
+
+
 def get_problem(name):
     probs = {
         'Schroedinger': RunSchroedinger,
@@ -178,5 +226,6 @@ def get_experiment(name):
         'singleGPU': SingleGPUExperiment,
         'adaptivity': AdaptivityExperiment,
         # 'CUDA': CUDASweeperExperiment,
+        'visualisation': Visualisation,
     }
     return ex[name]

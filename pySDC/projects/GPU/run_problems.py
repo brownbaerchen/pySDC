@@ -199,7 +199,14 @@ class Experiment:
     name = None
 
     def __init__(
-        self, problem, num_procs=None, useGPU=True, num_runs=5, space_resolution=None, custom_description=None
+        self,
+        problem,
+        num_procs=None,
+        useGPU=True,
+        num_runs=5,
+        space_resolution=None,
+        custom_description=None,
+        custom_controller_params=None,
     ):
         self.problem = problem
         self.num_runs = num_runs
@@ -209,6 +216,7 @@ class Experiment:
             'useGPU': useGPU,
             'custom_description': custom_description if custom_description else {},
             'space_resolution': space_resolution,
+            'custom_controller_params': custom_controller_params,
         }
 
         self.prob = problem(**self.prob_args)
