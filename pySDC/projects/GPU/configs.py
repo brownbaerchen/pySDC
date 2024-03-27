@@ -199,11 +199,17 @@ class Visualisation(AdaptivityExperiment):
     def run(self, Tend=None):
         self.prob.run(Tend=Tend)
 
-    def plot(self, ax, ranks, idx):
-        self.logger_hook.file_name = f'solution_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
+    def get_grid(self, ranks):
         self.log_grid.file_name = f'grid_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
-        data = self.logger_hook.load(idx)
-        grid = self.log_grid.load()
+        return self.log_grid.load()
+
+    def get_solution(self, ranks, idx):
+        self.logger_hook.file_name = f'solution_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
+        return self.logger_hook.load(idx)
+
+    def plot(self, ax, ranks, idx):
+        data = self.get_solution(ranks, idx)
+        grid = self.get_grid(ranks)
 
         ax.pcolormesh(grid[0], grid[1], data['u'][0], vmin=0, vmax=7.0)
         # ax.set_xlim(0, 1)

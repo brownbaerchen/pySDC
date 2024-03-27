@@ -16,12 +16,14 @@ class LogGrid(hooks):
             return pickle.load(file)
 
     def pre_run(self, step, level_number):
+        import numpy as np
+
         self.file_logger()
 
         grid = step.levels[level_number].prob.X
 
         with open(self.get_path(), 'wb') as file:
             try:
-                pickle.dump(grid.get(), file)
+                pickle.dump(np.array([me.get() for me in grid]), file)
             except AttributeError:
                 pickle.dump(grid, file)
