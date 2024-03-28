@@ -89,7 +89,7 @@ class RunProblem:
             'factor_if_not_converged': 4.0,
             'residual_max_tol': 1e9,
             'maxiter': self.description['sweeper_params'].get('maxiter', 99),
-            'interpolate_between_restarts': True,
+            'interpolate_between_restarts': False,
             'abort_at_growing_residual': True,
         }
         return defaults
@@ -134,7 +134,7 @@ class RunProblem:
         return controller_params
 
     def get_controller_params(self, custom_controller_params):
-        self.controller_params = merge_descriptions(self.get_default_controller_params(), custom_controller_params)
+        self.controller_params = {**self.get_default_controller_params(), **custom_controller_params}
 
         # prevent duplicate logging
         if self.comm_space.rank > 0 or self.comm_sweep.rank > 0:

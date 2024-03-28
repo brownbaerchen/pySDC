@@ -34,7 +34,7 @@ def parse_args():
 
 
 class RunAllenCahn(RunProblem):
-    default_Tend = 1e0
+    default_Tend = 2e-1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
@@ -50,7 +50,7 @@ class RunAllenCahn(RunProblem):
         description['level_params']['restol'] = 1e-8
 
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
-        description['sweeper_params']['num_nodes'] = 3
+        description['sweeper_params']['num_nodes'] = 4
         description['sweeper_params']['QI'] = 'MIN-SR-S'
         description['sweeper_params']['QE'] = 'PIC'
 
@@ -206,7 +206,7 @@ class Visualisation(AdaptivityExperiment):
         if self.comm_sweep.rank == self.comm_sweep.size - 1:
             controller_params = {'hook_class': [LogToFileAfterXs, LogGrid, LogStepSize], 'logger_level': 15}
         else:
-            controller_params = {}
+            controller_params = {'hook_class': [LogStepSize], 'logger_level': 15}
         super().__init__(custom_controller_params=controller_params, **kwargs)
 
     def run(self, Tend=None):
