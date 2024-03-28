@@ -40,7 +40,7 @@ class RunAllenCahn(RunProblem):
         super().__init__(*args, **kwargs, imex=True)
 
     def get_default_description(self):
-        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex, allencahn_imex_timeforcing
+        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex
 
         description = super().get_default_description()
 
@@ -69,6 +69,17 @@ class RunAllenCahn(RunProblem):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-7
         return defaults
+
+
+class RunAllenCahnForcing(RunAllenCahn):
+    default_Tend = 1e-2
+
+    def get_default_description(self):
+        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing
+
+        description = super().get_default_description()
+        description['problem_class'] = allencahn_imex_timeforcing
+        return description
 
 
 class RunSchroedinger(RunProblem):
@@ -235,6 +246,7 @@ def get_problem(name):
     probs = {
         'Schroedinger': RunSchroedinger,
         'AC': RunAllenCahn,
+        'ACT': RunAllenCahnForcing,
         'Brusselator': RunBrusselator,
     }
     return probs[name]
