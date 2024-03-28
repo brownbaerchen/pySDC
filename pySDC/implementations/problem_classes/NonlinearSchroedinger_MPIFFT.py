@@ -4,9 +4,8 @@ from scipy.optimize.nonlin import NoConvergence
 
 from pySDC.core.Errors import ProblemError
 from pySDC.core.Problem import WorkCounter
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
-import nvtx
 from pySDC.implementations.problem_classes.generic_MPIFFT_Laplacian import IMEX_Laplacian_MPIFFT
+from pySDC.implementations.datatype_classes.mesh import mesh
 
 
 class nonlinearschroedinger_imex(IMEX_Laplacian_MPIFFT):
@@ -47,10 +46,8 @@ class nonlinearschroedinger_imex(IMEX_Laplacian_MPIFFT):
     .. [1] Lisandro Dalcin, Mikael Mortensen, David E. Keyes. Fast parallel multidimensional FFT using advanced MPI.
         Journal of Parallel and Distributed Computing (2019).
     """
-    xp = np
 
-    dtype_u = mesh
-    dtype_f = imex_mesh
+    xp = np
 
     def __init__(self, c=1.0, **kwargs):
         """Initialization routine"""
