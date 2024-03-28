@@ -139,7 +139,7 @@ class allencahn_imex(IMEX_Laplacian_MPIFFT):
                 me[:] = 0.5 * (1.0 + np.tanh((self.radius - np.sqrt(r2)) / (np.sqrt(2) * self.eps)))
         elif self.init_type == 'circle_rand':
             ndim = len(me.shape)
-            L = int(self.L)
+            L = int(self.L[0])
             # get random radii for circles/spheres
             np.random.seed(1)
             lbound = 3.0 * self.eps

@@ -143,3 +143,19 @@ class LogToFile(hooks):
         path = cls.get_path(index)
         with open(path, 'rb') as file:
             return pickle.load(file)
+
+
+class LogToFileAfterXs(LogToFile):
+    r'''
+    Log to file after certain amount of time has passed instead of after every step
+    '''
+
+    time_increment = 0
+    t_next_log = 0
+
+    def post_step(self, step, level_number):
+        L = step.levels[level_number]
+
+        if L.time + L.dt >= self.t_next_log:
+            super().post_step(step, level_number)
+            self.t_next_log += self.time_increment

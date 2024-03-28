@@ -57,12 +57,10 @@ class nonlinearschroedinger_imex(IMEX_Laplacian_MPIFFT):
             raise ProblemError(f'Setup not implemented, c has to be 0 or 1, got {c}')
         self._makeAttributeAndRegister('c', localVars=locals(), readOnly=True)
 
-    @nvtx.annotate('eval_f_explicit', color='green')
     def _eval_explicit_part(self, u, t, f_expl):
         f_expl[:] = self.ndim * self.c * 2j * self.xp.absolute(u) ** 2 * u
         return f_expl
 
-    @nvtx.annotate('u_exact', color='green')
     def u_exact(self, t, **kwargs):
         r"""
         Routine to compute the exact solution at time :math:`t`, see (1.3) https://arxiv.org/pdf/nlin/0702010.pdf for details

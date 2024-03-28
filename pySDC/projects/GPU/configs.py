@@ -34,13 +34,13 @@ def parse_args():
 
 
 class RunAllenCahn(RunProblem):
-    default_Tend = 1e-2
+    default_Tend = 1e0
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
 
     def get_default_description(self):
-        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex
+        from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex, allencahn_imex_timeforcing
 
         description = super().get_default_description()
 
@@ -169,35 +169,48 @@ class Visualisation(AdaptivityExperiment):
     name = 'visualisation'
 
     def __init__(self, **kwargs):
-        from pySDC.implementations.hooks.log_solution import LogToFile
+        from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
+        from pySDC.implementations.hooks.log_step_size import LogStepSize
 
-        comm_steps, comm_sweep, comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
-        rank_path = f'{comm_steps.rank}_{comm_sweep.rank}_{comm_space.rank}'
+        self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
+        rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
 
         prob_name = kwargs['problem'].__name__
 
-        LogToFile.path = './simulation_output'
-        LogToFile.file_name = f'solution_{prob_name}_{rank_path}'
+        LogToFileAfterXs.path = './simulation_output'
+        LogToFileAfterXs.file_name = f'solution_{prob_name}_{rank_path}'
+        LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 100
         if kwargs['useGPU']:
             import numpy as np
 
-            LogToFile.process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.get().view(np.ndarray)}
-        self.logger_hook = LogToFile
+            LogToFileAfterXs.process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.get().view(np.ndarray)}
+        self.logger_hook = LogToFileAfterXs
 
-        LogGrid.file_logger = LogToFile
+        LogGrid.file_logger = LogToFileAfterXs
         LogGrid.file_name = f'grid_{prob_name}_{rank_path}'
         self.log_grid = LogGrid
 
-        if comm_sweep.rank == comm_sweep.size - 1:
-            controller_params = {'hook_class': [LogToFile, LogGrid], 'logger_level': 15}
+        if self.comm_sweep.rank == self.comm_sweep.size - 1:
+            controller_params = {'hook_class': [LogToFileAfterXs, LogGrid, LogStepSize], 'logger_level': 15}
         else:
             controller_params = {}
         super().__init__(custom_controller_params=controller_params, **kwargs)
 
     def run(self, Tend=None):
-        self.prob.run(Tend=Tend)
+        import pickle
+        from pySDC.helpers.stats_helper import get_sorted
+
+        stats = self.prob.run(Tend=Tend)
+
+        data = {'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps)}
+
+        if self.comm_steps.rank > 0 or self.comm_sweep.rank > 0 or self.comm_space.rank > 0:
+            return None
+
+        with open(f'{self.logger_hook.path}/{type(self.prob).__name__}_stats.pickle', 'wb') as file:
+            pickle.dump(data, file)
 
     def get_grid(self, ranks):
         self.log_grid.file_name = f'grid_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
