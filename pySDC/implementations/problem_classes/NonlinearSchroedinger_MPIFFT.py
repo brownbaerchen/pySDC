@@ -47,8 +47,6 @@ class nonlinearschroedinger_imex(IMEX_Laplacian_MPIFFT):
         Journal of Parallel and Distributed Computing (2019).
     """
 
-    xp = np
-
     def __init__(self, c=1.0, **kwargs):
         """Initialization routine"""
         super().__init__(L=2 * np.pi, alpha=1j, dtype='D', **kwargs)
