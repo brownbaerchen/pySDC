@@ -45,6 +45,8 @@ def plot_step_size(ax):
         data = pickle.load(file)
     dt = data['dt']
     ax.plot([me[0] for me in dt], [me[1] for me in dt])
+    ax.set_ylabel(r'$\Delta t$')
+    ax.set_xlabel(r'$t$')
 
 
 def plot_grid(ax, ranks):
@@ -94,7 +96,7 @@ def plot_all_AC(ranks, format='png'):
 
 
 fig, ax = plt.subplots()
-ranks = [0, 1, 4]
+ranks = [0, 4, 16]
 plot_step_size(ax)
 # plot_AC(ranks)
 # plot_all_AC(ranks)
