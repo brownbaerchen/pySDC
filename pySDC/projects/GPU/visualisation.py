@@ -1,8 +1,9 @@
-from configs import Visualisation, RunBrusselator, RunSchroedinger, RunAllenCahn, RunAllenCahnForcing
+from configs import Visualisation, RunBrusselator, RunSchroedinger, RunAllenCahn, RunAllenCahnForcing, RunGS
 import matplotlib.pyplot as plt
 
 
-V = Visualisation(problem=RunAllenCahnForcing, useGPU=False)
+problem = RunGS
+V = Visualisation(problem=problem, useGPU=False)
 
 
 # for i in range(99):
@@ -36,6 +37,19 @@ def plot_solution_AC(ax, ranks, idx):
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title(f'$t$ = {solution["t"]:.2f}')
+
+
+def plot_solution_GS(ax, ranks, idx):
+    plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True}
+    for n in range(ranks[2]):
+        solution = V.get_solution([ranks[0], ranks[1] - 1, n], idx)
+        x, y = V.get_grid([ranks[0], ranks[1] - 1, n])
+        ax.pcolormesh(x, y, solution['u'][1], **plotting_args)
+    ax.set_aspect(1.0)
+    ax.set_xlabel(r'$x$')
+    ax.set_ylabel(r'$y$')
+    ax.set_title(f'$t$ = {solution["t"]:.2f}')
+    print(f'plotted t={solution["t"]:.2f}')
 
 
 def plot_step_size(ax):
@@ -79,7 +93,7 @@ def plot_AC(ranks):
     plot_grid(ax, ranks)
 
 
-def plot_all_AC(ranks, format='png'):
+def plot_all(ranks, func, format='png'):
     fig, ax = plt.subplots()
     from mpi4py import MPI
 
@@ -87,7 +101,7 @@ def plot_all_AC(ranks, format='png'):
 
     for i in range(0, 999999, comm.size):
         try:
-            plot_solution_AC(ax, ranks, i + comm.rank)
+            func(ax, ranks, i + comm.rank)
             path = f'./simulation_plots/{V.logger_hook.file_name}_{V.logger_hook.format_index(i+comm.rank)}.{format}'
             fig.savefig(path, bbox_inches='tight')
             ax.cla()
@@ -95,9 +109,11 @@ def plot_all_AC(ranks, format='png'):
             break
 
 
-fig, ax = plt.subplots()
+# fig, ax = plt.subplots()
 ranks = [0, 4, 16]
-plot_step_size(ax)
+# plot_step_size(ax)
+# plot_solution_GS(ax, [0,1,4], 0)
+plot_all([0, 1, 4], plot_solution_GS)
 # plot_AC(ranks)
-# plot_all_AC(ranks)
+# plot_all(ranks, plot_AC)
 plt.show()

@@ -150,7 +150,45 @@ class RunBrusselator(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-7
-        defaults['interpolate_between_restarts'] = False
+        return defaults
+
+
+class RunGS(RunProblem):
+    default_Tend = 5500
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs, imex=True)
+
+    def get_default_description(self):
+        from pySDC.implementations.problem_classes.GrayScott_MPIFFT import grayscott_imex_diffusion
+
+        description = super().get_default_description()
+
+        description['step_params']['maxiter'] = 29
+
+        description['level_params']['dt'] = 1e-2
+        description['level_params']['restol'] = 1e-8
+
+        description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
+        description['sweeper_params']['num_nodes'] = 4
+        description['sweeper_params']['QI'] = 'MIN-SR-S'
+        description['sweeper_params']['QE'] = 'PIC'
+
+        description['problem_params']['nvars'] = (2**13,) * 2
+        description['problem_params']['comm'] = self.comm_space
+        description['problem_params']['Du'] = 2e-5
+        description['problem_params']['Dv'] = 1e-5
+        description['problem_params']['A'] = 0.04
+        description['problem_params']['B'] = 0.1
+
+        description['problem_class'] = grayscott_imex_diffusion
+
+        return description
+
+    @property
+    def get_poly_adaptivity_default_params(self):
+        defaults = super().get_poly_adaptivity_default_params
+        defaults['e_tol'] = 1e-5
         return defaults
 
 
@@ -179,7 +217,7 @@ class AdaptivityExperiment(Experiment):
 class Visualisation(AdaptivityExperiment):
     name = 'visualisation'
 
-    def __init__(self, **kwargs):
+    def __init__(self, live_plotting=False, **kwargs):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -192,7 +230,7 @@ class Visualisation(AdaptivityExperiment):
 
         LogToFileAfterXs.path = './simulation_output'
         LogToFileAfterXs.file_name = f'solution_{prob_name}_{rank_path}'
-        LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 100
+        LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
         if kwargs['useGPU']:
             import numpy as np
 
@@ -203,10 +241,16 @@ class Visualisation(AdaptivityExperiment):
         LogGrid.file_name = f'grid_{prob_name}_{rank_path}'
         self.log_grid = LogGrid
 
+        # hooks
+        hooks = [LogStepSize]
         if self.comm_sweep.rank == self.comm_sweep.size - 1:
-            controller_params = {'hook_class': [LogToFileAfterXs, LogGrid, LogStepSize], 'logger_level': 15}
-        else:
-            controller_params = {'hook_class': [LogStepSize], 'logger_level': 15}
+            hooks += [LogToFileAfterXs, LogGrid]
+        if live_plotting:
+            from pySDC.implementations.hooks.live_plotting import PlotPostStep
+
+            hooks += [PlotPostStep]
+        controller_params = {'hook_class': hooks, 'logger_level': 15}
+
         super().__init__(custom_controller_params=controller_params, **kwargs)
 
     def run(self, Tend=None):
@@ -248,6 +292,7 @@ def get_problem(name):
         'AC': RunAllenCahn,
         'ACT': RunAllenCahnForcing,
         'Brusselator': RunBrusselator,
+        'GS': RunGS,
     }
     return probs[name]
 

@@ -198,6 +198,56 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         return me
 
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots(1, 2, sharex=True, sharey=True, figsize=((8, 3)))
+        divider = make_axes_locatable(axs[1])
+        self.cax = divider.append_axes('right', size='3%', pad=0.03)
+        return self.fig
+
+    def plot(self, u, t=None, fig=None):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        axs = fig.axes
+
+        vmin = u.min()
+        vmax = u.max()
+        for i, label in zip([self.iU, self.iV], [r'$u$', r'$v$']):
+            im = axs[i].pcolormesh(self.X[0], self.X[1], u[i], vmin=vmin, vmax=vmax)
+            axs[i].set_aspect(1)
+            axs[i].set_title(label)
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2e}')
+        axs[0].set_xlabel(r'$x$')
+        axs[0].set_ylabel(r'$y$')
+        fig.colorbar(im, self.cax)
+
 
 class grayscott_imex_linear(grayscott_imex_diffusion):
     r"""
