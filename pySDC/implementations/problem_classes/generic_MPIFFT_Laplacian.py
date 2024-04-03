@@ -64,7 +64,7 @@ class IMEX_Laplacian_MPIFFT(ptype):
         cls.fft_comm_backend = 'NCCL'
 
     def __init__(
-        self, nvars=None, spectral=False, L=2 * np.pi, alpha=1.0, comm=MPI.COMM_WORLD, dtype='d', useGPU=False
+        self, nvars=None, spectral=False, L=2 * np.pi, alpha=1.0, comm=MPI.COMM_WORLD, dtype='d', useGPU=False, x0=0.0
     ):
         """Initialization routine"""
 
@@ -97,13 +97,15 @@ class IMEX_Laplacian_MPIFFT(ptype):
 
         # invoke super init, passing the communicator and the local dimensions as init
         super().__init__(init=(tmp_u.shape, comm, tmp_u.dtype))
-        self._makeAttributeAndRegister('nvars', 'spectral', 'L', 'alpha', 'comm', localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister(
+            'nvars', 'spectral', 'L', 'alpha', 'comm', 'x0', localVars=locals(), readOnly=True
+        )
 
         # get local mesh
         X = self.xp.ogrid[self.fft.local_slice(False)]
         N = self.fft.global_shape()
         for i in range(len(N)):
-            X[i] = X[i] * self.L[i] / N[i]
+            X[i] = x0 + (X[i] * L[i] / N[i])
         self.X = [self.xp.broadcast_to(x, self.fft.shape(False)) for x in X]
 
         # get local wavenumbers and Laplace operator
@@ -158,12 +160,13 @@ class IMEX_Laplacian_MPIFFT(ptype):
         self.work_counters['rhs']()
         return f
 
-    def _eval_Laplacian(self, u, f_impl):
+    def _eval_Laplacian(self, u, f_impl, alpha=None):
+        alpha = alpha if alpha else self.alpha
         if self.spectral:
-            f_impl[:] = -self.alpha * self.K2 * u
+            f_impl[:] = -alpha * self.K2 * u
         else:
             u_hat = self.fft.forward(u)
-            lap_u_hat = -self.alpha * self.K2 * u_hat
+            lap_u_hat = -alpha * self.K2 * u_hat
             f_impl[:] = self.fft.backward(lap_u_hat, f_impl)
         return f_impl
 
@@ -195,12 +198,13 @@ class IMEX_Laplacian_MPIFFT(ptype):
 
         return me
 
-    def _invert_Laplacian(self, me, factor, rhs):
+    def _invert_Laplacian(self, me, factor, rhs, alpha=None):
+        alpha = alpha if alpha else self.alpha
         if self.spectral:
-            me[:] = rhs / (1.0 + factor * self.alpha * self.K2)
+            me[:] = rhs / (1.0 + factor * alpha * self.K2)
 
         else:
             rhs_hat = self.fft.forward(rhs)
-            rhs_hat /= 1.0 + factor * self.alpha * self.K2
+            rhs_hat /= 1.0 + factor * alpha * self.K2
             me[:] = self.fft.backward(rhs_hat)
         return me
