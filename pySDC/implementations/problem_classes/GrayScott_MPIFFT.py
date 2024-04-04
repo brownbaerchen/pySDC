@@ -71,7 +71,19 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
     .. [3] https://www.chebfun.org/examples/pde/GrayScott.html
     """
 
-    def __init__(self, Du=1.0, Dv=0.01, A=0.09, B=0.086, num_blobs=1, r=1.0, x_shift=0.025, y_shift=0.01, **kwargs):
+    def __init__(
+        self,
+        Du=1.0,
+        Dv=0.01,
+        A=0.09,
+        B=0.086,
+        num_blobs=1,
+        r=1.0,
+        x_shift=0.025,
+        y_shift=0.01,
+        smooth_ic=True,
+        **kwargs,
+    ):
         kwargs['L'] = 2.0
         super().__init__(dtype='d', alpha=1.0, x0=-kwargs['L'] / 2.0, **kwargs)
 
@@ -82,7 +94,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         self.init = (shape, self.comm, self.xp.dtype('float'))
 
         self._makeAttributeAndRegister(
-            'Du', 'Dv', 'A', 'B', 'num_blobs', 'r', 'x_shift', 'y_shift', localVars=locals(), readOnly=True
+            'Du', 'Dv', 'A', 'B', 'num_blobs', 'r', 'x_shift', 'y_shift', 'smooth_ic', localVars=locals(), readOnly=True
         )
 
         # prepare "Laplacians"
@@ -193,8 +205,15 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         def get_single_circle(x, y, radius):
             _u = newDistArray(self.fft, False)
             _v = newDistArray(self.fft, False)
-            _u[:] = 1.0 - self.xp.exp(-80.0 / radius * ((self.X[0] + x) ** 2 + (self.X[1] + y) ** 2))
-            _v[:] = self.xp.exp(-80.0 / radius * ((self.X[0] - x) ** 2 + (self.X[1] - y) ** 2))
+            if self.smooth_ic:
+                _u[:] = 1.0 - self.xp.exp(-80.0 / radius * ((self.X[0] + x) ** 2 + (self.X[1] + y) ** 2))
+                _v[:] = self.xp.exp(-80.0 / radius * ((self.X[0] - x) ** 2 + (self.X[1] - y) ** 2))
+            else:
+                _u[:] = 1.0
+                u_radius = (self.X[0] + x) ** 2 + (self.X[1] + y) ** 2
+                v_radius = (self.X[0] - x) ** 2 + (self.X[1] - y) ** 2
+                _u[u_radius < radius**2] = radius - self.xp.sqrt(u_radius)[u_radius < radius**2]
+                _v[v_radius < radius**2] = radius - self.xp.sqrt(v_radius)[v_radius < radius**2]
             return _u, _v
 
         # This assumes that the box is [-L/2, L/2]^2

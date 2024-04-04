@@ -186,10 +186,11 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = 1e-5
         description['problem_params']['A'] = 0.04
         description['problem_params']['B'] = 0.1
-        description['problem_params']['num_blobs'] = 3
+        description['problem_params']['num_blobs'] = 2
         description['problem_params']['r'] = None
         description['problem_params']['x_shift'] = None
         description['problem_params']['y_shift'] = None
+        description['problem_params']['smooth_ic'] = False
 
         description['problem_class'] = grayscott_imex_diffusion
 
@@ -228,7 +229,7 @@ class AdaptivityExperiment(Experiment):
 class Visualisation(AdaptivityExperiment):
     name = 'visualisation'
 
-    def __init__(self, live_plotting=True, **kwargs):
+    def __init__(self, live_plotting=False, **kwargs):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
