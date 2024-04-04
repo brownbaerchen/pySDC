@@ -36,6 +36,7 @@ class RunProblem:
         imex=False,
         useGPU=True,
         space_resolution=None,
+        u_init=None,
     ):
         num_procs = (
             [
@@ -57,6 +58,8 @@ class RunProblem:
         self.get_controller_params(custom_controller_params)
         if space_resolution:
             self.set_space_resolution(space_resolution)
+
+        self.u_init = u_init
 
     def get_default_description(self):
         description = {
@@ -140,7 +143,7 @@ class RunProblem:
         if self.comm_space.rank > 0 or self.comm_sweep.rank > 0:
             self.controller_params['logger_level'] = 30
 
-    def run(self, Tend=None, storeResults=True):
+    def run(self, Tend=None, u_init=None, t0=0):
         from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
 
         Tend = self.default_Tend if Tend is None else Tend
@@ -148,8 +151,10 @@ class RunProblem:
             description=self.description, controller_params=self.controller_params, comm=self.comm_steps
         )
         prob = controller.S.levels[0].prob
-        u_init = prob.u_exact(0)
-        u_end, stats = controller.run(u0=u_init, t0=0, Tend=Tend)
+        _u0 = prob.u_exact(0)
+        if u_init is not None:
+            _u0[:] = u_init[:]
+        u_end, stats = controller.run(u0=_u0, t0=t0, Tend=Tend)
 
         return stats
 
@@ -221,7 +226,21 @@ class Experiment:
 
         self.prob = problem(**self.prob_args)
 
-    def run(self, Tend=None):
+    def get_hook_fname_for_ranks(self, ranks):
+        return f'{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
+
+    def get_grid(self, ranks):
+        self.log_grid.file_name = f'grid_{self.get_hook_fname_for_ranks(ranks)}'
+        return self.log_grid.load()
+
+    def get_solution(self, ranks, idx):
+        self.logger_hook.file_name = f'solution_{self.get_hook_fname_for_ranks(ranks)}'
+        return self.logger_hook.load(idx)
+
+    def restart_from_file(self, ranks, idx):
+        self.prob.u_init = self.get_solution(ranks, idx)
+
+    def run(self, Tend=None, **kwargs):
         self.prob.record_timing(num_runs=self.num_runs, name=self.name, Tend=Tend)
 
 
@@ -240,4 +259,9 @@ if __name__ == '__main__':
         'problem': args.get('problem', RunSchroedinger),
     }
     experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
-    experiment.run()
+
+    run_args = {
+        'restart_idx': args.get('restart_idx', None),
+        'Tend': args.get('Tend', None),
+    }
+    experiment.run(**run_args)

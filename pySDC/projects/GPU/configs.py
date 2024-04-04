@@ -22,13 +22,18 @@ def parse_args():
         'Tend': float,
         'problem': get_problem,
         'experiment': get_experiment,
+        'restart_idx': int,
     }
 
     args = {}
     for me in sys.argv[1:]:
+        found_key = False
         for key, cast in allowed_args.items():
             if key in me:
                 args[key] = cast(me[len(key) + 1 :])
+                found_key = True
+        if not found_key:
+            raise Exception(f'Warning: Can\'t parse {me!r}')
 
     return args
 
@@ -221,6 +226,7 @@ class Visualisation(AdaptivityExperiment):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
+        from pySDC.projects.GPU.hooks.LogStats import LogStats
         from pySDC.implementations.hooks.log_step_size import LogStepSize
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
@@ -244,7 +250,7 @@ class Visualisation(AdaptivityExperiment):
         # hooks
         hooks = [LogStepSize]
         if self.comm_sweep.rank == self.comm_sweep.size - 1:
-            hooks += [LogToFileAfterXs, LogGrid]
+            hooks += [self.logger_hook, LogGrid]
         if live_plotting:
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
@@ -252,12 +258,40 @@ class Visualisation(AdaptivityExperiment):
         controller_params = {'hook_class': hooks, 'logger_level': 15}
 
         super().__init__(custom_controller_params=controller_params, **kwargs)
+        self._stats_name = f'stats_{type(self.prob).__name__}_{rank_path}'
+        self.prob.description['convergence_controllers'][LogStats] = {
+            'hook': self.logger_hook,
+            'file_name': self._stats_name,
+        }
 
-    def run(self, Tend=None):
+    def run(self, Tend=None, restart_idx=None):
         import pickle
         from pySDC.helpers.stats_helper import get_sorted
 
-        stats = self.prob.run(Tend=Tend)
+        u_init = None
+        t0 = 0.0
+        stats_restart = {}
+        if restart_idx:
+            # load solution
+            _u_init = self.logger_hook.load(restart_idx)
+            u_init = _u_init['u']
+            t0 = _u_init['t']
+
+            # load stats
+            stats_path = (
+                f'{self.logger_hook.path}/{self._stats_name}_{self.logger_hook.format_index(restart_idx)}.pickle'
+            )
+            with open(stats_path, 'rb') as file:
+                stats_restart = pickle.load(file)
+            dts = get_sorted(stats_restart, type='dt')
+            dt = [me[1] for me in dts][[me[0] + me[1] for me in dts].index(t0)]
+            self.prob.description['level_params']['dt'] = dt
+
+            self.logger_hook.counter = restart_idx + 1
+            self.logger_hook.t_next_log = t0 + self.logger_hook.time_increment
+
+        _stats = self.prob.run(Tend=Tend, u_init=u_init, t0=t0)
+        stats = {**_stats, **stats_restart}
 
         data = {'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps)}
 
@@ -266,14 +300,6 @@ class Visualisation(AdaptivityExperiment):
 
         with open(f'{self.logger_hook.path}/{type(self.prob).__name__}_stats.pickle', 'wb') as file:
             pickle.dump(data, file)
-
-    def get_grid(self, ranks):
-        self.log_grid.file_name = f'grid_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
-        return self.log_grid.load()
-
-    def get_solution(self, ranks, idx):
-        self.logger_hook.file_name = f'solution_{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
-        return self.logger_hook.load(idx)
 
     def plot(self, ax, ranks, idx):
         data = self.get_solution(ranks, idx)

@@ -102,10 +102,10 @@ class LogToFile(hooks):
     logging_condition = lambda L: True
     process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.view(np.ndarray)}
     format_index = lambda index: f'{index:06d}'
+    counter = 0
 
     def __init__(self):
         super().__init__()
-        self.counter = 0
 
         if self.path is None:
             raise ValueError('Please set a path for logging as the class attribute `LogToFile.path`!')
@@ -132,7 +132,7 @@ class LogToFile(hooks):
                 pickle.dump(data, file)
             self.logger.info(f'Stored file {path!r}')
 
-            self.counter += 1
+            type(self).counter += 1
 
     @classmethod
     def get_path(cls, index):
