@@ -71,7 +71,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
     .. [3] https://www.chebfun.org/examples/pde/GrayScott.html
     """
 
-    def __init__(self, Du=1.0, Dv=0.01, A=0.09, B=0.086, **kwargs):
+    def __init__(self, Du=1.0, Dv=0.01, A=0.09, B=0.086, num_blobs=1, r=1.0, x_shift=0.025, y_shift=0.01, **kwargs):
         kwargs['L'] = 2.0
         super().__init__(dtype='d', alpha=1.0, x0=-kwargs['L'] / 2.0, **kwargs)
 
@@ -81,7 +81,9 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         self.iV = 1
         self.init = (shape, self.comm, self.xp.dtype('float'))
 
-        self._makeAttributeAndRegister('Du', 'Dv', 'A', 'B', localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister(
+            'Du', 'Dv', 'A', 'B', 'num_blobs', 'r', 'x_shift', 'y_shift', localVars=locals(), readOnly=True
+        )
 
         # prepare "Laplacians"
         self.Ku = -self.Du * self.K2
@@ -184,17 +186,46 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         assert t == 0.0, 'Exact solution only valid as initial condition'
         assert self.ndim == 2, 'The initial conditions are 2D for now..'
 
+        self.xp.random.seed(10700000)  # FM intermediate frequency
+
         me = self.dtype_u(self.init, val=0.0)
 
+        def get_single_circle(x, y, radius):
+            _u = newDistArray(self.fft, False)
+            _v = newDistArray(self.fft, False)
+            _u[:] = 1.0 - self.xp.exp(-80.0 / radius * ((self.X[0] + x) ** 2 + (self.X[1] + y) ** 2))
+            _v[:] = self.xp.exp(-80.0 / radius * ((self.X[0] - x) ** 2 + (self.X[1] - y) ** 2))
+            return _u, _v
+
         # This assumes that the box is [-L/2, L/2]^2
+        u = newDistArray(self.fft, False)
+        v = newDistArray(self.fft, False)
+
+        dx = self.L[0] / (self.num_blobs + 1)
+        dy = self.L[1] / (self.num_blobs + 1)
+
+        for i in range(1, self.num_blobs + 1):
+            x_shift = self.x_shift if self.x_shift is not None else self.xp.random.random(1) * 0.1 - 0.05
+            _x = -self.L[0] / 2.0 + i * dx + x_shift * self.L[0]
+
+            for j in range(1, self.num_blobs + 1):
+                y_shift = self.y_shift if self.y_shift is not None else self.xp.random.random(1) * 0.1 - 0.05
+                _y = -self.L[1] / 2.0 + j * dy + y_shift * self.L[1]
+
+                r = self.r if self.r else self.xp.random.random(1) * 0.5
+                _u, _v = get_single_circle(_x, _y, r * self.L[0])
+                u += _u
+                v += _v
+
         if self.spectral:
-            tmp = 1.0 - self.xp.exp(-80.0 * ((self.X[0] + 0.05) ** 2 + (self.X[1] + 0.02) ** 2))
-            me[0, ...] = self.fft.forward(tmp)
-            tmp = self.xp.exp(-80.0 * ((self.X[0] - 0.05) ** 2 + (self.X[1] - 0.02) ** 2))
-            me[1, ...] = self.fft.forward(tmp)
+            me[0, ...] = self.fft.forward(u)
+            me[1, ...] = self.fft.forward(v)
         else:
-            me[0, ...] = 1.0 - self.xp.exp(-80.0 * ((self.X[0] + 0.05) ** 2 + (self.X[1] + 0.02) ** 2))
-            me[1, ...] = self.xp.exp(-80.0 * ((self.X[0] - 0.05) ** 2 + (self.X[1] - 0.02) ** 2))
+            me[0, ...] = u
+            me[1, ...] = v
+
+        me[0] /= self.xp.max(me[0])
+        me[1] /= self.xp.max(me[1])
 
         return me
 

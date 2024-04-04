@@ -131,9 +131,7 @@ class RunProblem:
         self.description = merge_descriptions(self.description, custom_description)
 
     def get_default_controller_params(self):
-        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
-
-        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': [LogGlobalErrorPostRun]}
+        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': []}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):

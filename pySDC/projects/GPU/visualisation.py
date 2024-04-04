@@ -52,7 +52,6 @@ def plot_solution_GS(ax, ranks, idx):
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title(f'$t$ = {solution["t"]:.2f}')
-    print(f'plotted t={solution["t"]:.2f}')
     del solution
 
 
@@ -116,8 +115,7 @@ def plot_all(ranks, func, format='png', redo=False):
             print(f'Stored {path!r}', flush=True)
             ax.cla()
             fig.clf()
-            del ax
-            del fig
+            plt.close(fig)
         except FileNotFoundError:
             break
 
@@ -125,9 +123,8 @@ def plot_all(ranks, func, format='png', redo=False):
 fig, ax = plt.subplots()
 plot_step_size(ax)
 fig.savefig('out/step_size.pdf')
-ranks = [0, 4, 16]
 # plot_solution_GS(ax, [0,1,4], 0)
-plot_all([0, 4, 4], plot_solution_GS)
+plot_all([0, 1, 1], plot_solution_GS, redo=True)
 # plot_AC(ranks)
 # plot_all(ranks, plot_AC)
-# plt.show()
+plt.show()

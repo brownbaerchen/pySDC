@@ -1,5 +1,7 @@
 from pySDC.core.ConvergenceController import ConvergenceController
+from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
 import pickle
+import numpy as np
 
 
 class LogStats(ConvergenceController):
@@ -18,9 +20,22 @@ class LogStats(ConvergenceController):
     def post_step_processing(self, controller, S, **kwargs):
         hook = self.params.hook
         if self.counter < hook.counter:
-            path = f'{hook.path}/{self.params.file_name}_{hook.format_index(self.counter)}.pickle'
+            path = f'{hook.path}/{self.params.file_name}_{hook.format_index(hook.counter-1)}.pickle'
+            for _hook in controller.hooks:
+                _hook.post_step(S, 0)
+
             stats = controller.return_stats()
             with open(path, 'wb') as file:
                 pickle.dump(stats, file)
                 self.log(f'Stored stats in {path!r}', S)
-            self.counter += 1
+            self.counter = hook.counter
+
+
+# def toCPU(u):
+#     if np.ndarray in type(u).__mro__:
+#         return u.view(np.ndarray)
+#     else:
+#         return u.get().view(np.ndarray)
+#
+# class LogSolutionStepSize(LogToFileAfterXs):
+#     process_solution = lambda L: {'t': L.time + L.dt, 'u': toCPU(L.uend)}

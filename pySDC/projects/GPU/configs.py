@@ -1,5 +1,6 @@
 from pySDC.projects.GPU.run_problems import RunProblem
 from pySDC.projects.GPU.run_problems import Experiment
+import numpy as np
 
 
 def cast_to_bool(arg):
@@ -185,6 +186,10 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = 1e-5
         description['problem_params']['A'] = 0.04
         description['problem_params']['B'] = 0.1
+        description['problem_params']['num_blobs'] = 3
+        description['problem_params']['r'] = None
+        description['problem_params']['x_shift'] = None
+        description['problem_params']['y_shift'] = None
 
         description['problem_class'] = grayscott_imex_diffusion
 
@@ -194,6 +199,7 @@ class RunGS(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-5
+        # defaults['dt_max'] = 30
         return defaults
 
 
@@ -222,7 +228,7 @@ class AdaptivityExperiment(Experiment):
 class Visualisation(AdaptivityExperiment):
     name = 'visualisation'
 
-    def __init__(self, live_plotting=False, **kwargs):
+    def __init__(self, live_plotting=True, **kwargs):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -238,9 +244,18 @@ class Visualisation(AdaptivityExperiment):
         LogToFileAfterXs.file_name = f'solution_{prob_name}_{rank_path}'
         LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
         if kwargs['useGPU']:
-            import numpy as np
 
-            LogToFileAfterXs.process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.get().view(np.ndarray)}
+            LogToFileAfterXs.process_solution = lambda L: {
+                't': L.time + L.dt,
+                'dt': L.status.dt_new,
+                'u': L.uend.get().view(np.ndarray),
+            }
+        else:
+            LogToFileAfterXs.process_solution = lambda L: {
+                't': L.time + L.dt,
+                'dt': L.status.dt_new,
+                'u': L.uend.view(np.ndarray),
+            }
         self.logger_hook = LogToFileAfterXs
 
         LogGrid.file_logger = LogToFileAfterXs
@@ -276,6 +291,7 @@ class Visualisation(AdaptivityExperiment):
             _u_init = self.logger_hook.load(restart_idx)
             u_init = _u_init['u']
             t0 = _u_init['t']
+            self.prob.description['level_params']['dt'] = _u_init['dt']
 
             # load stats
             stats_path = (
@@ -283,9 +299,6 @@ class Visualisation(AdaptivityExperiment):
             )
             with open(stats_path, 'rb') as file:
                 stats_restart = pickle.load(file)
-            dts = get_sorted(stats_restart, type='dt')
-            dt = [me[1] for me in dts][[me[0] + me[1] for me in dts].index(t0)]
-            self.prob.description['level_params']['dt'] = dt
 
             self.logger_hook.counter = restart_idx + 1
             self.logger_hook.t_next_log = t0 + self.logger_hook.time_increment

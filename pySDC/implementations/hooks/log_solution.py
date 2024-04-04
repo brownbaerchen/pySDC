@@ -156,6 +156,6 @@ class LogToFileAfterXs(LogToFile):
     def post_step(self, step, level_number):
         L = step.levels[level_number]
 
-        if L.time + L.dt >= self.t_next_log:
+        if L.time + L.dt >= self.t_next_log and not step.status.restart:
             super().post_step(step, level_number)
             self.t_next_log += self.time_increment
