@@ -1,5 +1,6 @@
 from configs import Visualisation, RunBrusselator, RunSchroedinger, RunAllenCahn, RunAllenCahnForcing, RunGS
 import matplotlib.pyplot as plt
+import os
 
 
 problem = RunGS
@@ -40,16 +41,19 @@ def plot_solution_AC(ax, ranks, idx):
 
 
 def plot_solution_GS(ax, ranks, idx):
-    plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True}
+    plotting_args = {'vmin': 0, 'vmax': 0.5, 'rasterized': True}
     for n in range(ranks[2]):
         solution = V.get_solution([ranks[0], ranks[1] - 1, n], idx)
         x, y = V.get_grid([ranks[0], ranks[1] - 1, n])
         ax.pcolormesh(x, y, solution['u'][1], **plotting_args)
+        del x
+        del y
     ax.set_aspect(1.0)
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
     ax.set_title(f'$t$ = {solution["t"]:.2f}')
     print(f'plotted t={solution["t"]:.2f}')
+    del solution
 
 
 def plot_step_size(ax):
@@ -93,27 +97,37 @@ def plot_AC(ranks):
     plot_grid(ax, ranks)
 
 
-def plot_all(ranks, func, format='png'):
-    fig, ax = plt.subplots()
+def plot_all(ranks, func, format='png', redo=False):
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
 
     for i in range(0, 999999, comm.size):
+        fname = f'solution_{type(V.prob).__name__}_{ranks[0]}_{ranks[1]-1}_{ranks[2]-1}'
+        path = f'./simulation_plots/{fname}_{V.logger_hook.format_index(i+comm.rank)}.{format}'
+
+        if os.path.isfile(path) and not redo:
+            continue
+
         try:
+            fig, ax = plt.subplots()
             func(ax, ranks, i + comm.rank)
-            path = f'./simulation_plots/{V.logger_hook.file_name}_{V.logger_hook.format_index(i+comm.rank)}.{format}'
-            fig.savefig(path, bbox_inches='tight')
+            fig.savefig(path, bbox_inches='tight', dpi=300)
+            print(f'Stored {path!r}', flush=True)
             ax.cla()
+            fig.clf()
+            del ax
+            del fig
         except FileNotFoundError:
             break
 
 
-# fig, ax = plt.subplots()
+fig, ax = plt.subplots()
+plot_step_size(ax)
+fig.savefig('out/step_size.pdf')
 ranks = [0, 4, 16]
-# plot_step_size(ax)
 # plot_solution_GS(ax, [0,1,4], 0)
-plot_all([0, 1, 4], plot_solution_GS)
+plot_all([0, 4, 4], plot_solution_GS)
 # plot_AC(ranks)
 # plot_all(ranks, plot_AC)
-plt.show()
+# plt.show()

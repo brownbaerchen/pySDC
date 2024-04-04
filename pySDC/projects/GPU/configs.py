@@ -159,7 +159,7 @@ class RunBrusselator(RunProblem):
 
 
 class RunGS(RunProblem):
-    default_Tend = 5500
+    default_Tend = 10000
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
@@ -171,7 +171,7 @@ class RunGS(RunProblem):
 
         description['step_params']['maxiter'] = 29
 
-        description['level_params']['dt'] = 1e-2
+        description['level_params']['dt'] = 1e1
         description['level_params']['restol'] = 1e-8
 
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
