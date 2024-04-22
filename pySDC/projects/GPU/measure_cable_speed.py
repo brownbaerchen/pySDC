@@ -56,9 +56,9 @@ def measure_speed(comm, commNCCL, shape, name='', **kwargs):
         res = benchmark(func, (data,), **kwargs)
         results[mode] = {
             'CPU_time': res.cpu_times.mean(),
-            'CPU_std': res.cpu_times.std,
+            'CPU_std': res.cpu_times.std(),
             'GPU_time': res.gpu_times.mean(),
-            'GPU_std': res.gpu_times.std,
+            'GPU_std': res.gpu_times.std(),
             'size': size,
         }
         assert xp.linalg.norm(data, 2.0) > 0
@@ -124,4 +124,4 @@ def plot(shapes, name=''):
 
 
 if __name__ == '__main__':
-    plot(shapes)
+    record(shapes)
