@@ -2,7 +2,7 @@ from mpi4py import MPI
 import pickle
 
 
-powers = [2, 4, 6, 8, 10, 12, 14, 16, 18]
+powers = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
 shapes = [
     (
         2**power,
@@ -78,7 +78,7 @@ def record(shapes):
 def plot(shapes, name=''):
     import matplotlib.pyplot as plt
 
-    fig, ax = plt.subplots()
+    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True)
 
     results = []
     for shape in shapes:
@@ -86,8 +86,40 @@ def plot(shapes, name=''):
             data = pickle.load(file)
         results += [data]
 
+    colors = {
+        'MPI': 'blue',
+        'NCCL': 'red',
+    }
+
     for lib in ['NCCL', 'MPI']:
-        ax.loglog([me[lib]['size'] for me in results], [me[lib]['GPU'] for me in results], label=lib)
+        axs[0].errorbar(
+            [me[lib]['size'] for me in results],
+            [me[lib]['GPU_time'] for me in results],
+            yerr=[me[lib]['GPU_std'] for me in results],
+            label=lib,
+            color=colors[lib],
+        )
+        axs[1].errorbar(
+            [me[lib]['size'] for me in results],
+            [me[lib]['size'] / me[lib]['GPU_time'] for me in results],
+            yerr=[me[lib]['size'] * me[lib]['GPU_std'] / me[lib]['GPU_time'] ** 2 for me in results],
+            label=lib,
+            color=colors[lib],
+        )
+
+    axs[1].axhline(200 / 8 * 1e9, label='Infiniband limit', color='black')
+
+    axs[0].legend(frameon=False)
+    axs[0].set_xlabel('size / byte')
+    axs[0].set_ylabel('time / s')
+    axs[0].set_yscale('log')
+    axs[0].set_xscale('log')
+
+    axs[1].legend(frameon=False)
+    axs[1].set_ylabel('bandwidth / byte/s')
+    axs[1].set_yscale('log')
+    axs[1].set_xscale('log')
+    fig.tight_layout()
     plt.show()
 
 
