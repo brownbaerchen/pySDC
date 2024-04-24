@@ -74,9 +74,11 @@ jobs:
       - name: Install Conda environment with Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
-          environment-file: "etc/environment-${{ matrix.env }}.yml"
+          environment-file: "etc/environment-base.yml"
           create-args: >-
               python=${{ matrix.python }}
+        run: |
+          mamba env update -f "etc/environment-${{ matrix.env }}.yml" 
 
       - name: Run pytest for CPU stuff
         run: |
