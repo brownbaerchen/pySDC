@@ -2,7 +2,7 @@ from mpi4py import MPI
 import pickle
 
 
-powers = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22]
+powers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
 shapes = [
     (
         2**power,
@@ -76,9 +76,13 @@ def record(shapes):
 
 
 def plot(shapes, name=''):
+    from pySDC.helpers.plot_helper import figsize_by_journal, setup_mpl
     import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(1, 2, figsize=(7, 3), sharex=True)
+    setup_mpl()
+    figsize = figsize_by_journal('JSC_thesis', 1.0, 0.4)
+
+    fig, axs = plt.subplots(1, 2, figsize=figsize, sharex=True)
 
     results = []
     for shape in shapes:
@@ -87,8 +91,14 @@ def plot(shapes, name=''):
         results += [data]
 
     colors = {
-        'MPI': 'blue',
-        'NCCL': 'red',
+        'MPI': 'tab:blue',
+        'NCCL': 'tab:orange',
+        'NCCL group': 'tab:green',
+    }
+    ls = {
+        'MPI': '-',
+        'NCCL': '--',
+        'NCCL group': ':',
     }
 
     for lib in ['NCCL', 'MPI']:
@@ -98,6 +108,7 @@ def plot(shapes, name=''):
             yerr=[me[lib]['GPU_std'] for me in results],
             label=lib,
             color=colors[lib],
+            ls=ls[lib],
         )
         axs[1].errorbar(
             [me[lib]['size'] for me in results],
@@ -105,23 +116,27 @@ def plot(shapes, name=''):
             yerr=[me[lib]['size'] * me[lib]['GPU_std'] / me[lib]['GPU_time'] ** 2 for me in results],
             label=lib,
             color=colors[lib],
+            ls=ls[lib],
         )
 
     axs[1].axhline(200 / 8 * 1e9, label='Infiniband limit', color='black')
 
     axs[0].legend(frameon=False)
-    axs[0].set_xlabel('size / byte')
+    axs[0].set_xlabel('size / B')
     axs[0].set_ylabel('time / s')
     axs[0].set_yscale('log')
     axs[0].set_xscale('log')
 
     axs[1].legend(frameon=False)
-    axs[1].set_ylabel('bandwidth / byte/s')
+    axs[1].set_ylabel('bandwidth / B/s')
+    axs[1].set_xlabel('size / B')
     axs[1].set_yscale('log')
     axs[1].set_xscale('log')
     fig.tight_layout()
+
+    fig.savefig('plots/p2p_cable_speed.pdf', bbox_inches='tight')
     plt.show()
 
 
 if __name__ == '__main__':
-    record(shapes)
+    plot(shapes)
