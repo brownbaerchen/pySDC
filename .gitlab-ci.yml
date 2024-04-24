@@ -32,6 +32,7 @@ prepare_JUWELS:
     - module load CuPy
     - pip install -e .
     - pip install pytest-benchmark coverage
+    - alias mpirun=srun
 
 
 test_JUWELS:
@@ -65,6 +66,7 @@ test_JUWELS:
     - module load mpi4py
     - module load SciPy-Stack
     - module load CuPy
+    - alias mpirun=srun
   script:
     # - touch benchmarks/output.json
     - echo $SYSTEMNAME
