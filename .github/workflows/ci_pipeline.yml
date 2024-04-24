@@ -71,12 +71,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Install Conda environment with Micromamba
+      - name: Install base environment with Micromamba
         uses: mamba-org/setup-micromamba@v1
         with:
           environment-file: "etc/environment-base.yml"
           create-args: >-
               python=${{ matrix.python }}
+
+      - name: Install additional dependencies
         run: |
           mamba env update -f "etc/environment-${{ matrix.env }}.yml" 
 
