@@ -80,7 +80,7 @@ jobs:
 
       - name: Install additional dependencies
         run: |
-          mamba env update -f "etc/environment-${{ matrix.env }}.yml" 
+          conda env update -f "etc/environment-${{ matrix.env }}.yml" 
 
       - name: Run pytest for CPU stuff
         run: |
