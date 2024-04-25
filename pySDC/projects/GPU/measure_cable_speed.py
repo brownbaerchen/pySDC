@@ -34,26 +34,32 @@ def measure_speed(comm, commNCCL, shape, name='', **kwargs):
     size = data.nbytes
     results = {}
 
-    def speed_MPI(_data):
+    def speed_MPI(_data, group=None):
         if comm.rank == 0:
             comm.Send(data, dest=1)
         if comm.rank == 1:
             comm.Recv(data, source=0)
 
-    def speed_NCCL(_data):
+    def speed_NCCL(_data, group=False):
         stream = xp.cuda.get_current_stream().ptr
-        nccl.groupStart()
+        if group:
+            nccl.groupStart()
         if comm.rank == 0:
             commNCCL.send(data.data.ptr, data.size, nccl.NCCL_FLOAT64, 1, stream)
         if comm.rank == 1:
             commNCCL.recv(data.data.ptr, data.size, nccl.NCCL_FLOAT64, 0, stream)
-        nccl.groupEnd()
+        if group:
+            nccl.groupEnd()
 
-    for mode, func in zip(['MPI', 'NCCL'], [speed_MPI, speed_NCCL]):
+    for mode, func in zip(['MPI', 'NCCL', 'NCCL group'], [speed_MPI, speed_NCCL, speed_NCCL]):
         if comm.rank > 0:
             data[:] = 0
 
-        res = benchmark(func, (data,), **kwargs)
+        args = (data,)
+        if mode == 'NCCL group':
+            args += (True,)
+
+        res = benchmark(func, args, **kwargs)
         results[mode] = {
             'CPU_time': res.cpu_times.mean(),
             'CPU_std': res.cpu_times.std(),
@@ -72,7 +78,7 @@ def measure_speed(comm, commNCCL, shape, name='', **kwargs):
 def record(shapes):
     comm, commNCCL = get_communicators()
     for shape in shapes:
-        measure_speed(comm, commNCCL, shape, n_repeat=1000)
+        measure_speed(comm, commNCCL, shape, n_repeat=10000, n_warmup=20)
 
 
 def plot(shapes, name=''):

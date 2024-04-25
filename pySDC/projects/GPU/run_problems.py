@@ -163,7 +163,7 @@ class RunProblem:
         for _ in range(num_runs):
             stats = self.run(Tend=Tend)
 
-            errors += [max(me[1] for me in get_sorted(stats, type='e_global_post_run'))]
+            errors += [max([-1] + [me[1] for me in get_sorted(stats, type='e_global_post_run')])]
             times += [max(me[1] for me in get_sorted(stats, type='timing_run'))]
             if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0:
                 print(f'Needed {times[-1]:.2e}s with error {errors[-1]:.2e}', flush=True)
@@ -243,7 +243,7 @@ class Experiment:
 
 
 if __name__ == '__main__':
-    from pySDC.projects.GPU.configs import AdaptivityExperiment, RunSchroedinger, parse_args
+    from pySDC.projects.GPU.configs import AdaptivityExperiment, RunAllenCahn, parse_args
 
     args = parse_args()
 
@@ -254,7 +254,7 @@ if __name__ == '__main__':
         'num_runs': args.get('num_runs', 5),
         'useGPU': args.get('useGPU', True),
         'space_resolution': args.get('space_resolution', 2**13),
-        'problem': args.get('problem', RunSchroedinger),
+        'problem': args.get('problem', RunAllenCahn),
     }
     experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
 

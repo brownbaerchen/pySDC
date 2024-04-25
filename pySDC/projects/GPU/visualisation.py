@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 
 
-problem = RunGS
+problem = RunAllenCahnForcing
 V = Visualisation(problem=problem, useGPU=False)
 
 
@@ -58,6 +58,7 @@ def plot_solution_GS(ax, ranks, idx):
 def plot_step_size(ax):
     import pickle
 
+    print(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', flush=True)
     with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
         data = pickle.load(file)
     dt = data['dt']
@@ -122,9 +123,9 @@ def plot_all(ranks, func, format='png', redo=False):
 
 fig, ax = plt.subplots()
 plot_step_size(ax)
-fig.savefig('out/step_size.pdf')
+fig.savefig(f'plots/step_size_{type(V.prob).__name__}.pdf')
 # plot_solution_GS(ax, [0,1,4], 0)
-plot_all([0, 1, 1], plot_solution_GS, redo=False)
+# plot_all([0, 4, 1], plot_solution_AC, redo=False)
 # plot_AC(ranks)
 # plot_all(ranks, plot_AC)
 plt.show()

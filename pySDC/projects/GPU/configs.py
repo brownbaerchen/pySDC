@@ -50,7 +50,7 @@ class RunAllenCahn(RunProblem):
 
         description = super().get_default_description()
 
-        description['step_params']['maxiter'] = 5
+        description['step_params']['maxiter'] = 19
 
         description['level_params']['dt'] = 1e-4
         description['level_params']['restol'] = 1e-8
@@ -70,15 +70,19 @@ class RunAllenCahn(RunProblem):
 
         return description
 
+    def set_space_resolution(self, *args, **kwargs):
+        super().set_space_resolution(*args, **kwargs)
+        self.description['problem_params']['L'] = self.description['problem_params']['nvars'][0] // 128
+
     @property
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
-        defaults['e_tol'] = 1e-7
+        defaults['e_tol'] = 1e-5
         return defaults
 
 
 class RunAllenCahnForcing(RunAllenCahn):
-    default_Tend = 1e-2
+    # default_Tend = 1e-2
 
     def get_default_description(self):
         from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing
@@ -245,7 +249,6 @@ class Visualisation(AdaptivityExperiment):
         LogToFileAfterXs.file_name = f'solution_{prob_name}_{rank_path}'
         LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
         if kwargs['useGPU']:
-
             LogToFileAfterXs.process_solution = lambda L: {
                 't': L.time + L.dt,
                 'dt': L.status.dt_new,
