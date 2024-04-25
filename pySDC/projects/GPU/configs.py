@@ -72,7 +72,9 @@ class RunAllenCahn(RunProblem):
 
     def set_space_resolution(self, *args, **kwargs):
         super().set_space_resolution(*args, **kwargs)
-        self.description['problem_params']['L'] = self.description['problem_params']['nvars'][0] // 128
+        resolution = self.description['problem_params']['nvars']
+        resolution = resolution if isinstance(resolution, list) else [resolution]
+        self.description['problem_params']['L'] = resolution[0][0] // 128
 
     @property
     def get_poly_adaptivity_default_params(self):
@@ -220,6 +222,18 @@ class AdaptivityExperiment(Experiment):
         self.prob.add_polynomial_adaptivity()
 
 
+class PFASST(Experiment):
+    name = 'PFASST'
+
+    def __init__(self, **kwargs):
+        kwargs = {
+            **kwargs,
+            'space_resolution': [256, 128],
+        }
+        controller_params = {'logger_level': 15}
+        super().__init__(custom_controller_params=controller_params, **kwargs)
+
+
 # class CUDASweeperExperiment(Experiment):
 #     name = 'CUDA'
 #     def __init__(self, **kwargs):
@@ -346,5 +360,6 @@ def get_experiment(name):
         'adaptivity': AdaptivityExperiment,
         # 'CUDA': CUDASweeperExperiment,
         'visualisation': Visualisation,
+        'PFASST': PFASST,
     }
     return ex[name]

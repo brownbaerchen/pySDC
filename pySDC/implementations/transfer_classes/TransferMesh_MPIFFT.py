@@ -6,7 +6,7 @@ from mpi4py_fft import PFFT, newDistArray
 
 class fft_to_fft(space_transfer):
     """
-    Custon base_transfer class, implements Transfer.py
+    Custom base_transfer class, implements Transfer.py
 
     This implementation can restrict and prolong between PMESH datatypes meshes with FFT for periodic boundaries
 
@@ -22,7 +22,7 @@ class fft_to_fft(space_transfer):
             params: parameters for the transfer operators
         """
         # invoke super initialization
-        super(fft_to_fft, self).__init__(fine_prob, coarse_prob, params)
+        super().__init__(fine_prob, coarse_prob, params)
 
         assert self.fine_prob.spectral == self.coarse_prob.spectral
 
@@ -32,6 +32,10 @@ class fft_to_fft(space_transfer):
         Nc = list(self.coarse_prob.fft.global_shape())
         self.ratio = [int(nf / nc) for nf, nc in zip(Nf, Nc)]
         axes = tuple(range(len(Nf)))
+
+        dtype_u = self.fine_prob.dtype_u.__name__
+        dtype_f = self.fine_prob.dtype_f.__name__
+        print(dtype_u, dtype_f)
 
         self.fft_pad = PFFT(
             self.coarse_prob.comm,
@@ -49,6 +53,9 @@ class fft_to_fft(space_transfer):
         Args:
             F: the fine level data (easier to access than via the fine attribute)
         """
+        # if type(F).__name__ in ['mesh']:
+        print(type(F), isinstance(F, mesh))
+        breakpoint()
         if isinstance(F, mesh):
             if self.spectral:
                 G = self.coarse_prob.dtype_u(self.coarse_prob.init)

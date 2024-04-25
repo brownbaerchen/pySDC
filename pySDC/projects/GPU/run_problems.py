@@ -62,6 +62,8 @@ class RunProblem:
         self.u_init = u_init
 
     def get_default_description(self):
+        from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_fft
+
         description = {
             'step_params': {},
             'level_params': {},
@@ -70,13 +72,15 @@ class RunProblem:
             'problem_params': {},
             'problem_class': None,
             'convergence_controllers': {},
+            'space_transfer_class': fft_to_fft,
         }
         description['problem_params']['useGPU'] = self.useGPU
         return description
 
     def set_space_resolution(self, resolution):
         current_resolution = self.get_space_resolution()
-        self.description['problem_params']['nvars'] = (int(resolution),) * len(current_resolution)
+        resolution = resolution if isinstance(resolution, list) else [resolution]
+        self.description['problem_params']['nvars'] = [(int(me),) * len(current_resolution) for me in resolution]
 
     def get_space_resolution(self):
         return self.description['problem_params']['nvars']
