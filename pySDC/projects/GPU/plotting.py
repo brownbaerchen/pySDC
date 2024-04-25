@@ -1,4 +1,10 @@
-from pySDC.projects.GPU.configs import AdaptivityExperiment, SingleGPUExperiment, RunAllenCahn, RunSchroedinger
+from pySDC.projects.GPU.configs import (
+    AdaptivityExperiment,
+    SingleGPUExperiment,
+    RunAllenCahn,
+    RunSchroedinger,
+    RunAllenCahnForcing,
+)
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +17,7 @@ class PlotExperiments:
     num_nodes_serial_gpu = []
     num_nodes_parallel_cpu = []
     num_nodes_serial_cpu = []
+    space_resolution = {}
 
     def __init__(self, **kwargs):
         self.experiment = self.experiment_cls(problem=self.problem, **kwargs)
@@ -32,14 +39,27 @@ class PlotExperiments:
         vary_keys = {}
         if parallel_sweeper and useGPU:
             vary_keys['num_procs'] = [[1, 4, me] for me in self.num_nodes_parallel_gpu]
+            vary_keys['space_resolution'] = [
+                self.space_resolution.get(me, self.space_resolution[1]) for me in self.num_nodes_parallel_gpu
+            ]
         elif not parallel_sweeper and useGPU:
             vary_keys['num_procs'] = [[1, 1, 4 * me] for me in self.num_nodes_serial_gpu]
+            vary_keys['space_resolution'] = [
+                self.space_resolution.get(me, self.space_resolution[1]) for me in self.num_nodes_serial_gpu
+            ]
         elif parallel_sweeper and not useGPU:
             vary_keys['num_procs'] = [[1, 4, me * 12] for me in self.num_nodes_parallel_cpu]
+            vary_keys['space_resolution'] = [
+                self.space_resolution.get(me, self.space_resolution[1]) for me in self.num_nodes_parallel_cpu
+            ]
         elif not parallel_sweeper and not useGPU:
             vary_keys['num_procs'] = [[1, 1, me * 48] for me in self.num_nodes_serial_cpu]
+            vary_keys['space_resolution'] = [
+                self.space_resolution.get(me, self.space_resolution[1]) for me in self.num_nodes_serial_cpu
+            ]
         else:
             raise NotImplementedError
+
         return vary_keys
 
     def plot(self, ax):
@@ -66,6 +86,10 @@ class PlotExperiments:
         }
 
         timings = self.get_multiple_data(self.get_vary_keys(parallel_sweeper, useGPU), prob_args={'useGPU': useGPU})
+
+        if len(timings.keys()) == 0:
+            return None
+
         ax.loglog(
             timings.keys(),
             timings.values(),
@@ -86,6 +110,7 @@ class PlotSingleGPUStrongScalingSchroedinger(PlotExperiments):
     num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
     num_nodes_parallel_cpu = [4, 8, 16]
     num_nodes_serial_cpu = [1, 4, 8, 16]
+    space_resolution = {1: 1024}
 
 
 class PlotAdaptivityStrongScalingSchroedinger(PlotExperiments):
@@ -95,17 +120,38 @@ class PlotAdaptivityStrongScalingSchroedinger(PlotExperiments):
     num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32, 64]
     num_nodes_parallel_cpu = []
     num_nodes_serial_cpu = []
+    space_resolution = {1: 1024}
+
+
+class PlotAdaptivityStrongScalingACF(PlotExperiments):
+    experiment_cls = AdaptivityExperiment
+    problem = RunAllenCahnForcing
+    num_nodes_parallel_gpu = [1, 2, 4, 8, 16, 32, 64]
+    num_nodes_serial_gpu = [1, 2, 4, 8, 16, 32]
+    num_nodes_parallel_cpu = []
+    num_nodes_serial_cpu = []
+    space_resolution = {1: 8192}
+
+
+class PlotAdaptivityWeakScalingACF(PlotExperiments):
+    experiment_cls = AdaptivityExperiment
+    problem = RunAllenCahnForcing
+    num_nodes_parallel_gpu = [1, 4]
+    num_nodes_serial_gpu = [1, 4, 16]
+    space_resolution = {1: 8192, 4: 16384, 16: 32768}
 
 
 if __name__ == '__main__':
     setup_mpl()
 
-    figsize = figsize_by_journal('Springer_Numerical_Algorithms', 0.7, 0.8)
-    fig, ax = plt.subplots(figsize=figsize)
+    figsize = figsize_by_journal('JSC_thesis', 1, 0.48)
+    fig, axs = plt.subplots(1, 2, figsize=figsize)
     # plotter = PlotSingleGPUStrongScalingSchroedinger()
-    plotter = PlotAdaptivityStrongScalingSchroedinger()
-    plotter.plot(ax)
+    plotterS = PlotAdaptivityStrongScalingACF()
+    plotterW = PlotAdaptivityWeakScalingACF()
+    plotterS.plot(axs[0])
+    plotterW.plot(axs[1])
     fig.tight_layout()
-    fig.savefig('/Users/thomasbaumann/Desktop/space_time_SDC_Schroedinger.pdf', bbox_inches='tight')
+    fig.savefig('plots/space_time_SDC_ACF.pdf', bbox_inches='tight')
 
     plt.show()
