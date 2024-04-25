@@ -144,14 +144,16 @@ class PlotAdaptivityWeakScalingACF(PlotExperiments):
 if __name__ == '__main__':
     setup_mpl()
 
-    figsize = figsize_by_journal('JSC_thesis', 1, 0.48)
+    figsize = figsize_by_journal('JSC_thesis', 1, 0.5)
     fig, axs = plt.subplots(1, 2, figsize=figsize)
     # plotter = PlotSingleGPUStrongScalingSchroedinger()
     plotterS = PlotAdaptivityStrongScalingACF()
     plotterW = PlotAdaptivityWeakScalingACF()
     plotterS.plot(axs[0])
     plotterW.plot(axs[1])
+    for ax in axs:
+        ax.set_box_aspect(1.0)
     fig.tight_layout()
-    fig.savefig('plots/space_time_SDC_ACF.pdf', bbox_inches='tight')
+    fig.savefig('plots/space_time_SDC_ACF.pdf')
 
     plt.show()
