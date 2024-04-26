@@ -136,9 +136,9 @@ class PlotAdaptivityStrongScalingACF(PlotExperiments):
 class PlotAdaptivityWeakScalingACF(PlotExperiments):
     experiment_cls = AdaptivityExperiment
     problem = RunAllenCahnForcing
-    num_nodes_parallel_gpu = [1, 4]
+    num_nodes_parallel_gpu = [1, 4, 16]
     num_nodes_serial_gpu = [1, 4, 16]
-    space_resolution = {1: 8192, 4: 16384, 16: 32768}
+    space_resolution = {1: 8192, 4: 16384, 16: 32768, 64: 65536}
 
 
 if __name__ == '__main__':

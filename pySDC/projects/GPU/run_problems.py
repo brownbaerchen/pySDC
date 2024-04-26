@@ -187,7 +187,7 @@ class RunProblem:
         procs = f'{self.num_procs[0]}x{self.num_procs[1]}x{self.num_procs[2]}'
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
-        space_resolution = f'{self.get_space_resolution()[0]:d}'
+        space_resolution = f'{self.get_space_resolution()[0][0]:d}'
         return f'{base_path}/{prob}_{procs}_{gpu}{name}_{space_resolution}.pickle'
 
     def get_data(self, name=''):

@@ -4,6 +4,7 @@
 [![zenodo](https://zenodo.org/badge/26165004.svg)](https://zenodo.org/badge/latestdoi/26165004)
 [![fair-software.eu](https://img.shields.io/badge/fair--software.eu-%E2%97%8F%20%20%E2%97%8F%20%20%E2%97%8F%20%20%E2%97%8F%20%20%E2%97%8F-green)](https://fair-software.eu)
 [![SQAaaS badge shields.io](https://img.shields.io/badge/sqaaas%20software-silver-lightgrey)](https://api.eu.badgr.io/public/assertions/aS8J0NDTTjCyYP6iVufviQ "SQAaaS silver badge achieved")
+
 # Welcome to pySDC!
 
 The `pySDC` project is a Python implementation of the
@@ -95,7 +96,6 @@ Checkout the [Changelog](./CHANGELOG.md) to see pySDC's evolution since 2016.
 Any contribution is dearly welcome ! If you want to take part of this, please take the time to read our [Contribution Guidelines](./CONTRIBUTING.md)
 (and don't forget to take a peek at our nice [Code of Conduct](./CODE_OF_CONDUCT.md) :wink:).
 
-
 ## Acknowledgements
 
 This project has received funding from the [European High-Performance
@@ -105,7 +105,7 @@ The JU receives support from the European Union's Horizon 2020 research
 and innovation programme and Belgium, France, Germany, and Switzerland.
 This project also received funding from the [German Federal Ministry of
 Education and Research](https://www.bmbf.de/bmbf/en/home/home_node.html)
-(BMBF) grant 16HPC047. The project also received help from the
+(BMBF) grants  16HPC047 and 16ME0679K. Supported by the European Union - NextGenerationEU. The project also received help from the
 [Helmholtz Platform for Research Software Engineering - Preparatory
 Study (HiRSE_PS)](https://www.helmholtz-hirse.de/).
 
