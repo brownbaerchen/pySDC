@@ -33,10 +33,6 @@ class fft_to_fft(space_transfer):
         self.ratio = [int(nf / nc) for nf, nc in zip(Nf, Nc)]
         axes = tuple(range(len(Nf)))
 
-        dtype_u = self.fine_prob.dtype_u.__name__
-        dtype_f = self.fine_prob.dtype_f.__name__
-        print(dtype_u, dtype_f)
-
         self.fft_pad = PFFT(
             self.coarse_prob.comm,
             Nc,

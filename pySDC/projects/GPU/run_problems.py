@@ -73,6 +73,7 @@ class RunProblem:
             'problem_class': None,
             'convergence_controllers': {},
             'space_transfer_class': fft_to_fft,
+            'space_transfer_params': {'periodic': True},
         }
         description['problem_params']['useGPU'] = self.useGPU
         return description
@@ -160,6 +161,10 @@ class RunProblem:
 
         return stats
 
+    def print(self, *args):
+        if self.comm_steps.rank == self.comm_steps.size - 1 and self.comm_space.rank == 0 and self.comm_sweep.rank == 0:
+            print(*args, flush=True)
+
     def record_timing(self, num_runs=5, name='', Tend=None):
         errors = []
         times = []
@@ -169,10 +174,14 @@ class RunProblem:
 
             errors += [max([-1] + [me[1] for me in get_sorted(stats, type='e_global_post_run')])]
             times += [max(me[1] for me in get_sorted(stats, type='timing_run'))]
-            if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0:
-                print(f'Needed {times[-1]:.2e}s with error {errors[-1]:.2e}', flush=True)
+            self.print(f'Needed {times[-1]:.2e}s with error {errors[-1]:.2e}')
 
-        if self.comm_sweep.rank == 0 and self.comm_space.rank == 0 and self.comm_steps.rank == 0 and Tend is None:
+        if (
+            self.comm_sweep.rank == 0
+            and self.comm_space.rank == 0
+            and self.comm_steps.rank == self.comm_steps.size - 1
+            and Tend is None
+        ):
             with open(self.get_path(name=name), 'wb') as file:
                 pickle.dump({'errors': errors, 'times': times}, file)
             print(f'Stored file {self.get_path(name=name)!r}')

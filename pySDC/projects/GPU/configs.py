@@ -230,7 +230,9 @@ class PFASST(Experiment):
             **kwargs,
             'space_resolution': [256, 128],
         }
-        controller_params = {'logger_level': 15}
+        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
+
+        controller_params = {'hook_class': LogGlobalErrorPostRun, 'logger_level': 30}
         super().__init__(custom_controller_params=controller_params, **kwargs)
 
 
