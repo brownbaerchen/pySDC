@@ -234,6 +234,7 @@ class PFASST(Experiment):
 
         controller_params = {'hook_class': LogGlobalErrorPostRun, 'logger_level': 30}
         super().__init__(custom_controller_params=controller_params, **kwargs)
+        self.prob.add_polynomial_adaptivity()
 
 
 # class CUDASweeperExperiment(Experiment):
