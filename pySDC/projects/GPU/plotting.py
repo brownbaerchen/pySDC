@@ -136,8 +136,8 @@ class PlotAdaptivityStrongScalingACF(PlotExperiments):
 class PlotAdaptivityWeakScalingACF(PlotExperiments):
     experiment_cls = AdaptivityExperiment
     problem = RunAllenCahnForcing
-    num_nodes_parallel_gpu = [1, 4, 16]
-    num_nodes_serial_gpu = [1, 4, 16]
+    num_nodes_parallel_gpu = [1, 4, 16, 64]
+    num_nodes_serial_gpu = [1, 4, 16, 64]
     space_resolution = {1: 8192, 4: 16384, 16: 32768, 64: 65536}
 
 
@@ -151,8 +151,9 @@ if __name__ == '__main__':
     plotterW = PlotAdaptivityWeakScalingACF()
     plotterS.plot(axs[0])
     plotterW.plot(axs[1])
-    for ax in axs:
+    for ax, label in zip(axs, ['strong scaling', 'weak scaling']):
         ax.set_box_aspect(1.0)
+        ax.set_title(label)
     fig.tight_layout()
     fig.savefig('plots/space_time_SDC_ACF.pdf')
 
