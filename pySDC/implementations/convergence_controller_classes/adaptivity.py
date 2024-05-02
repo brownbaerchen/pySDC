@@ -242,7 +242,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             self.trigger_restart_upon_nonconvergence(
                 S, f', residual is growing ({S.levels[0].status.residual:.2e} > {self.res_last_iter:.2e})'
             )
-        elif S.levels[0].status.residual > self.params.residual_max_tol:
+        elif S.levels[0].status.residual > self.params.residual_max_tol and S.status.iter > 0:
             self.trigger_restart_upon_nonconvergence(S, ', max. residual exceeded')
 
         if self.params.useMPI:

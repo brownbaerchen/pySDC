@@ -111,14 +111,14 @@ class RunSchroedinger(RunProblem):
 
         description = super().get_default_description()
 
-        description['step_params']['maxiter'] = 9
+        description['step_params']['maxiter'] = 19
 
         description['level_params']['dt'] = 1e-2
         description['level_params']['restol'] = 1e-8
 
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         description['sweeper_params']['num_nodes'] = 4
-        description['sweeper_params']['QI'] = 'MIN-SR-S'
+        description['sweeper_params']['QI'] = 'MIN-SR-FLEX'
         description['sweeper_params']['QE'] = 'PIC'
 
         description['problem_params']['nvars'] = (2**13,) * 2
@@ -231,12 +231,14 @@ class AdaptivityExperiment(Experiment):
 class PFASST(Experiment):
     name = 'PFASST'
 
-    def __init__(self, **kwargs):
+    def __init__(self, space_resolution, **kwargs):
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
         controller_params = {'hook_class': LogGlobalErrorPostRun, **kwargs.get('custom_controller_params', {})}
 
         kwargs = {
+            'space_resolution': [space_resolution, space_resolution // 2],
+            # 'space_resolution': space_resolution,
             **kwargs,
             'custom_controller_params': controller_params,
         }

@@ -60,10 +60,16 @@ class RunProblem:
         if space_resolution:
             self.set_space_resolution(space_resolution, levels=space_levels)
 
+        if self.comm_sweep.size > 1:
+            from pySDC.implementations.transfer_classes.BaseTransferMPI import base_transfer_MPI
+
+            self.description['base_transfer_class'] = base_transfer_MPI
+
         self.u_init = u_init
 
     def get_default_description(self):
         from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_fft
+        from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI
 
         description = {
             'step_params': {},
@@ -72,7 +78,7 @@ class RunProblem:
             'sweeper_class': None,
             'problem_params': {},
             'problem_class': None,
-            'convergence_controllers': {},
+            'convergence_controllers': {BasicRestartingMPI: {'max_restarts': 29}},
             'space_transfer_class': fft_to_fft,
             'space_transfer_params': {'periodic': True},
         }
@@ -139,7 +145,7 @@ class RunProblem:
         self.description = merge_descriptions(self.description, custom_description)
 
     def get_default_controller_params(self):
-        controller_params = {'mssdc_jac': False, 'hook_class': []}
+        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'all_to_done': True, 'hook_class': []}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):

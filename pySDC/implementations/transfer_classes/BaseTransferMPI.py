@@ -126,7 +126,6 @@ class base_transfer_MPI(base_transfer):
         recvBuf = [None for _ in range(SF.coll.num_nodes)]
         recvBuf[CF.rank] = F.u[CF.rank + 1].copy()
         for n in range(SF.coll.num_nodes):
-
             CG.Reduce(self.Pcoll[n, CG.rank] * tmp_u, recvBuf[n], root=n, op=MPI.SUM)
         F.u[CF.rank + 1] += recvBuf[CF.rank]
 
@@ -164,7 +163,6 @@ class base_transfer_MPI(base_transfer):
         recvBuf_u[CF.rank] = F.u[CF.rank + 1].copy()
         recvBuf_f[CF.rank] = F.f[CF.rank + 1].copy()
         for n in range(SF.coll.num_nodes):
-
             CG.Reduce(self.Pcoll[n, CG.rank] * tmp_u, recvBuf_u[CF.rank], root=n, op=MPI.SUM)
             CG.Reduce(self.Pcoll[n, CG.rank] * tmp_f, recvBuf_f[CF.rank], root=n, op=MPI.SUM)
 
