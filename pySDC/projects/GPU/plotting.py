@@ -1,6 +1,7 @@
 from pySDC.projects.GPU.configs import (
     AdaptivityExperiment,
     SingleGPUExperiment,
+    PFASST,
     RunAllenCahn,
     RunSchroedinger,
     RunAllenCahnForcing,
@@ -17,6 +18,7 @@ class PlotExperiments:
     num_nodes_serial_gpu = []
     num_nodes_parallel_cpu = []
     num_nodes_serial_cpu = []
+    num_procs = []
     space_resolution = {}
 
     def __init__(self, **kwargs):
@@ -37,7 +39,12 @@ class PlotExperiments:
 
     def get_vary_keys(self, parallel_sweeper, useGPU):
         vary_keys = {}
-        if parallel_sweeper and useGPU:
+        if len(self.num_procs) > 0:
+            vary_keys['num_procs'] = self.num_procs
+            vary_keys['space_resolution'] = [
+                self.space_resolution.get(sum(me), self.space_resolution[4]) for me in self.num_procs
+            ]
+        elif parallel_sweeper and useGPU:
             vary_keys['num_procs'] = [[1, 4, me] for me in self.num_nodes_parallel_gpu]
             vary_keys['space_resolution'] = [
                 self.space_resolution.get(me, self.space_resolution[1]) for me in self.num_nodes_parallel_gpu
@@ -141,12 +148,18 @@ class PlotAdaptivityWeakScalingACF(PlotExperiments):
     space_resolution = {1: 8192, 4: 16384, 16: 32768, 64: 65536}
 
 
-if __name__ == '__main__':
-    setup_mpl()
+class PlotPFASSTSchroedinger(PlotExperiments):
+    experiment_cls = PFASST
+    problem = RunSchroedinger
+    num_procs = [
+        [1, 1, 4],
+    ]
+    space_resolution = {4: 256}
 
+
+def ACF_plots():
     figsize = figsize_by_journal('JSC_thesis', 1, 0.5)
     fig, axs = plt.subplots(1, 2, figsize=figsize)
-    # plotter = PlotSingleGPUStrongScalingSchroedinger()
     plotterS = PlotAdaptivityStrongScalingACF()
     plotterW = PlotAdaptivityWeakScalingACF()
     plotterS.plot(axs[0])
@@ -156,5 +169,12 @@ if __name__ == '__main__':
         ax.set_title(label)
     fig.tight_layout()
     fig.savefig('plots/space_time_SDC_ACF.pdf')
+
+
+if __name__ == '__main__':
+    setup_mpl()
+    plotter = PlotPFASSTSchroedinger()
+    fig, ax = plt.subplots()
+    plotter.plot_single(ax, True, True)
 
     plt.show()
