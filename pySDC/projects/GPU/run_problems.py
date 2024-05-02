@@ -37,6 +37,7 @@ class RunProblem:
         useGPU=True,
         space_resolution=None,
         u_init=None,
+        space_levels=1,
     ):
         num_procs = (
             [
@@ -57,7 +58,7 @@ class RunProblem:
         self.get_description(custom_description, imex)
         self.get_controller_params(custom_controller_params)
         if space_resolution:
-            self.set_space_resolution(space_resolution)
+            self.set_space_resolution(space_resolution, levels=space_levels)
 
         self.u_init = u_init
 
@@ -78,10 +79,12 @@ class RunProblem:
         description['problem_params']['useGPU'] = self.useGPU
         return description
 
-    def set_space_resolution(self, resolution):
+    def set_space_resolution(self, resolution, levels=1):
+        levels = 1 if levels is None else levels
         current_resolution = self.get_space_resolution()
-        resolution = resolution if isinstance(resolution, list) else [resolution]
-        self.description['problem_params']['nvars'] = [(int(me),) * len(current_resolution) for me in resolution]
+        self.description['problem_params']['nvars'] = [
+            (int(resolution // 2**i),) * len(current_resolution) for i in range(levels)
+        ]
 
     def get_space_resolution(self):
         return self.description['problem_params']['nvars']
@@ -136,7 +139,7 @@ class RunProblem:
         self.description = merge_descriptions(self.description, custom_description)
 
     def get_default_controller_params(self):
-        controller_params = {'logger_level': 30, 'mssdc_jac': False, 'hook_class': []}
+        controller_params = {'mssdc_jac': False, 'hook_class': []}
         return controller_params
 
     def get_controller_params(self, custom_controller_params):
@@ -223,6 +226,7 @@ class Experiment:
         space_resolution=None,
         custom_description=None,
         custom_controller_params=None,
+        space_levels=1,
     ):
         self.problem = problem
         self.num_runs = num_runs
@@ -233,6 +237,7 @@ class Experiment:
             'custom_description': custom_description if custom_description else {},
             'space_resolution': space_resolution,
             'custom_controller_params': custom_controller_params,
+            'space_levels': space_levels,
         }
 
         self.prob = problem(**self.prob_args)
@@ -265,6 +270,7 @@ if __name__ == '__main__':
     custom_controller_params = {
         'logger_level': args.get('logger_level', None),
     }
+
     kwargs = {
         'num_procs': num_procs,
         'num_runs': args.get('num_runs', 5),
@@ -272,6 +278,7 @@ if __name__ == '__main__':
         'space_resolution': args.get('space_resolution', 2**13),
         'problem': args.get('problem', RunAllenCahn),
         'custom_controller_params': custom_controller_params,
+        'space_levels': args['space_levels'],
     }
     experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
 

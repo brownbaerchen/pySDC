@@ -25,6 +25,8 @@ def parse_args():
     parser.add_argument('--experiment', type=get_experiment, help='Experiment to run')
     parser.add_argument('--restart_idx', type=int, help='Restart from file by index')
     parser.add_argument('--procs', type=str_to_procs, help='Processes in steps/sweeper/space', default='1/1/1')
+    parser.add_argument('--space_levels', type=int, help='Number of levels in space', default=None)
+    # parser.add_argument('--time_levels', type=int, help='Number of levels in time', default = None)
     parser.add_argument(
         '--logger_level', type=int, help='Logger level on the first rank in space and in the sweeper', default='30'
     )
@@ -236,9 +238,9 @@ class PFASST(Experiment):
 
         kwargs = {
             **kwargs,
-            'space_resolution': [256, 128],
             'custom_controller_params': controller_params,
         }
+        kwargs['space_levels'] = 2 if kwargs['space_levels'] is None else kwargs['space_levels']
 
         super().__init__(**kwargs)
         self.prob.add_polynomial_adaptivity()
