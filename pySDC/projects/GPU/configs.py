@@ -7,20 +7,40 @@ def parse_args():
     import argparse
 
     cast_to_bool = lambda me: False if me == 'False' else True
+
+    def str_to_procs(me):
+        procs = me.split('/')
+        assert len(procs) == 3
+        return [int(p) for p in procs]
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('--Nsteps', type=int, help='Number of parallel steps')
-    parser.add_argument('--Nsweep', type=int, help='Number of ranks in the sweeper')
-    parser.add_argument('--Nspace', type=int, help='Number of ranks in space')
-    parser.add_argument('--num_runs', type=int, help='Number of runs for statistics')
-    parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs')
+    parser.add_argument('--Nsteps', type=int, help='Number of parallel steps', default=None)
+    parser.add_argument('--Nsweep', type=int, help='Number of ranks in the sweeper', default=None)
+    parser.add_argument('--Nspace', type=int, help='Number of ranks in space', default=None)
+    parser.add_argument('--num_runs', type=int, help='Number of runs for statistics', default=5)
+    parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs', default=True)
     parser.add_argument('--space_resolution', type=int, help='Resolution in space of the finest level')
     parser.add_argument('--Tend', type=float, help='Time to solve to')
     parser.add_argument('--problem', type=get_problem, help='Problem to run')
     parser.add_argument('--experiment', type=get_experiment, help='Experiment to run')
     parser.add_argument('--restart_idx', type=int, help='Restart from file by index')
+    parser.add_argument('--procs', type=str_to_procs, help='Processes in steps/sweeper/space', default='1/1/1')
+    parser.add_argument(
+        '--logger_level', type=int, help='Logger level on the first rank in space and in the sweeper', default='30'
+    )
 
-    args = parser.parse_args()
-    return vars(args)
+    kwargs = vars(parser.parse_args())
+
+    for k, i in zip(['Nsteps', 'Nsweep', 'Nspace'], [0, 1, 2]):
+        if kwargs[k] is None:
+            kwargs[k] = kwargs.get(
+                'procs',
+                [
+                    None,
+                ]
+                * 3,
+            )[i]
+    return kwargs
 
 
 class RunAllenCahn(RunProblem):
@@ -210,14 +230,17 @@ class PFASST(Experiment):
     name = 'PFASST'
 
     def __init__(self, **kwargs):
+        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
+
+        controller_params = {'hook_class': LogGlobalErrorPostRun, **kwargs.get('custom_controller_params', {})}
+
         kwargs = {
             **kwargs,
             'space_resolution': [256, 128],
+            'custom_controller_params': controller_params,
         }
-        from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
-        controller_params = {'hook_class': LogGlobalErrorPostRun, 'logger_level': 15}
-        super().__init__(custom_controller_params=controller_params, **kwargs)
+        super().__init__(**kwargs)
         self.prob.add_polynomial_adaptivity()
 
 
@@ -275,9 +298,9 @@ class Visualisation(AdaptivityExperiment):
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
             hooks += [PlotPostStep]
-        controller_params = {'hook_class': hooks, 'logger_level': 15}
+        kwargs['controller_params'] = {'hook_class': hooks, 'logger_level': 15}
 
-        super().__init__(custom_controller_params=controller_params, **kwargs)
+        super().__init__(**kwargs)
         self._stats_name = f'stats_{type(self.prob).__name__}_{rank_path}'
         self.prob.description['convergence_controllers'][LogStats] = {
             'hook': self.logger_hook,

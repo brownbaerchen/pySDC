@@ -262,12 +262,16 @@ if __name__ == '__main__':
 
     num_procs = [args.get(key, 1) for key in ['Nsteps', 'Nsweep', 'Nspace']]
 
+    custom_controller_params = {
+        'logger_level': args.get('logger_level', None),
+    }
     kwargs = {
         'num_procs': num_procs,
         'num_runs': args.get('num_runs', 5),
         'useGPU': args.get('useGPU', True),
         'space_resolution': args.get('space_resolution', 2**13),
         'problem': args.get('problem', RunAllenCahn),
+        'custom_controller_params': custom_controller_params,
     }
     experiment = args.get('experiment', AdaptivityExperiment)(**kwargs)
 
