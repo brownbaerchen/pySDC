@@ -3,40 +3,24 @@ from pySDC.projects.GPU.run_problems import Experiment
 import numpy as np
 
 
-def cast_to_bool(arg):
-    if arg == 'False':
-        return False
-    else:
-        return True
-
-
 def parse_args():
-    import sys
+    import argparse
 
-    allowed_args = {
-        'Nsteps': int,
-        'Nsweep': int,
-        'Nspace': int,
-        'num_runs': int,
-        'useGPU': cast_to_bool,
-        'space_resolution': int,
-        'Tend': float,
-        'problem': get_problem,
-        'experiment': get_experiment,
-        'restart_idx': int,
-    }
+    cast_to_bool = lambda me: False if me == 'False' else True
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--Nsteps', type=int, help='Number of parallel steps')
+    parser.add_argument('--Nsweep', type=int, help='Number of ranks in the sweeper')
+    parser.add_argument('--Nspace', type=int, help='Number of ranks in space')
+    parser.add_argument('--num_runs', type=int, help='Number of runs for statistics')
+    parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs')
+    parser.add_argument('--space_resolution', type=int, help='Resolution in space of the finest level')
+    parser.add_argument('--Tend', type=float, help='Time to solve to')
+    parser.add_argument('--problem', type=get_problem, help='Problem to run')
+    parser.add_argument('--experiment', type=get_experiment, help='Experiment to run')
+    parser.add_argument('--restart_idx', type=int, help='Restart from file by index')
 
-    args = {}
-    for me in sys.argv[1:]:
-        found_key = False
-        for key, cast in allowed_args.items():
-            if key in me:
-                args[key] = cast(me[len(key) + 1 :])
-                found_key = True
-        if not found_key:
-            raise Exception(f'Warning: Can\'t parse {me!r}')
-
-    return args
+    args = parser.parse_args()
+    return vars(args)
 
 
 class RunAllenCahn(RunProblem):
@@ -232,7 +216,7 @@ class PFASST(Experiment):
         }
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
-        controller_params = {'hook_class': LogGlobalErrorPostRun, 'logger_level': 30}
+        controller_params = {'hook_class': LogGlobalErrorPostRun, 'logger_level': 15}
         super().__init__(custom_controller_params=controller_params, **kwargs)
         self.prob.add_polynomial_adaptivity()
 
