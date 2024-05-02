@@ -38,6 +38,7 @@ class RunProblem:
         space_resolution=None,
         u_init=None,
         space_levels=1,
+        time_levels=1,
     ):
         num_procs = (
             [
@@ -48,6 +49,8 @@ class RunProblem:
             else num_procs
         )
         assert len(num_procs) == 3
+        self.space_levels = space_levels
+        self.time_levels = time_levels
 
         custom_description = {} if custom_description is None else custom_description
         custom_controller_params = {} if custom_controller_params is None else custom_controller_params
@@ -206,7 +209,8 @@ class RunProblem:
         prob = type(self).__name__
         gpu = 'GPU' if self.useGPU else 'CPU'
         space_resolution = f'{self.get_space_resolution()[0][0]:d}'
-        return f'{base_path}/{prob}_{procs}_{gpu}{name}_{space_resolution}.pickle'
+        levels = f'l{self.space_levels}x{self.time_levels}'
+        return f'{base_path}/{prob}_{procs}_{gpu}{name}_{space_resolution}_{levels}.pickle'
 
     def get_data(self, name=''):
         with open(self.get_path(name=name), 'rb') as file:

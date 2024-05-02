@@ -231,14 +231,12 @@ class AdaptivityExperiment(Experiment):
 class PFASST(Experiment):
     name = 'PFASST'
 
-    def __init__(self, space_resolution, **kwargs):
+    def __init__(self, **kwargs):
         from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostRun
 
         controller_params = {'hook_class': LogGlobalErrorPostRun, **kwargs.get('custom_controller_params', {})}
 
         kwargs = {
-            'space_resolution': [space_resolution, space_resolution // 2],
-            # 'space_resolution': space_resolution,
             **kwargs,
             'custom_controller_params': controller_params,
         }
