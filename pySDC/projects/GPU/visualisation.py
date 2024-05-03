@@ -1,38 +1,34 @@
-from configs import Visualisation, RunBrusselator, RunSchroedinger, RunAllenCahn, RunAllenCahnForcing, RunGS
+from mpi4py import MPI
 import matplotlib.pyplot as plt
 import os
-
-
-problem = RunAllenCahnForcing
-V = Visualisation(problem=problem, useGPU=False)
 
 
 # for i in range(99):
 #     for n_space in range(4):
 #         V.plot(ax, [0, 0, n_space], i)
 #         plt.pause(1e-7)
-def plot_solution_Brusselator(axs, ranks, idx):
+def plot_solution_Brusselator(axs, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 7}
-    for n in range(ranks[2]):
-        solution = V.get_solution([ranks[0], ranks[1], n], idx)
-        x, y = V.get_grid([ranks[0], ranks[1], n])
+    for n in range(procs[2]):
+        solution = V.get_solution([procs[0], procs[1], n], idx)
+        x, y = V.get_grid([procs[0], procs[1], n])
         for i in [0, 1]:
             axs[i].pcolormesh(x, y, solution['u'][i], **plotting_args)
 
 
-def plot_solution_Schroedinger(ax, ranks, idx):
+def plot_solution_Schroedinger(ax, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 1}
-    for n in range(ranks[2]):
-        solution = V.get_solution([ranks[0], ranks[1], n], idx)
-        x, y = V.get_grid([ranks[0], ranks[1], n])
+    for n in range(procs[2]):
+        solution = V.get_solution([procs[0], procs[1], n], idx)
+        x, y = V.get_grid([procs[0], procs[1], n])
         ax.pcolormesh(x, y, abs(solution['u']), **plotting_args)
 
 
-def plot_solution_AC(ax, ranks, idx):
+def plot_solution_AC(ax, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True}
-    for n in range(ranks[2]):
-        solution = V.get_solution([ranks[0], ranks[1] - 1, n], idx)
-        x, y = V.get_grid([ranks[0], ranks[1] - 1, n])
+    for n in range(procs[2]):
+        solution = V.get_solution([procs[0], procs[1] - 1, n], idx)
+        x, y = V.get_grid([procs[0], procs[1] - 1, n])
         ax.pcolormesh(x, y, solution['u'], **plotting_args)
     ax.set_aspect(1.0)
     ax.set_xlabel(r'$x$')
@@ -40,11 +36,11 @@ def plot_solution_AC(ax, ranks, idx):
     ax.set_title(f'$t$ = {solution["t"]:.2f}')
 
 
-def plot_solution_GS(ax, ranks, idx):
+def plot_solution_GS(ax, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 0.5, 'rasterized': True}
-    for n in range(ranks[2]):
-        solution = V.get_solution([ranks[0], ranks[1] - 1, n], idx)
-        x, y = V.get_grid([ranks[0], ranks[1] - 1, n])
+    for n in range(procs[2]):
+        solution = V.get_solution([procs[0], procs[1] - 1, n], idx)
+        x, y = V.get_grid([procs[0], procs[1] - 1, n])
         ax.pcolormesh(x, y, solution['u'][1], **plotting_args)
         del x
         del y
@@ -58,7 +54,7 @@ def plot_solution_GS(ax, ranks, idx):
 def plot_step_size(ax):
     import pickle
 
-    print(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', flush=True)
+    # print(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', flush=True)
     with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
         data = pickle.load(file)
     dt = data['dt']
@@ -67,10 +63,10 @@ def plot_step_size(ax):
     ax.set_xlabel(r'$t$')
 
 
-def plot_grid(ax, ranks):
+def plot_grid(ax, procs):
     plotting_args = {'color': 'white'}
-    for n in range(ranks[2]):
-        x, y = V.get_grid([ranks[0], ranks[1] - 1, n])
+    for n in range(procs[2]):
+        x, y = V.get_grid([procs[0], procs[1] - 1, n])
 
         ax.axvline(x.min(), **plotting_args)
         ax.axhline(y.min(), **plotting_args)
@@ -78,54 +74,77 @@ def plot_grid(ax, ranks):
 
 def plot_Brusselator():
     fig, axs = plt.subplots(1, 2)
-    ranks = [0, 0, 4]
-    plot_solution_Brusselator(axs, ranks, 0)
-    plot_grid(axs[0], ranks)
-    plot_grid(axs[1], ranks)
+    procs = [0, 0, 4]
+    plot_solution_Brusselator(axs, procs, 0)
+    plot_grid(axs[0], procs)
+    plot_grid(axs[1], procs)
 
 
 def plot_Schroedinger():
     fig, ax = plt.subplots()
-    ranks = [0, 0, 4]
-    plot_solution_Schroedinger(ax, ranks, 0)
-    plot_grid(ax, ranks)
+    procs = [0, 0, 4]
+    plot_solution_Schroedinger(ax, procs, 0)
+    plot_grid(ax, procs)
 
 
-def plot_AC(ranks):
+def plot_AC(procs):
     fig, ax = plt.subplots()
-    plot_solution_AC(ax, ranks, 0)
-    plot_grid(ax, ranks)
+    plot_solution_AC(ax, procs, 0)
+    plot_grid(ax, procs)
 
 
-def plot_all(ranks, func, format='png', redo=False):
-    from mpi4py import MPI
+def plot_all(func=None, format='png', redo=False):
 
-    comm = MPI.COMM_WORLD
+    func = func if func else problem.plot
 
     for i in range(0, 999999, comm.size):
-        fname = f'solution_{type(V.prob).__name__}_{ranks[0]}_{ranks[1]-1}_{ranks[2]-1}'
+        fname = f'solution_{type(V.prob).__name__}_{procs[0]-1}_{procs[1]-1}_{procs[2]-1}'
         path = f'./simulation_plots/{fname}_{V.logger_hook.format_index(i+comm.rank)}.{format}'
 
         if os.path.isfile(path) and not redo:
             continue
 
         try:
-            fig, ax = plt.subplots()
-            func(ax, ranks, i + comm.rank)
+            fig = func(V, procs, i + comm.rank)
             fig.savefig(path, bbox_inches='tight', dpi=300)
             print(f'Stored {path!r}', flush=True)
-            ax.cla()
-            fig.clf()
             plt.close(fig)
         except FileNotFoundError:
             break
 
+def format_procs(_procs):
+    return f'{_procs[0]-1}_{_procs[1]-1}_{_procs[2]-1}'
 
-fig, ax = plt.subplots()
-plot_step_size(ax)
-fig.savefig(f'plots/step_size_{type(V.prob).__name__}.pdf')
-# plot_solution_GS(ax, [0,1,4], 0)
-# plot_all([0, 4, 1], plot_solution_AC, redo=False)
-# plot_AC(ranks)
-# plot_all(ranks, plot_AC)
-plt.show()
+def make_video(name, format='png'):
+    import subprocess
+
+    if comm.rank > 0:
+        return None
+
+    fname = f'solution_{type(V.prob).__name__}_{format_procs(procs)}'
+    path = f'./simulation_plots/{fname}_%06d.{format}'
+
+    cmd = f'ffmpeg -y -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 videos/{fname}_{name}.mp4'
+    subprocess.run(cmd.split())
+
+
+if __name__ == '__main__':
+    from configs import get_experiment, parse_args
+    kwargs = parse_args()
+    problem = kwargs['problem']
+    procs = kwargs['procs']
+
+    V = get_experiment('visualisation')(problem=problem, useGPU=False)
+    comm = MPI.COMM_WORLD
+    
+    plot_all(redo=True)
+
+    if comm.rank == 0:
+        make_video('AC_adaptivity')
+
+        fig, ax = plt.subplots()
+        plot_step_size(ax)
+        fig.savefig(f'plots/step_size_{type(V.prob).__name__}.pdf')
+
+        if comm.size == 1:
+            plt.show()

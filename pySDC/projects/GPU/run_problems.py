@@ -111,6 +111,7 @@ class RunProblem:
             'maxiter': self.description['sweeper_params'].get('maxiter', 99),
             'interpolate_between_restarts': False,
             'abort_at_growing_residual': True,
+            'dt_min': self.default_Tend / 1e6,
         }
         return defaults
 
@@ -222,6 +223,10 @@ class RunProblem:
             if np.std(values) / np.median(values) > 1e-2:
                 print(f'Warning! Standard deviation too large in {key!r}!')
         return results
+
+    @staticmethod
+    def plot(experiment, procs, idx, fig=None, **plotting_params):
+        raise NotImplementedError
 
 
 class Experiment:

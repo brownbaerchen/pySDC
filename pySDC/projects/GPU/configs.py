@@ -58,9 +58,6 @@ class RunAllenCahn(RunProblem):
 
         description['step_params']['maxiter'] = 19
 
-        description['level_params']['dt'] = 1e-4
-        description['level_params']['restol'] = 1e-8
-
         description['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         description['sweeper_params']['num_nodes'] = 4
         description['sweeper_params']['QI'] = 'MIN-SR-S'
@@ -71,8 +68,12 @@ class RunAllenCahn(RunProblem):
         description['problem_params']['L'] = 16
         description['problem_params']['spectral'] = False
         description['problem_params']['comm'] = self.comm_space
+        description['problem_params']['eps'] = 0.04
 
         description['problem_class'] = allencahn_imex
+
+        description['level_params']['dt'] = description['problem_params']['eps']**2
+        description['level_params']['restol'] = 1e-8
 
         return description
 
@@ -86,7 +87,30 @@ class RunAllenCahn(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-5
+        defaults['dt_max'] = self.description['problem_params']['eps']**2
         return defaults
+
+    @staticmethod
+    def plot(experiment, procs, idx, fig=None, **plotting_params):
+        import matplotlib.pyplot as plt
+
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.get_axs()
+
+        plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True, **plotting_params,}
+
+        for n in range(procs[2]):
+            solution = experiment.get_solution([procs[0]-1, procs[1] - 1, n], idx)
+            x, y = experiment.get_grid([procs[0]-1, procs[1] - 1, n])
+            ax.pcolormesh(x, y, solution['u'], **plotting_args)
+        ax.set_aspect(1.0)
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$y$')
+        ax.set_title(f'$t$ = {solution["t"]:.2f}')
+        return fig
+
 
 
 class RunAllenCahnForcing(RunAllenCahn):
@@ -97,6 +121,17 @@ class RunAllenCahnForcing(RunAllenCahn):
 
         description = super().get_default_description()
         description['problem_class'] = allencahn_imex_timeforcing
+        return description
+
+class RunAllenCahnAdaptivity(RunAllenCahn):
+    default_Tend = 2e-1
+
+    def get_default_description(self):
+        from pySDC.projects.GPU.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing_adaptivity
+
+        description = super().get_default_description()
+        description['problem_class'] = allencahn_imex_timeforcing_adaptivity
+        description['problem_params']['time_freq'] = 1e-2 # 1 / self.default_Tend / 4
         return description
 
 
@@ -300,7 +335,7 @@ class Visualisation(AdaptivityExperiment):
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
             hooks += [PlotPostStep]
-        kwargs['controller_params'] = {'hook_class': hooks, 'logger_level': 15}
+        kwargs['custom_controller_params'] = {'hook_class': hooks, 'logger_level': 15}
 
         super().__init__(**kwargs)
         self._stats_name = f'stats_{type(self.prob).__name__}_{rank_path}'
@@ -362,6 +397,7 @@ def get_problem(name):
         'ACT': RunAllenCahnForcing,
         'Brusselator': RunBrusselator,
         'GS': RunGS,
+        'ACA': RunAllenCahnAdaptivity,
     }
     return probs[name]
 
