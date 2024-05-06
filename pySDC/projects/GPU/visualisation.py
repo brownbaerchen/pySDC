@@ -108,7 +108,12 @@ def plot_all(func=None, format='png', redo=False):
             fig = func(V, procs, i + comm.rank)
             fig.savefig(path, bbox_inches='tight', dpi=300)
             print(f'Stored {path!r}', flush=True)
+
+            for ax in fig.get_axes():
+                del ax
+            fig.clf()
             plt.close(fig)
+            del fig
         except FileNotFoundError:
             break
 
@@ -128,6 +133,16 @@ def make_video(name, format='png'):
     subprocess.run(cmd.split())
 
 
+def plot_time_dep_AC_think(ax):
+    import numpy as np
+    t = np.linspace(0, problem.default_Tend, 1000)
+    time_freq = problem(comm_world = MPI.COMM_SELF).get_default_description()['problem_params']['time_freq']
+    time_dep_strength=0.7
+    time_dep_fac = time_dep_strength * 2 * np.cos(time_freq * 2 * np.pi * t)**2 + 1
+    ax2 = ax.twinx()
+    ax2.plot(t, time_dep_fac, color='black', label='Time dependent modulation')
+
+
 if __name__ == '__main__':
     from configs import get_experiment, parse_args
     kwargs = parse_args()
@@ -137,14 +152,15 @@ if __name__ == '__main__':
     V = get_experiment('visualisation')(problem=problem, useGPU=False)
     comm = MPI.COMM_WORLD
     
-    plot_all(redo=True)
+    plot_all(redo=False)
 
     if comm.rank == 0:
-        make_video('AC_adaptivity')
+        # make_video('AC_adaptivity')
 
         fig, ax = plt.subplots()
+        plot_time_dep_AC_think(ax)
         plot_step_size(ax)
-        fig.savefig(f'plots/step_size_{type(V.prob).__name__}.pdf')
+        fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
 
         if comm.size == 1:
             plt.show()

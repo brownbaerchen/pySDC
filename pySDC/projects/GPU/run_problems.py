@@ -111,7 +111,7 @@ class RunProblem:
             'maxiter': self.description['sweeper_params'].get('maxiter', 99),
             'interpolate_between_restarts': False,
             'abort_at_growing_residual': True,
-            'dt_min': self.default_Tend / 1e6,
+            'dt_min': 1e-8,
         }
         return defaults
 

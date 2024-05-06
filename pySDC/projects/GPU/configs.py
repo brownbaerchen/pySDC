@@ -87,7 +87,7 @@ class RunAllenCahn(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-5
-        defaults['dt_max'] = self.description['problem_params']['eps']**2
+        defaults['dt_max'] = 0.9 * self.description['problem_params']['eps']**2
         return defaults
 
     @staticmethod
@@ -124,14 +124,14 @@ class RunAllenCahnForcing(RunAllenCahn):
         return description
 
 class RunAllenCahnAdaptivity(RunAllenCahn):
-    default_Tend = 2e-1
+    default_Tend = 4e-1
 
     def get_default_description(self):
         from pySDC.projects.GPU.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing_adaptivity
 
         description = super().get_default_description()
         description['problem_class'] = allencahn_imex_timeforcing_adaptivity
-        description['problem_params']['time_freq'] = 1e-2 # 1 / self.default_Tend / 4
+        description['problem_params']['time_freq'] = 1 / self.default_Tend * 1.
         return description
 
 

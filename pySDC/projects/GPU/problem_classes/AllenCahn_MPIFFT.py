@@ -80,8 +80,12 @@ class allencahn_imex_timeforcing_adaptivity(allencahn_imex_timeforcing, Rain):
         else:
             dw = 0.0
 
-        time_dep_fac = np.cos(self.time_freq * 2 * np.pi * t)**2
-        f.expl -= 6.0 * dw * u * (1.0 - u * time_dep_fac)
+        f.expl -= 6.0 * dw * u * (1.0 - u)
+        f.expl *= self.get_time_dep_fac(t)
 
         self.work_counters['rhs']()
         return f
+
+    def get_time_dep_fac(self, t):
+        time_dep_strength=0.7
+        return time_dep_strength * 2 * np.cos(self.time_freq * 2 * np.pi * t)**2 + 1# - time_dep_strength
