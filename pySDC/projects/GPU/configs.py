@@ -131,7 +131,8 @@ class RunAllenCahnAdaptivity(RunAllenCahn):
 
         description = super().get_default_description()
         description['problem_class'] = allencahn_imex_timeforcing_adaptivity
-        description['problem_params']['time_freq'] = 1 / self.default_Tend * 1.
+        description['problem_params']['time_freq'] = 1 / self.default_Tend * 1.5
+        description['problem_params']['time_dep_strength'] = 3.
         return description
 
 
@@ -388,6 +389,8 @@ class Visualisation(AdaptivityExperiment):
         # ax.set_ylim(0, 1)
         ax.set_aspect(1.0)
         ax.set_title(data['t'])
+        del data
+        del grid
 
 
 def get_problem(name):

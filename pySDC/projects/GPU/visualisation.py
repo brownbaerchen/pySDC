@@ -1,6 +1,7 @@
 from mpi4py import MPI
 import matplotlib.pyplot as plt
 import os
+import gc
 
 
 # for i in range(99):
@@ -117,6 +118,8 @@ def plot_all(func=None, format='png', redo=False):
         except FileNotFoundError:
             break
 
+        gc.collect()
+
 def format_procs(_procs):
     return f'{_procs[0]-1}_{_procs[1]-1}_{_procs[2]-1}'
 
@@ -136,11 +139,10 @@ def make_video(name, format='png'):
 def plot_time_dep_AC_thing(ax):
     import numpy as np
     t = np.linspace(0, problem.default_Tend, 1000)
-    time_freq = problem(comm_world = MPI.COMM_SELF).get_default_description()['problem_params']['time_freq']
-    time_dep_strength=0.7
-    time_dep_fac = time_dep_strength * 2 * np.cos(time_freq * 2 * np.pi * t)**2 + 1
+    desc = problem(comm_world = MPI.COMM_SELF).get_default_description()
+    params = desc['problem_params']
     ax2 = ax.twinx()
-    ax2.plot(t, time_dep_fac, color='black', label='Time dependent modulation')
+    ax2.plot(t, desc['problem_class'].get_time_dep_fac(params['time_freq'], params['time_dep_strength'], t), color='black', label='Time dependent modulation')
 
 
 if __name__ == '__main__':

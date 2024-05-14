@@ -153,7 +153,7 @@ class allencahn_imex(IMEX_Laplacian_MPIFFT):
                         # build radius
                         r2 = (self.X[0] + i - L + 0.5) ** 2 + (self.X[1] + j - L + 0.5) ** 2
                         # add this blob, shifted by 1 to avoid issues with adding up negative contributions
-                        tmp += self.xp.tanh((rand_radii[i, j] - np.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
+                        tmp += self.xp.tanh((rand_radii[i, j] - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
             # normalize to [0,1]
             tmp *= 0.5
             assert self.xp.all(tmp <= 1.0)
