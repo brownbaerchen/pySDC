@@ -133,7 +133,7 @@ def make_video(name, format='png'):
     subprocess.run(cmd.split())
 
 
-def plot_time_dep_AC_think(ax):
+def plot_time_dep_AC_thing(ax):
     import numpy as np
     t = np.linspace(0, problem.default_Tend, 1000)
     time_freq = problem(comm_world = MPI.COMM_SELF).get_default_description()['problem_params']['time_freq']
@@ -152,15 +152,15 @@ if __name__ == '__main__':
     V = get_experiment('visualisation')(problem=problem, useGPU=False)
     comm = MPI.COMM_WORLD
     
-    plot_all(redo=False)
+    # plot_all(redo=False)
 
     if comm.rank == 0:
-        # make_video('AC_adaptivity')
+        make_video('AC_adaptivity')
 
         fig, ax = plt.subplots()
-        plot_time_dep_AC_think(ax)
+        plot_time_dep_AC_thing(ax)
         plot_step_size(ax)
-        fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
+        #fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
 
-        if comm.size == 1:
-            plt.show()
+     #   if comm.size == 1:
+     #       plt.show()
