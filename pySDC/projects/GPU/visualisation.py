@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import os
 import gc
 import numpy as np
+import pickle
 
 
 # for i in range(99):
@@ -53,15 +54,20 @@ def plot_solution_GS(ax, procs, idx):
     del solution
 
 
-def plot_step_size(ax):
-    import pickle
+def plot_relative_restarts(ax):
+    with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
+        data = pickle.load(file)
+    restart = [me[1] for me in data['restart']]
+    ax.plot([me[0] for me in data['restart']], np.cumsum(restart)/np.cumsum(np.ones_like(restart)))
+    ax.set_ylabel(r'relative number of restarts')
+    ax.set_xlabel(r'$t$')
 
-    # print(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', flush=True)
+def plot_step_size(ax):
+
     with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
         data = pickle.load(file)
     dt = data['dt']
     ax.plot([me[0] for me in dt], [me[1] for me in dt])
-    ax.plot([me[0] for me in data['restart']], np.cumsum([me[1] for me in data['restart']])/np.cumsum(np.ones_like([me[1] for me in data['restart']])))
     ax.set_ylabel(r'$\Delta t$')
     ax.set_xlabel(r'$t$')
 
@@ -143,8 +149,7 @@ def plot_time_dep_AC_thing(ax):
     t = np.linspace(0, problem.default_Tend, 1000)
     desc = problem(comm_world = MPI.COMM_SELF).get_default_description()
     params = desc['problem_params']
-    ax2 = ax.twinx()
-    ax2.plot(t, desc['problem_class'].get_time_dep_fac(params['time_freq'], params['time_dep_strength'], t), color='black', label='Time dependent modulation')
+    ax.plot(t, desc['problem_class'].get_time_dep_fac(params['time_freq'], params['time_dep_strength'], t), color='black', label='Time dependent modulation')
 
 
 if __name__ == '__main__':
@@ -161,9 +166,13 @@ if __name__ == '__main__':
     if comm.rank == 0:
         # make_video('AC_adaptivity')
 
-        fig, ax = plt.subplots()
-        plot_time_dep_AC_thing(ax)
-        plot_step_size(ax)
+        fig, axs = plt.subplots(3, 1, sharex=True)
+
+        plot_time_dep_AC_thing(axs[1])
+        plot_step_size(axs[0])
+        plot_relative_restarts(axs[2])
+        for ax in axs[:-1]:
+            ax.set_xlabel('')
         fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
 
         if comm.size == 1:
