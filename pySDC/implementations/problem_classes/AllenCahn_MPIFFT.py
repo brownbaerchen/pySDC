@@ -7,7 +7,7 @@ from mpi4py_fft import newDistArray
 
 class allencahn_imex(IMEX_Laplacian_MPIFFT):
     r"""
-    Example implementing the :math:`N`-dimensional Allen-Cahn equation with periodic boundary conditions :math:`u \in [0, 1]^2`
+    Example implementing the :math:`2`-dimensional Allen-Cahn equation with periodic boundary conditions :math:`u \in [0, 1]^2`
 
     .. math::
         \frac{\partial u}{\partial t} = \Delta u - \frac{2}{\varepsilon^2} u (1 - u) (1 - 2u)
@@ -154,6 +154,8 @@ class allencahn_imex(IMEX_Laplacian_MPIFFT):
                         r2 = (self.X[0] + i - L + 0.5) ** 2 + (self.X[1] + j - L + 0.5) ** 2
                         # add this blob, shifted by 1 to avoid issues with adding up negative contributions
                         tmp += self.xp.tanh((rand_radii[i, j] - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
+            else:
+                raise NotImplementedError
             # normalize to [0,1]
             tmp *= 0.5
             assert self.xp.all(tmp <= 1.0)

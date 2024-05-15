@@ -2,6 +2,7 @@ from mpi4py import MPI
 import matplotlib.pyplot as plt
 import os
 import gc
+import numpy as np
 
 
 # for i in range(99):
@@ -60,6 +61,7 @@ def plot_step_size(ax):
         data = pickle.load(file)
     dt = data['dt']
     ax.plot([me[0] for me in dt], [me[1] for me in dt])
+    ax.plot([me[0] for me in data['restart']], np.cumsum([me[1] for me in data['restart']])/np.cumsum(np.ones_like([me[1] for me in data['restart']])))
     ax.set_ylabel(r'$\Delta t$')
     ax.set_xlabel(r'$t$')
 
@@ -157,12 +159,12 @@ if __name__ == '__main__':
     # plot_all(redo=False)
 
     if comm.rank == 0:
-        make_video('AC_adaptivity')
+        # make_video('AC_adaptivity')
 
         fig, ax = plt.subplots()
         plot_time_dep_AC_thing(ax)
         plot_step_size(ax)
-        #fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
+        fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
 
-     #   if comm.size == 1:
-     #       plt.show()
+        if comm.size == 1:
+            plt.show()

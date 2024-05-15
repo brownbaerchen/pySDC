@@ -372,7 +372,10 @@ class Visualisation(AdaptivityExperiment):
         _stats = self.prob.run(Tend=Tend, u_init=u_init, t0=t0)
         stats = {**_stats, **stats_restart}
 
-        data = {'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps)}
+        data = {
+                'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
+                'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
+                }
 
         if self.comm_steps.rank > 0 or self.comm_sweep.rank > 0 or self.comm_space.rank > 0:
             return None
