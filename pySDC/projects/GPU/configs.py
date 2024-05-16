@@ -3,6 +3,54 @@ from pySDC.projects.GPU.run_problems import Experiment
 import numpy as np
 
 
+class PathFormatter:
+
+    @classmethod
+    def get_formatter(cls, name):
+        return cls.formatters[name]
+
+    @staticmethod
+    def format_procs(procs):
+        if type(procs[0]).__name__ == 'Intracomm':
+            return f'{procs[0].rank}_{procs[1].rank}_{procs[2].rank}'
+        else:
+            return f'{procs[0]-1}_{procs[1]-1}_{procs[2]-1}'
+
+    @staticmethod
+    def format_problem(problem):
+        if hasattr(problem, '__name__'):
+            return f'{problem.__name__}'
+        else:
+            return f'{type(problem).__name__}'
+
+    @classmethod
+    def complete_fname(cls, **kwargs):
+        out = ''
+        for key in cls.formatters.keys():
+            if key in kwargs.keys():
+                out += f'_{PathFormatter.get_formatter(key)(kwargs[key])}'
+        return out[1:]
+
+    @staticmethod
+    def format_index(args):
+        return args[0].format_index(args[1])
+
+    @staticmethod
+    def to_str(args):
+        return str(args)
+
+    formatters = {
+        'base_path': to_str,
+        'name': to_str,
+        'problem': format_problem,
+        'num_procs': format_procs,
+        'space_resolution': to_str,
+        'space_levels': to_str,
+        'index': format_index,
+        'format': to_str,
+    }
+
+
 def parse_args():
     import argparse
 
@@ -72,7 +120,7 @@ class RunAllenCahn(RunProblem):
 
         description['problem_class'] = allencahn_imex
 
-        description['level_params']['dt'] = description['problem_params']['eps']**2
+        description['level_params']['dt'] = description['problem_params']['eps'] ** 2
         description['level_params']['restol'] = 1e-8
 
         return description
@@ -87,7 +135,7 @@ class RunAllenCahn(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-5
-        defaults['dt_max'] = 0.9 * self.description['problem_params']['eps']**2
+        defaults['dt_max'] = 0.9 * self.description['problem_params']['eps'] ** 2
         return defaults
 
     @staticmethod
@@ -99,18 +147,22 @@ class RunAllenCahn(RunProblem):
         else:
             ax = fig.get_axs()
 
-        plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True, **plotting_params,}
+        plotting_args = {
+            'vmin': 0,
+            'vmax': 1,
+            'rasterized': True,
+            **plotting_params,
+        }
 
         for n in range(procs[2]):
-            solution = experiment.get_solution([procs[0]-1, procs[1] - 1, n], idx)
-            x, y = experiment.get_grid([procs[0]-1, procs[1] - 1, n])
+            solution = experiment.get_solution([procs[0] - 1, procs[1] - 1, n], idx)
+            x, y = experiment.get_grid([procs[0] - 1, procs[1] - 1, n])
             ax.pcolormesh(x, y, solution['u'], **plotting_args)
         ax.set_aspect(1.0)
         ax.set_xlabel(r'$x$')
         ax.set_ylabel(r'$y$')
         ax.set_title(f'$t$ = {solution["t"]:.2f}')
         return fig
-
 
 
 class RunAllenCahnForcing(RunAllenCahn):
@@ -123,6 +175,7 @@ class RunAllenCahnForcing(RunAllenCahn):
         description['problem_class'] = allencahn_imex_timeforcing
         return description
 
+
 class RunAllenCahnAdaptivity(RunAllenCahn):
     default_Tend = 4e-1
 
@@ -132,7 +185,7 @@ class RunAllenCahnAdaptivity(RunAllenCahn):
         description = super().get_default_description()
         description['problem_class'] = allencahn_imex_timeforcing_adaptivity
         description['problem_params']['time_freq'] = 1 / self.default_Tend * 1.5
-        description['problem_params']['time_dep_strength'] = 3.
+        description['problem_params']['time_dep_strength'] = 3.0
         return description
 
 
@@ -303,12 +356,13 @@ class Visualisation(AdaptivityExperiment):
         from pySDC.implementations.hooks.log_step_size import LogStepSize
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
-        rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
 
-        prob_name = kwargs['problem'].__name__
+        rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
+        path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
 
         LogToFileAfterXs.path = './simulation_output'
-        LogToFileAfterXs.file_name = f'solution_{prob_name}_{rank_path}'
+        LogToFileAfterXs.file_name = PathFormatter.complete_fname(name='solution', **path_args)
+        # file_name = PathFormatter.complete_fname(name='solution', problem=kwargs['problem'], , space_resolution=kwargs['space_resolution'])
         LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
         if kwargs['useGPU']:
             LogToFileAfterXs.process_solution = lambda L: {
@@ -325,7 +379,7 @@ class Visualisation(AdaptivityExperiment):
         self.logger_hook = LogToFileAfterXs
 
         LogGrid.file_logger = LogToFileAfterXs
-        LogGrid.file_name = f'grid_{prob_name}_{rank_path}'
+        LogGrid.file_name = PathFormatter.complete_fname(name='grid', **path_args)
         self.log_grid = LogGrid
 
         # hooks
@@ -339,7 +393,7 @@ class Visualisation(AdaptivityExperiment):
         kwargs['custom_controller_params'] = {'hook_class': hooks, 'logger_level': 15}
 
         super().__init__(**kwargs)
-        self._stats_name = f'stats_{type(self.prob).__name__}_{rank_path}'
+        self._stats_name = PathFormatter.complete_fname(name='stats', **path_args)
         self.prob.description['convergence_controllers'][LogStats] = {
             'hook': self.logger_hook,
             'file_name': self._stats_name,
@@ -373,9 +427,9 @@ class Visualisation(AdaptivityExperiment):
         stats = {**_stats, **stats_restart}
 
         data = {
-                'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
-                'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
-                }
+            'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
+            'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
+        }
 
         if self.comm_steps.rank > 0 or self.comm_sweep.rank > 0 or self.comm_space.rank > 0:
             return None

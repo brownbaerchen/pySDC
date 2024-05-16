@@ -4,6 +4,7 @@ import os
 import gc
 import numpy as np
 import pickle
+from pySDC.projects.GPU.configs import PathFormatter
 
 
 # for i in range(99):
@@ -58,9 +59,10 @@ def plot_relative_restarts(ax):
     with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
         data = pickle.load(file)
     restart = [me[1] for me in data['restart']]
-    ax.plot([me[0] for me in data['restart']], np.cumsum(restart)/np.cumsum(np.ones_like(restart)))
+    ax.plot([me[0] for me in data['restart']], np.cumsum(restart) / np.cumsum(np.ones_like(restart)))
     ax.set_ylabel(r'relative number of restarts')
     ax.set_xlabel(r'$t$')
+
 
 def plot_step_size(ax):
 
@@ -107,8 +109,15 @@ def plot_all(func=None, format='png', redo=False):
     func = func if func else problem.plot
 
     for i in range(0, 999999, comm.size):
-        fname = f'solution_{type(V.prob).__name__}_{procs[0]-1}_{procs[1]-1}_{procs[2]-1}'
-        path = f'./simulation_plots/{fname}_{V.logger_hook.format_index(i+comm.rank)}.{format}'
+        path = PathFormatter.complete_fname(
+            base_path='./simulation_plots',
+            name='solution',
+            problem=V.prob,
+            num_procs=procs,
+            space_resolution=space_resolution,
+            index=(V.logger_hook, i + comm.rank),
+            format=format,
+        )
 
         if os.path.isfile(path) and not redo:
             continue
@@ -128,8 +137,10 @@ def plot_all(func=None, format='png', redo=False):
 
         gc.collect()
 
+
 def format_procs(_procs):
     return f'{_procs[0]-1}_{_procs[1]-1}_{_procs[2]-1}'
+
 
 def make_video(name, format='png'):
     import subprocess
@@ -146,22 +157,30 @@ def make_video(name, format='png'):
 
 def plot_time_dep_AC_thing(ax):
     import numpy as np
+
     t = np.linspace(0, problem.default_Tend, 1000)
-    desc = problem(comm_world = MPI.COMM_SELF).get_default_description()
+    desc = problem(comm_world=MPI.COMM_SELF).get_default_description()
     params = desc['problem_params']
-    ax.plot(t, desc['problem_class'].get_time_dep_fac(params['time_freq'], params['time_dep_strength'], t), color='black', label='Time dependent modulation')
+    ax.plot(
+        t,
+        desc['problem_class'].get_time_dep_fac(params['time_freq'], params['time_dep_strength'], t),
+        color='black',
+        label='Time dependent modulation',
+    )
 
 
 if __name__ == '__main__':
     from configs import get_experiment, parse_args
+
     kwargs = parse_args()
     problem = kwargs['problem']
     procs = kwargs['procs']
+    space_resolution = kwargs['space_resolution']
 
     V = get_experiment('visualisation')(problem=problem, useGPU=False)
     comm = MPI.COMM_WORLD
-    
-    # plot_all(redo=False)
+
+    plot_all(redo=True)
 
     if comm.rank == 0:
         # make_video('AC_adaptivity')
