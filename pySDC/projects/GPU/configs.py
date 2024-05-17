@@ -4,10 +4,11 @@ import numpy as np
 
 
 class PathFormatter:
+    logger_hook = None
 
-    @classmethod
-    def get_formatter(cls, name):
-        return cls.formatters[name]
+    @staticmethod
+    def get_formatter(name):
+        return PathFormatter.formatters[name]
 
     @staticmethod
     def format_procs(procs):
@@ -28,12 +29,12 @@ class PathFormatter:
         out = ''
         for key in cls.formatters.keys():
             if key in kwargs.keys():
-                out += f'_{PathFormatter.get_formatter(key)(kwargs[key])}'
+                out += f'{cls.delimiters.get(key, "_")}{cls.get_formatter(key)(kwargs[key])}'
         return out[1:]
 
     @staticmethod
-    def format_index(args):
-        return args[0].format_index(args[1])
+    def format_index(index):
+        return PathFormatter.logger_hook.format_index(index)
 
     @staticmethod
     def to_str(args):
@@ -46,8 +47,13 @@ class PathFormatter:
         'num_procs': format_procs,
         'space_resolution': to_str,
         'space_levels': to_str,
-        'index': format_index,
+        'restart_idx': format_index,
         'format': to_str,
+    }
+
+    delimiters = {
+        'format': '.',
+        'name': '/',
     }
 
 
@@ -350,19 +356,19 @@ class Visualisation(AdaptivityExperiment):
 
     def __init__(self, live_plotting=False, **kwargs):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
+        from pySDC.implementations.hooks.log_step_size import LogStepSize
+        from pySDC.implementations.hooks.log_work import LogWork, LogSDCIterations
         from pySDC.projects.GPU.run_problems import get_comms
         from pySDC.projects.GPU.hooks.LogGrid import LogGrid
         from pySDC.projects.GPU.hooks.LogStats import LogStats
-        from pySDC.implementations.hooks.log_step_size import LogStepSize
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
 
         rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
-        path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
+        self.path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
 
         LogToFileAfterXs.path = './simulation_output'
-        LogToFileAfterXs.file_name = PathFormatter.complete_fname(name='solution', **path_args)
-        # file_name = PathFormatter.complete_fname(name='solution', problem=kwargs['problem'], , space_resolution=kwargs['space_resolution'])
+        LogToFileAfterXs.file_name = PathFormatter.complete_fname(name='solution', **self.path_args)
         LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
         if kwargs['useGPU']:
             LogToFileAfterXs.process_solution = lambda L: {
@@ -379,13 +385,13 @@ class Visualisation(AdaptivityExperiment):
         self.logger_hook = LogToFileAfterXs
 
         LogGrid.file_logger = LogToFileAfterXs
-        LogGrid.file_name = PathFormatter.complete_fname(name='grid', **path_args)
+        LogGrid.file_name = PathFormatter.complete_fname(name='grid', **self.path_args)
         self.log_grid = LogGrid
 
         # hooks
         hooks = [LogStepSize]
         if self.comm_sweep.rank == self.comm_sweep.size - 1:
-            hooks += [self.logger_hook, LogGrid]
+            hooks += [self.logger_hook, LogGrid, LogWork, LogSDCIterations]
         if live_plotting:
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
@@ -393,7 +399,7 @@ class Visualisation(AdaptivityExperiment):
         kwargs['custom_controller_params'] = {'hook_class': hooks, 'logger_level': 15}
 
         super().__init__(**kwargs)
-        self._stats_name = PathFormatter.complete_fname(name='stats', **path_args)
+        self._stats_name = PathFormatter.complete_fname(name='stats', **self.path_args)
         self.prob.description['convergence_controllers'][LogStats] = {
             'hook': self.logger_hook,
             'file_name': self._stats_name,
@@ -426,16 +432,24 @@ class Visualisation(AdaptivityExperiment):
         _stats = self.prob.run(Tend=Tend, u_init=u_init, t0=t0)
         stats = {**_stats, **stats_restart}
 
-        data = {
-            'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
-            'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
-        }
+        # data = {
+        #     'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
+        #     'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
+        # }
 
-        if self.comm_steps.rank > 0 or self.comm_sweep.rank > 0 or self.comm_space.rank > 0:
-            return None
-
-        with open(f'{self.logger_hook.path}/{type(self.prob).__name__}_stats.pickle', 'wb') as file:
-            pickle.dump(data, file)
+        args = {key: value for key, value in self.path_args.items() if key not in ['index']}
+        with open(
+            PathFormatter.complete_fname(name='stats', format='pickle', base_path='{self.logger_hook.path}', **args),
+            'wb',
+        ) as file:
+            pickle.dump(stats, file)
+        with open(
+            PathFormatter.complete_fname(
+                name='stats', format='pickle', base_path='{self.logger_hook.path}', **self.path_args
+            ),
+            'wb',
+        ) as file:
+            pickle.dump(stats, file)
 
     def plot(self, ax, ranks, idx):
         data = self.get_solution(ranks, idx)

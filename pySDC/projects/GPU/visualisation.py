@@ -5,12 +5,9 @@ import gc
 import numpy as np
 import pickle
 from pySDC.projects.GPU.configs import PathFormatter
+from pySDC.helpers.stats_helper import get_sorted
 
 
-# for i in range(99):
-#     for n_space in range(4):
-#         V.plot(ax, [0, 0, n_space], i)
-#         plt.pause(1e-7)
 def plot_solution_Brusselator(axs, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 7}
     for n in range(procs[2]):
@@ -18,6 +15,23 @@ def plot_solution_Brusselator(axs, procs, idx):
         x, y = V.get_grid([procs[0], procs[1], n])
         for i in [0, 1]:
             axs[i].pcolormesh(x, y, solution['u'][i], **plotting_args)
+
+
+def combine_stats():
+    stats = {}
+
+    for p1 in range(procs[0]):
+        for p2 in range(procs[1]):
+            for p3 in range(procs[2]):
+                path_args = {**kwargs, 'num_procs': [p1 + 1, p2 + 1, p3 + 1]}
+                with open(
+                    PathFormatter.complete_fname(
+                        name='stats', format='pickle', base_path=f'{V.logger_hook.path}', **path_args
+                    ),
+                    'rb',
+                ) as file:
+                    stats = {**stats, **pickle.load(file)}
+    return stats
 
 
 def plot_solution_Schroedinger(ax, procs, idx):
@@ -55,20 +69,20 @@ def plot_solution_GS(ax, procs, idx):
     del solution
 
 
-def plot_relative_restarts(ax):
-    with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
-        data = pickle.load(file)
-    restart = [me[1] for me in data['restart']]
-    ax.plot([me[0] for me in data['restart']], np.cumsum(restart) / np.cumsum(np.ones_like(restart)))
+def plot_relative_restarts(stats, ax):
+    restart = get_sorted(stats, recomputed=None, type='restart')
+    restart_ = [me[1] for me in restart]
+    ax.plot([me[0] for me in restart], np.cumsum(restart_) / np.cumsum(np.ones_like(restart_)))
     ax.set_ylabel(r'relative number of restarts')
     ax.set_xlabel(r'$t$')
 
 
-def plot_step_size(ax):
+def plot_step_size(stats, ax):
 
-    with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
-        data = pickle.load(file)
-    dt = data['dt']
+    # with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
+    #     data = pickle.load(file)
+
+    dt = get_sorted(stats, recomputed=False, type='dt')
     ax.plot([me[0] for me in dt], [me[1] for me in dt])
     ax.set_ylabel(r'$\Delta t$')
     ax.set_xlabel(r'$t$')
@@ -115,7 +129,7 @@ def plot_all(func=None, format='png', redo=False):
             problem=V.prob,
             num_procs=procs,
             space_resolution=space_resolution,
-            index=(V.logger_hook, i + comm.rank),
+            restart_idx=i + comm.rank,
             format=format,
         )
 
@@ -148,7 +162,12 @@ def make_video(name, format='png'):
     if comm.rank > 0:
         return None
 
-    fname = f'solution_{type(V.prob).__name__}_{format_procs(procs)}'
+    fname = PathFormatter.complete_fname(
+        name='solution',
+        problem=V.prob,
+        num_procs=procs,
+        space_resolution=space_resolution,
+    )
     path = f'./simulation_plots/{fname}_%06d.{format}'
 
     cmd = f'ffmpeg -y -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 videos/{fname}_{name}.mp4'
@@ -156,8 +175,6 @@ def make_video(name, format='png'):
 
 
 def plot_time_dep_AC_thing(ax):
-    import numpy as np
-
     t = np.linspace(0, problem.default_Tend, 1000)
     desc = problem(comm_world=MPI.COMM_SELF).get_default_description()
     params = desc['problem_params']
@@ -178,18 +195,20 @@ if __name__ == '__main__':
     space_resolution = kwargs['space_resolution']
 
     V = get_experiment('visualisation')(problem=problem, useGPU=False)
+    PathFormatter.logger_hook = V.logger_hook
     comm = MPI.COMM_WORLD
 
-    plot_all(redo=True)
+    # plot_all(redo=True)
 
     if comm.rank == 0:
-        # make_video('AC_adaptivity')
+        make_video('AC_adaptivity')
+        stats = combine_stats()
 
         fig, axs = plt.subplots(3, 1, sharex=True)
 
         plot_time_dep_AC_thing(axs[1])
-        plot_step_size(axs[0])
-        plot_relative_restarts(axs[2])
+        plot_step_size(stats, axs[0])
+        plot_relative_restarts(stats, axs[2])
         for ax in axs[:-1]:
             ax.set_xlabel('')
         fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
