@@ -1,60 +1,8 @@
+from pySDC.projects.GPU.utils import PathFormatter
 from pySDC.projects.GPU.run_problems import RunProblem
 from pySDC.projects.GPU.run_problems import Experiment
-import numpy as np
-
-
-class PathFormatter:
-    logger_hook = None
-
-    @staticmethod
-    def get_formatter(name):
-        return PathFormatter.formatters[name]
-
-    @staticmethod
-    def format_procs(procs):
-        if type(procs[0]).__name__ == 'Intracomm':
-            return f'{procs[0].rank}_{procs[1].rank}_{procs[2].rank}'
-        else:
-            return f'{procs[0]-1}_{procs[1]-1}_{procs[2]-1}'
-
-    @staticmethod
-    def format_problem(problem):
-        if hasattr(problem, '__name__'):
-            return f'{problem.__name__}'
-        else:
-            return f'{type(problem).__name__}'
-
-    @classmethod
-    def complete_fname(cls, **kwargs):
-        out = ''
-        for key in cls.formatters.keys():
-            if key in kwargs.keys():
-                out += f'{cls.delimiters.get(key, "_")}{cls.get_formatter(key)(kwargs[key])}'
-        return out[1:]
-
-    @staticmethod
-    def format_index(index):
-        return PathFormatter.logger_hook.format_index(index)
-
-    @staticmethod
-    def to_str(args):
-        return str(args)
-
-    formatters = {
-        'base_path': to_str,
-        'name': to_str,
-        'problem': format_problem,
-        'num_procs': format_procs,
-        'space_resolution': to_str,
-        'space_levels': to_str,
-        'restart_idx': format_index,
-        'format': to_str,
-    }
-
-    delimiters = {
-        'format': '.',
-        'name': '/',
-    }
+from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
+from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
 
 def parse_args():
@@ -126,7 +74,7 @@ class RunAllenCahn(RunProblem):
 
         description['problem_class'] = allencahn_imex
 
-        description['level_params']['dt'] = description['problem_params']['eps'] ** 2
+        description['level_params']['dt'] = description['problem_params']['eps'] ** 3
         description['level_params']['restol'] = 1e-8
 
         return description
@@ -140,8 +88,9 @@ class RunAllenCahn(RunProblem):
     @property
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
-        defaults['e_tol'] = 1e-5
+        defaults['e_tol'] = 1e-8
         defaults['dt_max'] = 0.9 * self.description['problem_params']['eps'] ** 2
+        # defaults['dt_max'] = 10 * self.description['problem_params']['eps'] ** 3
         return defaults
 
     @staticmethod
@@ -161,8 +110,8 @@ class RunAllenCahn(RunProblem):
         }
 
         for n in range(procs[2]):
-            solution = experiment.get_solution([procs[0] - 1, procs[1] - 1, n], idx)
-            x, y = experiment.get_grid([procs[0] - 1, procs[1] - 1, n])
+            solution = experiment.get_solution([procs[0], procs[1], n + 1], idx)
+            x, y = experiment.get_grid([procs[0], procs[1], n + 1])
             ax.pcolormesh(x, y, solution['u'], **plotting_args)
         ax.set_aspect(1.0)
         ax.set_xlabel(r'$x$')
@@ -183,15 +132,16 @@ class RunAllenCahnForcing(RunAllenCahn):
 
 
 class RunAllenCahnAdaptivity(RunAllenCahn):
-    default_Tend = 4e-1
+    default_Tend = 2e-1
 
     def get_default_description(self):
         from pySDC.projects.GPU.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing_adaptivity
 
         description = super().get_default_description()
         description['problem_class'] = allencahn_imex_timeforcing_adaptivity
-        description['problem_params']['time_freq'] = 1 / self.default_Tend * 1.5
-        description['problem_params']['time_dep_strength'] = 3.0
+        description['problem_params']['time_freq'] = 1 / 2e-1 * 1.5
+        # description['problem_params']['time_freq'] = 1 / 4e-1 * 1.5
+        description['problem_params']['time_dep_strength'] = 5.0e-1
         return description
 
 
@@ -353,45 +303,26 @@ class PFASST(Experiment):
 
 class Visualisation(AdaptivityExperiment):
     name = 'visualisation'
+    log_solution = LogToFileAfterXs
+    log_grid = LogGrid
 
     def __init__(self, live_plotting=False, **kwargs):
-        from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
         from pySDC.implementations.hooks.log_step_size import LogStepSize
         from pySDC.implementations.hooks.log_work import LogWork, LogSDCIterations
         from pySDC.projects.GPU.run_problems import get_comms
-        from pySDC.projects.GPU.hooks.LogGrid import LogGrid
         from pySDC.projects.GPU.hooks.LogStats import LogStats
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
 
-        rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
-        self.path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
+        # rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
+        # self.path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
 
-        LogToFileAfterXs.path = './simulation_output'
-        LogToFileAfterXs.file_name = PathFormatter.complete_fname(name='solution', **self.path_args)
-        LogToFileAfterXs.time_increment = kwargs['problem'].default_Tend / 200
-        if kwargs['useGPU']:
-            LogToFileAfterXs.process_solution = lambda L: {
-                't': L.time + L.dt,
-                'dt': L.status.dt_new,
-                'u': L.uend.get().view(np.ndarray),
-            }
-        else:
-            LogToFileAfterXs.process_solution = lambda L: {
-                't': L.time + L.dt,
-                'dt': L.status.dt_new,
-                'u': L.uend.view(np.ndarray),
-            }
-        self.logger_hook = LogToFileAfterXs
-
-        LogGrid.file_logger = LogToFileAfterXs
-        LogGrid.file_name = PathFormatter.complete_fname(name='grid', **self.path_args)
-        self.log_grid = LogGrid
+        self.log_solution.time_increment = kwargs['problem'].default_Tend / 200
 
         # hooks
         hooks = [LogStepSize]
         if self.comm_sweep.rank == self.comm_sweep.size - 1:
-            hooks += [self.logger_hook, LogGrid, LogWork, LogSDCIterations]
+            hooks += [self.log_solution, LogGrid, LogWork, LogSDCIterations]
         if live_plotting:
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
@@ -401,37 +332,37 @@ class Visualisation(AdaptivityExperiment):
         super().__init__(**kwargs)
         self._stats_name = PathFormatter.complete_fname(name='stats', **self.path_args)
         self.prob.description['convergence_controllers'][LogStats] = {
-            'hook': self.logger_hook,
+            'hook': self.log_solution,
             'file_name': self._stats_name,
         }
 
     def run(self, Tend=None, restart_idx=None):
         import pickle
-        from pySDC.helpers.stats_helper import get_sorted
 
         u_init = None
         t0 = 0.0
         stats_restart = {}
         if restart_idx:
             # load solution
-            _u_init = self.logger_hook.load(restart_idx)
+            _u_init = self.log_solution.load(restart_idx)
             u_init = _u_init['u']
             t0 = _u_init['t']
             self.prob.description['level_params']['dt'] = _u_init['dt']
 
             # load stats
             stats_path = (
-                f'{self.logger_hook.path}/{self._stats_name}_{self.logger_hook.format_index(restart_idx)}.pickle'
+                f'{self.log_solution.path}/{self._stats_name}_{self.log_solution.format_index(restart_idx)}.pickle'
             )
             with open(stats_path, 'rb') as file:
                 stats_restart = pickle.load(file)
 
-            self.logger_hook.counter = restart_idx + 1
-            self.logger_hook.t_next_log = t0 + self.logger_hook.time_increment
+            self.log_solution.counter = restart_idx + 1
+            self.log_solution.t_next_log = t0 + self.log_solution.time_increment
 
         _stats = self.prob.run(Tend=Tend, u_init=u_init, t0=t0)
         stats = {**_stats, **stats_restart}
 
+        # from pySDC.helpers.stats_helper import get_sorted
         # data = {
         #     'dt': get_sorted(stats, type='dt', recomputed=False, comm=self.comm_steps),
         #     'restart': get_sorted(stats, type='restart', recomputed=None, comm=self.comm_steps),
@@ -439,13 +370,13 @@ class Visualisation(AdaptivityExperiment):
 
         args = {key: value for key, value in self.path_args.items() if key not in ['index']}
         with open(
-            PathFormatter.complete_fname(name='stats', format='pickle', base_path='{self.logger_hook.path}', **args),
+            PathFormatter.complete_fname(name='stats', format='pickle', base_path=f'{self.log_solution.path}', **args),
             'wb',
         ) as file:
             pickle.dump(stats, file)
         with open(
             PathFormatter.complete_fname(
-                name='stats', format='pickle', base_path='{self.logger_hook.path}', **self.path_args
+                name='stats', format='pickle', base_path=f'{self.log_solution.path}', **self.path_args
             ),
             'wb',
         ) as file:

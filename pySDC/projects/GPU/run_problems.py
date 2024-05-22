@@ -2,6 +2,7 @@ import numpy as np
 from mpi4py import MPI
 from pySDC.projects.Resilience.strategies import merge_descriptions
 from pySDC.helpers.stats_helper import get_sorted
+from pySDC.projects.GPU.utils import PathFormatter, DummyLogger
 import pickle
 
 
@@ -231,42 +232,76 @@ class RunProblem:
 
 class Experiment:
     name = None
+    log_grid = DummyLogger
+    log_solution = DummyLogger
 
     def __init__(
         self,
         problem,
-        num_procs=None,
-        useGPU=True,
         num_runs=5,
-        space_resolution=None,
         custom_description=None,
         custom_controller_params=None,
-        space_levels=1,
+        **kwargs,
     ):
+        kwargs['problem'] = problem
         self.problem = problem
         self.num_runs = num_runs
 
         self.prob_args = {
-            'num_procs': num_procs if num_procs else [1, 1, 1],
-            'useGPU': useGPU,
+            'num_procs': kwargs.get('num_procs', [1, 1, 1]),
+            'useGPU': kwargs.get('useGPU', True),
             'custom_description': custom_description if custom_description else {},
-            'space_resolution': space_resolution,
+            'space_resolution': kwargs.get('space_resolution', None),
             'custom_controller_params': custom_controller_params,
-            'space_levels': space_levels,
+            'space_levels': kwargs.get('space_levels', 1),
         }
 
         self.prob = problem(**self.prob_args)
+
+        self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
+
+        self.path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
+        for key in ['restart_idx']:
+            self.path_args.pop(key, None)
+
+        self.log_grid.file_name = PathFormatter.complete_fname(name='grid', **self.path_args)
+        self.log_grid.path = './simulation_output'
+        self.log_solution.file_name = PathFormatter.complete_fname(name='solution', **self.path_args)
+        self.log_solution.path = './simulation_output'
+
+        if kwargs['useGPU']:
+            self.log_solution.process_solution = lambda L: {
+                't': L.time + L.dt,
+                'dt': L.status.dt_new,
+                'u': L.uend.get().view(np.ndarray),
+            }
+        else:
+            self.log_solution.process_solution = lambda L: {
+                't': L.time + L.dt,
+                'dt': L.status.dt_new,
+                'u': L.uend.view(np.ndarray),
+            }
+
+        self.log_grid.file_logger = self.log_solution
 
     def get_hook_fname_for_ranks(self, ranks):
         return f'{type(self.prob).__name__}_{ranks[0]}_{ranks[1]}_{ranks[2]}'
 
     def get_grid(self, ranks):
-        self.log_grid.file_name = f'grid_{self.get_hook_fname_for_ranks(ranks)}'
-        return self.log_grid.load()
+        _fname = f'{self.log_grid.file_name}'
+        self.log_grid.file_name = PathFormatter.complete_fname(**{**self.path_args, 'num_procs': ranks, 'name': 'grid'})
+        res = self.log_grid.load()
+        self.log_grid.file_name = _fname
+        return res
 
     def get_solution(self, ranks, idx):
-        self.logger_hook.file_name = f'solution_{self.get_hook_fname_for_ranks(ranks)}'
-        return self.logger_hook.load(idx)
+        _fname = f'{self.log_solution.file_name}'
+        self.log_solution.file_name = PathFormatter.complete_fname(
+            **{**self.path_args, 'num_procs': ranks, 'name': 'solution'}
+        )
+        res = self.log_solution.load(idx)
+        self.log_solution.file_name = _fname
+        return res
 
     def restart_from_file(self, ranks, idx):
         self.prob.u_init = self.get_solution(ranks, idx)

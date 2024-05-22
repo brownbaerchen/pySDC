@@ -2,13 +2,12 @@ import numpy as np
 from pySDC.implementations.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing
 
 
-
 class allencahn_imex_timeforcing_adaptivity(allencahn_imex_timeforcing):
     r"""
     Add more source terms to `allencahn_imex_timeforcing` such that the time-scale changes and we can benefit from adaptivity.
     """
 
-    def __init__(self, time_freq=1., time_dep_strength=3., *args, **kwargs):
+    def __init__(self, time_freq=1.0, time_dep_strength=3.0, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._makeAttributeAndRegister('time_freq', 'time_dep_strength', localVars=locals(), readOnly=True)
 
@@ -19,4 +18,5 @@ class allencahn_imex_timeforcing_adaptivity(allencahn_imex_timeforcing):
 
     @staticmethod
     def get_time_dep_fac(time_freq, time_dep_strength, t):
-        return time_dep_strength *  np.cos(time_freq * 2 * np.pi * t)**2 + 1# - time_dep_strength
+        return 1 - time_dep_strength * (np.cos(time_freq * 2 * np.pi * t) ** 2)  # + 1# - time_dep_strength
+        return time_dep_strength * np.cos(time_freq * 2 * np.pi * t) ** 2 + 1  # - time_dep_strength

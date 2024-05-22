@@ -4,7 +4,7 @@ import os
 import gc
 import numpy as np
 import pickle
-from pySDC.projects.GPU.configs import PathFormatter
+from pySDC.projects.GPU.utils import PathFormatter
 from pySDC.helpers.stats_helper import get_sorted
 
 
@@ -26,7 +26,7 @@ def combine_stats():
                 path_args = {**kwargs, 'num_procs': [p1 + 1, p2 + 1, p3 + 1]}
                 with open(
                     PathFormatter.complete_fname(
-                        name='stats', format='pickle', base_path=f'{V.logger_hook.path}', **path_args
+                        name='stats', format='pickle', base_path=f'{V.log_solution.path}', **path_args
                     ),
                     'rb',
                 ) as file:
@@ -69,17 +69,21 @@ def plot_solution_GS(ax, procs, idx):
     del solution
 
 
-def plot_relative_restarts(stats, ax):
+def plot_restarts(stats, ax, relative=True):
     restart = get_sorted(stats, recomputed=None, type='restart')
     restart_ = [me[1] for me in restart]
-    ax.plot([me[0] for me in restart], np.cumsum(restart_) / np.cumsum(np.ones_like(restart_)))
-    ax.set_ylabel(r'relative number of restarts')
+    if relative:
+        ax.plot([me[0] for me in restart], np.cumsum(restart_) / np.cumsum(np.ones_like(restart_)))
+        ax.set_ylabel(r'relative number of restarts')
+    else:
+        ax.plot([me[0] for me in restart], np.cumsum(restart_))
+        ax.set_ylabel(r'number of restarts')
     ax.set_xlabel(r'$t$')
 
 
 def plot_step_size(stats, ax):
 
-    # with open(f'{V.logger_hook.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
+    # with open(f'{V.log_solution.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
     #     data = pickle.load(file)
 
     dt = get_sorted(stats, recomputed=False, type='dt')
@@ -130,6 +134,7 @@ def plot_all(func=None, format='png', redo=False):
             num_procs=procs,
             space_resolution=space_resolution,
             restart_idx=i + comm.rank,
+            space_levels=space_levels,
             format=format,
         )
 
@@ -147,7 +152,7 @@ def plot_all(func=None, format='png', redo=False):
             plt.close(fig)
             del fig
         except FileNotFoundError:
-            break
+            pass
 
         gc.collect()
 
@@ -167,10 +172,12 @@ def make_video(name, format='png'):
         problem=V.prob,
         num_procs=procs,
         space_resolution=space_resolution,
+        space_levels=space_levels,
     )
     path = f'./simulation_plots/{fname}_%06d.{format}'
 
     cmd = f'ffmpeg -y -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 videos/{fname}_{name}.mp4'
+    print(f'Recorded video to "videos/{fname}_{name}.mp4"')
     subprocess.run(cmd.split())
 
 
@@ -193,12 +200,14 @@ if __name__ == '__main__':
     problem = kwargs['problem']
     procs = kwargs['procs']
     space_resolution = kwargs['space_resolution']
+    space_levels = kwargs['space_levels']
 
-    V = get_experiment('visualisation')(problem=problem, useGPU=False)
-    PathFormatter.logger_hook = V.logger_hook
+    V = get_experiment('visualisation')(**kwargs)
+    PathFormatter.log_solution = V.log_solution
     comm = MPI.COMM_WORLD
 
-    # plot_all(redo=True)
+    plot_all(redo=True)
+    # comm.Barrier()
 
     if comm.rank == 0:
         make_video('AC_adaptivity')
@@ -208,7 +217,7 @@ if __name__ == '__main__':
 
         plot_time_dep_AC_thing(axs[1])
         plot_step_size(stats, axs[0])
-        plot_relative_restarts(stats, axs[2])
+        plot_restarts(stats, axs[2], relative=False)
         for ax in axs[:-1]:
             ax.set_xlabel('')
         fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
