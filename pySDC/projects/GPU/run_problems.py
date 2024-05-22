@@ -71,6 +71,10 @@ class RunProblem:
 
         self.u_init = u_init
 
+    @classmethod
+    def get_visualisation_hooks(cls):
+        return []
+
     def get_default_description(self):
         from pySDC.implementations.transfer_classes.TransferMesh_MPIFFT import fft_to_fft
         from pySDC.implementations.convergence_controller_classes.basic_restarting import BasicRestartingMPI

@@ -74,7 +74,7 @@ class RunAllenCahn(RunProblem):
 
         description['problem_class'] = allencahn_imex
 
-        description['level_params']['dt'] = description['problem_params']['eps'] ** 3
+        description['level_params']['dt'] = 0.5 * description['problem_params']['eps'] ** 2
         description['level_params']['restol'] = 1e-8
 
         return description
@@ -90,7 +90,6 @@ class RunAllenCahn(RunProblem):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-8
         defaults['dt_max'] = 0.9 * self.description['problem_params']['eps'] ** 2
-        # defaults['dt_max'] = 10 * self.description['problem_params']['eps'] ** 3
         return defaults
 
     @staticmethod
@@ -98,7 +97,7 @@ class RunAllenCahn(RunProblem):
         import matplotlib.pyplot as plt
 
         if fig is None:
-            fig, ax = plt.subplots()  # asdjkhflasjkdh
+            fig, ax = plt.subplots()
         else:
             ax = fig.get_axs()
 
@@ -143,6 +142,28 @@ class RunAllenCahnAdaptivity(RunAllenCahn):
         # description['problem_params']['time_freq'] = 1 / 4e-1 * 1.5
         description['problem_params']['time_dep_strength'] = 5.0e-1
         return description
+
+
+class RunAllenCahnSharpInterface(RunAllenCahn):
+    default_Tend = 0.032
+
+    def get_default_description(self):
+        description = super().get_default_description()
+        description['problem_params']['init_type'] = 'circle'
+        return description
+
+    def set_space_resolution(self, *args, **kwargs):
+        super().set_space_resolution(*args, **kwargs)
+        resolution = self.description['problem_params']['nvars']
+        resolution = resolution if isinstance(resolution, list) else [resolution]
+        self.description['problem_params']['L'] = 1
+        self.description['problem_params']['eps'] = 0.04 * 128 / resolution[0][0]
+
+    @classmethod
+    def get_visualisation_hooks(cls):
+        from pySDC.projects.GPU.problem_classes.AllenCahn_monitor import monitor
+
+        return [monitor]
 
 
 class RunSchroedinger(RunProblem):
@@ -324,9 +345,10 @@ class Visualisation(AdaptivityExperiment):
             from pySDC.implementations.hooks.live_plotting import PlotPostStep
 
             hooks += [PlotPostStep]
+        hooks += kwargs['problem'].get_visualisation_hooks()
         kwargs['custom_controller_params'] = {'hook_class': hooks, 'logger_level': 15}
-
         super().__init__(**kwargs)
+
         self._stats_name = PathFormatter.complete_fname(name='stats', **self.path_args)
         self.prob.description['convergence_controllers'][LogStats] = {
             'hook': self.log_solution,
@@ -400,6 +422,7 @@ def get_problem(name):
         'Brusselator': RunBrusselator,
         'GS': RunGS,
         'ACA': RunAllenCahnAdaptivity,
+        'ACI': RunAllenCahnSharpInterface,
     }
     return probs[name]
 
