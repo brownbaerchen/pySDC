@@ -152,7 +152,7 @@ def plot_all(func=None, format='png', redo=False):
             plt.close(fig)
             del fig
         except FileNotFoundError:
-            pass
+            break
 
         gc.collect()
 
@@ -207,7 +207,7 @@ if __name__ == '__main__':
     comm = MPI.COMM_WORLD
 
     plot_all(redo=True)
-    # comm.Barrier()
+    comm.Barrier()
 
     if comm.rank == 0:
         make_video('AC_adaptivity')

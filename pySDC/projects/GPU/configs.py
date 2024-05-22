@@ -98,7 +98,7 @@ class RunAllenCahn(RunProblem):
         import matplotlib.pyplot as plt
 
         if fig is None:
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots()  # asdjkhflasjkdh
         else:
             ax = fig.get_axs()
 
@@ -313,9 +313,6 @@ class Visualisation(AdaptivityExperiment):
         from pySDC.projects.GPU.hooks.LogStats import LogStats
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
-
-        # rank_path = f'{self.comm_steps.rank}_{self.comm_sweep.rank}_{self.comm_space.rank}'
-        # self.path_args = {**kwargs, 'num_procs': [self.comm_steps, self.comm_sweep, self.comm_space]}
 
         self.log_solution.time_increment = kwargs['problem'].default_Tend / 200
 
