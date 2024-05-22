@@ -131,7 +131,7 @@ class RunAllenCahnForcing(RunAllenCahn):
 
 
 class RunAllenCahnAdaptivity(RunAllenCahn):
-    default_Tend = 2e-1
+    default_Tend = 1.3e-1
 
     def get_default_description(self):
         from pySDC.projects.GPU.problem_classes.AllenCahn_MPIFFT import allencahn_imex_timeforcing_adaptivity
