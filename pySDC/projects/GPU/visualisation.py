@@ -40,18 +40,6 @@ def plot_solution_Schroedinger(ax, procs, idx):
         ax.pcolormesh(x, y, abs(solution['u']), **plotting_args)
 
 
-def plot_solution_AC(ax, procs, idx):
-    plotting_args = {'vmin': 0, 'vmax': 1, 'rasterized': True}
-    for n in range(procs[2]):
-        solution = V.get_solution([procs[0], procs[1] - 1, n], idx)
-        x, y = V.get_grid([procs[0], procs[1] - 1, n])
-        ax.pcolormesh(x, y, solution['u'], **plotting_args)
-    ax.set_aspect(1.0)
-    ax.set_xlabel(r'$x$')
-    ax.set_ylabel(r'$y$')
-    ax.set_title(f'$t$ = {solution["t"]:.2f}')
-
-
 def plot_solution_GS(ax, procs, idx):
     plotting_args = {'vmin': 0, 'vmax': 0.5, 'rasterized': True}
     for n in range(procs[2]):
@@ -86,6 +74,15 @@ def plot_step_size(stats, ax):
     dt = get_sorted(stats, recomputed=False, type='dt')
     ax.plot([me[0] for me in dt], [me[1] for me in dt])
     ax.set_ylabel(r'$\Delta t$')
+    ax.set_xlabel(r'$t$')
+
+
+def plot_AC_radius(stats, ax):
+    r = get_sorted(stats, recomputed=False, type='computed_radius')
+    rE = get_sorted(stats, recomputed=False, type='exact_radius')
+    ax.plot([me[0] for me in r], [me[1] for me in r], label='$r$')
+    ax.plot([me[0] for me in rE], [me[1] for me in rE], label='$r^*$')
+    ax.legend(frameon=False)
     ax.set_xlabel(r'$t$')
 
 
@@ -202,21 +199,23 @@ if __name__ == '__main__':
     PathFormatter.log_solution = V.log_solution
     comm = MPI.COMM_WORLD
 
-    plot_all(redo=True)
+    # plot_all(redo=True)
     comm.Barrier()
 
     if comm.rank == 0:
-        make_video('AC_adaptivity')
+        # make_video('AC_adaptivity')
         stats = combine_stats()
 
         fig, axs = plt.subplots(3, 1, sharex=True)
 
-        plot_time_dep_AC_thing(axs[1])
+        # plot_time_dep_AC_thing(axs[1])
         plot_step_size(stats, axs[0])
         plot_restarts(stats, axs[2], relative=False)
+        plot_AC_radius(stats, axs[1])
         for ax in axs[:-1]:
             ax.set_xlabel('')
-        fig.savefig(f'plots/step_size_{type(V.prob).__name__}_{format_procs(procs)}.pdf')
+
+        fig.savefig(PathFormatter.complete_fname(base_path='plots', name='step_size', format='pdf', **kwargs))
 
         if comm.size == 1:
             plt.show()
