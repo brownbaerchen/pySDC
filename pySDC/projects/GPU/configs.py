@@ -161,9 +161,9 @@ class RunAllenCahnSharpInterface(RunAllenCahn):
 
     @classmethod
     def get_visualisation_hooks(cls):
-        from pySDC.projects.GPU.problem_classes.AllenCahn_monitor import monitor
+        from pySDC.projects.GPU.problem_classes.AllenCahn_monitor import monitor_MPI
 
-        return [monitor]
+        return [monitor_MPI]
 
 
 class RunSchroedinger(RunProblem):

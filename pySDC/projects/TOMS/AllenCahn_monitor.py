@@ -18,7 +18,8 @@ class monitor(hooks):
         return np.sqrt(max(self.init_radius**2 - 2.0 * t, 0))
 
     @classmethod
-    def get_radius(cls, u, dx):
+    def get_radius(cls, u, L):
+        dx = L.prob.dx
         c = np.count_nonzero(u > cls.phase_thresh)
         return np.sqrt(c / np.pi) * dx
 
@@ -41,7 +42,7 @@ class monitor(hooks):
         super().pre_run(step, level_number)
         L = step.levels[0]
 
-        radius = self.get_radius(L.u[0], L.prob.dx)
+        radius = self.get_radius(L.u[0], L)
         interface_width = self.get_interface_width(L.u[0], L)
         self.init_radius = L.prob.radius
 
@@ -87,7 +88,7 @@ class monitor(hooks):
         # some abbreviations
         L = step.levels[0]
 
-        radius = self.get_radius(L.uend, L.prob.dx)
+        radius = self.get_radius(L.uend, L)
         interface_width = self.get_interface_width(L.uend, L)
 
         exact_radius = self.get_exact_radius(L.time + L.dt)
