@@ -81,7 +81,12 @@ def plot_AC_radius(stats, ax):
     r = get_sorted(stats, recomputed=False, type='computed_radius')
     rE = get_sorted(stats, recomputed=False, type='exact_radius')
     ax.plot([me[0] for me in r], [me[1] for me in r], label='$r$')
-    ax.plot([me[0] for me in rE], [me[1] for me in rE], label='$r^*$')
+    ax.plot([me[0] for me in rE], [me[1] for me in rE], label='$r^*$', ls='--')
+
+    # compute error as maximum difference between exact and computed radius
+    e = [abs(r[i][1] - rE[i][1]) for i in range(len(r))]
+    print(max(e))
+    ax.plot([me[0] for me in r], e, label='e')
     ax.legend(frameon=False)
     ax.set_xlabel(r'$t$')
 

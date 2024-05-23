@@ -8,7 +8,8 @@ class monitor_MPI(monitor):
 
     @classmethod
     def get_radius(cls, u, L):
+        cls.xp = L.prob.xp
         dx = L.prob.dx
         comm = L.prob.comm
-        c = comm.allreduce(np.count_nonzero(u > cls.phase_thresh))
+        c = float(comm.allreduce(np.count_nonzero(u > cls.phase_thresh)))
         return np.sqrt(c / np.pi) * dx

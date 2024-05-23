@@ -5,6 +5,7 @@ from pySDC.core.Hooks import hooks
 
 class monitor(hooks):
     phase_thresh = 0.0  # count everything above this threshold to the high phase.
+    xp = np
 
     def __init__(self):
         """
@@ -20,14 +21,14 @@ class monitor(hooks):
     @classmethod
     def get_radius(cls, u, L):
         dx = L.prob.dx
-        c = np.count_nonzero(u > cls.phase_thresh)
+        c = cls.xp.count_nonzero(u > cls.phase_thresh)
         return np.sqrt(c / np.pi) * dx
 
-    @staticmethod
-    def get_interface_width(u, L):
+    @classmethod
+    def get_interface_width(cls, u, L):
         # TODO: How does this generalize to different phase transitions?
-        rows1 = np.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] > -0.99)
-        rows2 = np.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] < 0.99)
+        rows1 = cls.xp.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] > -0.99)
+        rows2 = cls.xp.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] < 0.99)
 
         return (rows2[0][-1] - rows1[0][0]) * L.prob.dx / L.prob.eps
 
