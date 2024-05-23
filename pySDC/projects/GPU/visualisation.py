@@ -20,17 +20,15 @@ def plot_solution_Brusselator(axs, procs, idx):
 def combine_stats():
     stats = {}
 
-    for p1 in range(procs[0]):
-        for p2 in range(procs[1]):
-            for p3 in range(procs[2]):
-                path_args = {**kwargs, 'num_procs': [p1 + 1, p2 + 1, p3 + 1]}
-                with open(
-                    PathFormatter.complete_fname(
-                        name='stats', format='pickle', base_path=f'{V.log_solution.path}', **path_args
-                    ),
-                    'rb',
-                ) as file:
-                    stats = {**stats, **pickle.load(file)}
+    for p3 in range(procs[2]):
+        path_args = {**kwargs, 'num_procs': [procs[0], procs[1], p3 + 1]}
+        with open(
+            PathFormatter.complete_fname(
+                name='stats', format='pickle', base_path=f'{V.log_solution.path}', **path_args
+            ),
+            'rb',
+        ) as file:
+            stats = {**stats, **pickle.load(file)}
     return stats
 
 
@@ -82,7 +80,6 @@ def plot_restarts(stats, ax, relative=True):
 
 
 def plot_step_size(stats, ax):
-
     # with open(f'{V.log_solution.path}/{type(V.prob).__name__}_stats.pickle', 'rb') as file:
     #     data = pickle.load(file)
 
@@ -123,7 +120,6 @@ def plot_AC(procs):
 
 
 def plot_all(func=None, format='png', redo=False):
-
     func = func if func else problem.plot
 
     for i in range(0, 999999, comm.size):
