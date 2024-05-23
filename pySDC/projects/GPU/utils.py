@@ -35,11 +35,27 @@ class PathFormatter:
     def to_str(args):
         return str(args)
 
+    @staticmethod
+    def useGPU_to_str(useGPU):
+        if useGPU:
+            return 'GPU'
+        else:
+            return 'CPU'
+
+    @staticmethod
+    def bool_to_str(args):
+        if args:
+            return 'Y'
+        else:
+            return 'N'
+
+
     formatters = {
         'base_path': to_str,
         'name': to_str,
         'problem': format_problem,
         'num_procs': format_procs,
+        'useGPU': useGPU_to_str,
         'space_resolution': to_str,
         'space_levels': to_str,
         'restart_idx': format_index,
