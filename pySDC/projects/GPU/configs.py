@@ -70,7 +70,7 @@ class RunAllenCahn(RunProblem):
         description['problem_params']['L'] = 16
         description['problem_params']['spectral'] = False
         description['problem_params']['comm'] = self.comm_space
-        description['problem_params']['eps'] = 0.04
+        description['problem_params']['eps'] = 0.01
 
         description['problem_class'] = allencahn_imex
 
@@ -83,7 +83,7 @@ class RunAllenCahn(RunProblem):
         super().set_space_resolution(*args, **kwargs)
         resolution = self.description['problem_params']['nvars']
         resolution = resolution if isinstance(resolution, list) else [resolution]
-        self.description['problem_params']['L'] = resolution[0][0] // 128
+        self.description['problem_params']['L'] = (resolution[0][0] + 511) // 512
 
     @property
     def get_poly_adaptivity_default_params(self):
