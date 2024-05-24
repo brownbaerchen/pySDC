@@ -268,7 +268,7 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = self.Dv
         description['problem_params']['A'] = self.A
         description['problem_params']['B'] = self.B
-        description['problem_params']['num_blobs'] = 2
+        description['problem_params']['num_blobs'] = 4
         description['problem_params']['r'] = None
         description['problem_params']['x_shift'] = 0.0
         description['problem_params']['y_shift'] = 0.0
@@ -313,7 +313,7 @@ class RunGS(RunProblem):
 
 
 class RunGS_GoL(RunGS):
-    default_Tend = 1000
+    default_Tend = 10000
     Du = 2e-5
     Dv = 1e-5
     A = 0.062
