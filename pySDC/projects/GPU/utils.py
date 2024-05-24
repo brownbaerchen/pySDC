@@ -14,7 +14,11 @@ class PathFormatter:
 
     @staticmethod
     def format_problem(problem):
-        if hasattr(problem, '__name__'):
+        if type(problem) == str:
+            from pySDC.projects.GPU.configs import get_problem
+
+            return PathFormatter.format_problem(get_problem(problem))
+        elif hasattr(problem, '__name__'):
             return f'{problem.__name__}'
         else:
             return f'{type(problem).__name__}'
@@ -24,11 +28,21 @@ class PathFormatter:
         out = ''
         for key in cls.formatters.keys():
             if key in kwargs.keys():
-                out += f'{cls.delimiters.get(key, "_")}{cls.get_formatter(key)(kwargs[key])}'
+                formatted = cls.get_formatter(key)(kwargs[key])
+                out += f'{cls.get_delimiter(key, formatted)}{formatted}'
         return out[1:]
+
+    @classmethod
+    def get_delimiter(cls, key, formatted):
+        if formatted != '':
+            return cls.delimiters.get(key, "_")
+        else:
+            return ''
 
     @staticmethod
     def format_index(index):
+        if index is None:
+            return ''
         return PathFormatter.log_solution.format_index(index)
 
     @staticmethod
@@ -48,7 +62,6 @@ class PathFormatter:
             return 'Y'
         else:
             return 'N'
-
 
     formatters = {
         'base_path': to_str,
