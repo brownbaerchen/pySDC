@@ -164,7 +164,7 @@ class PlottingUtils:
             gc.collect()
         self.comm.Barrier()
 
-    def make_video(self, name, format='png'):
+    def make_video(self, format='png'):
         if self.comm.rank > 0:
             return None
         import subprocess
@@ -178,8 +178,8 @@ class PlottingUtils:
         )
         path = f'./simulation_plots/{fname}_%06d.{format}'
 
-        cmd = f'ffmpeg -y -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 videos/{fname}_{name}.mp4'
-        print(f'Recorded video to "videos/{fname}_{name}.mp4"')
+        cmd = f'ffmpeg -y -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 videos/{fname}.mp4'
+        print(f'Recorded video to "videos/{fname}.mp4"')
         subprocess.run(cmd.split())
 
     def plot_time_dep_AC_thing(self, ax):
@@ -200,8 +200,8 @@ if __name__ == '__main__':
     plotter = PlottingUtils(kwargs)
     # V = get_experiment('visualisation')(**kwargs)
 
-    # plotter.plot_all(redo=True)
-    plotter.make_video('AC_adaptivity')
+    plotter.plot_all(redo=True)
+    plotter.make_video()
 
     if plotter.comm.rank == 0:
         stats = plotter.combine_stats(kwargs)
@@ -211,7 +211,7 @@ if __name__ == '__main__':
         # plot_time_dep_AC_thing(axs[1])
         plotter.plot_step_size(stats, axs[0])
         plotter.plot_restarts(stats, axs[2], relative=False)
-        plotter.plot_AC_radius(stats, axs[1])
+        # plotter.plot_AC_radius(stats, axs[1])
         for ax in axs[:-1]:
             ax.set_xlabel('')
 

@@ -239,6 +239,10 @@ class RunBrusselator(RunProblem):
 
 class RunGS(RunProblem):
     default_Tend = 10000
+    Du = 2e-5
+    Dv = 1e-5
+    A = 0.04
+    B = 0.1
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
@@ -260,15 +264,15 @@ class RunGS(RunProblem):
 
         description['problem_params']['nvars'] = (2**13,) * 2
         description['problem_params']['comm'] = self.comm_space
-        description['problem_params']['Du'] = 2e-5
-        description['problem_params']['Dv'] = 1e-5
-        description['problem_params']['A'] = 0.04
-        description['problem_params']['B'] = 0.1
+        description['problem_params']['Du'] = self.Du
+        description['problem_params']['Dv'] = self.Dv
+        description['problem_params']['A'] = self.A
+        description['problem_params']['B'] = self.B
         description['problem_params']['num_blobs'] = 2
         description['problem_params']['r'] = None
-        description['problem_params']['x_shift'] = None
-        description['problem_params']['y_shift'] = None
-        description['problem_params']['smooth_ic'] = False
+        description['problem_params']['x_shift'] = 0.0
+        description['problem_params']['y_shift'] = 0.0
+        description['problem_params']['smooth_ic'] = True
 
         description['problem_class'] = grayscott_imex_diffusion
 
@@ -280,6 +284,40 @@ class RunGS(RunProblem):
         defaults['e_tol'] = 1e-5
         # defaults['dt_max'] = 30
         return defaults
+
+    @staticmethod
+    def plot(experiment, procs, idx, fig=None, **plotting_params):
+        import matplotlib.pyplot as plt
+
+        if fig is None:
+            fig, ax = plt.subplots()
+        else:
+            ax = fig.get_axs()
+
+        plotting_args = {
+            'vmin': 0,
+            'vmax': 1,
+            'rasterized': True,
+            **plotting_params,
+        }
+
+        for n in range(procs[2]):
+            solution = experiment.get_solution([procs[0], procs[1], n + 1], idx)
+            x, y = experiment.get_grid([procs[0], procs[1], n + 1])
+            ax.pcolormesh(x, y, solution['u'][0], **plotting_args)
+        ax.set_aspect(1.0)
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$y$')
+        ax.set_title(f'$t$ = {solution["t"]:.2f}')
+        return fig
+
+
+class RunGS_GoL(RunGS):
+    default_Tend = 1000
+    Du = 2e-5
+    Dv = 1e-5
+    A = 0.062
+    B = 0.062 + 0.0609
 
 
 class SingleGPUExperiment(Experiment):
@@ -421,6 +459,7 @@ def get_problem(name):
         'ACT': RunAllenCahnForcing,
         'Brusselator': RunBrusselator,
         'GS': RunGS,
+        'GSGoL': RunGS_GoL,
         'ACA': RunAllenCahnAdaptivity,
         'ACI': RunAllenCahnSharpInterface,
     }
