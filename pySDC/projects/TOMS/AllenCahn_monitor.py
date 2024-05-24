@@ -29,7 +29,6 @@ class monitor(hooks):
         # TODO: How does this generalize to different phase transitions?
         rows1 = cls.xp.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] > -0.99)
         rows2 = cls.xp.where(u[L.prob.init[0][0] // 2, : L.prob.init[0][0] // 2] < 0.99)
-
         return (rows2[0][-1] - rows1[0][0]) * L.prob.dx / L.prob.eps
 
     def pre_run(self, step, level_number):
