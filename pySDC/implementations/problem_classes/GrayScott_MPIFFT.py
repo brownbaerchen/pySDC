@@ -212,32 +212,11 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         assert t == 0.0, 'Exact solution only valid as initial condition'
         assert self.ndim == 2, 'The initial conditions are 2D for now..'
 
-        self.xp.random.seed(10700000)  # FM intermediate frequency
+        rng = np.random.default_rng(10700000)  # FM intermediate frequency
 
         me = self.dtype_u(self.init, val=0.0)
-
-        def get_single_circle(x, y, radius):
-            _u = newDistArray(self.fft, False)
-            _v = newDistArray(self.fft, False)
-            if self.smooth_ic:
-                _u[:] = 1.0 - self.xp.exp(-80.0 / radius * ((self.X[0] + x) ** 2 + (self.X[1] + y) ** 2))
-                _v[:] = self.xp.exp(-80.0 / radius * ((self.X[0] - x) ** 2 + (self.X[1] - y) ** 2))
-            else:
-                _u[:] = 1.0
-                u_radius = (self.X[0] + x) ** 2 + (self.X[1] + y) ** 2
-                v_radius = (self.X[0] - x) ** 2 + (self.X[1] - y) ** 2
-                _u[u_radius < radius**2] = radius - self.xp.sqrt(u_radius)[u_radius < radius**2]
-                _v[v_radius < radius**2] = radius - self.xp.sqrt(v_radius)[v_radius < radius**2]
-            return _u, _v
-
-        # This assumes that the box is [-L/2, L/2]^2
-        u = newDistArray(self.fft, False)
-        v = newDistArray(self.fft, False)
-
-        dx = self.L[0] / (self.num_blobs + 1)
-        dy = self.L[1] / (self.num_blobs + 1)
-
         tmp = newDistArray(self.fft, False)
+
         if self.init_type == 'chebfun':
             tmp[:] = self.xp.exp(-80.0 * ((self.X[0] + 0.05) ** 2 + (self.X[1] + 0.02) ** 2))
 
@@ -246,38 +225,38 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             L = int(self.num_blobs)
             self.eps = 0.01
             # get random radii for circles/spheres
-            self.xp.random.seed(1)
             lbound = 3.0 * self.eps
             ubound = 0.5 - self.eps
-            rand_radii = (ubound - lbound) * self.xp.random.random_sample(size=tuple([L] * 2)) + lbound
             # distribute circles/spheres
             for i in range(0, L):
                 for j in range(0, L):
+                    radius = rng.uniform(lbound, ubound)
                     # build radius
                     r2 = ((self.X[0] + self.L[0] / 2.0) / self.L[0] * self.num_blobs + i - L + 0.5) ** 2 + (
                         (self.X[1] + self.L[1] / 2.0) / self.L[1] * self.num_blobs + j - L + 0.5
                     ) ** 2
                     # add this blob, shifted by 1 to avoid issues with adding up negative contributions
-                    tmp += self.xp.tanh((rand_radii[i, j] - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
+                    tmp += self.xp.tanh((radius - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
 
             # normalize to [0,1]
             tmp *= 0.5
         elif self.init_type == 'rectangles':
 
-            def add_single_rectangle(x, y, dx, dy, v, eps=0.04):
+            def add_single_rectangle(x0, y0, x1, x2, v, eps=0.04):
                 denom = np.sqrt(2) * eps
-                X_window = self.xp.maximum(self.X[0] - x, -self.X[0] + x - dx)
-                Y_window = self.xp.maximum(self.X[1] - y, -self.X[1] + y - dy)
+                X_window = self.xp.maximum(self.X[0] - x0, -self.X[0] + x1)
+                Y_window = self.xp.maximum(self.X[1] - y0, -self.X[1] + y1)
                 return (1 - (self.xp.tanh(self.xp.maximum(X_window, Y_window) / denom) + 1) / 2) * v
 
+            buffer = 0.1
             for i in range(self.num_blobs):
-                x = self.xp.random.uniform(self.x0, self.x0 + self.L[0])
-                y = self.xp.random.uniform(self.x0, self.x0 + self.L[1])
-                dx = self.xp.random.uniform(0, abs(self.x0 + self.L[0] - x))
-                dy = self.xp.random.uniform(0, abs(self.x0 + self.L[1] - y))
-                v = self.xp.random.uniform(0, 1)
+                x0 = rng.uniform(self.x0, self.x0 + self.L[0])
+                y0 = rng.uniform(self.x0, self.x0 + self.L[1])
+                x1 = rng.uniform(self.x0, self.x0 + self.L[0])
+                y1 = rng.uniform(self.x0, self.x0 + self.L[1])
+                v = rng.uniform(0.1, 1)
 
-                tmp += add_single_rectangle(x, y, dx, dy, v)
+                tmp += add_single_rectangle(x0, y0, x1, y1, v)
 
             tmp[tmp > 1] = 1.0
 
@@ -290,29 +269,6 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         else:
             me[0, ...] = 1 - tmp
             me[1, ...] = tmp
-
-        # for i in range(1, self.num_blobs + 1):
-        #     x_shift = self.x_shift if self.x_shift is not None else self.xp.random.random(1) * 0.1 - 0.05
-        #     _x = -self.L[0] / 2.0 + i * dx + x_shift * self.L[0]
-
-        #     for j in range(1, self.num_blobs + 1):
-        #         y_shift = self.y_shift if self.y_shift is not None else self.xp.random.random(1) * 0.1 - 0.05
-        #         _y = -self.L[1] / 2.0 + j * dy + y_shift * self.L[1]
-
-        #         r = self.r if self.r else self.xp.random.random(1) * 0.5
-        #         _u, _v = get_single_circle(_x, _y, r * self.L[0])
-        #         u += _u
-        #         v += _v
-
-        # if self.spectral:
-        #     me[0, ...] = self.fft.forward(u)
-        #     me[1, ...] = self.fft.forward(v)
-        # else:
-        #     me[0, ...] = u
-        #     me[1, ...] = v
-
-        # me[0] /= self.xp.max(me[0])
-        # me[1] /= self.xp.max(me[1])
 
         return me
 
