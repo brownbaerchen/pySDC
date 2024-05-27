@@ -1,3 +1,4 @@
+import numpy as np
 import scipy.sparse as sp
 from mpi4py import MPI
 from mpi4py_fft import PFFT
@@ -82,6 +83,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         x_shift=0.025,
         y_shift=0.01,
         smooth_ic=True,
+        init_type='chebfun',
         **kwargs,
     ):
         kwargs['L'] = 2.0
@@ -95,7 +97,18 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         self.init = (shape, self.comm, self.xp.dtype('float'))
 
         self._makeAttributeAndRegister(
-            'Du', 'Dv', 'A', 'B', 'num_blobs', 'r', 'x_shift', 'y_shift', 'smooth_ic', localVars=locals(), readOnly=True
+            'Du',
+            'Dv',
+            'A',
+            'B',
+            'num_blobs',
+            'r',
+            'x_shift',
+            'y_shift',
+            'smooth_ic',
+            'init_type',
+            localVars=locals(),
+            readOnly=True,
         )
 
         # prepare "Laplacians"
@@ -224,6 +237,60 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         dx = self.L[0] / (self.num_blobs + 1)
         dy = self.L[1] / (self.num_blobs + 1)
 
+        tmp = newDistArray(self.fft, False)
+        if self.init_type == 'chebfun':
+            tmp[:] = self.xp.exp(-80.0 * ((self.X[0] + 0.05) ** 2 + (self.X[1] + 0.02) ** 2))
+
+        elif self.init_type == 'circles':
+
+            L = int(self.num_blobs)
+            self.eps = 0.01
+            # get random radii for circles/spheres
+            self.xp.random.seed(1)
+            lbound = 3.0 * self.eps
+            ubound = 0.5 - self.eps
+            rand_radii = (ubound - lbound) * self.xp.random.random_sample(size=tuple([L] * 2)) + lbound
+            # distribute circles/spheres
+            for i in range(0, L):
+                for j in range(0, L):
+                    # build radius
+                    r2 = ((self.X[0] + self.L[0] / 2.0) / self.L[0] * self.num_blobs + i - L + 0.5) ** 2 + (
+                        (self.X[1] + self.L[1] / 2.0) / self.L[1] * self.num_blobs + j - L + 0.5
+                    ) ** 2
+                    # add this blob, shifted by 1 to avoid issues with adding up negative contributions
+                    tmp += self.xp.tanh((rand_radii[i, j] - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
+
+            # normalize to [0,1]
+            tmp *= 0.5
+        elif self.init_type == 'rectangles':
+
+            def add_single_rectangle(x, y, dx, dy, v, eps=0.04):
+                denom = np.sqrt(2) * eps
+                X_window = self.xp.maximum(self.X[0] - x, -self.X[0] + x - dx)
+                Y_window = self.xp.maximum(self.X[1] - y, -self.X[1] + y - dy)
+                return (1 - (self.xp.tanh(self.xp.maximum(X_window, Y_window) / denom) + 1) / 2) * v
+
+            for i in range(self.num_blobs):
+                x = self.xp.random.uniform(self.x0, self.x0 + self.L[0])
+                y = self.xp.random.uniform(self.x0, self.x0 + self.L[1])
+                dx = self.xp.random.uniform(0, abs(self.x0 + self.L[0] - x))
+                dy = self.xp.random.uniform(0, abs(self.x0 + self.L[1] - y))
+                v = self.xp.random.uniform(0, 1)
+
+                tmp += add_single_rectangle(x, y, dx, dy, v)
+
+            tmp[tmp > 1] = 1.0
+
+        assert self.xp.all(tmp <= 1.0), f'Initial conditions for {type(self).__name__} exceed upper bound of 1!'
+        assert self.xp.all(tmp >= 0), f'Initial conditions for {type(self).__name__} exceed lower bound of 0!'
+
+        if self.spectral:
+            me[0, ...] = self.fft.forward(tmp)
+            me[1, ...] = self.fft.forward(tmp)
+        else:
+            me[0, ...] = 1 - tmp
+            me[1, ...] = tmp
+
         # for i in range(1, self.num_blobs + 1):
         #     x_shift = self.x_shift if self.x_shift is not None else self.xp.random.random(1) * 0.1 - 0.05
         #     _x = -self.L[0] / 2.0 + i * dx + x_shift * self.L[0]
@@ -246,40 +313,6 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         # me[0] /= self.xp.max(me[0])
         # me[1] /= self.xp.max(me[1])
-
-        if True:
-            import numpy as np
-
-            ndim = 2
-            L = int(self.num_blobs)
-            self.eps = 0.01
-            # get random radii for circles/spheres
-            self.xp.random.seed(1)
-            lbound = 3.0 * self.eps
-            ubound = 0.5 - self.eps
-            rand_radii = (ubound - lbound) * self.xp.random.random_sample(size=tuple([L] * ndim)) + lbound
-            # distribute circles/spheres
-            tmp = newDistArray(self.fft, False)
-            if ndim == 2:
-                for i in range(0, L):
-                    for j in range(0, L):
-                        # build radius
-                        r2 = ((self.X[0] + self.L[0] / 2.0) / self.L[0] * self.num_blobs + i - L + 0.5) ** 2 + (
-                            (self.X[1] + self.L[1] / 2.0) / self.L[1] * self.num_blobs + j - L + 0.5
-                        ) ** 2
-                        # add this blob, shifted by 1 to avoid issues with adding up negative contributions
-                        tmp += self.xp.tanh((rand_radii[i, j] - self.xp.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
-            else:
-                raise NotImplementedError
-            # normalize to [0,1]
-            tmp *= 0.5
-            assert self.xp.all(tmp <= 1.0)
-            if self.spectral:
-                me[0, ...] = self.fft.forward(tmp)
-            else:
-                # self.xp.copyto(me[0], tmp)
-                me[0, ...] = 1 - tmp
-                me[1, ...] = tmp
 
         return me
 
