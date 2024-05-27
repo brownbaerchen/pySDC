@@ -221,7 +221,6 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             tmp[:] = self.xp.exp(-80.0 * ((self.X[0] + 0.05) ** 2 + (self.X[1] + 0.02) ** 2))
 
         elif self.init_type == 'circles':
-
             L = int(self.num_blobs)
             self.eps = 0.01
             # get random radii for circles/spheres
@@ -241,6 +240,8 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             # normalize to [0,1]
             tmp *= 0.5
         elif self.init_type == 'rectangles':
+            self.xp.random.seed(1)
+            eps = 0.04 * self.nvars[0] / 512
 
             def add_single_rectangle(x0, y0, x1, x2, v, eps=0.04):
                 denom = np.sqrt(2) * eps
