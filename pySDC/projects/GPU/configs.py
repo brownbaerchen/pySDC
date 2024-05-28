@@ -317,6 +317,14 @@ class RunGS_GoL(RunGS):
     B = 0.062 + 0.0609
 
 
+class RunGS_Turing(RunGS):
+    default_Tend = 100000
+    Du = 2e-5
+    Dv = 1e-5
+    A = 0.060
+    B = 0.062 + 0.060
+
+
 class SingleGPUExperiment(Experiment):
     name = 'single_gpu'
 
@@ -457,6 +465,7 @@ def get_problem(name):
         'Brusselator': RunBrusselator,
         'GS': RunGS,
         'GSGoL': RunGS_GoL,
+        'GST': RunGS_Turing,
         'ACA': RunAllenCahnAdaptivity,
         'ACI': RunAllenCahnSharpInterface,
     }
