@@ -242,7 +242,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
                 return (1 - (self.xp.tanh(self.xp.maximum(X_window, Y_window) / denom) + 1) / 2) * v
 
             buffer = 0.1
-            max_size = 0.2
+            max_size = 0.2 * 512 / self.nvars[0]
             base_level = 0.3
 
             tmp += base_level
@@ -268,7 +268,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         if self.spectral:
             me[0, ...] = self.fft.forward(tmp)
-            me[1, ...] = self.fft.forward(1-tmp)
+            me[1, ...] = self.fft.forward(1 - tmp)
         else:
             me[0, ...] = tmp
             me[1, ...] = 1 - tmp

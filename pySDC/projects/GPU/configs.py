@@ -309,20 +309,35 @@ class RunGS(RunProblem):
         return fig
 
 
-class RunGS_GoL(RunGS):
-    default_Tend = 10000#0
-    Du = 2e-5
-    Dv = 1e-5
-    A = 0.062
-    B = 0.062 + 0.0609
-
-
-class RunGS_Turing(RunGS):
+class GS_FK(RunGS):
     default_Tend = 100000
     Du = 2e-5
     Dv = 1e-5
-    A = 0.060
-    B = 0.062 + 0.060
+    F = 0
+    K = 0
+
+    def __init__(self, *args, **kwargs):
+        self.A = self.F
+        self.B = self.F + self.K
+        super().__init__(*args, **kwargs)
+
+
+class RunGS_GoL(GS_FK):
+    default_Tend = 10000  # 0
+    F = 0.062
+    K = 0.0609
+
+
+class RunGS_Turing(GS_FK):
+    default_Tend = 100000
+    F = 0.060
+    K = 0.062
+
+
+class RunGS_WOW(GS_FK):
+    default_Tend = 100
+    F = 0.060
+    K = 0.062
 
 
 class SingleGPUExperiment(Experiment):
@@ -466,6 +481,7 @@ def get_problem(name):
         'GS': RunGS,
         'GSGoL': RunGS_GoL,
         'GST': RunGS_Turing,
+        'GSW': RunGS_WOW,
         'ACA': RunAllenCahnAdaptivity,
         'ACI': RunAllenCahnSharpInterface,
     }
