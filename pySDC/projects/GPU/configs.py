@@ -333,7 +333,7 @@ class RunGS_GoL(GS_FK):
 
 
 class RunGS_Turing(GS_FK):
-    default_Tend = 1000
+    default_Tend = 200
     F = 0.060
     K = 0.062
     num_blobs = 16
@@ -399,7 +399,7 @@ class Visualisation(AdaptivityExperiment):
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
 
-        self.log_solution.time_increment = kwargs['problem'].default_Tend / 500
+        self.log_solution.time_increment = kwargs['problem'].default_Tend / 50
 
         # hooks
         hooks = [LogStepSize]

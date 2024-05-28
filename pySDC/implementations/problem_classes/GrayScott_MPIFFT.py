@@ -212,7 +212,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         elif self.init_type == 'circles':
             L = int(self.num_blobs)
-            self.eps = 0.01
+            self.eps = 0.04
             # get random radii for circles/spheres
             lbound = 3.0 * self.eps
             ubound = 0.5 - self.eps
