@@ -1,11 +1,9 @@
 import numpy as np
 import scipy.sparse as sp
-from mpi4py import MPI
-from mpi4py_fft import PFFT
 
 from pySDC.core.Errors import ProblemError
-from pySDC.core.Problem import ptype, WorkCounter
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, comp2_mesh
+from pySDC.core.Problem import WorkCounter
+from pySDC.implementations.datatype_classes.mesh import comp2_mesh
 from pySDC.implementations.problem_classes.generic_MPIFFT_Laplacian import IMEX_Laplacian_MPIFFT
 
 from mpi4py_fft import newDistArray
@@ -246,7 +244,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             base_level = 0.0
 
             tmp += base_level
-            for i in range(self.num_blobs):
+            for _ in range(self.num_blobs):
                 x0 = rng.uniform(self.x0, self.x0 + self.L[0])
                 y0 = rng.uniform(self.x0, self.x0 + self.L[1])
                 x1 = rng.uniform(max([x0 - max_size, self.x0 + buffer]), max([x0, self.x0 + buffer]))

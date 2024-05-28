@@ -268,7 +268,7 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = self.Dv
         description['problem_params']['A'] = self.A
         description['problem_params']['B'] = self.B
-        description['problem_params']['num_blobs'] = 256
+        description['problem_params']['num_blobs'] = 9
         description['problem_params']['init_type'] = 'circles'
 
         description['problem_class'] = grayscott_imex_diffusion
