@@ -279,7 +279,7 @@ class RunGS(RunProblem):
     def get_poly_adaptivity_default_params(self):
         defaults = super().get_poly_adaptivity_default_params
         defaults['e_tol'] = 1e-5
-        # defaults['dt_max'] = 30
+        defaults['dt_max'] = 20
         return defaults
 
     @staticmethod
@@ -378,7 +378,7 @@ class Visualisation(AdaptivityExperiment):
 
         self.comm_steps, self.comm_sweep, self.comm_space = get_comms(kwargs.get('num_procs', [1, 1, 1]))
 
-        self.log_solution.time_increment = kwargs['problem'].default_Tend / 200
+        self.log_solution.time_increment = kwargs['problem'].default_Tend / 500
 
         # hooks
         hooks = [LogStepSize]
