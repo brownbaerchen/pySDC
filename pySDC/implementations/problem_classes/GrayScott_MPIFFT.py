@@ -251,7 +251,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
                 y1 = rng.uniform(max([y0 - max_size, self.x0 + buffer]), max([y0, self.x0 + buffer]))
                 v = rng.uniform(-base_level, 1.0 - base_level)
 
-                tmp += add_single_rectangle(x0, y0, x1, y1, v)
+                tmp += add_single_rectangle(x0, y0, x1, y1, v, eps)
 
             tmp[tmp > 1] = 1.0
             tmp[tmp < 0] = 0.0

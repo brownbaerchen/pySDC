@@ -143,7 +143,13 @@ class LogToFile(hooks):
         self.log_to_file(step, level_number, type(self).logging_condition(L))
 
     def pre_run(self, step, level_number):
-        process_solution = lambda L: {'t': L.time, 'u': L.u[0].view(np.ndarray)}
+        L = step.levels[level_number]
+        if type(L.u[0]).__name__ in ['cupy_mesh']:
+            import cupy as cp
+
+            process_solution = lambda L: {'t': L.time, 'u': cp.asnumpy(L.u[0]).view(np.ndarray)}
+        else:
+            process_solution = lambda L: {'t': L.time, 'u': L.u[0].view(np.ndarray)}
         self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod

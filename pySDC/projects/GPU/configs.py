@@ -243,6 +243,8 @@ class RunGS(RunProblem):
     Dv = 1e-5
     A = 0.04
     B = 0.1
+    num_blobs = 9
+    init_type = 'circles'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs, imex=True)
@@ -268,8 +270,8 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = self.Dv
         description['problem_params']['A'] = self.A
         description['problem_params']['B'] = self.B
-        description['problem_params']['num_blobs'] = 9
-        description['problem_params']['init_type'] = 'circles'
+        description['problem_params']['num_blobs'] = self.num_blobs
+        description['problem_params']['init_type'] = self.init_type
 
         description['problem_class'] = grayscott_imex_diffusion
 
@@ -326,12 +328,16 @@ class RunGS_GoL(GS_FK):
     default_Tend = 10000  # 0
     F = 0.062
     K = 0.0609
+    num_blobs = 256
+    init_type = 'rectangles'
 
 
 class RunGS_Turing(GS_FK):
-    default_Tend = 10000
+    default_Tend = 1000
     F = 0.060
     K = 0.062
+    num_blobs = 16
+    init_type = 'rectangles'
 
 
 class RunGS_WOW(GS_FK):
