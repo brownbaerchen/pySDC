@@ -118,21 +118,33 @@ class LogToFile(hooks):
         if not os.path.isdir(self.path):
             os.mkdir(self.path)
 
-    def post_step(self, step, level_number):
+    def log_to_file(self, step, level_number, condition, process_solution=None):
         if level_number > 0:
             return None
 
         L = step.levels[level_number]
 
-        if type(self).logging_condition(L):
+        if condition:
             path = self.get_path(self.counter)
-            data = type(self).process_solution(L)
+
+            if process_solution:
+                data = process_solution(L)
+            else:
+                data = type(self).process_solution(L)
 
             with open(path, 'wb') as file:
                 pickle.dump(data, file)
             self.logger.info(f'Stored file {path!r}')
 
             type(self).counter += 1
+
+    def post_step(self, step, level_number):
+        L = step.levels[level_number]
+        self.log_to_file(step, level_number, type(self).logging_condition(L))
+
+    def pre_run(self, step, level_number):
+        process_solution = lambda L: {'t': L.time, 'u': L.u[0].view(np.ndarray)}
+        self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod
     def get_path(cls, index):
