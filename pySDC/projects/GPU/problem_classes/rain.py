@@ -1,11 +1,13 @@
 import numpy as np
 
+
 class Rain:
     xp = np
     rain_params = {}
 
     def set_random_generator(self, seed):
         import numpy as np
+
         self.rng = np.random.default_rng(seed=seed)
 
     def single_drop(self, x=None, y=None, sigma=None):
@@ -16,7 +18,7 @@ class Rain:
         me = self.dtype_u(self.init, val=0.0)
 
         r2 = (self.X[0] - x) ** 2 + (self.X[1] - y) ** 2
-        tmp = self.xp.exp(- r2 / sigma**2 / 2.)
+        tmp = self.xp.exp(-r2 / sigma**2 / 2.0)
 
         if self.spectral:
             me[:] = self.fft.forward(tmp)
@@ -31,9 +33,9 @@ class Rain:
         sigma = self.rain_params.get('sigma', sigma)
 
         self.rain_params = {
-                'x': self.rng.uniform(self.x0, self.x0 + self.L[0]) if x is None else x,
-                'y': self.rng.uniform(self.x0, self.x0 + self.L[1]) if y is None else y,
-                'sigma': self.rng.uniform(self.L[0] / 100, self.L[0] / 10) if sigma is None else sigma,
+            'x': self.rng.uniform(self.x0, self.x0 + self.L[0]) if x is None else x,
+            'y': self.rng.uniform(self.x0, self.x0 + self.L[1]) if y is None else y,
+            'sigma': self.rng.uniform(self.L[0] / 100, self.L[0] / 10) if sigma is None else sigma,
         }
         return self.rain_params
 
