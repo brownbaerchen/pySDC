@@ -256,6 +256,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
                 tmp += add_single_rectangle(x0, y0, x1, y1, v)
 
             tmp[tmp > 1] = 1.0
+            tmp[tmp < 0] = 0.0
 
         # import matplotlib.pyplot as plt
         # im = plt.pcolormesh(self.X[0], self.X[1], tmp, vmin=0, vmax=1.0)
