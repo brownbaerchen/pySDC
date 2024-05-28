@@ -269,7 +269,7 @@ class RunGS(RunProblem):
         description['problem_params']['A'] = self.A
         description['problem_params']['B'] = self.B
         description['problem_params']['num_blobs'] = 256
-        description['problem_params']['init_type'] = 'rectangles'
+        description['problem_params']['init_type'] = 'circles'
 
         description['problem_class'] = grayscott_imex_diffusion
 
@@ -329,7 +329,7 @@ class RunGS_GoL(GS_FK):
 
 
 class RunGS_Turing(GS_FK):
-    default_Tend = 100000
+    default_Tend = 10000
     F = 0.060
     K = 0.062
 

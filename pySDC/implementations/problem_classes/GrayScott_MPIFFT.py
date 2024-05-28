@@ -243,7 +243,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
             buffer = 0.1
             max_size = 0.2 * 512 / self.nvars[0]
-            base_level = 0.3
+            base_level = 0.0
 
             tmp += base_level
             for i in range(self.num_blobs):
