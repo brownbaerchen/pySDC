@@ -164,7 +164,7 @@ class PlottingUtils:
             gc.collect()
         self.comm.Barrier()
 
-    def make_video(self, format='png'):
+    def make_video(self, fps=20, format='png'):
         if self.comm.rank > 0:
             return None
         import subprocess

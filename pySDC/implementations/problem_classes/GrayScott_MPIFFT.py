@@ -268,10 +268,10 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         if self.spectral:
             me[0, ...] = self.fft.forward(tmp)
-            me[1, ...] = self.fft.forward(tmp)
+            me[1, ...] = self.fft.forward(1-tmp)
         else:
-            me[0, ...] = 1 - tmp
-            me[1, ...] = tmp
+            me[0, ...] = tmp
+            me[1, ...] = 1 - tmp
 
         return me
 

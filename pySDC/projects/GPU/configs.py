@@ -310,7 +310,7 @@ class RunGS(RunProblem):
 
 
 class RunGS_GoL(RunGS):
-    default_Tend = 100000
+    default_Tend = 10000#0
     Du = 2e-5
     Dv = 1e-5
     A = 0.062
