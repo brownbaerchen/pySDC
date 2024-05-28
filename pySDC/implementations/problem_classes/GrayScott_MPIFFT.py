@@ -234,6 +234,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         elif self.init_type == 'rectangles':
             self.xp.random.seed(1)
             eps = 0.04 * self.nvars[0] / 512
+            tmp += 0.5
 
             def add_single_rectangle(x0, y0, x1, x2, v, eps=0.04):
                 denom = np.sqrt(2) * eps
@@ -242,16 +243,23 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
                 return (1 - (self.xp.tanh(self.xp.maximum(X_window, Y_window) / denom) + 1) / 2) * v
 
             buffer = 0.1
+            max_size = 0.1
             for i in range(self.num_blobs):
                 x0 = rng.uniform(self.x0, self.x0 + self.L[0])
                 y0 = rng.uniform(self.x0, self.x0 + self.L[1])
-                x1 = rng.uniform(max([x0 - 0.4, self.x0 + 0.1]), max([x0, self.x0 + 0.1]))
-                y1 = rng.uniform(max([y0 - 0.4, self.x0 + 0.1]), max([y0, self.x0 + 0.1]))
-                v = rng.uniform(0.3, 1)
+                x1 = rng.uniform(max([x0 - max_size, self.x0 + buffer]), max([x0, self.x0 + buffer]))
+                y1 = rng.uniform(max([y0 - max_size, self.x0 + buffer]), max([y0, self.x0 + buffer]))
+                v = rng.uniform(-0.5, 0.5)
 
-                tmp += add_single_rectangle(x0, y0, x1, y1, 1)
+                tmp += add_single_rectangle(x0, y0, x1, y1, v)
 
             tmp[tmp > 1] = 1.0
+
+        import matplotlib.pyplot as plt
+
+        im = plt.pcolormesh(self.X[0], self.X[1], tmp, vmin=0, vmax=1.0)
+        plt.colorbar(im)
+        plt.show()
 
         assert self.xp.all(tmp <= 1.0), f'Initial conditions for {type(self).__name__} exceed upper bound of 1!'
         assert self.xp.all(tmp >= 0), f'Initial conditions for {type(self).__name__} exceed lower bound of 0!'
