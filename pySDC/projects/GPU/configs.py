@@ -268,12 +268,8 @@ class RunGS(RunProblem):
         description['problem_params']['Dv'] = self.Dv
         description['problem_params']['A'] = self.A
         description['problem_params']['B'] = self.B
-        description['problem_params']['num_blobs'] = 34
+        description['problem_params']['num_blobs'] = 36
         description['problem_params']['init_type'] = 'rectangles'
-        description['problem_params']['r'] = None
-        description['problem_params']['x_shift'] = 0.0
-        description['problem_params']['y_shift'] = 0.0
-        description['problem_params']['smooth_ic'] = True
 
         description['problem_class'] = grayscott_imex_diffusion
 

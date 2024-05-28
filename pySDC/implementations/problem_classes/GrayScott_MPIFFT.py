@@ -245,11 +245,11 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             for i in range(self.num_blobs):
                 x0 = rng.uniform(self.x0, self.x0 + self.L[0])
                 y0 = rng.uniform(self.x0, self.x0 + self.L[1])
-                x1 = rng.uniform(self.x0, self.x0 + self.L[0])
-                y1 = rng.uniform(self.x0, self.x0 + self.L[1])
-                v = rng.uniform(0.1, 1)
+                x1 = rng.uniform(max([x0 - 0.4, self.x0 + 0.1]), max([x0, self.x0 + 0.1]))
+                y1 = rng.uniform(max([y0 - 0.4, self.x0 + 0.1]), max([y0, self.x0 + 0.1]))
+                v = rng.uniform(0.3, 1)
 
-                tmp += add_single_rectangle(x0, y0, x1, y1, v)
+                tmp += add_single_rectangle(x0, y0, x1, y1, 1)
 
             tmp[tmp > 1] = 1.0
 
