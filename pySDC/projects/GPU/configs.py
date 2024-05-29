@@ -336,14 +336,14 @@ class RunGS_Turing(GS_FK):
     default_Tend = 200
     F = 0.060
     K = 0.062
-    num_blobs = 16
+    num_blobs = 69  # 16
     init_type = 'rectangles'
 
 
-class RunGS_WOW(GS_FK):
-    default_Tend = 100
-    F = 0.060
-    K = 0.062
+class RunGS_WOW(RunGS_Turing):
+    # default_Tend = 100
+    F = 0.089
+    K = 0.060
 
 
 class SingleGPUExperiment(Experiment):
