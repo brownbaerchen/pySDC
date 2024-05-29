@@ -342,8 +342,9 @@ class RunGS_Turing(GS_FK):
 
 class RunGS_WOW(RunGS_Turing):
     default_Tend = 1000
-    F = 0.0898
-    K = 0.0603
+    F = 0.092
+    K = 0.060
+    num_blobs = 256
 
 
 class SingleGPUExperiment(Experiment):
