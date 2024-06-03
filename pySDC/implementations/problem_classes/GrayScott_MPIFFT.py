@@ -230,9 +230,9 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             # normalize to [0,1]
             tmp *= 0.5
         elif self.init_type == 'rectangles':
-            eps = 0.01  # * self.nvars[0] / 512
+            eps = 0.01 * self.nvars[0] / 128
             buffer = 0.1
-            max_size = 0.2  # * 512 / self.nvars[0]
+            max_size = 0.2 * 128 / self.nvars[0]
             base_level = 0.0
 
             def add_single_rectangle(x0, y0, x1, x2, v, eps=0.04):
@@ -253,6 +253,9 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
             tmp[tmp > 1] = 1.0
             tmp[tmp < 0] = 0.0
+
+        elif self.init_type == 'random':
+            tmp[:] = self.xp.random.rand(*tmp.shape)
 
         # import matplotlib.pyplot as plt
         # im = plt.pcolormesh(self.X[0], self.X[1], tmp, vmin=0, vmax=1.0)
