@@ -9,52 +9,38 @@ class Heat1DChebychev(ptype):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, poly_coeffs=None, use_cheby_grid=True):
+    def __init__(self, nvars=128, poly_coeffs=None):
+        self._makeAttributeAndRegister('nvars', localVars=locals(), readOnly=True)
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
-        assert use_cheby_grid
-
         # construct grids
-        self.x = np.linspace(-1.3, 1.1, nvars)
-        self.y = np.cos(np.pi / nvars * (np.arange(nvars) + 0.5))
-        if use_cheby_grid:
-            self.x = self.y
-        self.inter_mat = self._get_interpolation_matrix()
+        self.x = np.cos(np.pi / nvars * (np.arange(nvars) + 0.5))
 
         self.norm = np.ones(nvars) / nvars
         self.norm[0] /= 2
 
-        # construct differentiation matrix
-        self.L = np.array([np.polynomial.Chebyshev((0,) * (i) + (1,)).deriv(2)(self.x) for i in range(nvars)]).T
-        self.Id = np.array([np.polynomial.Chebyshev((0,) * (i) + (1,)).deriv(0)(self.x) for i in range(nvars)]).T
+        self.D = self.get_differentiation_matrix(2)
+        self.Id = np.diag(np.ones(nvars))
 
-        # register variables etc.
-        self._makeAttributeAndRegister('nvars', 'use_cheby_grid', localVars=locals(), readOnly=True)
         super().__init__(init=(nvars, None, np.dtype('float64')))
 
     @property
     def _get_initial_polynomial(self):
         return np.polynomial.Polynomial(self.poly_coeffs)
 
-    def _get_interpolation_matrix(self):
-        """
-        We use two grids: `x` for the grid we want to simulate and
-        """
-        from pySDC.core.Lagrange import LagrangeApproximation
+    def get_differentiation_matrix(self, deriv):
+        N = self.nvars
+        D = np.zeros((N, N))
+        for j in range(N):
+            for k in range(j):
+                D[k, j] = 2 * j * ((j - k) % 2)
 
-        interp = LagrangeApproximation(points=self.x)
-        return interp.getInterpolationMatrix(self.y)
-
-    def _interpolate_to_chebychev_grid(self, u):
-        return self.inter_mat @ u
+        D[0, :] /= 2
+        return np.linalg.matrix_power(D, deriv)
 
     def eval_f(self, u, *args, **kwargs):
-        from scipy import interpolate
-
-        u_c = interpolate.interp1d(self.x, u)
-        u_cheby = u_c(self.y)
-        u_hat = scipy.fft.dct(u_cheby) * self.norm
-        return self.L @ u_hat
+        u_hat = scipy.fft.dct(u) * self.norm
+        return np.polynomial.Chebyshev(self.D @ u_hat)(self.x)
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         r"""
@@ -76,16 +62,31 @@ class Heat1DChebychev(ptype):
         """
         sol = self.u_init
 
-        # construct system matrix with boundary conditions
-        A = self.Id.copy()
-        A[1:-1, :] -= factor * self.L[1:-1, :]
+        rhs_hat = scipy.fft.dct(rhs) * self.norm
 
-        # solve for the coefficients in the Chebychev basis
-        res = np.linalg.solve(A, rhs)
-
-        sol[:] = np.polynomial.Chebyshev(res)(self.x)
+        A = self.Id - factor * self.D
+        sol_hat = np.linalg.solve(A, rhs_hat)
+        sol[:] = np.polynomial.Chebyshev(sol_hat)(self.x)
         return sol
 
     def u_exact(self, t=0):
         assert t == 0
         return self._get_initial_polynomial(self.x)
+
+
+class Heat2d(ptype):
+    def __init__(self, nx=32, nz=32):
+        super().__init__(init=((nx, nz), None, np.dtype('float64')))
+
+        self._makeAttributeAndRegister('nx', 'nz', localVars=locals(), readOnly=True)
+
+        # generate grid
+        self.x = 2 * np.pi / (nx + 1) * np.arange(nx)
+        self.z = np.cos(np.pi / nz * (np.arange(nz) + 0.5))
+        self.X, self.Z = np.meshgrid(self.x, self.z)
+
+        # setup Laplacian in x-direction
+        k = np.fft.fftfreq(nx, 1.0 / nx)
+
+    def u_exact(self, *args, **kwargs):
+        return np.sin(self.X) * np.cos(self.Z)
