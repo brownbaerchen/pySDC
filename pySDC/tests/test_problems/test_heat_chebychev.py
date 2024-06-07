@@ -6,7 +6,7 @@ def test_heat1d_chebychev(plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
 
-    P = Heat1DChebychev(nvars=8, poly_coeffs=[10, 0, 0, 1, 0])
+    P = Heat1DChebychev(nvars=80, poly_coeffs=[10, 0, 0, 1, 0])
 
     u0 = P.u_exact()
     dt = 1e-1

@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from scipy import sparse as sp
 
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.mesh import mesh
@@ -16,11 +17,17 @@ class Heat1DChebychev(ptype):
         # construct grids
         self.x = np.cos(np.pi / nvars * (np.arange(nvars) + 0.5))
 
+        # get normalization for converting Chebychev coefficients and DCT
         self.norm = np.ones(nvars) / nvars
         self.norm[0] /= 2
 
+        # setup matrices for derivative / integration
         self.D = self.get_differentiation_matrix(2)
-        self.Id = np.diag(np.ones(nvars))
+        self.Id = sp.eye(self.nvars, format='csc')
+
+        # get conversion matrix between Chebychev and Dirichlet polynomials
+        self.CtoD = sp.eye(self.nvars, format='csc') - sp.diags(np.ones(self.nvars - 2), offsets=-2, format='csc')
+        self.DtoC = sp.linalg.inv(self.CtoD)
 
         super().__init__(init=(nvars, None, np.dtype('float64')))
 
@@ -29,6 +36,24 @@ class Heat1DChebychev(ptype):
         return np.polynomial.Polynomial(self.poly_coeffs)
 
     def get_differentiation_matrix(self, deriv):
+        """
+        This is adapted from the Dedalus paper.
+        It expresses the derivative of one Chebychev polynomial as a linear combination of Chebychev polynomials of
+        lower order.
+
+        Computes the derivative matrix for the first derivative and then raises that to the power of the desired
+        derivative.
+
+        TODO:
+          - Take a look at the derivative matrix in the Chebychev U-bases
+          - Use sparse matrix?
+
+        Args:
+            deriv (int): Order of derivative.
+
+        Returns:
+            np.ndarray: Derivative matrix
+        """
         N = self.nvars
         D = np.zeros((N, N))
         for j in range(N):
@@ -39,8 +64,11 @@ class Heat1DChebychev(ptype):
         return np.linalg.matrix_power(D, deriv)
 
     def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+
         u_hat = scipy.fft.dct(u) * self.norm
-        return scipy.fft.idct(self.D @ u_hat / self.norm)
+        f[:] = scipy.fft.idct(self.D @ u_hat / self.norm)
+        return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         r"""
@@ -65,6 +93,11 @@ class Heat1DChebychev(ptype):
         rhs_hat = scipy.fft.dct(rhs) * self.norm
 
         A = self.Id - factor * self.D
+
+        # A = (self.Id - factor * self.D) @ self.DtoC
+        # sol_d = np.linalg.solve(A, rhs_hat)
+        # sol_hat = self.DtoC @ sol_d
+
         sol_hat = np.linalg.solve(A, rhs_hat)
         sol[:] = scipy.fft.idct(sol_hat / self.norm)
         return sol
