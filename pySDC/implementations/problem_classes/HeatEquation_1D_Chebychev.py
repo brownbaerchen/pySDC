@@ -40,7 +40,7 @@ class Heat1DChebychev(ptype):
 
     def eval_f(self, u, *args, **kwargs):
         u_hat = scipy.fft.dct(u) * self.norm
-        return np.polynomial.Chebyshev(self.D @ u_hat)(self.x)
+        return scipy.fft.idct(self.D @ u_hat / self.norm)
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         r"""
@@ -66,7 +66,7 @@ class Heat1DChebychev(ptype):
 
         A = self.Id - factor * self.D
         sol_hat = np.linalg.solve(A, rhs_hat)
-        sol[:] = np.polynomial.Chebyshev(sol_hat)(self.x)
+        sol[:] = scipy.fft.idct(sol_hat / self.norm)
         return sol
 
     def u_exact(self, t=0):
