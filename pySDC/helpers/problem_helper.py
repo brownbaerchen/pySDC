@@ -273,6 +273,7 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
 class ChebychovHelper:
     def __init__(self, N):
         self.N = N
+        self.cache = {}
 
     def get_1dgrid(self):
         '''
@@ -285,18 +286,35 @@ class ChebychovHelper:
         '''
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
 
-    def getT2U_converstion_matrices(self):
+    def get_T2U(self):
         '''
-        Get matrices for conversion between Chebychov polynomials of first (T) and second (U) kind
+        Get matrix for converting from Chebychov polynomials of first (T) to second (U) kind.
 
         Returns:
             scipy.sparse: Sparse conversion matrix from T to U
+        '''
+        if 'T2U' in self.cache:
+            return self.cache['T2U']
+        else:
+            T2U = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
+            T2U[:, 0] *= 2
+            self.cache['T2U'] = T2U
+            return T2U
+
+    def get_U2T(self):
+        '''
+        Get matrix for converting from Chebychov polynomials of second (U) to first (T) kind.
+
+        Returns:
             scipy.sparse: Sparse conversion matrix from U to T
         '''
-        T2U = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
-        T2U[:, 0] *= 2
-        U2T = sp.linalg.inv(T2U)
-        return T2U, U2T
+        if 'U2T' in self.cache:
+            return 'U2T'
+        else:
+            T2U = self.get_T2U()
+            U2T = sp.linalg.inv(T2U)
+            self.cache['U2T'] = U2T
+            return U2T
 
     def get_T2Udifferentiation_matrix(self):
         '''
@@ -327,20 +345,39 @@ class ChebychovHelper:
         D[0, :] /= 2
         return np.linalg.matrix_power(D, p)
 
-    def get_D2T_conversion_matrices(self):
+    def get_T2D(self):
         '''
-        Get conversion matrices between Chebychov polynomials of first kind (T)and a Dirichlet recombination (D), which
-        is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
+        Get matrix for converting from Chebychov polynomials of first (T) kind to Dirichlet recombination (D).
+        This is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
 
         Returns:
             scipy.sparse: Sparse conversion matrix from T to D
+        '''
+        if 'T2D' in self.cache:
+            return self.cache['T2D']
+        else:
+            D2T = self.get_D2T()
+            T2D = sp.linalg.inv(D2T)
+            self.cache['T2U'] = T2U
+            return T2U
+
+    def get_D2T(self):
+        '''
+        Get matrix for converting from Chebychov polynomials of first (T) kind to Dirichlet recombination (D).
+        This is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
+
+        Returns:
             scipy.sparse: Sparse conversion matrix from D to T
         '''
-        D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
-        T2D = sp.linalg.inv(D2T)
-        return T2D, D2T
+        if 'D2T' in self.cache:
+            return 'D2T'
+        else:
+            D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
+            self.cache['D2T'] = D2T
+            return D2T
 
     def get_norm(self):
         '''get normalization for converting Chebychev coefficients and DCT'''
-        self.norm = np.ones(self.N) / self.N
-        self.norm[0] /= 2
+        norm = np.ones(self.N) / self.N
+        norm[0] /= 2
+        return norm
