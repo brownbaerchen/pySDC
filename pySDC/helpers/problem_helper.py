@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.special import factorial
+import scipy.sparse as sp
 
 
 def get_steps(derivative, order, stencil_type):
@@ -267,3 +268,25 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
         raise NotImplementedError(f'Boundary conditions \"{bc}\" not implemented.')
 
     return dx, xvalues
+
+
+class ChebychovHelper:
+    def __init__(self, N):
+        self.N = N
+
+    def get_1dgrid(self):
+        return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
+
+    def getT2U_converstion_matrices(self):
+        T2U = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
+        T2U[:, 0] *= 2
+        U2T = sp.linalg.inv(T2U)
+        return T2U, U2T
+
+    def get_differentiation_matrix(self):
+        return sp.diags(np.arange(self.N - 1) + 1, offsets=1)
+
+    def get_D2T_conversion_matrices(self):
+        D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
+        T2D = sp.linalg.inv(D2T)
+        return T2D, D2T

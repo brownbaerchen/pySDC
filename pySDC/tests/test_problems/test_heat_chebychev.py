@@ -6,10 +6,10 @@ def test_heat1d_chebychev(plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
 
-    P = Heat1DChebychev(nvars=80, poly_coeffs=[10, 0, 0, 1, 0])
+    P = Heat1DChebychev(nvars=32, poly_coeffs=[10, 0, 0, 1, -2])
 
     u0 = P.u_exact()
-    dt = 1e-1
+    dt = 1e-2
     sol = P.solve_system(rhs=u0, factor=dt)
     backward = sol - dt * P.eval_f(sol)
     forward = u0 + dt * P.eval_f(u0)
@@ -20,7 +20,7 @@ def test_heat1d_chebychev(plot=False):
         plt.plot(P.x, u0, label='u0')
         plt.plot(P.x, sol, ls=':', label='BE')
         plt.plot(P.x, backward, ls='-.', label='BFE')
-        # plt.plot(P.x, forward, ls='-.', label='FE')
+        plt.plot(P.x, forward, ls='-.', label='FE')
         plt.legend(frameon=False)
         plt.show()
 
