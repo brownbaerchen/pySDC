@@ -5,6 +5,8 @@ from scipy import sparse as sp
 from pySDC.core.Problem import ptype
 from pySDC.implementations.datatype_classes.mesh import mesh
 
+from pySDC.helpers.problem_helper import ChebychovHelper
+
 
 class Heat1DChebychev(ptype):
     dtype_u = mesh
@@ -14,15 +16,14 @@ class Heat1DChebychev(ptype):
         self._makeAttributeAndRegister('nvars', localVars=locals(), readOnly=True)
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
-        # construct grids
-        self.x = np.cos(np.pi / nvars * (np.arange(nvars) + 0.5))
+        cheby = ChebychovHelper(N=nvars)
 
-        # get normalization for converting Chebychev coefficients and DCT
-        self.norm = np.ones(nvars) / nvars
-        self.norm[0] /= 2
+        # construct grids
+        self.x = cheby.get_1dgrid()
+        self.norm = cheby.get_norm()
 
         # setup matrices for derivative / integration
-        self.D = self.get_differentiation_matrix(2)
+        self.D = cheby.get_T2Tdifferentiation_matrix(2)
         self.Id = sp.eye(self.nvars, format='csc')
 
         # get conversion matrix between Chebychev and Dirichlet polynomials
@@ -34,34 +35,6 @@ class Heat1DChebychev(ptype):
     @property
     def _get_initial_polynomial(self):
         return np.polynomial.Polynomial(self.poly_coeffs)
-
-    def get_differentiation_matrix(self, deriv):
-        """
-        This is adapted from the Dedalus paper.
-        It expresses the derivative of one Chebychev polynomial as a linear combination of Chebychev polynomials of
-        lower order.
-
-        Computes the derivative matrix for the first derivative and then raises that to the power of the desired
-        derivative.
-
-        TODO:
-          - Take a look at the derivative matrix in the Chebychev U-bases
-          - Use sparse matrix?
-
-        Args:
-            deriv (int): Order of derivative.
-
-        Returns:
-            np.ndarray: Derivative matrix
-        """
-        N = self.nvars
-        D = np.zeros((N, N))
-        for j in range(N):
-            for k in range(j):
-                D[k, j] = 2 * j * ((j - k) % 2)
-
-        D[0, :] /= 2
-        return np.linalg.matrix_power(D, deriv)
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init

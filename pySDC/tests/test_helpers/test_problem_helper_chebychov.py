@@ -7,10 +7,10 @@ def test_D2T_conversion_matrices(N):
     import numpy as np
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    Cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N)
 
     x = np.linspace(-1, 1, N)
-    T2D, D2T = Cheby.get_D2T_conversion_matrices()
+    T2D, D2T = cheby.get_D2T_conversion_matrices()
 
     for i in range(N):
         coeffs = np.zeros(N)
@@ -33,12 +33,12 @@ def test_T_U_conversion(N):
     from scipy.special import chebyt, chebyu
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    Cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N)
 
-    T2U, U2T = Cheby.getT2U_converstion_matrices()
+    T2U, U2T = cheby.getT2U_converstion_matrices()
 
     coeffs = np.random.random(N)
-    x = Cheby.get_1dgrid()
+    x = cheby.get_1dgrid()
 
     def eval_poly(poly, coeffs, x):
         return np.array([coeffs[i] * poly(i)(x) for i in range(len(coeffs))]).sum(axis=0)
@@ -55,19 +55,24 @@ def test_T_U_conversion(N):
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
-def test_differentiation_matrix(N):
+@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+def test_differentiation_matrix(N, variant):
     import numpy as np
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    Cheby = ChebychovHelper(N)
-
-    D = Cheby.get_differentiation_matrix()
-    T2U, U2T = Cheby.getT2U_converstion_matrices()
+    cheby = ChebychovHelper(N)
     x = np.cos(np.pi / N * (np.arange(N) + 0.5))
-
     coeffs = np.random.random(N)
 
-    du = np.polynomial.Chebyshev(U2T @ D @ coeffs)(x)
+    if variant == 'T2U':
+        _D = cheby.get_T2Udifferentiation_matrix()
+        _, U2T = cheby.getT2U_converstion_matrices()
+
+        D = U2T @ _D
+    elif variant == 'T2T':
+        D = cheby.get_T2T_differentiation_matrix(1)
+
+    du = np.polynomial.Chebyshev(D @ coeffs)(x)
     exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
 
     assert np.allclose(exact, du)

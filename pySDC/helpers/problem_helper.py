@@ -275,18 +275,72 @@ class ChebychovHelper:
         self.N = N
 
     def get_1dgrid(self):
+        '''
+        Generates a 1D grid with Chebychov points. These are clustered at the boundary. You need this kind of grid to
+        use discrete cosine transformation (DCT) to get the Chebychov representation. If you want a different grid, you
+        need to do an affine transformation before any Chebychov business.
+
+        Returns:
+            numpy.ndarray: 1D grid
+        '''
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
 
     def getT2U_converstion_matrices(self):
+        '''
+        Get matrices for conversion between Chebychov polynomials of first (T) and second (U) kind
+
+        Returns:
+            scipy.sparse: Sparse conversion matrix from T to U
+            scipy.sparse: Sparse conversion matrix from U to T
+        '''
         T2U = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
         T2U[:, 0] *= 2
         U2T = sp.linalg.inv(T2U)
         return T2U, U2T
 
-    def get_differentiation_matrix(self):
+    def get_T2Udifferentiation_matrix(self):
+        '''
+        Sparse differentiation matrix from Chebychov polynomials of first kind to second. When using this, you must
+        formulate your problem in first order derivatives.
+
+        Returns:
+            scipy.sparse: Sparse differentiation matrix
+        '''
         return sp.diags(np.arange(self.N - 1) + 1, offsets=1)
 
+    def get_T2T_differentiation_matrix(self, p):
+        '''
+        This is adapted from the Dedalus paper. Keep in mind that the T2T differentiation matrix is dense. But you can
+        compute any derivative by simply raising it to some power `p`.
+
+        Args:
+            p (int): Derivative you want to compute (can be negative for integration)
+
+        Returns:
+            numpy.ndarray: Differentiation matrix
+        '''
+        D = np.zeros((self.N, self.N))
+        for j in range(self.N):
+            for k in range(j):
+                D[k, j] = 2 * j * ((j - k) % 2)
+
+        D[0, :] /= 2
+        return np.linalg.matrix_power(D, p)
+
     def get_D2T_conversion_matrices(self):
+        '''
+        Get conversion matrices between Chebychov polynomials of first kind (T)and a Dirichlet recombination (D), which
+        is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
+
+        Returns:
+            scipy.sparse: Sparse conversion matrix from T to D
+            scipy.sparse: Sparse conversion matrix from D to T
+        '''
         D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
         T2D = sp.linalg.inv(D2T)
         return T2D, D2T
+
+    def get_norm(self):
+        '''get normalization for converting Chebychev coefficients and DCT'''
+        self.norm = np.ones(self.N) / self.N
+        self.norm[0] /= 2
