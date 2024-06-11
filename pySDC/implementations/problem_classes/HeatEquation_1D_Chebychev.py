@@ -12,8 +12,8 @@ class Heat1DChebychev(ptype):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None):
-        self._makeAttributeAndRegister('nvars', 'a', 'b', localVars=locals(), readOnly=True)
+    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None, solver_type='direct'):
+        self._makeAttributeAndRegister('nvars', 'a', 'b', 'solver_type', localVars=locals(), readOnly=True)
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
         cheby = ChebychovHelper(N=nvars)
@@ -22,28 +22,41 @@ class Heat1DChebychev(ptype):
         self.T2U = cheby.get_T2U()
         self.U2T = cheby.get_U2T()
 
+        S = 2  # number of components in the solution
         self.iu = 0  # index for solution
         self.idu = 1  # index for first space derivative of solution
 
-        # construct grids
+        # construct grid
         self.x = cheby.get_1dgrid()
         self.norm = cheby.get_norm()
 
-        # setup matrices for derivative / integration
+        # setup operators between components going from T to U
         zero = sp.eye(self.nvars) * 0.0
+        Id = sp.eye(self.nvars) @ self.T2U
         D = cheby.get_T2U_differentiation_matrix()
 
         # Adapt derivative matrix such that it does not change the boundary conditions
         D_D = (D @ self.U2T @ self.T2D).tolil()
         D_D[0, :] = 0
         D_D[1, :] = 0
-        D = self.T2U @ self.D2T @ D_D
+        D = D_D @ self.D2T @ self.T2U
 
-        self.L = sp.bmat([[zero, -D], [-D, self.T2U]])
-        self.M = sp.bmat([[self.T2U, zero], [zero, zero]])
+        # Id_D = (Id @ self.U2T @ self.T2D).tolil()
+        # Id_D[0,:] = 0
+        # Id_D[1,:] = 0
+        # Id = Id_D @ self.D2T @ self.T2U
+
+        n = np.arange(nvars)
+        perm = np.stack((n, n + nvars), axis=1).flatten()
+        Pl = sp.eye(S * nvars).toarray()
+        self.Pl = sp.csc_matrix(Pl[perm])
+        self.Pr = sp.linalg.inv(self.Pl)
+
+        self.L = sp.bmat([[zero, -D], [-D, Id]])
+        self.M = sp.bmat([[Id, zero], [zero, zero]])
         self.D = D
 
-        super().__init__(init=((2, nvars), None, np.dtype('float64')))
+        super().__init__(init=((S, nvars), None, np.dtype('float64')))
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
@@ -81,11 +94,27 @@ class Heat1DChebychev(ptype):
         sol = self.u_init
 
         rhs_hat = scipy.fft.dct(rhs, axis=1) * self.norm
-        rhs_hat[self.iu] = self._apply_BCs(rhs_hat[self.iu])
+        rhs_hat[self.iu][:] = self._apply_BCs(rhs_hat[self.iu])
 
-        A = self.M + factor * self.L
+        A = self.Pl @ (self.M + factor * self.L) @ self.Pr
+        _rhs = self.Pl @ self.M @ rhs_hat.flatten()
 
-        sol_hat = sp.linalg.spsolve(A, self.M @ rhs_hat.flatten()).reshape(sol.shape)
+        # A_inv = sp.linalg.inv(A)
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(1, 3)
+        # axs[0].imshow(np.log(abs(A.toarray())))
+        # axs[1].imshow(np.log(abs(A_inv.toarray())))
+        # axs[2].imshow(np.log(abs((A_inv@A).toarray())))
+        # plt.show()
+
+        if self.solver_type == 'direct':
+            res = sp.linalg.spsolve(A, _rhs)
+        elif self.solver_type == 'gmres':
+            res, _ = sp.linalg.gmres(A, _rhs)
+        else:
+            raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
+
+        sol_hat = (self.Pr @ res).reshape(sol.shape)
         sol[:] = scipy.fft.idct(sol_hat / self.norm, axis=1)
         return sol
 

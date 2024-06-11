@@ -8,8 +8,8 @@ def test_heat1d_chebychev(plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 5
-    P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1])
+    N = 2**5
+    P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1], solver_type='gmres')
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
@@ -23,13 +23,19 @@ def test_heat1d_chebychev(plot=False):
     backward = sol - dt * P.eval_f(sol)
     backward[P.idu] = P._compute_derivative(backward[P.iu])
 
+    # k=1
+    # source_term = np.sin(k * P.x * 2 * np.pi / L)
+    # sol_ex = P.solve_system(rhs=source_term
+    # u = spsolve(A, source_term - b)
+    # u_expect = (bc_right - bc_left) * x / L + bc_left - source_term / k**2
+
     if plot:
         import matplotlib.pyplot as plt
 
-        for i in [P.iu, P.idu]:
+        for i in [P.iu]:
             plt.plot(P.x, u0[i], label=f'u0[{i}]')
             plt.plot(P.x, sol[i], ls='--', label=f'BE[{i}]')
-            plt.plot(P.x, backward[i], ls='-.', label='BFE')
+            plt.plot(P.x, backward[i], ls='-.', label=f'BFE[{i}]')
         plt.legend(frameon=False)
         plt.show()
 
@@ -52,6 +58,16 @@ def test_heat1d_chebychev(plot=False):
         u0, P.solve_system(u0, 1e-9, u0)
     ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
     assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
+
+
+# def test_condition_number:
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
+#     import scipy
+#     from pySDC.helpers.problem_helper import ChebychovHelper
+#
+#     N = 5
+#     P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1])
 
 
 @pytest.mark.base
