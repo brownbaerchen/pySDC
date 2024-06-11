@@ -30,8 +30,14 @@ class Heat1DChebychev(ptype):
         self.norm = cheby.get_norm()
 
         # setup matrices for derivative / integration
-        D = cheby.get_T2U_differentiation_matrix()
         zero = sp.eye(self.nvars) * 0.0
+        D = cheby.get_T2U_differentiation_matrix()
+
+        # Adapt derivative matrix such that it does not change the boundary conditions
+        D_D = (D @ self.U2T @ self.T2D).tolil()
+        D_D[0, :] = 0
+        D_D[1, :] = 0
+        D = self.T2U @ self.D2T @ D_D
 
         self.L = sp.bmat([[zero, -D], [-D, self.T2U]])
         self.M = sp.bmat([[self.T2U, zero], [zero, zero]])
@@ -41,9 +47,18 @@ class Heat1DChebychev(ptype):
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-        u_hat = scipy.fft.dct(u, axis=1) * self.norm
-        f[self.iu][:] = scipy.fft.idct(self.U2T @ self.D @ u_hat[self.idu] / self.norm)
+        f[self.iu][:] = self._compute_derivative(u[self.idu])
         return f
+
+    def _compute_derivative(self, u):
+        u_hat = scipy.fft.dct(u) * self.norm
+        return scipy.fft.idct(self.U2T @ self.D @ u_hat / self.norm)
+
+    def _apply_BCs(self, u_hat):
+        u_D = self.T2D @ u_hat
+        u_D[0] = (self.b + self.a) / 2
+        u_D[1] = (self.b - self.a) / 2
+        return self.D2T @ u_D
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         r"""
@@ -66,12 +81,9 @@ class Heat1DChebychev(ptype):
         sol = self.u_init
 
         rhs_hat = scipy.fft.dct(rhs, axis=1) * self.norm
+        rhs_hat[self.iu] = self._apply_BCs(rhs_hat[self.iu])
 
         A = self.M + factor * self.L
-        # print(self.M.toarray())
-        # print(self.L.toarray())
-        # print(A.toarray())
-        # print(self.M@rhs_hat.flatten())
 
         sol_hat = sp.linalg.spsolve(A, self.M @ rhs_hat.flatten()).reshape(sol.shape)
         sol[:] = scipy.fft.idct(sol_hat / self.norm, axis=1)
@@ -89,10 +101,7 @@ class Heat1DChebychev(ptype):
 
         coeffs = np.zeros(self.nvars)
         coeffs[: len(self.poly_coeffs)] = self.poly_coeffs
-        D_coeffs = self.T2D @ coeffs
-        D_coeffs[0] = (self.b + self.a) / 2
-        D_coeffs[1] = (self.b - self.a) / 2
-        coeffs = self.D2T @ D_coeffs
+        coeffs = self._apply_BCs(coeffs)
         me[self.iu][:] = np.polynomial.Chebyshev(coeffs)(self.x)
 
         me[self.idu] = scipy.fft.idct(self.U2T @ self.D @ coeffs / self.norm)
