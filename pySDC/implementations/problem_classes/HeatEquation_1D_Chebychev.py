@@ -12,35 +12,40 @@ class Heat1DChebychev(ptype):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, poly_coeffs=None):
-        self._makeAttributeAndRegister('nvars', localVars=locals(), readOnly=True)
+    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None):
+        self._makeAttributeAndRegister('nvars', 'a', 'b', localVars=locals(), readOnly=True)
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
         cheby = ChebychovHelper(N=nvars)
+        self.T2D = cheby.get_T2D()
+        self.D2T = cheby.get_D2T()
+        self.T2U = cheby.get_T2U()
+        self.U2T = cheby.get_U2T()
+
+        self.iu = 0  # index for solution
+        self.idu = 1  # index for first space derivative of solution
 
         # construct grids
         self.x = cheby.get_1dgrid()
         self.norm = cheby.get_norm()
 
         # setup matrices for derivative / integration
-        self.D = cheby.get_T2Tdifferentiation_matrix(2)
-        self.Id = sp.eye(self.nvars, format='csc')
+        D = cheby.get_T2U_differentiation_matrix()
+        zero = sp.eye(self.nvars) * 0.0
 
-        # get conversion matrix between Chebychev and Dirichlet polynomials
-        self.CtoD = sp.eye(self.nvars, format='csc') - sp.diags(np.ones(self.nvars - 2), offsets=-2, format='csc')
-        self.DtoC = sp.linalg.inv(self.CtoD)
+        self.L = sp.bmat([[zero, -D], [-D, self.T2U]])
+        self.M = sp.bmat([[self.T2U, zero], [zero, zero]])
+        self.D = D
 
-        super().__init__(init=(nvars, None, np.dtype('float64')))
-
-    @property
-    def _get_initial_polynomial(self):
-        return np.polynomial.Polynomial(self.poly_coeffs)
+        super().__init__(init=((2, nvars), None, np.dtype('float64')))
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
 
-        u_hat = scipy.fft.dct(u) * self.norm
-        f[:] = scipy.fft.idct(self.D @ u_hat / self.norm)
+        u_hat = scipy.fft.dct(u, axis=1) * self.norm
+
+        # f[self.idu][:] = scipy.fft.idct(self.U2T @ self.D @ u_hat[self.iu] / self.norm)
+        f[self.iu][:] = scipy.fft.idct(self.U2T @ self.D @ u_hat[self.idu] / self.norm)
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
@@ -63,21 +68,38 @@ class Heat1DChebychev(ptype):
         """
         sol = self.u_init
 
-        rhs_hat = scipy.fft.dct(rhs) * self.norm
+        rhs_hat = scipy.fft.dct(rhs, axis=1) * self.norm
 
-        A = self.Id - factor * self.D
+        A = self.M + factor * self.L
+        # print(self.M.toarray())
+        # print(self.L.toarray())
+        # print(A.toarray())
+        # print(self.M@rhs_hat.flatten())
 
-        # A = (self.Id - factor * self.D) @ self.DtoC
-        # sol_d = np.linalg.solve(A, rhs_hat)
-        # sol_hat = self.DtoC @ sol_d
-
-        sol_hat = np.linalg.solve(A, rhs_hat)
-        sol[:] = scipy.fft.idct(sol_hat / self.norm)
+        sol_hat = sp.linalg.spsolve(A, self.M @ rhs_hat.flatten()).reshape(sol.shape)
+        sol[:] = scipy.fft.idct(sol_hat / self.norm, axis=1)
         return sol
 
     def u_exact(self, t=0):
+        """
+        This will use the polynomial coefficients supplied, but will change it to enforce the BC's.
+
+        Returns:
+            pySDC.dataype.mesh: Initial conditions
+        """
         assert t == 0
-        return self._get_initial_polynomial(self.x)
+        me = self.u_init
+
+        coeffs = np.zeros(self.nvars)
+        coeffs[: len(self.poly_coeffs)] = self.poly_coeffs
+        D_coeffs = self.T2D @ coeffs
+        D_coeffs[0] = (self.b + self.a) / 2
+        D_coeffs[1] = (self.b - self.a) / 2
+        coeffs = self.D2T @ D_coeffs
+        me[self.iu][:] = np.polynomial.Chebyshev(coeffs)(self.x)
+
+        me[self.idu] = scipy.fft.idct(self.U2T @ self.D @ coeffs / self.norm)
+        return me
 
 
 class Heat2d(ptype):

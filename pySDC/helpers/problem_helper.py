@@ -316,7 +316,7 @@ class ChebychovHelper:
             self.cache['U2T'] = U2T
             return U2T
 
-    def get_T2Udifferentiation_matrix(self):
+    def get_T2U_differentiation_matrix(self):
         '''
         Sparse differentiation matrix from Chebychov polynomials of first kind to second. When using this, you must
         formulate your problem in first order derivatives.
@@ -358,8 +358,8 @@ class ChebychovHelper:
         else:
             D2T = self.get_D2T()
             T2D = sp.linalg.inv(D2T)
-            self.cache['T2U'] = T2U
-            return T2U
+            self.cache['T2D'] = T2D
+            return T2D
 
     def get_D2T(self):
         '''
@@ -370,7 +370,7 @@ class ChebychovHelper:
             scipy.sparse: Sparse conversion matrix from D to T
         '''
         if 'D2T' in self.cache:
-            return 'D2T'
+            return self.cache['D2T']
         else:
             D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
             self.cache['D2T'] = D2T

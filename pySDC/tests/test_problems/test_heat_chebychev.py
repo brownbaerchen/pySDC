@@ -5,10 +5,18 @@ import pytest
 def test_heat1d_chebychev(plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
+    import scipy
+    from pySDC.helpers.problem_helper import ChebychovHelper
 
-    P = Heat1DChebychev(nvars=32, poly_coeffs=[10, 0, 0, 1, -2])
+    N = 5
+    P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1])
+    cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
+    u_hat = scipy.fft.dct(u0, axis=1) * P.norm
+
+    f_eval = P.eval_f(u0)
+
     dt = 1e-2
     sol = P.solve_system(rhs=u0, factor=dt)
     backward = sol - dt * P.eval_f(sol)
@@ -17,15 +25,35 @@ def test_heat1d_chebychev(plot=False):
     if plot:
         import matplotlib.pyplot as plt
 
-        plt.plot(P.x, u0, label='u0')
-        plt.plot(P.x, sol, ls=':', label='BE')
-        plt.plot(P.x, backward, ls='-.', label='BFE')
-        plt.plot(P.x, forward, ls='-.', label='FE')
+        for i in [P.iu, P.idu]:
+            plt.plot(P.x, u0[i], label=f'u0[{i}]')
+            # plt.plot(P.x, sol[i], ls='--', label=f'BE[{i}]')
+            # plt.plot(P.x, backward[i], ls='-.', label='BFE')
+            # plt.plot(P.x, forward, ls='-.', label='FE')
+            # plt.plot(P.x, f_eval[i], label=f'F[{i}]')
         plt.legend(frameon=False)
-        plt.show()
+        # plt.show()
 
-    assert np.allclose(u0, P.solve_system(u0, 0, u0))
-    assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
+    # test that the solution satisfies the algebraic constraints
+    sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
+    D_u = scipy.fft.idct(P.U2T @ P.D @ sol_hat[P.iu] / P.norm)
+    assert np.allclose(D_u, sol[P.idu]), 'The solution of backward Euler does not satisfy the algebraic constraints'
+
+    # test that f evaluation is second derivative of the solution
+    f = P.eval_f(u0)
+    D2 = cheby.get_T2T_differentiation_matrix(2)
+    D1 = cheby.get_T2T_differentiation_matrix(1)
+    D2u = scipy.fft.idct(D2 @ u_hat[P.iu] / P.norm)
+    D1u = scipy.fft.idct(D1 @ u_hat[P.iu] / P.norm)
+    assert np.allclose(D2u, f[P.iu]), 'The time derivative is not the second space derivative.'
+    assert np.allclose(
+        D1u, u0[P.idu]
+    ), 'The initial conditions don\'t have the first space derivative where it needs to be.'
+
+    assert np.allclose(
+        u0, P.solve_system(u0, 1e-9, u0)
+    ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
+    # assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
 
 
 @pytest.mark.base

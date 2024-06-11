@@ -10,7 +10,7 @@ def test_D2T_conversion_matrices(N):
     cheby = ChebychovHelper(N)
 
     x = np.linspace(-1, 1, N)
-    T2D, D2T = cheby.get_D2T_conversion_matrices()
+    D2T = cheby.get_D2T()
 
     for i in range(N):
         coeffs = np.zeros(N)
@@ -35,7 +35,8 @@ def test_T_U_conversion(N):
 
     cheby = ChebychovHelper(N)
 
-    T2U, U2T = cheby.getT2U_converstion_matrices()
+    T2U = cheby.get_T2U()
+    U2T = cheby.get_U2T()
 
     coeffs = np.random.random(N)
     x = cheby.get_1dgrid()
@@ -58,21 +59,23 @@ def test_T_U_conversion(N):
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 def test_differentiation_matrix(N, variant):
     import numpy as np
+    import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
     x = np.cos(np.pi / N * (np.arange(N) + 0.5))
     coeffs = np.random.random(N)
+    norm = cheby.get_norm()
 
     if variant == 'T2U':
-        _D = cheby.get_T2Udifferentiation_matrix()
-        _, U2T = cheby.getT2U_converstion_matrices()
+        _D = cheby.get_T2U_differentiation_matrix()
+        U2T = cheby.get_U2T()
 
         D = U2T @ _D
     elif variant == 'T2T':
         D = cheby.get_T2T_differentiation_matrix(1)
 
-    du = np.polynomial.Chebyshev(D @ coeffs)(x)
+    du = scipy.fft.idct(D @ coeffs / norm)
     exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
 
     assert np.allclose(exact, du)
