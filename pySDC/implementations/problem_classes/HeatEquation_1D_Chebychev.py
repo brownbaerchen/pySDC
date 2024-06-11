@@ -41,10 +41,7 @@ class Heat1DChebychev(ptype):
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-
         u_hat = scipy.fft.dct(u, axis=1) * self.norm
-
-        # f[self.idu][:] = scipy.fft.idct(self.U2T @ self.D @ u_hat[self.iu] / self.norm)
         f[self.iu][:] = scipy.fft.idct(self.U2T @ self.D @ u_hat[self.idu] / self.norm)
         return f
 

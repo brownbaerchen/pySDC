@@ -8,19 +8,21 @@ def test_heat1d_chebychev(plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 5
+    N = 12
     P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1])
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
     u_hat = scipy.fft.dct(u0, axis=1) * P.norm
 
-    f_eval = P.eval_f(u0)
-
     dt = 1e-2
     sol = P.solve_system(rhs=u0, factor=dt)
+    sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
+
+    # for computing forward Euler, we need to reevaluate the spatial derivative
     backward = sol - dt * P.eval_f(sol)
-    forward = u0 + dt * P.eval_f(u0)
+    backward_hat = scipy.fft.dct(backward[P.iu]) * P.norm
+    backward[P.idu] = scipy.fft.idct(P.U2T @ P.D @ backward_hat / P.norm)
 
     if plot:
         import matplotlib.pyplot as plt
@@ -28,14 +30,11 @@ def test_heat1d_chebychev(plot=False):
         for i in [P.iu, P.idu]:
             plt.plot(P.x, u0[i], label=f'u0[{i}]')
             # plt.plot(P.x, sol[i], ls='--', label=f'BE[{i}]')
-            # plt.plot(P.x, backward[i], ls='-.', label='BFE')
-            # plt.plot(P.x, forward, ls='-.', label='FE')
-            # plt.plot(P.x, f_eval[i], label=f'F[{i}]')
+            plt.plot(P.x, backward[i], ls='-.', label='BFE')
         plt.legend(frameon=False)
-        # plt.show()
+        plt.show()
 
     # test that the solution satisfies the algebraic constraints
-    sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
     D_u = scipy.fft.idct(P.U2T @ P.D @ sol_hat[P.iu] / P.norm)
     assert np.allclose(D_u, sol[P.idu]), 'The solution of backward Euler does not satisfy the algebraic constraints'
 
@@ -53,7 +52,7 @@ def test_heat1d_chebychev(plot=False):
     assert np.allclose(
         u0, P.solve_system(u0, 1e-9, u0)
     ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
-    # assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
+    assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
 
 
 @pytest.mark.base
