@@ -287,6 +287,18 @@ class ChebychovHelper:
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
 
     def get_conv(self, name):
+        '''
+        Get conversion matrix between different kinds of polynomials. The supported kinds are
+         - T: Chebychov polynomials of first kind
+         - U: Chebychov polynomials of second kind
+         - D: Dirichlet recombination.
+
+        You get the desired matrix by choosing a name as ``A2B``. I.e. ``T2U`` for the conversion matrix from T to U.
+        Once generates matrices are cached. So feel free to call the method as often as you like.
+
+        Returns:
+            scipy.sparse: Sparse conversion matrix
+        '''
         if name in self.cache.keys():
             return self.cache[name]
 

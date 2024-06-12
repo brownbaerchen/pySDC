@@ -94,5 +94,25 @@ def test_differentiation_matrix(N, variant):
     assert np.allclose(exact, du)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('N', [4, 32])
+def test_norm(N):
+    from pySDC.helpers.problem_helper import ChebychovHelper
+    import numpy as np
+    import scipy
+
+    cheby = ChebychovHelper(N)
+    coeffs = np.random.random(N)
+    x = cheby.get_1dgrid()
+    norm = cheby.get_norm()
+
+    u = np.polynomial.Chebyshev(coeffs)(x)
+    u_dct = scipy.fft.idct(coeffs / norm)
+    coeffs_dct = scipy.fft.dct(u) * norm
+
+    assert np.allclose(u, u_dct)
+    assert np.allclose(coeffs, coeffs_dct)
+
+
 if __name__ == '__main__':
     test_conversion_inverses('T2D')
