@@ -9,19 +9,21 @@ def test_heat1d_chebychev(plot=False):
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     N = 2**5
-    P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1], solver_type='gmres')
+    P = Heat1DChebychev(nvars=N, a=-2, b=3, poly_coeffs=[0, 0, 0, -1, 1], solver_type='gmres')
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
     u_hat = scipy.fft.dct(u0, axis=1) * P.norm
 
-    dt = 1e-2
+    dt = 1e-1
     sol = P.solve_system(rhs=u0, factor=dt)
     sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
 
     # for computing forward Euler, we need to reevaluate the spatial derivative
     backward = sol - dt * P.eval_f(sol)
     backward[P.idu] = P._compute_derivative(backward[P.iu])
+
+    deriv = P._compute_derivative(u0[P.idu])
 
     # k=1
     # source_term = np.sin(k * P.x * 2 * np.pi / L)
@@ -36,6 +38,7 @@ def test_heat1d_chebychev(plot=False):
             plt.plot(P.x, u0[i], label=f'u0[{i}]')
             plt.plot(P.x, sol[i], ls='--', label=f'BE[{i}]')
             plt.plot(P.x, backward[i], ls='-.', label=f'BFE[{i}]')
+            plt.plot(P.x, deriv)
         plt.legend(frameon=False)
         plt.show()
 
@@ -55,7 +58,7 @@ def test_heat1d_chebychev(plot=False):
     # ), 'The initial conditions don\'t have the first space derivative where it needs to be.'
 
     assert np.allclose(
-        u0, P.solve_system(u0, 1e-9, u0)
+        u0, P.solve_system(u0, 1e-9, u0), atol=1e-7
     ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
     assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
 

@@ -12,8 +12,8 @@ class Heat1DChebychev(ptype):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None, solver_type='direct'):
-        self._makeAttributeAndRegister('nvars', 'a', 'b', 'solver_type', localVars=locals(), readOnly=True)
+    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None, solver_type='direct', lintol=1e-9):
+        self._makeAttributeAndRegister('nvars', 'a', 'b', 'solver_type', 'lintol', localVars=locals(), readOnly=True)
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
         cheby = ChebychovHelper(N=nvars)
@@ -40,21 +40,19 @@ class Heat1DChebychev(ptype):
         D_D[0, :] = 0
         D_D[1, :] = 0
         D = D_D @ self.D2T @ self.T2U
+        self.D = D
 
-        # Id_D = (Id @ self.U2T @ self.T2D).tolil()
-        # Id_D[0,:] = 0
-        # Id_D[1,:] = 0
-        # Id = Id_D @ self.D2T @ self.T2U
-
+        # setup preconditioner to generate a banded matrix
         n = np.arange(nvars)
         perm = np.stack((n, n + nvars), axis=1).flatten()
         Pl = sp.eye(S * nvars).toarray()
         self.Pl = sp.csc_matrix(Pl[perm])
+        self.Pl = sp.eye(S * nvars)
         self.Pr = sp.linalg.inv(self.Pl)
 
+        # setup system matrices connecting the components
         self.L = sp.bmat([[zero, -D], [-D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
-        self.D = D
 
         super().__init__(init=((S, nvars), None, np.dtype('float64')))
 
@@ -110,7 +108,7 @@ class Heat1DChebychev(ptype):
         if self.solver_type == 'direct':
             res = sp.linalg.spsolve(A, _rhs)
         elif self.solver_type == 'gmres':
-            res, _ = sp.linalg.gmres(A, _rhs)
+            res, _ = sp.linalg.gmres(A, _rhs, tol=self.lintol)
         else:
             raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
 
