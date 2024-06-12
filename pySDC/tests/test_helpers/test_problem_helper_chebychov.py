@@ -10,7 +10,7 @@ def test_D2T_conversion_matrices(N):
     cheby = ChebychovHelper(N)
 
     x = np.linspace(-1, 1, N)
-    D2T = cheby.get_D2T()
+    D2T = cheby.get_conv('D2T')
 
     for i in range(N):
         coeffs = np.zeros(N)
@@ -35,8 +35,8 @@ def test_T_U_conversion(N):
 
     cheby = ChebychovHelper(N)
 
-    T2U = cheby.get_T2U()
-    U2T = cheby.get_U2T()
+    T2U = cheby.get_conv('T2U')
+    U2T = cheby.get_conv('U2T')
 
     coeffs = np.random.random(N)
     x = cheby.get_1dgrid()
@@ -55,6 +55,19 @@ def test_T_U_conversion(N):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('name', ['T2U', 'T2D', 'U2D'])
+def test_conversion_inverses(name):
+    from pySDC.helpers.problem_helper import ChebychovHelper
+    import numpy as np
+
+    N = 8
+    cheby = ChebychovHelper(N)
+    P = cheby.get_conv(name)
+    Pinv = cheby.get_conv(name[::-1])
+    assert np.allclose((P @ Pinv).toarray(), np.diag(np.ones(N)))
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 def test_differentiation_matrix(N, variant):
@@ -69,7 +82,7 @@ def test_differentiation_matrix(N, variant):
 
     if variant == 'T2U':
         _D = cheby.get_T2U_differentiation_matrix()
-        U2T = cheby.get_U2T()
+        U2T = cheby.get_conv('U2T')
 
         D = U2T @ _D
     elif variant == 'T2T':
@@ -82,4 +95,4 @@ def test_differentiation_matrix(N, variant):
 
 
 if __name__ == '__main__':
-    test_differentiation_matrix(4)
+    test_conversion_inverses('T2D')

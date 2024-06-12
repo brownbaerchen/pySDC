@@ -17,10 +17,12 @@ class Heat1DChebychev(ptype):
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
 
         cheby = ChebychovHelper(N=nvars)
-        self.T2D = cheby.get_T2D()
-        self.D2T = cheby.get_D2T()
-        self.T2U = cheby.get_T2U()
-        self.U2T = cheby.get_U2T()
+        self.T2D = cheby.get_conv('T2D')
+        self.D2T = cheby.get_conv('D2T')
+        self.T2U = cheby.get_conv('T2U')
+        self.U2T = cheby.get_conv('U2T')
+        self.U2D = cheby.get_conv('U2D')
+        self.D2U = cheby.get_conv('D2U')
 
         S = 2  # number of components in the solution
         self.iu = 0  # index for solution
@@ -32,14 +34,14 @@ class Heat1DChebychev(ptype):
 
         # setup operators between components going from T to U
         zero = sp.eye(self.nvars) * 0.0
-        Id = sp.eye(self.nvars) @ self.T2U
+        Id = sp.eye(self.nvars) @ self.D2U
         D = cheby.get_T2U_differentiation_matrix()
 
         # Adapt derivative matrix such that it does not change the boundary conditions
-        D_D = (D @ self.U2T @ self.T2D).tolil()
+        D_D = (D @ self.U2D).tolil()
         D_D[0, :] = 0
         D_D[1, :] = 0
-        D = D_D @ self.D2T @ self.T2U
+        D = D_D @ self.D2U
         self.D = D
 
         # setup preconditioner to generate a banded matrix
@@ -96,6 +98,8 @@ class Heat1DChebychev(ptype):
 
         A = self.Pl @ (self.M + factor * self.L) @ self.Pr
         _rhs = self.Pl @ self.M @ rhs_hat.flatten()
+
+        print(A.toarray())
 
         # A_inv = sp.linalg.inv(A)
         # import matplotlib.pyplot as plt

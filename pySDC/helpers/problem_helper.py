@@ -286,35 +286,33 @@ class ChebychovHelper:
         '''
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
 
-    def get_T2U(self):
-        '''
-        Get matrix for converting from Chebychov polynomials of first (T) to second (U) kind.
+    def get_conv(self, name):
+        if name in self.cache.keys():
+            return self.cache[name]
 
-        Returns:
-            scipy.sparse: Sparse conversion matrix from T to U
-        '''
-        if 'T2U' in self.cache:
-            return self.cache['T2U']
-        else:
-            T2U = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
-            T2U[:, 0] *= 2
-            self.cache['T2U'] = T2U
-            return T2U
+        def get_forward_conv(name):
+            if name == 'T2U':
+                mat = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
+                mat[:, 0] *= 2
+            elif name == 'D2T':
+                mat = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
+            elif name == 'D2U':
+                mat = self.get_conv('D2T') @ self.get_conv('T2U')
+            else:
+                raise NotImplementedError(f'Don\'t have conversion matrix {name!r}')
+            return mat
 
-    def get_U2T(self):
-        '''
-        Get matrix for converting from Chebychov polynomials of second (U) to first (T) kind.
+        try:
+            mat = get_forward_conv(name)
+        except NotImplementedError as E:
+            try:
+                fwd = get_forward_conv(name[::-1])
+                mat = sp.linalg.inv(fwd)
+            except NotImplementedError:
+                raise E
 
-        Returns:
-            scipy.sparse: Sparse conversion matrix from U to T
-        '''
-        if 'U2T' in self.cache:
-            return 'U2T'
-        else:
-            T2U = self.get_T2U()
-            U2T = sp.linalg.inv(T2U)
-            self.cache['U2T'] = U2T
-            return U2T
+        self.cache[name] = mat
+        return mat
 
     def get_T2U_differentiation_matrix(self):
         '''
@@ -344,37 +342,6 @@ class ChebychovHelper:
 
         D[0, :] /= 2
         return np.linalg.matrix_power(D, p)
-
-    def get_T2D(self):
-        '''
-        Get matrix for converting from Chebychov polynomials of first (T) kind to Dirichlet recombination (D).
-        This is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
-
-        Returns:
-            scipy.sparse: Sparse conversion matrix from T to D
-        '''
-        if 'T2D' in self.cache:
-            return self.cache['T2D']
-        else:
-            D2T = self.get_D2T()
-            T2D = sp.linalg.inv(D2T)
-            self.cache['T2D'] = T2D
-            return T2D
-
-    def get_D2T(self):
-        '''
-        Get matrix for converting from Chebychov polynomials of first (T) kind to Dirichlet recombination (D).
-        This is useful for Dirichlet boundary conditions as only the first two modes are non-zero at the boundary.
-
-        Returns:
-            scipy.sparse: Sparse conversion matrix from D to T
-        '''
-        if 'D2T' in self.cache:
-            return self.cache['D2T']
-        else:
-            D2T = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
-            self.cache['D2T'] = D2T
-            return D2T
 
     def get_norm(self):
         '''get normalization for converting Chebychev coefficients and DCT'''

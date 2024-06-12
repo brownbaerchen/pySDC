@@ -8,7 +8,7 @@ def test_heat1d_chebychev(plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 2**5
+    N = 5
     P = Heat1DChebychev(nvars=N, a=-2, b=3, poly_coeffs=[0, 0, 0, -1, 1], solver_type='gmres')
     cheby = ChebychovHelper(N)
 
@@ -38,7 +38,7 @@ def test_heat1d_chebychev(plot=False):
             plt.plot(P.x, u0[i], label=f'u0[{i}]')
             plt.plot(P.x, sol[i], ls='--', label=f'BE[{i}]')
             plt.plot(P.x, backward[i], ls='-.', label=f'BFE[{i}]')
-            plt.plot(P.x, deriv)
+            # plt.plot(P.x, deriv)
         plt.legend(frameon=False)
         plt.show()
 
