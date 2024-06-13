@@ -71,7 +71,7 @@ def test_conversion_inverses(name):
     assert np.allclose((P @ Pinv).toarray(), np.diag(np.ones(N)))
 
 
-@pytest.mark.bae
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('convs', [['D2T', 'T2U'], ['U2D', 'D2T'], ['T2U', 'U2D'], ['T2U', 'U2D', 'D2T']])
 def test_multi_conversion(N, convs):
@@ -91,7 +91,7 @@ def test_multi_conversion(N, convs):
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+@pytest.mark.parametrize('variant', ['T2U', 'T2T', 'D2U'])
 def test_differentiation_matrix(N, variant):
     import numpy as np
     import scipy
@@ -103,14 +103,21 @@ def test_differentiation_matrix(N, variant):
     norm = cheby.get_norm()
 
     if variant == 'T2U':
-        _D = cheby.get_T2U_differentiation_matrix()
-        U2T = cheby.get_conv('U2T')
-
-        D = U2T @ _D
+        D = cheby.get_T2U_differentiation_matrix()
+        P = cheby.get_conv('T2T')
+        Q = cheby.get_conv('U2T')
     elif variant == 'T2T':
         D = cheby.get_T2T_differentiation_matrix(1)
+        P = cheby.get_conv('T2T')
+        Q = cheby.get_conv('T2T')
+    elif variant == 'D2U':
+        D = cheby.get_T2U_differentiation_matrix() @ cheby.get_conv('D2T')
+        Q = cheby.get_conv('U2T')
+        P = cheby.get_conv('T2D')
+    else:
+        raise NotImplementedError
 
-    du = scipy.fft.idct(D @ coeffs / norm)
+    du = scipy.fft.idct(Q @ D @ P @ coeffs / norm)
     exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
 
     assert np.allclose(exact, du)
@@ -153,7 +160,7 @@ def test_norm(N):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
-@pytest.mark.parametrize('method', ['T2T', 'T2U'])
+@pytest.mark.parametrize('method', ['T2T', 'T2U', 'D2U'])
 @pytest.mark.parametrize('N', [4, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
 def test_tau_method(method, bc, N, bc_val):
@@ -167,13 +174,13 @@ def test_tau_method(method, bc, N, bc_val):
     '''
     from pySDC.helpers.problem_helper import ChebychovHelper
     import numpy as np
-    import scipy
     import scipy.sparse as sp
 
     cheby = ChebychovHelper(N, 1)
     x = cheby.get_1dgrid()
 
     coef = np.append(np.zeros(N - 1), [1])
+    rhs = np.append(np.zeros(N - 1), [bc_val])
 
     if method == 'T2T':
         P = np.polynomial.Chebyshev(coef)
@@ -182,7 +189,6 @@ def test_tau_method(method, bc, N, bc_val):
 
         A = D - Id
         A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
-        rhs = np.append(np.zeros(N - 1), [bc_val])
 
         sol_hat = np.linalg.solve(A, rhs)
 
@@ -196,9 +202,25 @@ def test_tau_method(method, bc, N, bc_val):
 
         A = D - Id
         A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
-        rhs = np.append(np.zeros(N - 1), [bc_val])
 
         sol_hat = sp.linalg.spsolve(A, rhs)
+
+    elif method == 'D2U':
+        if bc == 0:
+            return None
+
+        U2T = cheby.get_conv('U2T')
+        T2U = cheby.get_conv('T2U')
+        D2T = cheby.get_conv('D2T')
+
+        P = np.polynomial.Chebyshev(U2T @ coef)
+        D = cheby.get_T2U_differentiation_matrix()
+        Id = T2U
+
+        A = (D - Id) @ D2T
+        A[-1, :] = cheby.get_Dirichlet_BC_row_D(bc)
+
+        sol_hat = D2T @ sp.linalg.spsolve(A, rhs)
 
     else:
         raise NotImplementedError
@@ -214,4 +236,4 @@ def test_tau_method(method, bc, N, bc_val):
 
 
 if __name__ == '__main__':
-    test_tau_method('T2U', +1.0, N=3, bc_val=3.0)
+    test_tau_method('D2U', -1.0, N=4, bc_val=3.0)
