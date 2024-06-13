@@ -120,13 +120,15 @@ class Heat1DChebychev(ptype):
 
         # apply boundary conditions
         if self.mode == 'D2U':
-            _A[self.nvars - 1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_D(-1)
-            _A[-1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_D(1)
+            bc_left = self.cheby.get_Dirichlet_BC_row_D(-1)
+            bc_right = self.cheby.get_Dirichlet_BC_row_D(1)
         elif self.mode == 'T2U':
-            _A[self.nvars - 1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(-1)
-            _A[-1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(1)
+            bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
+            bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
         else:
             raise NotADirectoryError
+        _A[self.nvars - 1, : self.nvars] = bc_left
+        _A[-1, : self.nvars] = bc_right
 
         _rhs[self.nvars - 1] = self.a
 
