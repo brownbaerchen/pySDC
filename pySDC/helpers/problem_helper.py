@@ -1,4 +1,5 @@
 import numpy as np
+import scipy
 from scipy.special import factorial
 import scipy.sparse as sp
 
@@ -271,9 +272,15 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
 
 
 class ChebychovHelper:
-    def __init__(self, N):
+    fft_lib = scipy.fft
+
+    def __init__(self, N, S=1, d=1):
         self.N = N
+        self.S = S
+        self.d = d
         self.cache = {}
+
+        self.norm = self.get_norm()
 
     def get_1dgrid(self):
         '''
@@ -286,7 +293,7 @@ class ChebychovHelper:
         '''
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
 
-    def get_conv(self, name):
+    def get_conv(self, name, N=None):
         '''
         Get conversion matrix between different kinds of polynomials. The supported kinds are
          - T: Chebychov polynomials of first kind
@@ -296,20 +303,28 @@ class ChebychovHelper:
         You get the desired matrix by choosing a name as ``A2B``. I.e. ``T2U`` for the conversion matrix from T to U.
         Once generates matrices are cached. So feel free to call the method as often as you like.
 
+        Args:
+         name (str): Conversion code, e.g. 'T2U'
+         N (int): Size of the matrix (optional)
+
         Returns:
             scipy.sparse: Sparse conversion matrix
         '''
-        if name in self.cache.keys():
+        if name in self.cache.keys() and not N:
             return self.cache[name]
+
+        N = N if N else self.N
 
         def get_forward_conv(name):
             if name == 'T2U':
-                mat = (sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')) / 2.0
+                mat = (sp.eye(N, format='csc') - sp.diags(np.ones(N - 2), offsets=+2, format='csc')) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
-                mat = sp.eye(self.N, format='csc') - sp.diags(np.ones(self.N - 2), offsets=+2, format='csc')
+                mat = sp.eye(N, format='csc') - sp.diags(np.ones(N - 2), offsets=+2, format='csc')
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
+            elif name[0] == name[-1]:
+                mat = sp.eye(self.N)
             else:
                 raise NotImplementedError(f'Don\'t have conversion matrix {name!r}')
             return mat
@@ -336,7 +351,7 @@ class ChebychovHelper:
         '''
         return sp.diags(np.arange(self.N - 1) + 1, offsets=1)
 
-    def get_T2T_differentiation_matrix(self, p):
+    def get_T2T_differentiation_matrix(self, p=1):
         '''
         This is adapted from the Dedalus paper. Keep in mind that the T2T differentiation matrix is dense. But you can
         compute any derivative by simply raising it to some power `p`.
@@ -360,3 +375,53 @@ class ChebychovHelper:
         norm = np.ones(self.N) / self.N
         norm[0] /= 2
         return norm
+
+    def dct(self, u):
+        if self.S == 1 and self.d == 1:
+            return self.fft_lib.dct(u) * self.norm
+        elif self.S > 1 and self.d == 1:
+            return self.fft_lib.dct(u, axis=1) * self.norm
+        else:
+            raise NotImplementedError
+
+    def idct(self, u):
+        if self.S == 1 and self.d == 1:
+            return self.fft_lib.idct(u / self.norm)
+        elif self.S > 1 and self.d == 1:
+            return self.fft_lib.idct(u / self.norm, axis=1)
+        else:
+            raise NotImplementedError
+
+    def get_Dirichlet_BC_row_T(self, x):
+        """
+        Get a row for generating Dirichlet BCs at x with T polynomials.
+        It returns the values of the T polynomials at x.
+
+        Args:
+            x (float): Position of the boundary condition
+
+        Returns:
+            np.ndarray: Row to put into a matrix
+        """
+        if x == -1:
+            return (-1) ** np.arange(self.N)
+        elif x == 1:
+            return np.ones(self.N)
+        elif x == 0:
+            n = (1 + (-1) ** np.arange(self.N)) / 2
+            n[2::4] *= -1
+            return n
+        else:
+            raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
+
+    # def get_Dirichlet_BC_row_U(self, x):
+    #     if x == -1:
+    #         n = np.arange(self.N)
+    #         return (-1)**n * (n + 1)
+    #     elif x == 1:
+    #         return np.arange(self.N) + 1
+    #     elif x == 0:
+    #         return self.get_Dirichlet_BC_row_T(x)
+    #         return n
+    #     else:
+    #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')

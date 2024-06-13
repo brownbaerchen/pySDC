@@ -7,7 +7,7 @@ def test_D2T_conversion_matrices(N):
     import numpy as np
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, 1)
 
     x = np.linspace(-1, 1, N)
     D2T = cheby.get_conv('D2T')
@@ -33,7 +33,7 @@ def test_T_U_conversion(N):
     from scipy.special import chebyt, chebyu
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, 1)
 
     T2U = cheby.get_conv('T2U')
     U2T = cheby.get_conv('U2T')
@@ -46,25 +46,47 @@ def test_T_U_conversion(N):
 
     u = eval_poly(chebyu, coeffs, x)
     t_from_u = eval_poly(chebyt, U2T @ coeffs, x)
+    t_from_u_r = eval_poly(chebyt, coeffs @ U2T.T, x)
 
     t = eval_poly(chebyt, coeffs, x)
     u_from_t = eval_poly(chebyu, T2U @ coeffs, x)
+    u_from_t_r = eval_poly(chebyu, coeffs @ T2U.T, x)
 
     assert np.allclose(u, t_from_u)
+    assert np.allclose(u, t_from_u_r)
     assert np.allclose(t, u_from_t)
+    assert np.allclose(t, u_from_t_r)
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('name', ['T2U', 'T2D', 'U2D'])
+@pytest.mark.parametrize('name', ['T2U', 'T2D', 'U2D', 'T2T'])
 def test_conversion_inverses(name):
     from pySDC.helpers.problem_helper import ChebychovHelper
     import numpy as np
 
     N = 8
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, 1)
     P = cheby.get_conv(name)
     Pinv = cheby.get_conv(name[::-1])
     assert np.allclose((P @ Pinv).toarray(), np.diag(np.ones(N)))
+
+
+@pytest.mark.bae
+@pytest.mark.parametrize('N', [4])
+@pytest.mark.parametrize('convs', [['D2T', 'T2U'], ['U2D', 'D2T'], ['T2U', 'U2D'], ['T2U', 'U2D', 'D2T']])
+def test_multi_conversion(N, convs):
+    from pySDC.helpers.problem_helper import ChebychovHelper
+    import numpy as np
+
+    N = 8
+    cheby = ChebychovHelper(N, 1)
+
+    full_conv = cheby.get_conv(f'{convs[0][0]}2{convs[-1][-1]}')
+    P = cheby.get_conv(convs[-1])
+    for i in range(1, len(convs)):
+        P = cheby.get_conv(convs[-i - 1]) @ P
+
+    assert np.allclose(P.toarray(), full_conv.toarray())
 
 
 @pytest.mark.base
@@ -75,7 +97,7 @@ def test_differentiation_matrix(N, variant):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, 1)
     x = np.cos(np.pi / N * (np.arange(N) + 0.5))
     coeffs = np.random.random(N)
     norm = cheby.get_norm()
@@ -95,13 +117,28 @@ def test_differentiation_matrix(N, variant):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('N', [4])
+def test_dct(N):
+    import scipy
+    import numpy as np
+    from pySDC.helpers.problem_helper import ChebychovHelper
+
+    cheby = ChebychovHelper(N)
+    u = np.random.random(N)
+    norm = cheby.get_norm()
+
+    assert np.allclose(scipy.fft.dct(u) * norm, cheby.dct(u))
+    assert np.allclose(scipy.fft.idct(u / norm), cheby.idct(u))
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
 def test_norm(N):
     from pySDC.helpers.problem_helper import ChebychovHelper
     import numpy as np
     import scipy
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, 1)
     coeffs = np.random.random(N)
     x = cheby.get_1dgrid()
     norm = cheby.get_norm()
@@ -114,5 +151,67 @@ def test_norm(N):
     assert np.allclose(coeffs, coeffs_dct)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('bc', [-1, 0, 1])
+@pytest.mark.parametrize('method', ['T2T', 'T2U'])
+@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('bc_val', [-99, 3.1415])
+def test_tau_method(method, bc, N, bc_val):
+    '''
+    solve u_x - u + tau P = 0, u(bc) = bc_val
+
+    We choose P = T_N or U_N. We replace the last row in the matrix with the boundary condition to get a
+    unique solution for the given resolution.
+
+    The test verifies that the solution satisfies the perturbed equation and the boundary condition.
+    '''
+    from pySDC.helpers.problem_helper import ChebychovHelper
+    import numpy as np
+    import scipy
+    import scipy.sparse as sp
+
+    cheby = ChebychovHelper(N, 1)
+    x = cheby.get_1dgrid()
+
+    coef = np.append(np.zeros(N - 1), [1])
+
+    if method == 'T2T':
+        P = np.polynomial.Chebyshev(coef)
+        D = cheby.get_T2T_differentiation_matrix()
+        Id = np.diag(np.ones(N))
+
+        A = D - Id
+        A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+        rhs = np.append(np.zeros(N - 1), [bc_val])
+
+        sol_hat = np.linalg.solve(A, rhs)
+
+    elif method == 'T2U':
+        T2U = cheby.get_conv('T2U')
+        U2T = cheby.get_conv('U2T')
+
+        P = np.polynomial.Chebyshev(U2T @ coef)
+        D = cheby.get_T2U_differentiation_matrix()
+        Id = T2U
+
+        A = D - Id
+        A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+        rhs = np.append(np.zeros(N - 1), [bc_val])
+
+        sol_hat = sp.linalg.spsolve(A, rhs)
+
+    else:
+        raise NotImplementedError
+
+    sol_poly = np.polynomial.Chebyshev(sol_hat)
+    d_sol_poly = sol_poly.deriv(1)
+    x = np.linspace(-1, 1, 100)
+
+    assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
+
+    tau = (d_sol_poly(x) - sol_poly(x)) / P(x)
+    assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
+
+
 if __name__ == '__main__':
-    test_conversion_inverses('T2D')
+    test_tau_method('T2U', +1.0, N=3, bc_val=3.0)
