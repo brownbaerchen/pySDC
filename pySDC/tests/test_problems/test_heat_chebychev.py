@@ -8,7 +8,7 @@ def test_heat1d_chebychev(plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 5
+    N = 2**5
     P = Heat1DChebychev(nvars=N, a=-2, b=3, poly_coeffs=[0, 0, 0, -1, 1], solver_type='gmres')
     cheby = ChebychovHelper(N)
 
@@ -24,12 +24,6 @@ def test_heat1d_chebychev(plot=False):
     backward[P.idu] = P._compute_derivative(backward[P.iu])
 
     deriv = P._compute_derivative(u0[P.idu])
-
-    # k=1
-    # source_term = np.sin(k * P.x * 2 * np.pi / L)
-    # sol_ex = P.solve_system(rhs=source_term
-    # u = spsolve(A, source_term - b)
-    # u_expect = (bc_right - bc_left) * x / L + bc_left - source_term / k**2
 
     if plot:
         import matplotlib.pyplot as plt
@@ -58,19 +52,9 @@ def test_heat1d_chebychev(plot=False):
     # ), 'The initial conditions don\'t have the first space derivative where it needs to be.'
 
     assert np.allclose(
-        u0, P.solve_system(u0, 1e-9, u0), atol=1e-7
+        u0[P.iu], P.solve_system(u0, 1e-9, u0)[P.iu], atol=1e-7
     ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
     assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
-
-
-# def test_condition_number:
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
-#     import scipy
-#     from pySDC.helpers.problem_helper import ChebychovHelper
-#
-#     N = 5
-#     P = Heat1DChebychev(nvars=N, a=-1, b=3, poly_coeffs=[0, 0, 1, -1, 1])
 
 
 @pytest.mark.base
