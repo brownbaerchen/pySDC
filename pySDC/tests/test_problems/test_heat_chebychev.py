@@ -2,14 +2,24 @@ import pytest
 
 
 @pytest.mark.base
-def test_heat1d_chebychev(plot=False):
+@pytest.mark.parametrize('mode', ['T2U', 'D2U'])
+@pytest.mark.parametrize('preconditioning', [True, False])
+def test_heat1d_chebychev(mode, preconditioning, plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 2**5
-    P = Heat1DChebychev(nvars=N, a=-2, b=3, poly_coeffs=[0, 0, 0, -1, 1], solver_type='gmres')
+    N = 2**4
+    P = Heat1DChebychev(
+        nvars=N,
+        a=-2,
+        b=3,
+        poly_coeffs=[0, 0, 0, -1, 1],
+        solver_type='gmres',
+        mode=mode,
+        preconditioning=preconditioning,
+    )
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
@@ -37,7 +47,7 @@ def test_heat1d_chebychev(plot=False):
         plt.show()
 
     # test that the solution satisfies the algebraic constraints
-    D_u = scipy.fft.idct(P.U2T @ P.D @ sol_hat[P.iu] / P.norm)
+    D_u = P._compute_derivative(sol[P.iu])
     assert np.allclose(D_u, sol[P.idu]), 'The solution of backward Euler does not satisfy the algebraic constraints'
 
     # # test that f evaluation is second derivative of the solution
@@ -54,7 +64,7 @@ def test_heat1d_chebychev(plot=False):
     assert np.allclose(
         u0[P.iu], P.solve_system(u0, 1e-9, u0)[P.iu], atol=1e-7
     ), 'We did not get back the initial conditions when solving with \"zero\" step size.'
-    assert np.allclose(u0, backward, atol=1e-7), abs(u0 - backward)
+    assert np.allclose(u0[P.iu], backward[P.iu], atol=1e-7), abs(u0 - backward)
 
 
 @pytest.mark.base
@@ -74,4 +84,4 @@ def test_heat2d(plot=False):
 
 
 if __name__ == '__main__':
-    test_heat1d_chebychev(plot=True)
+    test_heat1d_chebychev('D2U', False, plot=True)

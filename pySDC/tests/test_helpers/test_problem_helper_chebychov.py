@@ -214,10 +214,10 @@ def test_tau_method(method, bc, N, bc_val):
         D2T = cheby.get_conv('D2T')
 
         P = np.polynomial.Chebyshev(U2T @ coef)
-        D = cheby.get_T2U_differentiation_matrix()
-        Id = T2U
+        D = cheby.get_T2U_differentiation_matrix() @ D2T
+        Id = T2U @ D2T
 
-        A = (D - Id) @ D2T
+        A = D - Id
         A[-1, :] = cheby.get_Dirichlet_BC_row_D(bc)
 
         sol_hat = D2T @ sp.linalg.spsolve(A, rhs)

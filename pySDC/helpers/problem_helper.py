@@ -274,12 +274,13 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
 class ChebychovHelper:
     fft_lib = scipy.fft
 
-    def __init__(self, N, S=1, d=1):
+    def __init__(self, N, S=1, d=1, sparse_format='lil'):
         self.N = N
         self.S = S
         self.d = d
-        self.cache = {}
+        self.sparse_format = sparse_format
 
+        self.cache = {}
         self.norm = self.get_norm()
 
     def get_1dgrid(self):
@@ -317,14 +318,19 @@ class ChebychovHelper:
 
         def get_forward_conv(name):
             if name == 'T2U':
-                mat = (sp.eye(N, format='csc') - sp.diags(np.ones(N - 2), offsets=+2, format='csc')) / 2.0
+                mat = (
+                    sp.eye(N, format=self.sparse_format)
+                    - sp.diags(np.ones(N - 2), offsets=+2, format=self.sparse_format)
+                ) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
-                mat = sp.eye(N, format='csc') - sp.diags(np.ones(N - 2), offsets=+2, format='csc')
+                mat = sp.eye(N, format=self.sparse_format) - sp.diags(
+                    np.ones(N - 2), offsets=+2, format=self.sparse_format
+                )
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
             elif name[0] == name[-1]:
-                mat = sp.eye(self.N)
+                mat = sp.eye(self.N, format=self.sparse_format)
             else:
                 raise NotImplementedError(f'Don\'t have conversion matrix {name!r}')
             return mat
@@ -349,7 +355,7 @@ class ChebychovHelper:
         Returns:
             scipy.sparse: Sparse differentiation matrix
         '''
-        return sp.diags(np.arange(self.N - 1) + 1, offsets=1)
+        return sp.diags(np.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
 
     def get_T2T_differentiation_matrix(self, p=1):
         '''
@@ -376,18 +382,20 @@ class ChebychovHelper:
         norm[0] /= 2
         return norm
 
-    def dct(self, u):
-        if self.S == 1 and self.d == 1:
+    def dct(self, u, S=None):
+        S = S if S else self.S
+        if S == 1 and self.d == 1:
             return self.fft_lib.dct(u) * self.norm
-        elif self.S > 1 and self.d == 1:
+        elif S > 1 and self.d == 1:
             return self.fft_lib.dct(u, axis=1) * self.norm
         else:
             raise NotImplementedError
 
-    def idct(self, u):
-        if self.S == 1 and self.d == 1:
+    def idct(self, u, S=None):
+        S = S if S else self.S
+        if S == 1 and self.d == 1:
             return self.fft_lib.idct(u / self.norm)
-        elif self.S > 1 and self.d == 1:
+        elif S > 1 and self.d == 1:
             return self.fft_lib.idct(u / self.norm, axis=1)
         else:
             raise NotImplementedError
@@ -413,6 +421,18 @@ class ChebychovHelper:
             return n
         else:
             raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
+
+    def get_Dirichlet_BC_row_D(self, x):
+        res = np.zeros(self.N)
+        if x == -1:
+            res[0] = 1
+            res[1] = -1
+        elif x == 1:
+            res[0] = 1
+            res[1] = 1
+        else:
+            raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
+        return res
 
     # def get_Dirichlet_BC_row_U(self, x):
     #     if x == -1:

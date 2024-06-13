@@ -12,11 +12,25 @@ class Heat1DChebychev(ptype):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, a=0, b=0, poly_coeffs=None, solver_type='direct', lintol=1e-9):
-        self._makeAttributeAndRegister('nvars', 'a', 'b', 'solver_type', 'lintol', localVars=locals(), readOnly=True)
+    def __init__(
+        self,
+        nvars=128,
+        a=0,
+        b=0,
+        poly_coeffs=None,
+        solver_type='direct',
+        lintol=1e-9,
+        mode='D2U',
+        preconditioning=False,
+    ):
         self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        self.cheby = ChebychovHelper(N=nvars)
+        self.S = 2  # number of components in the solution
+        self.iu = 0  # index for solution
+        self.idu = 1  # index for first space derivative of solution
+
+        self.cheby = ChebychovHelper(N=nvars, S=self.S)
         self.T2D = self.cheby.get_conv('T2D')
         self.D2T = self.cheby.get_conv('D2T')
         self.T2U = self.cheby.get_conv('T2U')
@@ -24,9 +38,14 @@ class Heat1DChebychev(ptype):
         self.U2D = self.cheby.get_conv('U2D')
         self.D2U = self.cheby.get_conv('D2U')
 
-        S = 2  # number of components in the solution
-        self.iu = 0  # index for solution
-        self.idu = 1  # index for first space derivative of solution
+        if mode == 'T2U':
+            self.conv = self.cheby.get_conv('T2T')
+            self.conv_inv = self.cheby.get_conv('T2T')
+        elif mode == 'D2U':
+            self.conv = self.cheby.get_conv('D2T')
+            self.conv_inv = self.cheby.get_conv('T2D')
+        else:
+            raise NotADirectoryError
 
         # construct grid
         self.x = self.cheby.get_1dgrid()
@@ -34,24 +53,28 @@ class Heat1DChebychev(ptype):
 
         # setup operators between components going from T to U
         zero = sp.eye(self.nvars) * 0.0
-        Id = sp.eye(self.nvars) @ self.T2U
-        D = self.cheby.get_T2U_differentiation_matrix()
+        Id = sp.eye(self.nvars) @ self.T2U @ self.conv
+        D = self.cheby.get_T2U_differentiation_matrix() @ self.conv
 
         self.D = D
+        self.zero = zero
+        self.Id = Id
 
         # setup preconditioner to generate a banded matrix
-        n = np.arange(nvars)
-        perm = np.stack((n, n + nvars), axis=1).flatten()
-        Pl = sp.eye(S * nvars).toarray()
-        self.Pl = sp.csc_matrix(Pl[perm])
-        self.Pl = sp.eye(S * nvars)
+        if preconditioning:
+            Pl = np.diag(np.ones(self.S * nvars))
+            n = np.arange(nvars)
+            perm = np.stack((n, n + nvars), axis=1).flatten()
+            self.Pl = sp.csc_matrix(Pl[perm])
+        else:
+            self.Pl = sp.eye(self.S * nvars)
         self.Pr = sp.linalg.inv(self.Pl)
 
         # setup system matrices connecting the components
         self.L = sp.bmat([[zero, -D], [-D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
 
-        super().__init__(init=((S, nvars), None, np.dtype('float64')))
+        super().__init__(init=((self.S, nvars), None, np.dtype('float64')))
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
@@ -59,8 +82,8 @@ class Heat1DChebychev(ptype):
         return f
 
     def _compute_derivative(self, u):
-        u_hat = scipy.fft.dct(u) * self.norm
-        return scipy.fft.idct(self.U2T @ self.D @ u_hat / self.norm)
+        u_hat = self.cheby.dct(u, S=1)
+        return self.cheby.idct(self.U2T @ self.D @ self.conv_inv @ u_hat, S=1)
 
     def _apply_BCs(self, u_hat):
         u_D = self.T2D @ u_hat
@@ -88,30 +111,38 @@ class Heat1DChebychev(ptype):
         """
         sol = self.u_init
 
-        rhs_hat = self.cheby.dct(rhs).flatten()
-        # rhs_hat[self.iu][:] = self._apply_BCs(rhs_hat[self.iu])
+        rhs_hat = self.cheby.dct(rhs)
+        for i in range(self.S):
+            rhs_hat[i] = self.conv_inv @ rhs_hat[i]
 
         _A = self.M + factor * self.L
-        _rhs = self.Pl @ self.M @ rhs_hat.flatten()
+        _rhs = self.M @ rhs_hat.flatten()
 
         # apply boundary conditions
-        _A[self.nvars - 1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(-1)
+        if self.mode == 'D2U':
+            _A[self.nvars - 1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_D(-1)
+            _A[-1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_D(1)
+        elif self.mode == 'T2U':
+            _A[self.nvars - 1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(-1)
+            _A[-1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(1)
+        else:
+            raise NotADirectoryError
+
         _rhs[self.nvars - 1] = self.a
 
-        _A[-1, : self.nvars] = self.cheby.get_Dirichlet_BC_row_T(1)
         _A[-1, self.nvars + 1 :] = 0
         _rhs[-1] = self.b
 
         A = self.Pl @ (_A) @ self.Pr
+        _rhs = self.Pl @ _rhs
 
-        A_inv = sp.linalg.inv(A)
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(1, 3)
-        axs[0].imshow(np.log(abs(A.toarray())))
-        axs[1].imshow(np.log(abs(A_inv.toarray())))
-        axs[2].imshow(np.log(abs((A_inv @ A).toarray())))
-        plt.show()
+        # import matplotlib.pyplot as plt
+        # A_inv = sp.linalg.inv(A)
+        # fig, axs = plt.subplots(1, 3)
+        # axs[0].imshow(np.log(abs(A.toarray())))
+        # axs[1].imshow(np.log(abs(A_inv.toarray())))
+        # axs[2].imshow(np.log(abs((A_inv @ A).toarray())))
+        # plt.show()
 
         if self.solver_type == 'direct':
             res = sp.linalg.spsolve(A, _rhs)
@@ -121,6 +152,8 @@ class Heat1DChebychev(ptype):
             raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
 
         sol_hat = (self.Pr @ res).reshape(sol.shape)
+        for i in range(self.S):
+            sol_hat[i] = self.conv @ sol_hat[i]
         sol[:] = scipy.fft.idct(sol_hat / self.norm, axis=1)
         return sol
 
