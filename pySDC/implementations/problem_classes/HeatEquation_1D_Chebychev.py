@@ -21,6 +21,7 @@ class Heat1DChebychev(ptype):
         solver_type='direct',
         lintol=1e-9,
         mode='D2U',
+        nu=1.0,
         preconditioning=False,
     ):
         poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
@@ -43,11 +44,10 @@ class Heat1DChebychev(ptype):
             self.conv = self.cheby.get_conv('D2T')
             self.conv_inv = self.cheby.get_conv('T2D')
         else:
-            raise NotADirectoryError
+            raise NotImplementedError
 
         # construct grid
         self.x = self.cheby.get_1dgrid()
-        self.norm = self.cheby.get_norm()
 
         # setup operators between components going from T to U
         zero = sp.eye(self.nvars) * 0.0
@@ -69,14 +69,14 @@ class Heat1DChebychev(ptype):
         self.Pr = sp.linalg.inv(self.Pl)
 
         # setup system matrices connecting the components
-        self.L = sp.bmat([[zero, -D], [-D, Id]])
+        self.L = sp.bmat([[zero, -nu * D], [-D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
 
         super().__init__(init=((self.S, nvars), None, np.dtype('float64')))
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-        f[self.iu][:] = self._compute_derivative(u[self.idu])
+        f[self.iu][:] = self.nu * self._compute_derivative(u[self.idu])
         return f
 
     def _compute_derivative(self, u):
@@ -177,18 +177,61 @@ class Heat1DChebychev(ptype):
 
 
 class Heat2d(ptype):
-    def __init__(self, nx=32, nz=32):
-        super().__init__(init=((nx, nz), None, np.dtype('float64')))
+    dtype_u = mesh
+    dtype_f = mesh
 
-        self._makeAttributeAndRegister('nx', 'nz', localVars=locals(), readOnly=True)
+    def __init__(
+        self,
+        nx=32,
+        nz=32,
+    ):
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        self.S = 2  # number of components in the solution
+        self.iu = 0  # index for solution
+        self.idu = 1  # index for first space derivative of solution
+
+        super().__init__(init=((self.S, nx, nz), None, np.dtype('float64')))
+
+        self.cheby = ChebychovHelper(N=nz, S=self.S)
+        self.norm = self.cheby.get_norm()
+        self.T2U = self.cheby.get_conv('T2U')
+        self.T2D = self.cheby.get_conv('T2D')
+        self.D2T = self.cheby.get_conv('D2T')
+        self.U2T = self.cheby.get_conv('U2T')
 
         # generate grid
         self.x = 2 * np.pi / (nx + 1) * np.arange(nx)
-        self.z = np.cos(np.pi / nz * (np.arange(nz) + 0.5))
-        self.X, self.Z = np.meshgrid(self.x, self.z)
+        self.z = self.cheby.get_1dgrid()
+        self.Z, self.X = np.meshgrid(self.z, self.x)
+
+        # setup 1D operators between components going from T to U
+        zero_z = sp.eye(nz) * 0.0
+        Id_z = sp.eye(nz) @ self.T2U
+        D_z = self.cheby.get_T2U_differentiation_matrix()
 
         # setup Laplacian in x-direction
         k = np.fft.fftfreq(nx, 1.0 / nx)
+        D_x = sp.diags(-1j * k)
+
+        # setup 2D operators
+        self.D = sp.kron(sp.eye(nx), D_z) + sp.kron(D_x, sp.eye(nz))
+
+    def transform(self, u):
+        u_fft = np.fft.fft(u, axis=0)
+        u_hat = scipy.fft.dct(u_fft, axis=1) * self.norm
+        return u_hat
+
+    def itransform(self, u_hat):
+        u_fft = np.fft.ifft(u_hat, axis=0)
+        u = scipy.fft.idct(u_fft / self.norm, axis=1)
+        return u
 
     def u_exact(self, *args, **kwargs):
-        return np.sin(self.X) * np.cos(self.Z)
+        u = self.u_init
+        u[0][:] = np.sin(self.X) * np.cos(4 * self.Z)
+
+        u_hat = self.transform(u[0])
+        D_u_hat = self.D @ u_hat.flatten()
+        u[1][:] = self.itransform(D_u_hat.reshape(u_hat.shape))
+        return u

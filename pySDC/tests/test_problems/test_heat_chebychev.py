@@ -18,16 +18,17 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
         poly_coeffs=[0, 0, 0, -1, 1],
         solver_type='direct',
         mode=mode,
+        nu=1e-1,
         preconditioning=preconditioning,
     )
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
-    u_hat = scipy.fft.dct(u0, axis=1) * P.norm
+    u_hat = P.cheby.dct(u0)
 
     dt = 1e-1
     sol = P.solve_system(rhs=u0, factor=dt, u0=u0)
-    sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
+    sol_hat = P.cheby.dct(sol)
 
     # for computing forward Euler, we need to reevaluate the spatial derivative
     backward = sol - dt * P.eval_f(sol)
@@ -125,22 +126,23 @@ def test_SDC(plotting=False):
     assert np.allclose(uend[0], expect)
 
 
-# @pytest.mark.base
-# def test_heat2d(plot=False):
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
-#
-#     P = Heat2d()
-#
-#     u0 = P.u_exact()
-#
-#     if plot:
-#         import matplotlib.pyplot as plt
-#
-#         plt.pcolormesh(P.X, P.Z, u0)
-#         plt.show()
+@pytest.mark.base
+def test_heat2d(plot=False):
+    import numpy as np
+    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
+
+    P = Heat2d(nx=2**8, nz=2**7)
+
+    u0 = P.u_exact()
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axs = plt.subplots(1, 2)
+        axs[0].pcolormesh(P.X, P.Z, u0[0])
+        axs[1].pcolormesh(P.X, P.Z, u0[1])
+        plt.show()
 
 
 if __name__ == '__main__':
-    test_SDC(plotting=True)
-    # test_heat1d_chebychev('T2U', False, plot=True)
+    test_heat2d(plot=True)
