@@ -31,12 +31,10 @@ class Heat1DChebychev(ptype):
         self.idu = 1  # index for first space derivative of solution
 
         self.cheby = ChebychovHelper(N=nvars, S=self.S)
+        self.T2U = self.cheby.get_conv('T2U')
         self.T2D = self.cheby.get_conv('T2D')
         self.D2T = self.cheby.get_conv('D2T')
-        self.T2U = self.cheby.get_conv('T2U')
         self.U2T = self.cheby.get_conv('U2T')
-        self.U2D = self.cheby.get_conv('U2D')
-        self.D2U = self.cheby.get_conv('D2U')
 
         if mode == 'T2U':
             self.conv = self.cheby.get_conv('T2T')
@@ -156,7 +154,7 @@ class Heat1DChebychev(ptype):
         sol_hat = (self.Pr @ res).reshape(sol.shape)
         for i in range(self.S):
             sol_hat[i] = self.conv @ sol_hat[i]
-        sol[:] = scipy.fft.idct(sol_hat / self.norm, axis=1)
+        sol[:] = self.cheby.idct(sol_hat)
         return sol
 
     def u_exact(self, t=0):
@@ -174,7 +172,7 @@ class Heat1DChebychev(ptype):
         coeffs = self._apply_BCs(coeffs)
         me[self.iu][:] = np.polynomial.Chebyshev(coeffs)(self.x)
 
-        me[self.idu] = scipy.fft.idct(self.U2T @ self.D @ coeffs / self.norm)
+        me[self.idu] = self.cheby.idct(self.U2T @ self.D @ coeffs, S=1)
         return me
 
 
