@@ -490,6 +490,7 @@ class sweeper(object):
                 res[m] += L.tau[m]
             # use abs function from data type here
             res_norm.append(abs(res[m]))
+            # res_norm.append(abs((L.prob.M.toarray() @ res[m].flatten()).reshape(res[m].shape)))
 
         # find maximal residual over the nodes
         if L.params.residual_type == 'full_abs':

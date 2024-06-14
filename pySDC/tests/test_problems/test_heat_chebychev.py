@@ -10,13 +10,13 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 2**4
+    N = 2**6
     P = Heat1DChebychev(
         nvars=N,
         a=-2,
         b=3,
         poly_coeffs=[0, 0, 0, -1, 1],
-        solver_type='gmres',
+        solver_type='direct',
         mode=mode,
         preconditioning=preconditioning,
     )
@@ -26,7 +26,7 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
     u_hat = scipy.fft.dct(u0, axis=1) * P.norm
 
     dt = 1e-1
-    sol = P.solve_system(rhs=u0, factor=dt)
+    sol = P.solve_system(rhs=u0, factor=dt, u0=u0)
     sol_hat = scipy.fft.dct(sol, axis=1) * P.norm
 
     # for computing forward Euler, we need to reevaluate the spatial derivative
@@ -67,21 +67,80 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
     assert np.allclose(u0[P.iu], backward[P.iu], atol=1e-7), abs(u0 - backward)
 
 
-@pytest.mark.base
-def test_heat2d(plot=False):
+def test_SDC(plotting=False):
     import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
+    from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat1DChebychev
+    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 
-    P = Heat2d()
+    dt = 1
+    Tend = 10
 
-    u0 = P.u_exact()
+    level_params = {}
+    level_params['dt'] = dt
+    level_params['restol'] = 1e-9
 
-    if plot:
+    sweeper_params = {}
+    sweeper_params['quad_type'] = 'RADAU-RIGHT'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'IE'
+
+    problem_params = {'a': -9, 'b': 3, 'poly_coeffs': (0, 0, 0, -1, 1), 'nvars': 2**5, 'mode': 'D2U'}
+
+    step_params = {}
+    step_params['maxiter'] = 1
+
+    controller_params = {}
+    controller_params['logger_level'] = 15
+    controller_params['hook_class'] = []
+
+    description = {}
+    description['problem_class'] = Heat1DChebychev
+    description['problem_params'] = problem_params
+    description['sweeper_class'] = generic_implicit
+    description['sweeper_params'] = sweeper_params
+    description['level_params'] = level_params
+    description['step_params'] = step_params
+
+    controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+
+    # get initial values on finest level
+    P = controller.MS[0].levels[0].prob
+    uinit = P.u_exact()
+
+    # call main function to get things done...
+    uend, stats = controller.run(u0=uinit, t0=0.0, Tend=Tend)
+
+    a, b = problem_params['a'], problem_params['b']
+    expect = (b - a) / 2 * P.x + (b + a) / 2
+    if plotting:
         import matplotlib.pyplot as plt
 
-        plt.pcolormesh(P.X, P.Z, u0)
+        x = P.x
+        i = P.iu
+        plt.plot(x, uinit[i])
+        plt.plot(x, uend[i])
+        plt.plot(P.x, expect)
         plt.show()
+    assert np.allclose(uend[0], expect)
+
+
+# @pytest.mark.base
+# def test_heat2d(plot=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
+#
+#     P = Heat2d()
+#
+#     u0 = P.u_exact()
+#
+#     if plot:
+#         import matplotlib.pyplot as plt
+#
+#         plt.pcolormesh(P.X, P.Z, u0)
+#         plt.show()
 
 
 if __name__ == '__main__':
-    test_heat1d_chebychev('D2U', False, plot=True)
+    test_SDC(plotting=True)
+    # test_heat1d_chebychev('T2U', False, plot=True)

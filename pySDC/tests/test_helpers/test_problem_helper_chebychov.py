@@ -236,4 +236,4 @@ def test_tau_method(method, bc, N, bc_val):
 
 
 if __name__ == '__main__':
-    test_tau_method('D2U', -1.0, N=4, bc_val=3.0)
+    test_tau_method('D2U', -1.0, N=2**10, bc_val=3.0)

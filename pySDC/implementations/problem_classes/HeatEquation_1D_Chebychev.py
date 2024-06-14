@@ -23,7 +23,7 @@ class Heat1DChebychev(ptype):
         mode='D2U',
         preconditioning=False,
     ):
-        self.poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
+        poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         self.S = 2  # number of components in the solution
@@ -91,7 +91,7 @@ class Heat1DChebychev(ptype):
         u_D[1] = (self.b - self.a) / 2
         return self.D2T @ u_D
 
-    def solve_system(self, rhs, factor, *args, **kwargs):
+    def solve_system(self, rhs, factor, u0, *args, **kwargs):
         r"""
         Simple linear solver for :math:`(I-factor\cdot A)\vec{u}=\vec{rhs}`.
 
@@ -149,7 +149,7 @@ class Heat1DChebychev(ptype):
         if self.solver_type == 'direct':
             res = sp.linalg.spsolve(A, _rhs)
         elif self.solver_type == 'gmres':
-            res, _ = sp.linalg.gmres(A, _rhs, tol=self.lintol)
+            res, _ = sp.linalg.gmres(A, _rhs, tol=self.lintol, u0=u0)
         else:
             raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
 
