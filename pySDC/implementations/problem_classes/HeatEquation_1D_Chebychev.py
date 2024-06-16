@@ -72,6 +72,23 @@ class Heat1DChebychev(ptype):
         self.L = sp.bmat([[zero, -nu * D], [-D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
 
+        # prepare BCs
+        if self.mode == 'D2U':
+            bc_left = self.cheby.get_Dirichlet_BC_row_D(-1)
+            bc_right = self.cheby.get_Dirichlet_BC_row_D(1)
+        elif self.mode == 'T2U':
+            bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
+            bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
+        else:
+            raise NotADirectoryError
+        BC = (self.M * 0).tolil()
+        BC[self.nvars - 1, : self.nvars] = bc_left
+        BC[-1, : self.nvars] = bc_right
+
+        self.BC_mask = BC != 0
+        self.BCs = BC[self.BC_mask]
+        BC[-1, self.nvars + 1 :] = 0  # not sure if we need this
+
         super().__init__(init=((self.S, nvars), None, np.dtype('float64')))
 
     def eval_f(self, u, *args, **kwargs):
@@ -118,20 +135,9 @@ class Heat1DChebychev(ptype):
         _rhs = self.M @ rhs_hat.flatten()
 
         # apply boundary conditions
-        if self.mode == 'D2U':
-            bc_left = self.cheby.get_Dirichlet_BC_row_D(-1)
-            bc_right = self.cheby.get_Dirichlet_BC_row_D(1)
-        elif self.mode == 'T2U':
-            bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
-            bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
-        else:
-            raise NotADirectoryError
-        _A[self.nvars - 1, : self.nvars] = bc_left
-        _A[-1, : self.nvars] = bc_right
-
+        _A[self.BC_mask] = self.BCs
+        # _A[-1, self.nvars + 1 :] = 0  # not sure if we need this
         _rhs[self.nvars - 1] = self.a
-
-        _A[-1, self.nvars + 1 :] = 0
         _rhs[-1] = self.b
 
         A = self.Pl @ (_A) @ self.Pr
@@ -346,7 +352,7 @@ class AdvectionDiffusion(ptype):
         # self.U2T = self.cheby.get_conv('U2T')
 
         self.fft = FFTHelper(N=nx)
-        self.cheby = FFTHelper(N=nz)
+        self.cheby = ChebychovHelper(N=nz, mode='T2U')
 
         # generate grid
         self.x = self.fft.get_1dgrid()
@@ -366,9 +372,30 @@ class AdvectionDiffusion(ptype):
         # self.O =  sp.kron(self.c * self.Ix, self.Iz)
         zero = sp.kron(self.Ix, self.Iz) * 0
         Id = sp.kron(self.Ix, self.Iz)
+        self.U2T = sp.kron(self.Ix, self.cheby.get_conv('U2T'))
+
+        print(self.D.toarray())
 
         self.L = sp.bmat([[zero, self.O], [-self.D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
+
+        # apply boundary conditions
+        bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
+        bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
+
+        BCza = (self.Dz * 0).tolil()
+        BCza[-1, :] = bc_left
+        BCzb = (self.Dz * 0).tolil()
+        BCzb[-1, :] = bc_right
+        # BCz[self.nz - 1, : self.nz] = bc_left
+        # BCz[-1, : self.nz] = bc_right
+        _BCa = sp.kron(self.Ix, BCza, format='lil')
+        _BCb = sp.kron(self.Ix, BCzb, format='lil')
+        BC = sp.bmat([[_BCa, zero], [_BCb, zero]]).tolil()
+        print(BC.toarray())
+
+        self.bc_mask = BC != 0
+        self.BCs = BC[self.bc_mask]
 
     def transform(self, u):
         _u_hat = self.fft.transform(u, axis=-2)
@@ -383,28 +410,23 @@ class AdvectionDiffusion(ptype):
     def _compute_derivative(self, u):
         assert u.ndim == 2, u.shape
         u_hat = self.transform(u)
-        D_u_hat = self.D @ u_hat.flatten()
+        D_u_hat = self.U2T @ self.D @ u_hat.flatten()
         return self.itransform(D_u_hat.reshape(u_hat.shape))
 
     def u_exact(self, *args, **kwargs):
         u = self.u_init
-        u[0][:] = np.sin(self.X) * np.sin(self.Z)
+        u[0][:] = np.sin(self.X) + np.sin(self.Z * np.pi) + (self.b - self.a) / 2 * self.Z + (self.b + self.a) / 2.0
+        # u[0][:] = np.sin(self.Z * np.pi)
+        # u[0][:] = self.Z**5 / 5
         # u[0][:] = np.exp(-(self.X-np.pi)**2 - (np.pi * self.Z)**2)
         u[1][:] = self._compute_derivative(u[0])
         return u
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-
-        u_hat = self.transform(u[self.iu])
-        D_u_hat = self.c * sp.kron(self.Dx, self.Iz) @ u_hat.flatten()
-        D_u = self.itransform(D_u_hat.reshape(u_hat.shape))
-
-        du_hat = self.transform(u[self.idu])
-        D_Du_hat = self.nu * sp.kron(self.Ix, self.Dz) @ du_hat.flatten()
-        D_Du = self.itransform(D_Du_hat.reshape(du_hat.shape))
-
-        f[self.iu][:] = D_u + D_Du
+        u_hat = self.transform(u[0])
+        D_u_hat = self.O @ u_hat.flatten()
+        f[:] = self.itransform(D_u_hat.reshape(u_hat.shape))
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
@@ -429,39 +451,19 @@ class AdvectionDiffusion(ptype):
 
         rhs_hat = self.transform(rhs)
 
-        # apply boundary conditions
-        # bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
-        # bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
-
-        # Az00 = self.Iz.copy()
-        # Az00[-1] = bc_left
-
-        # Az01 = -factor * self.nu * self.Dz
-
-        # Az10 = -factor * self.Dz
-        # Az10[-1] = bc_right
-
-        # Az11 = factor * self.Iz
-
-        # Az = sp.bmat([[Az00, Az10], [Az10, Az11]])
-
-        # Ax00 = self.Ix.copy()
-        # Ax01 = -factor * self.c
-        # Ax10 = -factor * self.Dx
-        # Ax11 = factor * self.Ix
-
-        # Ax = sp.bmat([[Ax00, Ax10], [Ax10, Ax11]])
-        # print(Ax.toarray(), factor)
-
-        # # A = sp.kron(self.Ix, Az) + sp.kron(Ax, self.Iz)
-        # A = sp.kron(Ax, self.Iz)
-
         A = self.M + factor * self.L
         _rhs = self.M @ rhs_hat.flatten()
-        # _rhs[self.nz-1:self.nx*self.nz:self.nz] = self.a
-        # _rhs[(self.nx + 1)*self.nz-1::self.nz] = self.b
 
-        res = sp.linalg.spsolve(A, _rhs)
+        A[self.bc_mask] = self.BCs
+
+        # _rhs[self.nvars - 1] = self.a
+        _rhs[self.nz - 1 : self.nx * self.nz : self.nz] = self.a
+        _rhs[(self.nx + 1) * self.nz - 1 :: self.nz] = self.b
+
+        print(A.toarray())
+        print(_rhs.real)
+
+        res = sp.linalg.spsolve(A.tocsc(), _rhs)
 
         sol_hat = res.reshape(sol.shape)
         sol[:] = self.itransform(sol_hat)

@@ -166,9 +166,9 @@ def test_AdvectionDiffusion(plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import AdvectionDiffusion
 
-    nx = 2**5
-    nz = 2**5
-    P = AdvectionDiffusion(nx=nx, nz=nz, a=0, b=0, nu=5.0, c=1.0e0)
+    nx = 2**0
+    nz = 2**2
+    P = AdvectionDiffusion(nx=nx, nz=nz, a=1, b=0.0, nu=0.0e-1, c=1.0e0)
 
     u0 = P.u_exact()
 
@@ -177,6 +177,7 @@ def test_AdvectionDiffusion(plot=False):
 
     dt = 1.0e-1
     un = P.solve_system(u0, dt)
+    f = P.eval_f(u0)
     # un = u0 + dt * P.eval_f(u0)
 
     if plot:
@@ -184,6 +185,7 @@ def test_AdvectionDiffusion(plot=False):
 
         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
         axs[0].pcolormesh(P.X, P.Z, u0[0])
+        # axs[1].pcolormesh(P.X, P.Z, f[0])
         # axs[1].pcolormesh(P.X, P.Z, u0[1])
         axs[1].pcolormesh(P.X, P.Z, un[0])
         idx = nx // 4
@@ -197,5 +199,5 @@ def test_AdvectionDiffusion(plot=False):
 
 
 if __name__ == '__main__':
-    # test_heat1d_chebychev('D2U', False)
-    test_AdvectionDiffusion(plot=True)
+    test_heat1d_chebychev('T2U', False, plot=True)
+    # test_AdvectionDiffusion(plot=True)
