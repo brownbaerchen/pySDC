@@ -80,6 +80,7 @@ class Heat1DChebychev(ptype):
         return f
 
     def _compute_derivative(self, u):
+        assert u.ndim == 1, u.shape
         u_hat = self.cheby.transform(u)
         return self.cheby.itransform(self.U2T @ self.D @ self.conv_inv @ u_hat)
 
@@ -214,7 +215,6 @@ class Heat2d(ptype):
         # setup Laplacian in x-direction
         k = np.fft.fftfreq(nx, 1.0 / nx)
         self.Dx = sp.diags(1j * k)
-        print(self.Dx.toarray(), k)
 
         # setup 2D operators
         self.Ix = sp.eye(nx, format='lil')
@@ -231,12 +231,12 @@ class Heat2d(ptype):
 
     def transform(self, u):
         u_fft = np.fft.fft(u, axis=0)
-        u_hat = scipy.fft.transform(u_fft, axis=1) * self.norm
+        u_hat = scipy.fft.dct(u_fft, axis=1) * self.norm
         return u_hat
 
     def itransform(self, u_hat):
         u_fft = np.fft.ifft(u_hat, axis=0)
-        u = scipy.fft.itransform(u_fft / self.norm, axis=1)
+        u = scipy.fft.idct(u_fft / self.norm, axis=1)
         return u.real
 
     def _compute_derivative(self, u):
@@ -300,7 +300,6 @@ class Heat2d(ptype):
         Ax11 = factor * self.Ix
 
         Ax = sp.bmat([[Ax00, Ax10], [Ax10, Ax11]])
-        print(Ax.toarray(), factor)
 
         # A = sp.kron(self.Ix, Az) + sp.kron(Ax, self.Iz)
         A = sp.kron(Ax, self.Iz)
@@ -339,12 +338,12 @@ class AdvectionDiffusion(ptype):
 
         super().__init__(init=((self.S, nx, nz), None, np.dtype('float64')))
 
-        self.cheby = ChebychovHelper(N=nz, S=self.S, sparse_format='lil')
-        self.norm = self.cheby.get_norm()
-        self.T2U = self.cheby.get_conv('T2U')
-        self.T2D = self.cheby.get_conv('T2D')
-        self.D2T = self.cheby.get_conv('D2T')
-        self.U2T = self.cheby.get_conv('U2T')
+        # self.cheby = ChebychovHelper(N=nz, S=self.S, sparse_format='lil')
+        # self.norm = self.cheby.get_norm()
+        # self.T2U = self.cheby.get_conv('T2U')
+        # self.T2D = self.cheby.get_conv('T2D')
+        # self.D2T = self.cheby.get_conv('D2T')
+        # self.U2T = self.cheby.get_conv('U2T')
 
         self.fft = FFTHelper(N=nx)
         self.cheby = FFTHelper(N=nz)
@@ -354,42 +353,42 @@ class AdvectionDiffusion(ptype):
         self.z = self.cheby.get_1dgrid()
         self.Z, self.X = np.meshgrid(self.z, self.x)
 
-        # setup 1D operators between components going from T to U
-        # self.Dz = self.cheby.get_T2U_differentiation_matrix()
+        # setup 1D operators
         self.Dz = self.cheby.get_differentiation_matrix()
         self.Dx = self.fft.get_differentiation_matrix()
-
-        # setup 2D operators
-        self.Ix = sp.eye(nx, format='lil')
-        self.Iz = sp.eye(nz)  # self.T2U
+        self.Ix = self.fft.get_Id()
+        self.Iz = self.cheby.get_Id()
 
         self.D = sp.kron(self.Ix, self.Dz) + sp.kron(self.Dx, self.Iz)
-        # self.D = sp.kron(self.Ix, self.Dz)
-        # self.D = sp.kron(self.Dx, self.Iz)
+        self.O = sp.kron(self.Ix, -self.nu * self.Dz) + sp.kron(-self.c * self.Ix, self.Iz)
+        # self.O = sp.kron(self.Ix, self.Dz)
+        # self.O = sp.kron(self.Dx, self.Iz)
+        # self.O =  sp.kron(self.c * self.Ix, self.Iz)
         zero = sp.kron(self.Ix, self.Iz) * 0
-        Id = sp.kron(self.Ix, self.Iz) + sp.kron(self.Iz, self.Ix)
+        Id = sp.kron(self.Ix, self.Iz)
 
-        self.L = sp.bmat([[zero, -nu * self.D], [-self.D, Id]])
+        self.L = sp.bmat([[zero, self.O], [-self.D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
 
     def transform(self, u):
-        u_fft = np.fft.fft(u, axis=0)
-        u_hat = scipy.fft.transform(u_fft, axis=1) * self.norm
+        _u_hat = self.fft.transform(u, axis=-2)
+        u_hat = self.cheby.transform(_u_hat, axis=-1)
         return u_hat
 
     def itransform(self, u_hat):
-        u_fft = np.fft.ifft(u_hat, axis=0)
-        u = scipy.fft.itransform(u_fft / self.norm, axis=1)
+        _u = self.fft.itransform(u_hat, axis=-2)
+        u = self.cheby.itransform(_u, axis=-1)
         return u.real
 
     def _compute_derivative(self, u):
+        assert u.ndim == 2, u.shape
         u_hat = self.transform(u)
         D_u_hat = self.D @ u_hat.flatten()
         return self.itransform(D_u_hat.reshape(u_hat.shape))
 
     def u_exact(self, *args, **kwargs):
         u = self.u_init
-        u[0][:] = np.sin(self.X)  # * np.sin(self.Z)
+        u[0][:] = np.sin(self.X) * np.sin(self.Z)
         # u[0][:] = np.exp(-(self.X-np.pi)**2 - (np.pi * self.Z)**2)
         u[1][:] = self._compute_derivative(u[0])
         return u

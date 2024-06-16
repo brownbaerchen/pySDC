@@ -1,7 +1,6 @@
 import numpy as np
 import scipy
 from scipy.special import factorial
-import scipy.sparse as sp
 
 
 def get_steps(derivative, order, stencil_type):
@@ -271,16 +270,31 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
     return dx, xvalues
 
 
-class ChebychovHelper:
+class SpectralHelper:
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
 
-    def __init__(self, N, S=1, d=1, mode='T2U', sparse_format='lil'):
+    def __init__(self, N, sparse_format='lil'):
         self.N = N
+        self.sparse_format = sparse_format
+
+    def get_Id(self):
+        raise NotImplementedError
+
+    def get_zero(self):
+        return 0 * self.get_Id()
+
+    def get_differentiation_matrix(self):
+        raise NotImplementedError()
+
+
+class ChebychovHelper(SpectralHelper):
+
+    def __init__(self, *args, S=1, d=1, mode='T2U', **kwargs):
+        super().__init__(*args, **kwargs)
         self.S = S
         self.d = d
         self.mode = mode
-        self.sparse_format = sparse_format
 
         self.cache = {}
         self.norm = self.get_norm()
@@ -300,9 +314,6 @@ class ChebychovHelper:
         if self.mode == 'D2U':
             return self.get_conv('T2U') @ self.get_conv('D2T')
         return self.get_conv(self.mode)
-
-    def get_zero(self):
-        return 0 * self.get_Id()
 
     def get_differentiation_matrix(self):
         if self.mode == 'T2T':
@@ -337,18 +348,18 @@ class ChebychovHelper:
         def get_forward_conv(name):
             if name == 'T2U':
                 mat = (
-                    sp.eye(N, format=self.sparse_format)
-                    - sp.diags(np.ones(N - 2), offsets=+2, format=self.sparse_format)
+                    self.sparse_lib.eye(N, format=self.sparse_format)
+                    - self.sparse_lib.diags(np.ones(N - 2), offsets=+2, format=self.sparse_format)
                 ) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
-                mat = sp.eye(N, format=self.sparse_format) - sp.diags(
+                mat = self.sparse_lib.eye(N, format=self.sparse_format) - self.sparse_lib.diags(
                     np.ones(N - 2), offsets=+2, format=self.sparse_format
                 )
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
             elif name[0] == name[-1]:
-                mat = sp.eye(self.N, format=self.sparse_format)
+                mat = self.sparse_lib.eye(self.N, format=self.sparse_format)
             else:
                 raise NotImplementedError(f'Don\'t have conversion matrix {name!r}')
             return mat
@@ -358,7 +369,7 @@ class ChebychovHelper:
         except NotImplementedError as E:
             try:
                 fwd = get_forward_conv(name[::-1])
-                mat = sp.linalg.inv(fwd)
+                mat = self.sparse_lib.linalg.inv(fwd)
             except NotImplementedError:
                 raise E
 
@@ -373,7 +384,7 @@ class ChebychovHelper:
         Returns:
             scipy.sparse: Sparse differentiation matrix
         '''
-        return sp.diags(np.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
+        return self.sparse_lib.diags(np.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
 
     def get_T2T_differentiation_matrix(self, p=1):
         '''
@@ -453,9 +464,7 @@ class ChebychovHelper:
     #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
 
 
-class FFTHelper:
-    def __init__(self, N):
-        self.N = N
+class FFTHelper(SpectralHelper):
 
     def get_1dgrid(self, x0=0):
         dx = 2 * np.pi / self.N
@@ -463,4 +472,13 @@ class FFTHelper:
 
     def get_differentiation_matrix(self):
         k = np.fft.fftfreq(self.N, 1.0 / self.N)
-        return sp.diags(1j * k)
+        return self.sparse_lib.diags(1j * k)
+
+    def get_Id(self):
+        return self.sparse_lib.eye(self.N, format=self.sparse_format)
+
+    def transform(self, u, axis=-1):
+        return self.fft_lib.fft(u, axis=axis)
+
+    def itransform(self, u, axis=-1):
+        return self.fft_lib.ifft(u, axis=axis)

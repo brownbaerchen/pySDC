@@ -126,76 +126,76 @@ def test_SDC(plotting=False):
     assert np.allclose(uend[0], expect)
 
 
-# @pytest.mark.base
-# def test_heat2d(plot=False):
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
-#
-#     nx = 2**5
-#     nz = 2**6
-#     P = Heat2d(nx=nx, nz=nz, a=-1, b=2)
-#
-#     u0 = P.u_exact()
-#
-#     u0_hat = P.transform(u0)
-#     assert np.allclose(u0, P.itransform(u0_hat))
-#
-#     dt = 3.e-2
-#     un = P.solve_system(u0, dt)
-#     un = u0 + dt * P.eval_f(u0)
-#
-#     if plot:
-#         import matplotlib.pyplot as plt
-#
-#         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-#         axs[0].pcolormesh(P.X, P.Z, u0[0])
-#         axs[1].pcolormesh(P.X, P.Z, un[0])
-#         idx = nx // 2
-#         print(u0.shape)
-#         axs[2].plot(P.Z[idx], u0[0][idx])
-#         axs[2].plot(P.Z[idx], un[0][idx])
-#
-#         idx = nz // 2
-#         axs[3].plot(P.X[:, idx], u0[0][:, idx])
-#         axs[3].plot(P.X[:, idx], un[0][:, idx])
-#         plt.show()
-#
-# @pytest.mark.base
-# def test_AdvectionDiffusion(plot=False):
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import AdvectionDiffusion
-#
-#     nx = 2**5
-#     nz = 2**1
-#     P = AdvectionDiffusion(nx=nx, nz=nz, a=-1, b=2, nu=0., c=1.)
-#
-#     u0 = P.u_exact()
-#
-#     u0_hat = P.transform(u0)
-#     assert np.allclose(u0, P.itransform(u0_hat))
-#
-#     dt = 1.e-1
-#     un = P.solve_system(u0, dt)
-#     # un = u0 + dt * P.eval_f(u0)
-#
-#     if plot:
-#         import matplotlib.pyplot as plt
-#
-#         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-#         axs[0].pcolormesh(P.X, P.Z, u0[0])
-#         axs[1].pcolormesh(P.X, P.Z, u0[1])
-#         # axs[1].pcolormesh(P.X, P.Z, un[0])
-#         idx = nx // 2
-#         print(u0.shape)
-#         axs[2].plot(P.Z[idx], u0[0][idx])
-#         axs[2].plot(P.Z[idx], un[0][idx])
-#
-#         idx = nz // 2
-#         axs[3].plot(P.X[:, idx], u0[0][:, idx])
-#         axs[3].plot(P.X[:, idx], un[0][:, idx])
-#         plt.show()
+@pytest.mark.base
+def test_heat2d(plot=False):
+    import numpy as np
+    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
+
+    nx = 2**5
+    nz = 2**6
+    P = Heat2d(nx=nx, nz=nz, a=-1, b=2)
+
+    u0 = P.u_exact()
+
+    u0_hat = P.transform(u0)
+    assert np.allclose(u0, P.itransform(u0_hat))
+
+    dt = 3.0e-2
+    un = P.solve_system(u0, dt)
+    un = u0 + dt * P.eval_f(u0)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axs = plt.subplots(1, 4, figsize=(12, 3))
+        axs[0].pcolormesh(P.X, P.Z, u0[0])
+        axs[1].pcolormesh(P.X, P.Z, un[0])
+        idx = nx // 2
+        print(u0.shape)
+        axs[2].plot(P.Z[idx], u0[0][idx])
+        axs[2].plot(P.Z[idx], un[0][idx])
+
+        idx = nz // 2
+        axs[3].plot(P.X[:, idx], u0[0][:, idx])
+        axs[3].plot(P.X[:, idx], un[0][:, idx])
+        plt.show()
+
+
+@pytest.mark.base
+def test_AdvectionDiffusion(plot=False):
+    import numpy as np
+    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import AdvectionDiffusion
+
+    nx = 2**5
+    nz = 2**5
+    P = AdvectionDiffusion(nx=nx, nz=nz, a=0, b=0, nu=5.0, c=1.0e0)
+
+    u0 = P.u_exact()
+
+    u0_hat = P.transform(u0)
+    assert np.allclose(u0, P.itransform(u0_hat))
+
+    dt = 1.0e-1
+    un = P.solve_system(u0, dt)
+    # un = u0 + dt * P.eval_f(u0)
+
+    if plot:
+        import matplotlib.pyplot as plt
+
+        fig, axs = plt.subplots(1, 4, figsize=(12, 3))
+        axs[0].pcolormesh(P.X, P.Z, u0[0])
+        # axs[1].pcolormesh(P.X, P.Z, u0[1])
+        axs[1].pcolormesh(P.X, P.Z, un[0])
+        idx = nx // 4
+        axs[2].plot(P.Z[idx], u0[0][idx], marker='.')
+        axs[2].plot(P.Z[idx], un[0][idx], '--', marker='.')
+
+        idx = nz // 4
+        axs[3].plot(P.X[:, idx], u0[0][:, idx])
+        axs[3].plot(P.X[:, idx], un[0][:, idx], '--')
+        plt.show()
 
 
 if __name__ == '__main__':
-    test_heat1d_chebychev('D2U', False)
-    # test_AdvectionDiffusion(plot=True)
+    # test_heat1d_chebychev('D2U', False)
+    test_AdvectionDiffusion(plot=True)
