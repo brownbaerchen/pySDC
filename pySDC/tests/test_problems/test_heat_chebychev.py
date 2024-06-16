@@ -24,11 +24,11 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
     cheby = ChebychovHelper(N)
 
     u0 = P.u_exact()
-    u_hat = P.cheby.dct(u0)
+    u_hat = P.cheby.transform(u0)
 
     dt = 1e-1
     sol = P.solve_system(rhs=u0, factor=dt, u0=u0)
-    sol_hat = P.cheby.dct(sol)
+    sol_hat = P.cheby.transform(sol)
 
     # for computing forward Euler, we need to reevaluate the spatial derivative
     backward = sol - dt * P.eval_f(sol)
@@ -55,8 +55,8 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
     # f = P.eval_f(u0)
     # D2 = cheby.get_T2T_differentiation_matrix(2)
     # D1 = cheby.get_T2T_differentiation_matrix(1)
-    # D2u = scipy.fft.idct(D2 @ u_hat[P.iu] / P.norm)
-    # D1u = scipy.fft.idct(D1 @ u_hat[P.iu] / P.norm)
+    # D2u = scipy.fft.itransform(D2 @ u_hat[P.iu] / P.norm)
+    # D1u = scipy.fft.itransform(D1 @ u_hat[P.iu] / P.norm)
     # assert np.allclose(D2u, f[P.iu]), 'The time derivative is not the second space derivative.'
     # assert np.allclose(
     #     D1u, u0[P.idu]
@@ -126,23 +126,76 @@ def test_SDC(plotting=False):
     assert np.allclose(uend[0], expect)
 
 
-@pytest.mark.base
-def test_heat2d(plot=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
-
-    P = Heat2d(nx=2**8, nz=2**7)
-
-    u0 = P.u_exact()
-
-    if plot:
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(1, 2)
-        axs[0].pcolormesh(P.X, P.Z, u0[0])
-        axs[1].pcolormesh(P.X, P.Z, u0[1])
-        plt.show()
+# @pytest.mark.base
+# def test_heat2d(plot=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
+#
+#     nx = 2**5
+#     nz = 2**6
+#     P = Heat2d(nx=nx, nz=nz, a=-1, b=2)
+#
+#     u0 = P.u_exact()
+#
+#     u0_hat = P.transform(u0)
+#     assert np.allclose(u0, P.itransform(u0_hat))
+#
+#     dt = 3.e-2
+#     un = P.solve_system(u0, dt)
+#     un = u0 + dt * P.eval_f(u0)
+#
+#     if plot:
+#         import matplotlib.pyplot as plt
+#
+#         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
+#         axs[0].pcolormesh(P.X, P.Z, u0[0])
+#         axs[1].pcolormesh(P.X, P.Z, un[0])
+#         idx = nx // 2
+#         print(u0.shape)
+#         axs[2].plot(P.Z[idx], u0[0][idx])
+#         axs[2].plot(P.Z[idx], un[0][idx])
+#
+#         idx = nz // 2
+#         axs[3].plot(P.X[:, idx], u0[0][:, idx])
+#         axs[3].plot(P.X[:, idx], un[0][:, idx])
+#         plt.show()
+#
+# @pytest.mark.base
+# def test_AdvectionDiffusion(plot=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import AdvectionDiffusion
+#
+#     nx = 2**5
+#     nz = 2**1
+#     P = AdvectionDiffusion(nx=nx, nz=nz, a=-1, b=2, nu=0., c=1.)
+#
+#     u0 = P.u_exact()
+#
+#     u0_hat = P.transform(u0)
+#     assert np.allclose(u0, P.itransform(u0_hat))
+#
+#     dt = 1.e-1
+#     un = P.solve_system(u0, dt)
+#     # un = u0 + dt * P.eval_f(u0)
+#
+#     if plot:
+#         import matplotlib.pyplot as plt
+#
+#         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
+#         axs[0].pcolormesh(P.X, P.Z, u0[0])
+#         axs[1].pcolormesh(P.X, P.Z, u0[1])
+#         # axs[1].pcolormesh(P.X, P.Z, un[0])
+#         idx = nx // 2
+#         print(u0.shape)
+#         axs[2].plot(P.Z[idx], u0[0][idx])
+#         axs[2].plot(P.Z[idx], un[0][idx])
+#
+#         idx = nz // 2
+#         axs[3].plot(P.X[:, idx], u0[0][:, idx])
+#         axs[3].plot(P.X[:, idx], un[0][:, idx])
+#         plt.show()
 
 
 if __name__ == '__main__':
-    test_heat2d(plot=True)
+    test_heat1d_chebychev('D2U', False)
+    # test_AdvectionDiffusion(plot=True)

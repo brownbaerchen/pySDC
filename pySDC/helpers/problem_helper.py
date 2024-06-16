@@ -273,11 +273,13 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
 
 class ChebychovHelper:
     fft_lib = scipy.fft
+    sparse_lib = scipy.sparse
 
-    def __init__(self, N, S=1, d=1, sparse_format='lil'):
+    def __init__(self, N, S=1, d=1, mode='T2U', sparse_format='lil'):
         self.N = N
         self.S = S
         self.d = d
+        self.mode = mode
         self.sparse_format = sparse_format
 
         self.cache = {}
@@ -293,6 +295,22 @@ class ChebychovHelper:
             numpy.ndarray: 1D grid
         '''
         return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
+
+    def get_Id(self):
+        if self.mode == 'D2U':
+            return self.get_conv('T2U') @ self.get_conv('D2T')
+        return self.get_conv(self.mode)
+
+    def get_zero(self):
+        return 0 * self.get_Id()
+
+    def get_differentiation_matrix(self):
+        if self.mode == 'T2T':
+            return self.get_T2T_differentiation_matrix()
+        elif self.mode == 'T2U':
+            return self.get_T2U_differentiation_matrix()
+        elif self.mode == 'D2U':
+            return self.get_T2U_differentiation_matrix() @ self.get_conv('D2T')
 
     def get_conv(self, name, N=None):
         '''
@@ -382,23 +400,11 @@ class ChebychovHelper:
         norm[0] /= 2
         return norm
 
-    def dct(self, u, S=None):
-        S = S if S else self.S
-        if S == 1 and self.d == 1:
-            return self.fft_lib.dct(u) * self.norm
-        elif S > 1 and self.d == 1:
-            return self.fft_lib.dct(u, axis=1) * self.norm
-        else:
-            raise NotImplementedError
+    def transform(self, u, axis=-1):
+        return self.fft_lib.dct(u, axis=axis) * self.norm
 
-    def idct(self, u, S=None):
-        S = S if S else self.S
-        if S == 1 and self.d == 1:
-            return self.fft_lib.idct(u / self.norm)
-        elif S > 1 and self.d == 1:
-            return self.fft_lib.idct(u / self.norm, axis=1)
-        else:
-            raise NotImplementedError
+    def itransform(self, u, axis=-1):
+        return self.fft_lib.idct(u / self.norm, axis=axis)
 
     def get_Dirichlet_BC_row_T(self, x):
         """
@@ -445,3 +451,16 @@ class ChebychovHelper:
     #         return n
     #     else:
     #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
+
+
+class FFTHelper:
+    def __init__(self, N):
+        self.N = N
+
+    def get_1dgrid(self, x0=0):
+        dx = 2 * np.pi / self.N
+        return np.arange(self.N) * dx
+
+    def get_differentiation_matrix(self):
+        k = np.fft.fftfreq(self.N, 1.0 / self.N)
+        return sp.diags(1j * k)
