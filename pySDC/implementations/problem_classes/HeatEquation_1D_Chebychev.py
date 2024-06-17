@@ -131,7 +131,7 @@ class Heat1DChebychev(ptype):
         for i in range(self.S):
             rhs_hat[i] = self.conv_inv @ rhs_hat[i]
 
-        _A = self.M + factor * self.L
+        _A = (self.M + factor * self.L).tolil()
         _rhs = self.M @ rhs_hat.flatten()
 
         # apply boundary conditions
@@ -152,9 +152,9 @@ class Heat1DChebychev(ptype):
         # plt.show()
 
         if self.solver_type == 'direct':
-            res = sp.linalg.spsolve(A, _rhs)
+            res = sp.linalg.spsolve(A.tocsc(), _rhs)
         elif self.solver_type == 'gmres':
-            res, _ = sp.linalg.gmres(A, _rhs, tol=self.lintol, u0=u0)
+            res, _ = sp.linalg.gmres(A.tocsc(), _rhs, tol=self.lintol, u0=u0)
         else:
             raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
 
@@ -324,7 +324,7 @@ class Heat2d(ptype):
         # me2[(self.nx + 1)*self.nz-1::self.nz] = self.b
         # print(me2)
 
-        res = sp.linalg.spsolve(A, _rhs)
+        res = sp.linalg.spsolve(A.tocsc(), _rhs)
 
         sol_hat = res.reshape(sol.shape)
         sol[:] = self.itransform(sol_hat)
@@ -343,13 +343,6 @@ class AdvectionDiffusion(ptype):
         self.idu = 1  # index for first space derivative of solution
 
         super().__init__(init=((self.S, nx, nz), None, np.dtype('float64')))
-
-        # self.cheby = ChebychovHelper(N=nz, S=self.S, sparse_format='lil')
-        # self.norm = self.cheby.get_norm()
-        # self.T2U = self.cheby.get_conv('T2U')
-        # self.T2D = self.cheby.get_conv('T2D')
-        # self.D2T = self.cheby.get_conv('D2T')
-        # self.U2T = self.cheby.get_conv('U2T')
 
         self.fft = FFTHelper(N=nx)
         self.cheby = ChebychovHelper(N=nz, mode='T2U')
@@ -374,8 +367,6 @@ class AdvectionDiffusion(ptype):
         Id = sp.kron(self.Ix, self.Iz)
         self.U2T = sp.kron(self.Ix, self.cheby.get_conv('U2T'))
 
-        print(self.D.toarray())
-
         self.L = sp.bmat([[zero, self.O], [-self.D, Id]])
         self.M = sp.bmat([[Id, zero], [zero, zero]])
 
@@ -383,12 +374,12 @@ class AdvectionDiffusion(ptype):
         bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
         bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
 
-        BCza = (self.Dz * 0).tolil()
-        BCza[-1, :] = bc_left
-        BCzb = (self.Dz * 0).tolil()
-        BCzb[-1, :] = bc_right
         # BCz[self.nz - 1, : self.nz] = bc_left
         # BCz[-1, : self.nz] = bc_right
+        BCza = (self.Dz * 0).tolil()
+        BCzb = (self.Dz * 0).tolil()
+        BCza[-1, :] = bc_left
+        BCzb[-1, :] = bc_right
         _BCa = sp.kron(self.Ix, BCza, format='lil')
         _BCb = sp.kron(self.Ix, BCzb, format='lil')
         BC = sp.bmat([[_BCa, zero], [_BCb, zero]]).tolil()
@@ -415,7 +406,7 @@ class AdvectionDiffusion(ptype):
 
     def u_exact(self, *args, **kwargs):
         u = self.u_init
-        u[0][:] = np.sin(self.X) + np.sin(self.Z * np.pi) + (self.b - self.a) / 2 * self.Z + (self.b + self.a) / 2.0
+        u[0][:] = np.sin(self.Z * np.pi) + (self.b - self.a) / 2 * self.Z + (self.b + self.a) / 2.0  # + np.sin(self.X)
         # u[0][:] = np.sin(self.Z * np.pi)
         # u[0][:] = self.Z**5 / 5
         # u[0][:] = np.exp(-(self.X-np.pi)**2 - (np.pi * self.Z)**2)
@@ -425,7 +416,7 @@ class AdvectionDiffusion(ptype):
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
         u_hat = self.transform(u[0])
-        D_u_hat = self.O @ u_hat.flatten()
+        D_u_hat = self.U2T @ self.O @ u_hat.flatten()
         f[:] = self.itransform(D_u_hat.reshape(u_hat.shape))
         return f
 
@@ -451,17 +442,19 @@ class AdvectionDiffusion(ptype):
 
         rhs_hat = self.transform(rhs)
 
-        A = self.M + factor * self.L
+        A = (self.M + factor * self.L).tolil()
         _rhs = self.M @ rhs_hat.flatten()
 
         A[self.bc_mask] = self.BCs
 
-        # _rhs[self.nvars - 1] = self.a
+        print(_rhs.real)
         _rhs[self.nz - 1 : self.nx * self.nz : self.nz] = self.a
+        # _rhs[1] = self.a
         _rhs[(self.nx + 1) * self.nz - 1 :: self.nz] = self.b
 
-        print(A.toarray())
+        print((A.toarray()).real)
         print(_rhs.real)
+        print(_rhs.reshape(rhs.shape).real)
 
         res = sp.linalg.spsolve(A.tocsc(), _rhs)
 

@@ -415,7 +415,10 @@ class ChebychovHelper(SpectralHelper):
         return self.fft_lib.dct(u, axis=axis) * self.norm
 
     def itransform(self, u, axis=-1):
+        assert self.norm.shape[0] == u.shape[axis]
+
         return self.fft_lib.idct(u / self.norm, axis=axis)
+        return self.fft_lib.idct(u / self.norm.reshape(u.shape), axis=axis)
 
     def get_Dirichlet_BC_row_T(self, x):
         """

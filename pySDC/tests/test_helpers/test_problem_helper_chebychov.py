@@ -7,7 +7,7 @@ def test_D2T_conversion_matrices(N):
     import numpy as np
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
 
     x = np.linspace(-1, 1, N)
     D2T = cheby.get_conv('D2T')
@@ -33,7 +33,7 @@ def test_T_U_conversion(N):
     from scipy.special import chebyt, chebyu
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
 
     T2U = cheby.get_conv('T2U')
     U2T = cheby.get_conv('U2T')
@@ -65,7 +65,7 @@ def test_conversion_inverses(name):
     import numpy as np
 
     N = 8
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
     P = cheby.get_conv(name)
     Pinv = cheby.get_conv(name[::-1])
     assert np.allclose((P @ Pinv).toarray(), np.diag(np.ones(N)))
@@ -79,7 +79,7 @@ def test_multi_conversion(N, convs):
     import numpy as np
 
     N = 8
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
 
     full_conv = cheby.get_conv(f'{convs[0][0]}2{convs[-1][-1]}')
     P = cheby.get_conv(convs[-1])
@@ -97,7 +97,7 @@ def test_differentiation_matrix(N, variant):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
     x = np.cos(np.pi / N * (np.arange(N) + 0.5))
     coeffs = np.random.random(N)
     norm = cheby.get_norm()
@@ -125,17 +125,24 @@ def test_differentiation_matrix(N, variant):
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4])
-def test_dct(N):
+@pytest.mark.parametrize('d', [1, 2, 3])
+def test_transform(N, d):
     import scipy
     import numpy as np
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
-    u = np.random.random(N)
+    u = np.random.random((d, N))
     norm = cheby.get_norm()
+    x = cheby.get_1dgrid()
 
-    assert np.allclose(scipy.fft.dct(u) * norm, cheby.dct(u))
-    assert np.allclose(scipy.fft.idct(u / norm), cheby.idct(u))
+    itransform = cheby.itransform(u, axis=-1)
+
+    assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axis=-1))
+    assert np.allclose(scipy.fft.idct(u / norm, axis=-1), itransform)
+    assert np.allclose(u.shape, itransform.shape)
+    for i in range(d):
+        assert np.allclose(np.polynomial.Chebyshev(u[i])(x), itransform[i])
 
 
 @pytest.mark.base
@@ -145,7 +152,7 @@ def test_norm(N):
     import numpy as np
     import scipy
 
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
     coeffs = np.random.random(N)
     x = cheby.get_1dgrid()
     norm = cheby.get_norm()
@@ -160,10 +167,10 @@ def test_norm(N):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
-@pytest.mark.parametrize('method', ['T2T', 'T2U', 'D2U'])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U', 'D2U'])
 @pytest.mark.parametrize('N', [4, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
-def test_tau_method(method, bc, N, bc_val):
+def test_tau_method(mode, bc, N, bc_val):
     '''
     solve u_x - u + tau P = 0, u(bc) = bc_val
 
@@ -176,13 +183,13 @@ def test_tau_method(method, bc, N, bc_val):
     import numpy as np
     import scipy.sparse as sp
 
-    cheby = ChebychovHelper(N, 1)
+    cheby = ChebychovHelper(N)
     x = cheby.get_1dgrid()
 
     coef = np.append(np.zeros(N - 1), [1])
     rhs = np.append(np.zeros(N - 1), [bc_val])
 
-    if method == 'T2T':
+    if mode == 'T2T':
         P = np.polynomial.Chebyshev(coef)
         D = cheby.get_T2T_differentiation_matrix()
         Id = np.diag(np.ones(N))
@@ -192,7 +199,11 @@ def test_tau_method(method, bc, N, bc_val):
 
         sol_hat = np.linalg.solve(A, rhs)
 
-    elif method == 'T2U':
+        print(A)
+        print(rhs)
+        print(sol_hat)
+
+    elif mode == 'T2U':
         T2U = cheby.get_conv('T2U')
         U2T = cheby.get_conv('U2T')
 
@@ -205,7 +216,7 @@ def test_tau_method(method, bc, N, bc_val):
 
         sol_hat = sp.linalg.spsolve(A, rhs)
 
-    elif method == 'D2U':
+    elif mode == 'D2U':
         if bc == 0:
             return None
 
@@ -235,5 +246,85 @@ def test_tau_method(method, bc, N, bc_val):
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('bc', [-1, 1])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('bc_val', [-2, 1.0])
+def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
+    '''
+    solve u_z - u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection problem.
+    We do FFT in x-direction and Chebychov in z-direction.
+    '''
+    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+    import numpy as np
+    import scipy.sparse as sp
+
+    cheby = ChebychovHelper(nz, mode=mode)
+    fft = FFTHelper(nx)
+
+    # generate grid
+    x = fft.get_1dgrid()
+    z = cheby.get_1dgrid()
+    Z, X = np.meshgrid(z, x)
+
+    # put BCs in right hand side
+    bcs = np.sin(bc_val * x)
+    rhs = np.zeros_like(X)
+    rhs[:, -1] = bcs
+    rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychov spectral space
+
+    # generate matrices
+    Dx = fft.get_differentiation_matrix()
+    Ix = fft.get_Id()
+    Dz = cheby.get_differentiation_matrix()
+    Iz = cheby.get_Id()
+    A = sp.kron(Ix, Dz) - sp.kron(Dx, Iz)
+
+    # put BCs in the system matrix
+    BCz = sp.eye(nz, format='lil') * 0
+    BCz[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+    BC = sp.kron(Ix, BCz, format='lil')
+    A[BC != 0] = BC[BC != 0]
+
+    # solve the system
+    sol_hat = (sp.linalg.spsolve(A, rhs_hat.flatten())).reshape(rhs.shape)
+
+    # transform back to real space
+    _sol = fft.itransform(sol_hat, axis=-2).real
+    sol = cheby.itransform(_sol, axis=-1)
+
+    # construct polynomials for testing
+    polys = [np.polynomial.Chebyshev(_sol[i, :]) for i in range(nx)]
+    d_polys = [me.deriv(1) for me in polys]
+    _z = np.linspace(-1, 1, 100)
+
+    if plotting:
+        import matplotlib.pyplot as plt
+
+        im = plt.pcolormesh(X, Z, sol)
+        plt.colorbar(im)
+        plt.xlabel('x')
+        plt.ylabel('t')
+        plt.show()
+
+    for i in range(nx):
+
+        assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
+
+        assert np.allclose(
+            polys[i](z), sol[i, :]
+        ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
+
+        # coef = np.append(np.zeros(nz - 1), [1])
+        # Pz = np.polynomial.Chebyshev(coef)
+        # tau = (d_polys[i](_z) - polys[i](_z)) / Pz(_z)
+        # plt.plot(_z, tau)
+        # plt.show()
+        # assert np.allclose(tau, tau[0]), f'Solution does not satisfy perturbed equation at x={x[i]}'
+
+
 if __name__ == '__main__':
-    test_tau_method('D2U', -1.0, N=2**10, bc_val=3.0)
+    # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
+    test_tau_method2D('T2U', -1.0, nx=2**9, nz=2**9, bc_val=4.0, plotting=True)
