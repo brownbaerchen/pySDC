@@ -16,7 +16,6 @@ def test_heat1d_chebychev(mode, preconditioning, plot=False):
         a=-2,
         b=3,
         poly_coeffs=[0, 0, 0, -1, 1],
-        solver_type='direct',
         mode=mode,
         nu=1e-1,
         preconditioning=preconditioning,
@@ -127,38 +126,56 @@ def test_SDC(plotting=False):
 
 
 @pytest.mark.base
-def test_heat2d(plot=False):
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+def test_heat2d(mode, nx, nz, plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
 
-    nx = 2**5
-    nz = 2**6
-    P = Heat2d(nx=nx, nz=nz, a=-1, b=2)
+    nx = 2**7
+    nz = 2**7
+    P = Heat2d(nx=nx, nz=nz, nu=1e-2, a=-1, b=2, bc_type='dirichlet', mode='T2U')
 
     u0 = P.u_exact()
 
     u0_hat = P.transform(u0)
     assert np.allclose(u0, P.itransform(u0_hat))
 
-    dt = 3.0e-2
+    dt = 3.0e-1
     un = P.solve_system(u0, dt)
-    un = u0 + dt * P.eval_f(u0)
+
+    # un[1] = P._compute_derivative(un[0])
+    # u02 = un - dt * P.eval_f(un)
+    # err = u0 - u02
+    # print(np.max(abs(err)))
+
+    # solve something akin to a Poisson problem
+    dtP = 1e9
+    uP = P.solve_system(u0 * 0, dtP)
+    uP_expect = (P.b - P.a) / 2 * P.Z + (P.b + P.a) / 2.0
 
     if plot:
         import matplotlib.pyplot as plt
 
         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-        axs[0].pcolormesh(P.X, P.Z, u0[0])
-        axs[1].pcolormesh(P.X, P.Z, un[0])
-        idx = nx // 2
-        print(u0.shape)
+        args = {'vmin': P.a * 1.2, 'vmax': P.b * 1.2}
+        axs[0].pcolormesh(P.X, P.Z, u0[0], **args)
+        axs[1].pcolormesh(P.X, P.Z, un[0], **args)
+        # axs[0].pcolormesh(P.X, P.Z, u02[0], **args)
+
+        idx = nx // 3
         axs[2].plot(P.Z[idx], u0[0][idx])
         axs[2].plot(P.Z[idx], un[0][idx])
+        axs[2].set_title('z-direction')
 
         idx = nz // 2
         axs[3].plot(P.X[:, idx], u0[0][:, idx])
         axs[3].plot(P.X[:, idx], un[0][:, idx])
+        axs[3].set_title('x-direction')
         plt.show()
+
+    assert np.allclose(uP[0], uP_expect, atol=1e3 / dtP), 'Got unexpected solution of Poisson problem!'
 
 
 @pytest.mark.base
@@ -200,4 +217,5 @@ def test_AdvectionDiffusion(plot=False):
 
 if __name__ == '__main__':
     # test_heat1d_chebychev('T2U', False, plot=True)
-    test_AdvectionDiffusion(plot=True)
+    test_heat2d(True)
+    # test_AdvectionDiffusion(plot=True)

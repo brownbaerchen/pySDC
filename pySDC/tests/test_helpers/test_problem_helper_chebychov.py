@@ -359,7 +359,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
     Iz = cheby.get_Id()
 
     # generate 2D matrices
-    D = sp.kron(Ix, Dz) - sp.kron(Dx, Iz)
+    D = sp.kron(Ix, Dz) + sp.kron(Dx, Iz)
     I = sp.kron(Ix, Iz)
     O = I * 0
 
@@ -397,7 +397,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
         im = plt.pcolormesh(X, Z, sol[0])
         plt.colorbar(im)
         plt.xlabel('x')
-        plt.ylabel('t')
+        plt.ylabel('z')
         plt.show()
 
     for i in range(nx):
@@ -412,4 +412,4 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
-    test_tau_method2D_diffusion('T2U', nx=2**2, nz=2**6, bc_val=4.0, plotting=True)
+    test_tau_method2D_diffusion('T2T', nx=2**7, nz=2**6, bc_val=4.0, plotting=True)

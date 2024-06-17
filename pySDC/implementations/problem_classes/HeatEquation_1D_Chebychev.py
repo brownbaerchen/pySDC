@@ -18,7 +18,6 @@ class Heat1DChebychev(ptype):
         a=0,
         b=0,
         poly_coeffs=None,
-        solver_type='direct',
         lintol=1e-9,
         mode='D2U',
         nu=1.0,
@@ -136,27 +135,13 @@ class Heat1DChebychev(ptype):
 
         # apply boundary conditions
         _A[self.BC_mask] = self.BCs
-        # _A[-1, self.nvars + 1 :] = 0  # not sure if we need this
         _rhs[self.nvars - 1] = self.a
         _rhs[-1] = self.b
 
         A = self.Pl @ (_A) @ self.Pr
         _rhs = self.Pl @ _rhs
 
-        # import matplotlib.pyplot as plt
-        # A_inv = sp.linalg.inv(A)
-        # fig, axs = plt.subplots(1, 3)
-        # axs[0].imshow(np.log(abs(A.toarray())))
-        # axs[1].imshow(np.log(abs(A_inv.toarray())))
-        # axs[2].imshow(np.log(abs((A_inv @ A).toarray())))
-        # plt.show()
-
-        if self.solver_type == 'direct':
-            res = sp.linalg.spsolve(A.tocsc(), _rhs)
-        elif self.solver_type == 'gmres':
-            res, _ = sp.linalg.gmres(A.tocsc(), _rhs, tol=self.lintol, u0=u0)
-        else:
-            raise NotImplementedError(f'Solver {self.solver_type!r} is not implemented')
+        res = sp.linalg.spsolve(A.tocsc(), _rhs)
 
         sol_hat = (self.Pr @ res).reshape(sol.shape)
         for i in range(self.S):
@@ -194,6 +179,8 @@ class Heat2d(ptype):
         nu=1.0,
         a=0.0,
         b=0.0,
+        mode='T2T',
+        bc_type='dirichlet',
     ):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
@@ -203,57 +190,75 @@ class Heat2d(ptype):
 
         super().__init__(init=((self.S, nx, nz), None, np.dtype('float64')))
 
-        self.cheby = ChebychovHelper(N=nz, S=self.S, sparse_format='lil')
-        self.norm = self.cheby.get_norm()
-        self.T2U = self.cheby.get_conv('T2U')
-        self.T2D = self.cheby.get_conv('T2D')
-        self.D2T = self.cheby.get_conv('D2T')
-        self.U2T = self.cheby.get_conv('U2T')
+        self.cheby = ChebychovHelper(nz, mode=mode)
+        self.fft = FFTHelper(nx)
 
         # generate grid
-        self.x = 2 * np.pi / (nx + 1) * np.arange(nx)
-        self.z = self.cheby.get_1dgrid()
-        self.Z, self.X = np.meshgrid(self.z, self.x)
+        x = self.fft.get_1dgrid()
+        z = self.cheby.get_1dgrid()
+        self.Z, self.X = np.meshgrid(z, x)
 
-        # setup 1D operators between components going from T to U
-        self.Dz = self.cheby.get_T2U_differentiation_matrix()
+        # prepare BCs
+        self.bc_lower = np.ones(nx) * a  # np.sin(x) + 1
+        self.bc_upper = np.ones(nx) * b  # 3 * np.exp(-((x - 3.6) ** 2)) + np.cos(x)
 
-        # setup Laplacian in x-direction
-        k = np.fft.fftfreq(nx, 1.0 / nx)
-        self.Dx = sp.diags(1j * k)
+        # generate 1D matrices
+        Dx = self.fft.get_differentiation_matrix()
+        Ix = self.fft.get_Id()
+        Dz = self.cheby.get_differentiation_matrix()
+        Iz = self.cheby.get_Id()
+        _Iz = sp.eye(nz)
+        T2U = self.cheby.get_conv(mode)
+        U2T = self.cheby.get_conv(mode[::-1])
 
-        # setup 2D operators
-        self.Ix = sp.eye(nx, format='lil')
-        self.Iz = self.T2U
+        # generate 2D matrices
+        D = sp.kron(Ix, Dz) + sp.kron(Dx, Iz)
+        Dnu = sp.kron(Ix, nu * Dz) + sp.kron(nu * Dx, Iz)
+        I = sp.kron(Ix, Iz)
+        O = I * 0
+        self.D = D
+        self.U2T = sp.kron(Ix, U2T)
+        self.T2U = sp.bmat([[sp.kron(Ix, T2U), O], [O, sp.kron(Ix, T2U)]])
 
-        self.D = sp.kron(self.Ix, self.Dz) + sp.kron(self.Dx, self.Iz)
-        # self.D = sp.kron(self.Ix, self.Dz)
-        # self.D = sp.kron(self.Dx, self.Iz)
-        zero = sp.kron(self.Ix, self.Iz) * 0
-        Id = sp.kron(self.Ix, self.Iz) + sp.kron(self.Iz, self.Ix)
+        # generate system matrix
+        self.L = sp.bmat([[O, -Dnu], [-D, I]])
+        self.M = sp.bmat([[I, O], [O, O]])
 
-        # self.L = sp.bmat([[zero, -nu * self.D], [-self.D, Id]])
-        self.M = sp.bmat([[Id, zero], [zero, zero]])
+        # generate BC matrices
+        BCa = sp.eye(nz, format='lil') * 0
+        BCa[-1, :] = self.cheby.get_Dirichlet_BC_row_T(-1)
+        BCa = sp.kron(Ix, BCa, format='lil')
+
+        BCb = sp.eye(nz, format='lil') * 0
+        BCb[-1, :] = self.cheby.get_Dirichlet_BC_row_T(1)
+        BCb = sp.kron(Ix, BCb, format='lil')
+        if bc_type == 'dirichlet':
+            self.BC = sp.bmat([[BCa, O], [BCb, O]], format='lil')
+        elif bc_type == 'neumann':
+            self.BC = sp.bmat([[O, BCa], [O, BCb]], format='lil')
+        else:
+            raise NotImplementedError
 
     def transform(self, u):
-        u_fft = np.fft.fft(u, axis=0)
-        u_hat = scipy.fft.dct(u_fft, axis=1) * self.norm
+        _u_hat = self.fft.transform(u, axis=-2)
+        u_hat = self.cheby.transform(_u_hat, axis=-1)
         return u_hat
 
     def itransform(self, u_hat):
-        u_fft = np.fft.ifft(u_hat, axis=0)
-        u = scipy.fft.idct(u_fft / self.norm, axis=1)
-        return u.real
+        _u = self.fft.itransform(u_hat, axis=-2).real
+        u = self.cheby.itransform(_u, axis=-1)
+        return u
 
     def _compute_derivative(self, u):
+        assert u.ndim == 2
         u_hat = self.transform(u)
-        D_u_hat = self.D @ u_hat.flatten()
+        D_u_hat = self.U2T @ self.D @ u_hat.flatten()
         return self.itransform(D_u_hat.reshape(u_hat.shape))
 
     def u_exact(self, *args, **kwargs):
         u = self.u_init
-        # u[0][:] = np.sin(self.X) * np.sin(self.Z)
-        u[0][:] = np.exp(-((self.X - np.pi) ** 2) - (np.pi * self.Z) ** 2)
+        u[0][:] = np.sin(self.X) * np.sin(self.Z * np.pi)
+        u[0][:] = u[0] + (self.b - self.a) / 2 * self.Z + (self.b + self.a) / 2.0
         u[1][:] = self._compute_derivative(u[0])
         return u
 
@@ -282,49 +287,18 @@ class Heat2d(ptype):
         """
         sol = self.u_init
 
-        rhs_hat = self.transform(rhs)
+        _rhs = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
+        if self.bc_type == 'dirichlet':
+            _rhs[0, :, -1] = self.bc_lower
+            _rhs[1, :, -1] = self.bc_upper
+        else:
+            raise NotImplementedError
+        rhs_hat = self.fft.transform(_rhs, axis=-2)
 
-        # apply boundary conditions
-        bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
-        bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
+        A = (self.M + factor * self.L).tolil()
+        A[self.BC != 0] = self.BC[self.BC != 0]
 
-        Az00 = self.Iz.copy()
-        Az00[-1] = bc_left
-
-        Az01 = -factor * self.nu * self.Dz
-
-        Az10 = -factor * self.Dz
-        Az10[-1] = bc_right
-
-        Az11 = factor * self.Iz
-
-        Az = sp.bmat([[Az00, Az10], [Az10, Az11]])
-
-        Ax00 = self.Ix.copy()
-        Ax01 = -factor * self.nu * self.Dx
-        Ax10 = -factor * self.Dx
-        Ax11 = factor * self.Ix
-
-        Ax = sp.bmat([[Ax00, Ax10], [Ax10, Ax11]])
-
-        # A = sp.kron(self.Ix, Az) + sp.kron(Ax, self.Iz)
-        A = sp.kron(Ax, self.Iz)
-
-        _rhs = self.M @ rhs_hat.flatten()
-        # _rhs[self.nz-1:self.nx*self.nz:self.nz] = self.a
-        # _rhs[(self.nx + 1)*self.nz-1::self.nz] = self.b
-
-        # me = np.zeros_like(rhs_hat)
-        # me[0][:,-1] = self.a
-        # me[1][:,-1] = self.b
-        # print(me)
-        # print(me.flatten())
-        # me2 = np.zeros_like(me).flatten()
-        # me2[self.nz-1:self.nx*self.nz:self.nz] = self.a
-        # me2[(self.nx + 1)*self.nz-1::self.nz] = self.b
-        # print(me2)
-
-        res = sp.linalg.spsolve(A.tocsc(), _rhs)
+        res = sp.linalg.spsolve(A.tocsc(), rhs_hat.flatten())
 
         sol_hat = res.reshape(sol.shape)
         sol[:] = self.itransform(sol_hat)
