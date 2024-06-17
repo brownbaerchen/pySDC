@@ -254,8 +254,8 @@ def test_tau_method(mode, bc, N, bc_val):
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
 def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
     '''
-    solve u_z - u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection problem.
-    We do FFT in x-direction and Chebychov in z-direction.
+    solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
+    problem. We do FFT in x-direction and Chebychov in z-direction.
     '''
     from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
     import numpy as np
@@ -276,7 +276,7 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
     rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychov spectral space
 
     # generate matrices
-    Dx = fft.get_differentiation_matrix()
+    Dx = sp.linalg.matrix_power(fft.get_differentiation_matrix(), 2) * 1e-1 + fft.get_differentiation_matrix()
     Ix = fft.get_Id()
     Dz = cheby.get_differentiation_matrix()
     Iz = cheby.get_Id()
@@ -325,6 +325,91 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
         # assert np.allclose(tau, tau[0]), f'Solution does not satisfy perturbed equation at x={x[i]}'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('bc_val', [4.0])
+def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
+    '''
+    Solve a Poisson problem with funny Dirichlet BCs in z-direction and periodic in x-direction.
+    '''
+    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+    import numpy as np
+    import scipy.sparse as sp
+
+    cheby = ChebychovHelper(nz, mode=mode)
+    fft = FFTHelper(nx)
+
+    # generate grid
+    x = fft.get_1dgrid()
+    z = cheby.get_1dgrid()
+    Z, X = np.meshgrid(z, x)
+
+    # put BCs in right hand side
+    rhs = np.zeros((2, nx, nz))  # components u and u_x
+    rhs[0, :, -1] = np.sin(bc_val * x) + 1
+    rhs[1, :, -1] = 3 * np.exp(-((x - 3.6) ** 2)) + np.cos(x)
+    rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychov spectral space
+
+    # generate 1D matrices
+    Dx = fft.get_differentiation_matrix()
+    Ix = fft.get_Id()
+    Dz = cheby.get_differentiation_matrix()
+    Iz = cheby.get_Id()
+
+    # generate 2D matrices
+    D = sp.kron(Ix, Dz) - sp.kron(Dx, Iz)
+    I = sp.kron(Ix, Iz)
+    O = I * 0
+
+    # generate system matrix
+    A = sp.bmat([[O, D], [D, -I]], format='lil')
+
+    # generate BC matrices
+    BCa = sp.eye(nz, format='lil') * 0
+    BCa[-1, :] = cheby.get_Dirichlet_BC_row_T(-1)
+    BCa = sp.kron(Ix, BCa, format='lil')
+
+    BCb = sp.eye(nz, format='lil') * 0
+    BCb[-1, :] = cheby.get_Dirichlet_BC_row_T(1)
+    BCb = sp.kron(Ix, BCb, format='lil')
+    BC = sp.bmat([[BCa, O], [BCb, O]], format='lil')
+
+    # put BCs in the system matrix
+    A[BC != 0] = BC[BC != 0]
+
+    # solve the system
+    sol_hat = (sp.linalg.spsolve(A, rhs_hat.flatten())).reshape(rhs.shape)
+
+    # transform back to real space
+    _sol = fft.itransform(sol_hat, axis=-2).real
+    sol = cheby.itransform(_sol, axis=-1)
+
+    # construct polynomials for testing
+    polys = [np.polynomial.Chebyshev(_sol[0, i, :]) for i in range(nx)]
+    d_polys = [me.deriv(1) for me in polys]
+    _z = np.linspace(-1, 1, 100)
+
+    if plotting:
+        import matplotlib.pyplot as plt
+
+        im = plt.pcolormesh(X, Z, sol[0])
+        plt.colorbar(im)
+        plt.xlabel('x')
+        plt.ylabel('t')
+        plt.show()
+
+    for i in range(nx):
+
+        assert np.isclose(polys[i](-1), rhs[0, i, -1]), f'Solution does not satisfy lower boundary condition x={x[i]}'
+        assert np.isclose(polys[i](1), rhs[1, i, -1]), f'Solution does not satisfy upper boundary condition x={x[i]}'
+
+        assert np.allclose(
+            polys[i](z), sol[0, i, :]
+        ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
+
+
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
-    test_tau_method2D('T2U', -1.0, nx=2**9, nz=2**9, bc_val=4.0, plotting=True)
+    test_tau_method2D_diffusion('T2U', nx=2**2, nz=2**6, bc_val=4.0, plotting=True)
