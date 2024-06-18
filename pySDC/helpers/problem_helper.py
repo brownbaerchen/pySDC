@@ -273,6 +273,7 @@ def get_1d_grid(size, bc, left_boundary=0.0, right_boundary=1.0):
 class SpectralHelper:
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
+    xp = np
 
     def __init__(self, N, sparse_format='lil'):
         self.N = N
@@ -285,6 +286,9 @@ class SpectralHelper:
         return 0 * self.get_Id()
 
     def get_differentiation_matrix(self):
+        raise NotImplementedError()
+
+    def get_integration_matrix(self):
         raise NotImplementedError()
 
     def get_empty_operator_matrix(self, S, O):
@@ -321,7 +325,7 @@ class ChebychovHelper(SpectralHelper):
         Returns:
             numpy.ndarray: 1D grid
         '''
-        return np.cos(np.pi / self.N * (np.arange(self.N) + 0.5))
+        return self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5))
 
     def get_Id(self):
         if self.mode == 'D2U':
@@ -364,12 +368,12 @@ class ChebychovHelper(SpectralHelper):
             if name == 'T2U':
                 mat = (
                     self.sparse_lib.eye(N, format=self.sparse_format)
-                    - self.sparse_lib.diags(np.ones(N - 2), offsets=+2, format=self.sparse_format)
+                    - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2, format=self.sparse_format)
                 ) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
                 mat = self.sparse_lib.eye(N, format=self.sparse_format) - self.sparse_lib.diags(
-                    np.ones(N - 2), offsets=+2, format=self.sparse_format
+                    self.xp.ones(N - 2), offsets=+2, format=self.sparse_format
                 )
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
@@ -399,7 +403,7 @@ class ChebychovHelper(SpectralHelper):
         Returns:
             scipy.sparse: Sparse differentiation matrix
         '''
-        return self.sparse_lib.diags(np.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
+        return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
 
     def get_T2T_differentiation_matrix(self, p=1):
         '''
@@ -412,17 +416,17 @@ class ChebychovHelper(SpectralHelper):
         Returns:
             numpy.ndarray: Differentiation matrix
         '''
-        D = np.zeros((self.N, self.N))
+        D = self.xp.zeros((self.N, self.N))
         for j in range(self.N):
             for k in range(j):
                 D[k, j] = 2 * j * ((j - k) % 2)
 
         D[0, :] /= 2
-        return np.linalg.matrix_power(D, p)
+        return self.xp.linalg.matrix_power(D, p)
 
     def get_norm(self):
         '''get normalization for converting Chebychev coefficients and DCT'''
-        norm = np.ones(self.N) / self.N
+        norm = self.xp.ones(self.N) / self.N
         norm[0] /= 2
         return norm
 
@@ -444,21 +448,21 @@ class ChebychovHelper(SpectralHelper):
             x (float): Position of the boundary condition
 
         Returns:
-            np.ndarray: Row to put into a matrix
+            self.xp.ndarray: Row to put into a matrix
         """
         if x == -1:
-            return (-1) ** np.arange(self.N)
+            return (-1) ** self.xp.arange(self.N)
         elif x == 1:
-            return np.ones(self.N)
+            return self.xp.ones(self.N)
         elif x == 0:
-            n = (1 + (-1) ** np.arange(self.N)) / 2
+            n = (1 + (-1) ** self.xp.arange(self.N)) / 2
             n[2::4] *= -1
             return n
         else:
             raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
 
     def get_Dirichlet_BC_row_D(self, x):
-        res = np.zeros(self.N)
+        res = self.xp.zeros(self.N)
         if x == -1:
             res[0] = 1
             res[1] = -1
@@ -471,10 +475,10 @@ class ChebychovHelper(SpectralHelper):
 
     # def get_Dirichlet_BC_row_U(self, x):
     #     if x == -1:
-    #         n = np.arange(self.N)
+    #         n = self.xp.arange(self.N)
     #         return (-1)**n * (n + 1)
     #     elif x == 1:
-    #         return np.arange(self.N) + 1
+    #         return self.xp.arange(self.N) + 1
     #     elif x == 0:
     #         return self.get_Dirichlet_BC_row_T(x)
     #         return n
@@ -484,13 +488,26 @@ class ChebychovHelper(SpectralHelper):
 
 class FFTHelper(SpectralHelper):
 
-    def get_1dgrid(self, x0=0):
-        dx = 2 * np.pi / self.N
-        return np.arange(self.N) * dx
+    def __init__(self, *args, x0=0, L=2 * np.pi, **kwargs):
+        self.x0 = x0
+        self.L = L
+        super().__init__(*args, **kwargs)
 
-    def get_differentiation_matrix(self):
-        k = np.fft.fftfreq(self.N, 1.0 / self.N)
-        return self.sparse_lib.diags(1j * k)
+    def get_1dgrid(self):
+        dx = self.L / self.N
+        return self.xp.arange(self.N) * dx + self.x0
+
+    def get_wavenumbers(self):
+        return self.xp.fft.fftfreq(self.N, 1.0 / self.N)
+
+    def get_differentiation_matrix(self, p=1):
+        k = self.get_wavenumbers()
+        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
+
+    def get_integration_matrix(self, p=1):
+        k = self.xp.array(self.get_wavenumbers(), dtype='complex128')
+        k[0] = 1j * self.L
+        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
     def get_Id(self):
         return self.sparse_lib.eye(self.N, format=self.sparse_format)
