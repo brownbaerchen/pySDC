@@ -111,13 +111,13 @@ class RayleighBenard(ptype):
         super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
 
     def transform(self, u):
-        u_hat = self.u_init
+        u_hat = u * 0
         _u_hat = self.fft.transform(u, axis=-2)
         u_hat[:] = self.cheby.transform(_u_hat, axis=-1)
         return u_hat
 
     def itransform(self, u_hat):
-        u = self.u_init
+        u = u_hat * 0
         _u = self.fft.itransform(u_hat, axis=-2)
         u[:] = self.cheby.itransform(_u, axis=-1)
         return u
@@ -146,11 +146,6 @@ class RayleighBenard(ptype):
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
 
-        # treat convection explicitly
-        f_hat.expl[self.iu] = -u_hat[self.iu] * (u_hat[self.iux] + u_hat[self.ivz])
-        f_hat.expl[self.iv] = -u_hat[self.iv] * (u_hat[self.iux] + u_hat[self.ivz])
-        f_hat.expl[self.iT] = -u_hat[self.iu] * u_hat[self.iTx] - u_hat[self.iv] * u_hat[self.iTz]
-
         # evaluate implicit terms
         shape = u[self.iu].shape
         f_hat.impl[self.iT] = (Dx @ u_hat[self.iTx].flatten() + Dz @ u_hat[self.iTz].flatten()).reshape(shape)
@@ -160,6 +155,11 @@ class RayleighBenard(ptype):
         ) + self.Ra * u_hat[self.iT]
 
         f[:] = self.itransform(f_hat)
+
+        # treat convection explicitly
+        f.expl[self.iu] = -u[self.iu] * (u[self.iux] + u[self.ivz])
+        f.expl[self.iv] = -u[self.iv] * (u[self.iux] + u[self.ivz])
+        f.expl[self.iT] = -u[self.iu] * u[self.iTx] - u[self.iv] * u[self.iTz]
 
         return f
 

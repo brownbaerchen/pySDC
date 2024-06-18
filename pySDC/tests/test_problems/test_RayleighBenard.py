@@ -80,10 +80,74 @@ def test_derivatives(nx, nz, direction, cheby_mode):
     i = P.iu
 
     for i in [P.iux, P.iTx]:
-        assert np.allclose(derivatives[i].real, expect_x), f'Got unexpected x-derivative in component {i}'
+        assert np.allclose(derivatives[i], expect_x), f'Got unexpected x-derivative in component {i}'
     for i in [P.ivz, P.iTz]:
-        assert np.allclose(derivatives[i].real, expect_z.real), f'Got unexpected z-derivative in component {i}'
+        assert np.allclose(derivatives[i], expect_z), f'Got unexpected z-derivative in component {i}'
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
+@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+def test_eval_f(nx, nz, cheby_mode, direction):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+    X, Z = P.X, P.Z
+    Pr, Ra = P.Pr, P.Ra
+    cos, sin = np.cos, np.sin
+
+    if direction == 'x':
+        y = sin(X)
+        y_x = cos(X)
+        y_xx = -sin(X)
+        y_z = 0
+        y_zz = 0
+    elif direction == 'z':
+        y = Z**2
+        y_x = 0
+        y_xx = 0
+        y_z = 2 * Z
+        y_zz = 2.0
+    elif direction == 'mixed':
+        y = sin(X) * Z**2
+        y_x = cos(X) * Z**2
+        y_xx = -sin(X) * Z**2
+        y_z = sin(X) * 2 * Z
+        y_zz = sin(X) * 2
+    else:
+        raise NotImplementedError
+
+    assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
+
+    u = P.u_init
+    for i in [P.iu, P.iv, P.iT, P.ip]:
+        u[i][:] = y
+    u[P.iux] = y_x
+    u[P.ivz] = y_z
+    u[P.iTx] = y_x
+    u[P.iTz] = y_z
+
+    f = P.eval_f(u)
+
+    for i in [P.iux, P.ivz, P.iTx, P.iTz]:
+        assert np.allclose(f.impl[i] + f.expl[i], 0), f'Non-zero time derivative in algebraic component {i}'
+
+    f_expect = P.f_init
+    f_expect.expl[P.iT] = -y * (y_x + y_z)
+    f_expect.impl[P.iT] = y_xx + y_zz
+    f_expect.expl[P.iu] = -y * (y_z + y_x)
+    f_expect.impl[P.iu] = -Pr * y_x + y_xx
+    f_expect.expl[P.iv] = -y * (y_z + y_x)
+    f_expect.impl[P.iv] = -Pr * y_z + Pr * Ra * y + y_zz
+
+    for i in range(u.shape[0]):
+        assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {i}'
+        assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {i}'
 
 
 if __name__ == '__main__':
-    test_derivatives(4, 4, 'mixed', 'T2U')
+    # test_derivatives(4, 4, 'mixed', 'T2U')
+    test_eval_f(128, 129, 'T2T', 'z')
