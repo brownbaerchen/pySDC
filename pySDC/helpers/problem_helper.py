@@ -342,6 +342,14 @@ class ChebychovHelper(SpectralHelper):
         else:
             raise NotImplementedError(f'{self.mode=!r} not implemented')
 
+    def get_integration_matrix(self):
+        if self.mode == 'T2T':
+            return self.get_T2T_integration_matrix()
+        elif self.mode == 'T2U':
+            return self.get_U2T_integration_matrix()
+        else:
+            raise NotImplementedError(f'{self.mode=!r} not implemented')
+
     def get_conv(self, name, N=None):
         '''
         Get conversion matrix between different kinds of polynomials. The supported kinds are
@@ -404,6 +412,12 @@ class ChebychovHelper(SpectralHelper):
             scipy.sparse: Sparse differentiation matrix
         '''
         return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
+
+    def get_U2T_integration_matrix(self):
+        return self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1, format=self.sparse_format)
+
+    def get_T2T_integration_matrix(self):
+        return self.get_U2T_integration_matrix() @ self.get_conv('T2U')
 
     def get_T2T_differentiation_matrix(self, p=1):
         '''

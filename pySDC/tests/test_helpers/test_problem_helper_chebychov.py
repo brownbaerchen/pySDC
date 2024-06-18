@@ -124,6 +124,38 @@ def test_differentiation_matrix(N, variant):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+def test_integration_matrix(N, variant):
+    import numpy as np
+    import scipy
+    from pySDC.helpers.problem_helper import ChebychovHelper
+
+    cheby = ChebychovHelper(N)
+    x = np.cos(np.pi / N * (np.arange(N) + 0.5))
+    coeffs = np.random.random(N)
+    coeffs[-1] = 0
+    norm = cheby.get_norm()
+
+    if variant == 'T2U':
+        D = cheby.get_U2T_integration_matrix()
+        P = cheby.get_conv('T2U')
+        Q = cheby.get_conv('T2T')
+    elif variant == 'T2T':
+        D = cheby.get_T2T_integration_matrix()
+        P = cheby.get_conv('T2T')
+        Q = cheby.get_conv('T2T')
+    else:
+        raise NotImplementedError
+
+    du = scipy.fft.idct(Q @ D @ P @ coeffs / norm)
+    exact = np.polynomial.Chebyshev(coeffs).integ(1)
+    exact.coef[0] = 0  # fix integration constant to 0
+
+    assert np.allclose(exact(x), du)
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('d', [1, 2, 3])
 def test_transform(N, d):
@@ -297,8 +329,8 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
 
     # construct polynomials for testing
     polys = [np.polynomial.Chebyshev(_sol[i, :]) for i in range(nx)]
-    d_polys = [me.deriv(1) for me in polys]
-    _z = np.linspace(-1, 1, 100)
+    # d_polys = [me.deriv(1) for me in polys]
+    # _z = np.linspace(-1, 1, 100)
 
     if plotting:
         import matplotlib.pyplot as plt
@@ -386,10 +418,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
     _sol = fft.itransform(sol_hat, axis=-2).real
     sol = cheby.itransform(_sol, axis=-1)
 
-    # construct polynomials for testing
     polys = [np.polynomial.Chebyshev(_sol[0, i, :]) for i in range(nx)]
-    d_polys = [me.deriv(1) for me in polys]
-    _z = np.linspace(-1, 1, 100)
 
     if plotting:
         import matplotlib.pyplot as plt
@@ -412,4 +441,5 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
-    test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
+    # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
+    test_integration_matrix(4, 'T2U')
