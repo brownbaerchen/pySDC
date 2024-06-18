@@ -148,6 +148,24 @@ def test_eval_f(nx, nz, cheby_mode, direction):
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {i}'
 
 
+def test_BCs(nx, nz, cheby_mode):
+    import numpy as np
+    import scipy.sparse as sp
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+
+    rhs = P._put_BCs_in_rhs(P.u_init).flatten()
+    _A = P.L + P.M
+    A = P._put_BCs_in_matrix(_A)
+    print(A.toarray())
+    # print(P.L.toarray() + P.M.toarray())
+    print(rhs)
+
+    sol_hat = sp.linalg.spsolve(A, rhs)
+
+
 if __name__ == '__main__':
     # test_derivatives(4, 4, 'mixed', 'T2U')
-    test_eval_f(128, 129, 'T2T', 'z')
+    # test_eval_f(128, 129, 'T2T', 'z')
+    test_BCs(1, 2, 'T2T')

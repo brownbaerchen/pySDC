@@ -1,7 +1,4 @@
 import numpy as np
-from mpi4py_fft import PFFT, newDistArray
-from mpi4py import MPI
-import scipy.sparse as sp
 
 from pySDC.core.Problem import ptype
 from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
@@ -14,7 +11,8 @@ class RayleighBenard(ptype):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, Pr=1, Ra=1, nx=8, nz=8, cheby_mode='T2T', **kwargs):
+    def __init__(self, Pr=1, Ra=1, nx=8, nz=8, cheby_mode='T2T', BCs=None, **kwargs):
+        BCs = {} if BCs is None else BCs
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         S = 8  # number of variables
@@ -96,17 +94,18 @@ class RayleighBenard(ptype):
         BC_down[-1, :] = self.cheby.get_Dirichlet_BC_row_T(1)
         BC_down = sp.kron(Ix1D, BC_down, format='lil')
 
+        # TODO: distribute tau terms sensibly
         BC = self.cheby.get_empty_operator_matrix(S, O)
-        BC[self.iu][self.iu] = BC_up
-        BC[self.iu][self.iux] = BC_down
-        BC[self.iv][self.iv] = BC_up
-        BC[self.iv][self.ivz] = BC_down
-        BC[self.iT][self.iTx] = BC_up
-        BC[self.iT][self.iTz] = BC_down
+        BC[self.iTz][self.iu] = BC_up
+        BC[self.iux][self.iu] = BC_down
+        BC[self.iT][self.iv] = BC_up
+        BC[self.ivz][self.iv] = BC_down
+        BC[self.iTx][self.iT] = BC_up
+        BC[self.ip][self.iT] = BC_down
 
         BC = sp.bmat(BC, format='lil')
         self.BC_mask = BC != 0
-        self.BCs = BC[self.BC_mask]
+        self.BC = BC[self.BC_mask]
 
         super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
 
@@ -183,5 +182,39 @@ class RayleighBenard(ptype):
 
         return me
 
+    def _put_BCs_in_rhs(self, rhs):
+        assert rhs.ndim > 1, 'Right hand side must not be flattened here!'
+
+        # _rhs_hat = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
+        _rhs_hat = self.cheby.transform(rhs, axis=-1)
+
+        _rhs_hat[self.iu, :, -1] = self.BCs.get('u_top', 0)
+        _rhs_hat[self.iux, :, -1] = self.BCs.get('u_bottom', 0)
+        _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
+        _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
+        _rhs_hat[self.iTx, :, -1] = self.BCs.get('T_top', 0)
+        _rhs_hat[self.ip, :, -1] = self.BCs.get('T_bottom', 0)
+
+        return self.cheby.itransform(_rhs_hat, axis=-1)
+
+    def _put_BCs_in_matrix(self, A):
+        A = A.tolil()
+        A[self.BC_mask] = self.BC
+        return A.tocsc()
+
     def solve_system(self, rhs, factor, *args, **kwargs):
-        pass
+        sol = self.u_init
+
+        # _rhs = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
+        # _rhs[0, :, -1] = self.bc_lower
+        # _rhs[1, :, -1] = self.bc_upper
+        # rhs_hat = self.fft.transform(_rhs, axis=-2)
+
+        # A = (self.M + factor * self.L).tolil()
+        # A[self.BC != 0] = self.BC[self.BC != 0]
+
+        # res = sp.linalg.spsolve(A.tocsc(), rhs_hat.flatten())
+
+        # sol_hat = res.reshape(sol.shape)
+        # sol[:] = self.itransform(sol_hat)
+        return sol
