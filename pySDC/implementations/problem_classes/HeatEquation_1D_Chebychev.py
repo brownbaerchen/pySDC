@@ -79,14 +79,14 @@ class Heat1DChebychev(ptype):
             bc_left = self.cheby.get_Dirichlet_BC_row_T(-1)
             bc_right = self.cheby.get_Dirichlet_BC_row_T(1)
         else:
-            raise NotADirectoryError
+            raise NotImplementedError
         BC = (self.M * 0).tolil()
         BC[self.nvars - 1, : self.nvars] = bc_left
         BC[-1, : self.nvars] = bc_right
 
         self.BC_mask = BC != 0
         self.BCs = BC[self.BC_mask]
-        BC[-1, self.nvars + 1 :] = 0  # not sure if we need this
+        # BC[-1, self.nvars + 1 :] = 0  # not sure if we need this
 
         super().__init__(init=((self.S, nvars), None, np.dtype('float64')))
 
@@ -207,7 +207,6 @@ class Heat2d(ptype):
         Ix = self.fft.get_Id()
         Dz = self.cheby.get_differentiation_matrix()
         Iz = self.cheby.get_Id()
-        _Iz = sp.eye(nz)
         T2U = self.cheby.get_conv(mode)
         U2T = self.cheby.get_conv(mode[::-1])
 

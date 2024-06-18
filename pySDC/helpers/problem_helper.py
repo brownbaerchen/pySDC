@@ -287,6 +287,19 @@ class SpectralHelper:
     def get_differentiation_matrix(self):
         raise NotImplementedError()
 
+    def get_empty_operator_matrix(self, S, O):
+        """
+        Return a matrix of operators to be filled with the connections between the solution components.
+
+        Args:
+            S (int): Number of components in the solution
+            O (sparse matrix): Zero matrix used for initialization
+
+        Returns:
+            list containing sparse zeros
+        """
+        return [[O for _ in range(S)] for _ in range(S)]
+
 
 class ChebychovHelper(SpectralHelper):
 
@@ -322,6 +335,8 @@ class ChebychovHelper(SpectralHelper):
             return self.get_T2U_differentiation_matrix()
         elif self.mode == 'D2U':
             return self.get_T2U_differentiation_matrix() @ self.get_conv('D2T')
+        else:
+            raise NotImplementedError(f'{self.mode=!r} not implemented')
 
     def get_conv(self, name, N=None):
         '''

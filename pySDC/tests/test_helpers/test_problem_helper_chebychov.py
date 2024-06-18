@@ -412,4 +412,4 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
-    test_tau_method2D_diffusion('T2T', nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
+    test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
