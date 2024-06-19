@@ -17,6 +17,8 @@ class RayleighBenard(ptype):
 
         S = 8  # number of variables
 
+        super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
+
         self.indices = {
             'u': 0,
             'v': 1,
@@ -83,8 +85,8 @@ class RayleighBenard(ptype):
         L[self.iTz][self.iTz] = -I
 
         # divergence-free constraint
-        L[self.iux][self.ivz] = I.copy()
-        L[self.iux][self.iux] = -I.copy()
+        L[self.ivz][self.ivz] = I.copy()
+        L[self.ivz][self.iux] = -I.copy()
 
         # pressure gauge
         L[self.ip][self.ip] = S2D
@@ -117,19 +119,32 @@ class RayleighBenard(ptype):
         BC_down = sp.kron(Ix1D, BC_down, format='lil')
 
         # TODO: distribute tau terms sensibly
+        # self.iub = self.ip
+        # self.iua = self.iu
         BC = self.cheby.get_empty_operator_matrix(S, O)
-        # BC[self.iu][self.iTz] = BC_up
-        # BC[self.iu][self.iux] = BC_down
-        # BC[self.iv][self.iv] = BC_up
-        # BC[self.iv][self.ivz] = BC_down
+        # BC[self.iua][self.iu] = BC_up
+        # BC[self.iub][self.iu] = BC_down
+        BC[self.ip][self.ip] = BC_up
+        BC[self.iv][self.iv] = BC_up
+        BC[self.ivz][self.iv] = BC_down
         BC[self.iT][self.iT] = BC_up
-        BC[self.iT][self.iTz] = BC_down
+        BC[self.iTz][self.iT] = BC_down
 
         BC = sp.bmat(BC, format='lil')
         self.BC_mask = BC != 0
         self.BC = BC[self.BC_mask]
 
-        super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
+        # prepare mask to zero rows that we put BCs into
+        rhs_BC_hat = self.u_init
+        # rhs_BC_hat[self.iua, :, -1] = 1
+        # rhs_BC_hat[self.iub, :, -1] = 1
+        rhs_BC_hat[self.iv, :, -1] = 1
+        rhs_BC_hat[self.ip, :, -1] = 1
+        rhs_BC_hat[self.ivz, :, -1] = 1
+        rhs_BC_hat[self.iT, :, -1] = 1
+        rhs_BC_hat[self.iTz, :, -1] = 1
+        mask = rhs_BC_hat.flatten() == 1
+        self.BC_zero_idx = self.xp.arange(self.nx * self.nz * S)[mask]
 
     def transform(self, u):
         u_hat = u * 0
@@ -210,17 +225,19 @@ class RayleighBenard(ptype):
         # _rhs_hat = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
         _rhs_hat = self.cheby.transform(rhs, axis=-1)
 
-        # _rhs_hat[self.iu, :, -1] = self.BCs.get('u_top', 0)
-        # _rhs_hat[self.iux, :, -1] = self.BCs.get('u_bottom', 0)
-        # _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
-        # _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
+        # _rhs_hat[self.iua, :, -1] = self.BCs.get('u_top', 0)
+        # _rhs_hat[self.iub, :, -1] = self.BCs.get('u_bottom', 0)
+        _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
+        _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
         _rhs_hat[self.iT, :, -1] = self.BCs.get('T_top', 0)
         _rhs_hat[self.iTz, :, -1] = self.BCs.get('T_bottom', 0)
+        _rhs_hat[self.ip, :, -1] = self.BCs.get('p_top', 0)
 
         return self.cheby.itransform(_rhs_hat, axis=-1)
 
     def _put_BCs_in_matrix(self, A):
         A = A.tolil()
+        A[self.BC_zero_idx, :] = 0
         A[self.BC_mask] = self.BC
         return A.tocsc()
 
