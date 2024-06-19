@@ -17,7 +17,7 @@ class RayleighBenard(ptype):
 
         S = 8  # number of variables
 
-        self.indeces = {
+        self.indices = {
             'u': 0,
             'v': 1,
             'ux': 2,
@@ -27,16 +27,17 @@ class RayleighBenard(ptype):
             'Tz': 6,
             'p': 7,
         }
+        self.index_to_name = {v: k for k, v, in self.indices.items()}
 
         # prepare indexes for the different components. Do this by hand so that the editor can autocomplete...
-        self.iu = self.indeces['u']  # velocity in x-direction
-        self.iv = self.indeces['v']  # velocity in z-direction
-        self.iux = self.indeces['ux']  # derivative of u wrt x
-        self.ivz = self.indeces['vz']  # derivative of v wrt z
-        self.iT = self.indeces['T']  # temperature
-        self.iTx = self.indeces['Tx']  # derivative of temperature wrt x
-        self.iTz = self.indeces['Tz']  # derivative of temperature wrt z
-        self.ip = self.indeces['p']  # pressure
+        self.iu = self.indices['u']  # velocity in x-direction
+        self.iv = self.indices['v']  # velocity in z-direction
+        self.iux = self.indices['ux']  # derivative of u wrt x
+        self.ivz = self.indices['vz']  # derivative of v wrt z
+        self.iT = self.indices['T']  # temperature
+        self.iTx = self.indices['Tx']  # derivative of temperature wrt x
+        self.iTz = self.indices['Tz']  # derivative of temperature wrt z
+        self.ip = self.indices['p']  # pressure
 
         self.cheby = ChebychovHelper(N=nz, mode=cheby_mode)
         self.fft = FFTHelper(N=nx)
@@ -108,21 +109,21 @@ class RayleighBenard(ptype):
 
         # prepare BCs
         BC_up = sp.eye(nz, format='lil') * 0
-        BC_up[-1, :] = self.cheby.get_Dirichlet_BC_row_T(-1)
+        BC_up[-1, :] = self.cheby.get_Dirichlet_BC_row_T(1)
         BC_up = sp.kron(Ix1D, BC_up, format='lil')
 
         BC_down = sp.eye(nz, format='lil') * 0
-        BC_down[-1, :] = self.cheby.get_Dirichlet_BC_row_T(1)
+        BC_down[-1, :] = self.cheby.get_Dirichlet_BC_row_T(-1)
         BC_down = sp.kron(Ix1D, BC_down, format='lil')
 
         # TODO: distribute tau terms sensibly
         BC = self.cheby.get_empty_operator_matrix(S, O)
-        BC[self.iTz][self.iu] = BC_up
-        BC[self.iux][self.iu] = BC_down
-        BC[self.iT][self.iv] = BC_up
-        BC[self.ivz][self.iv] = BC_down
-        BC[self.iTx][self.iT] = BC_up
-        BC[self.iTz][self.iT] = BC_down
+        # BC[self.iu][self.iTz] = BC_up
+        # BC[self.iu][self.iux] = BC_down
+        # BC[self.iv][self.iv] = BC_up
+        # BC[self.iv][self.ivz] = BC_down
+        BC[self.iT][self.iT] = BC_up
+        BC[self.iT][self.iTz] = BC_down
 
         BC = sp.bmat(BC, format='lil')
         self.BC_mask = BC != 0
@@ -209,12 +210,12 @@ class RayleighBenard(ptype):
         # _rhs_hat = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
         _rhs_hat = self.cheby.transform(rhs, axis=-1)
 
-        _rhs_hat[self.iu, :, -1] = self.BCs.get('u_top', 0)
-        _rhs_hat[self.iux, :, -1] = self.BCs.get('u_bottom', 0)
-        _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
-        _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
-        _rhs_hat[self.iTx, :, -1] = self.BCs.get('T_top', 0)
-        _rhs_hat[self.ip, :, -1] = self.BCs.get('T_bottom', 0)
+        # _rhs_hat[self.iu, :, -1] = self.BCs.get('u_top', 0)
+        # _rhs_hat[self.iux, :, -1] = self.BCs.get('u_bottom', 0)
+        # _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
+        # _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
+        _rhs_hat[self.iT, :, -1] = self.BCs.get('T_top', 0)
+        _rhs_hat[self.iTz, :, -1] = self.BCs.get('T_bottom', 0)
 
         return self.cheby.itransform(_rhs_hat, axis=-1)
 

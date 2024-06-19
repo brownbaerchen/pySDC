@@ -154,32 +154,42 @@ def test_BCs(nx, nz, cheby_mode):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
     BCs = {
-        'T_top': -1,
+        'T_top': 1,
+        'T_bottom': 0,
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
-    rhs = P._put_BCs_in_rhs(P.u_init).flatten()
+    rhs = P._put_BCs_in_rhs(P.u_init)
     _A = P.L + P.M
     A = P._put_BCs_in_matrix(_A)
-    print(A.toarray())
+    # print(A.toarray())
     # print(P.L.toarray() + P.M.toarray())
-    print(rhs)
 
-    sol_hat = sp.linalg.spsolve(A, rhs)
+    rhs_hat = P.transform(rhs).flatten()
+    print(rhs_hat)
+
+    sol_hat = sp.linalg.spsolve(A, rhs_hat)
     sol = P.itransform(sol_hat.reshape(P.u_init.shape))
-    print(sol)
+    # print(sol)
 
     import matplotlib.pyplot as plt
+
+    expect_T = (BCs['T_top'] - BCs['T_bottom']) / 2 * P.Z + (BCs['T_top'] + BCs['T_bottom']) / 2
 
     fig, axs = plt.subplots(1, 2)
     # axs[0].imshow(abs(_A.toarray()))
     # axs[1].imshow(abs(A.toarray()))
     for i in range(8):
-        axs[0].plot(P.Z[0, :], sol[i, 0, :], label='i')
+        axs[0].plot(P.Z[0, :], sol[i, 0, :], label=f'{P.index_to_name[i]}')
+        axs[1].plot(P.X[:, 0], sol[i, :, 0], label=f'{P.index_to_name[i]}')
+    axs[0].plot(P.Z[0, :], expect_T[0, :], '--')
+    axs[0].legend()
     plt.show()
+
+    assert np.allclose(sol[P.iT], expect_T), 'Unexpected BC at the top in T'
 
 
 if __name__ == '__main__':
     # test_derivatives(4, 4, 'mixed', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(1, 2**4, 'T2T')
+    test_BCs(1, 2**3, 'T2T')
