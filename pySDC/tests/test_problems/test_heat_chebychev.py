@@ -133,8 +133,6 @@ def test_heat2d(mode, nx, nz, plot=False):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import Heat2d
 
-    nx = 2**7
-    nz = 2**7
     P = Heat2d(nx=nx, nz=nz, nu=1e-2, a=-1, b=2, bc_type='dirichlet', mode='T2U')
 
     u0 = P.u_exact()
@@ -156,7 +154,6 @@ def test_heat2d(mode, nx, nz, plot=False):
     uP_expect = (P.b - P.a) / 2 * P.Z + (P.b + P.a) / 2.0
 
     if plot:
-        import matplotlib.pyplot as plt
 
         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
         args = {'vmin': P.a * 1.2, 'vmax': P.b * 1.2}
@@ -178,44 +175,7 @@ def test_heat2d(mode, nx, nz, plot=False):
     assert np.allclose(uP[0], uP_expect, atol=1e3 / dtP), 'Got unexpected solution of Poisson problem!'
 
 
-@pytest.mark.base
-def test_AdvectionDiffusion(plot=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_1D_Chebychev import AdvectionDiffusion
-
-    nx = 2**0
-    nz = 2**1
-    P = AdvectionDiffusion(nx=nx, nz=nz, a=1.0, b=1.0, nu=1.0e-1, c=-0.0e0)
-
-    u0 = P.u_exact()
-
-    u0_hat = P.transform(u0)
-    assert np.allclose(u0, P.itransform(u0_hat))
-
-    dt = 1.0e-1
-    un = P.solve_system(u0, dt)
-    f = P.eval_f(u0)
-    # un = u0 + dt * P.eval_f(u0)
-
-    if plot:
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-        axs[0].pcolormesh(P.X, P.Z, u0[0])
-        # axs[1].pcolormesh(P.X, P.Z, f[0])
-        # axs[1].pcolormesh(P.X, P.Z, u0[1])
-        axs[1].pcolormesh(P.X, P.Z, un[0])
-        idx = nx // 4
-        axs[2].plot(P.Z[idx], u0[0][idx], marker='.')
-        axs[2].plot(P.Z[idx], un[0][idx], '--', marker='.')
-
-        idx = nz // 4
-        axs[3].plot(P.X[:, idx], u0[0][:, idx])
-        axs[3].plot(P.X[:, idx], un[0][:, idx], '--')
-        plt.show()
-
-
 if __name__ == '__main__':
     # test_heat1d_chebychev('T2U', False, plot=True)
-    test_heat2d(True)
+    test_heat2d('T2T', 1, 2, True)
     # test_AdvectionDiffusion(plot=True)

@@ -153,7 +153,10 @@ def test_BCs(nx, nz, cheby_mode):
     import scipy.sparse as sp
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
-    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+    BCs = {
+        'T_top': -1,
+    }
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
     rhs = P._put_BCs_in_rhs(P.u_init).flatten()
     _A = P.L + P.M
@@ -163,9 +166,20 @@ def test_BCs(nx, nz, cheby_mode):
     print(rhs)
 
     sol_hat = sp.linalg.spsolve(A, rhs)
+    sol = P.itransform(sol_hat.reshape(P.u_init.shape))
+    print(sol)
+
+    import matplotlib.pyplot as plt
+
+    fig, axs = plt.subplots(1, 2)
+    # axs[0].imshow(abs(_A.toarray()))
+    # axs[1].imshow(abs(A.toarray()))
+    for i in range(8):
+        axs[0].plot(P.Z[0, :], sol[i, 0, :], label='i')
+    plt.show()
 
 
 if __name__ == '__main__':
     # test_derivatives(4, 4, 'mixed', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(1, 2, 'T2T')
+    test_BCs(1, 2**4, 'T2T')

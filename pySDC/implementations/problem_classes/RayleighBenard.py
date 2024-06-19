@@ -17,15 +17,26 @@ class RayleighBenard(ptype):
 
         S = 8  # number of variables
 
-        # prepare indexes for the different components
-        self.iu = 0  # velocity in x-direction
-        self.iv = 1  # velocity in z-direction
-        self.iux = 2  # derivative of u wrt x
-        self.ivz = 3  # derivative of v wrt z
-        self.iT = 4  # temperature
-        self.iTx = 5  # derivative of temperature wrt x
-        self.iTz = 6  # derivative of temperature wrt z
-        self.ip = 7  # pressure
+        self.indeces = {
+            'u': 0,
+            'v': 1,
+            'ux': 2,
+            'vz': 3,
+            'T': 4,
+            'Tx': 5,
+            'Tz': 6,
+            'p': 7,
+        }
+
+        # prepare indexes for the different components. Do this by hand so that the editor can autocomplete...
+        self.iu = self.indeces['u']  # velocity in x-direction
+        self.iv = self.indeces['v']  # velocity in z-direction
+        self.iux = self.indeces['ux']  # derivative of u wrt x
+        self.ivz = self.indeces['vz']  # derivative of v wrt z
+        self.iT = self.indeces['T']  # temperature
+        self.iTx = self.indeces['Tx']  # derivative of temperature wrt x
+        self.iTz = self.indeces['Tz']  # derivative of temperature wrt z
+        self.ip = self.indeces['p']  # pressure
 
         self.cheby = ChebychovHelper(N=nz, mode=cheby_mode)
         self.fft = FFTHelper(N=nx)
@@ -43,12 +54,15 @@ class RayleighBenard(ptype):
         Iz1D = self.cheby.get_Id()
         T2U1D = self.cheby.get_conv(cheby_mode)
         U2T1D = self.cheby.get_conv(cheby_mode[::-1])
+        Sx1D = self.fft.get_integration_matrix()
+        Sz1D = self.cheby.get_integration_matrix()
 
         # construct 2D matrices
         Dx = sp.kron(Dx1D, Iz1D)
         Dz = sp.kron(Ix1D, Dz1D)
         I = sp.kron(Ix1D, Iz1D)
         O = I * 0
+        S2D = sp.kron(Ix1D, Sz1D) + sp.kron(Sx1D, Iz1D)
         self.Dx = Dx
         self.Dz = Dz
         self.U2T = sp.kron(Ix1D, U2T1D)
@@ -59,13 +73,20 @@ class RayleighBenard(ptype):
 
         # relations between quantities and derivatives
         L[self.iux][self.iu] = Dx.copy()
+        L[self.iux][self.iux] = -I
         L[self.ivz][self.iv] = Dz.copy()
+        L[self.ivz][self.ivz] = -I
         L[self.iTx][self.iT] = Dx.copy()
+        L[self.iTx][self.iTx] = -I
         L[self.iTz][self.iT] = Dz.copy()
+        L[self.iTz][self.iTz] = -I
 
         # divergence-free constraint
-        L[self.iux][self.ivz] = -I.copy()
-        L[self.ivz][self.iux] = -I.copy()  # do we need/want this?
+        L[self.iux][self.ivz] = I.copy()
+        L[self.iux][self.iux] = -I.copy()
+
+        # pressure gauge
+        L[self.ip][self.ip] = S2D
 
         # differential terms
         L[self.iu][self.ip] = Pr * Dx
@@ -101,7 +122,7 @@ class RayleighBenard(ptype):
         BC[self.iT][self.iv] = BC_up
         BC[self.ivz][self.iv] = BC_down
         BC[self.iTx][self.iT] = BC_up
-        BC[self.ip][self.iT] = BC_down
+        BC[self.iTz][self.iT] = BC_down
 
         BC = sp.bmat(BC, format='lil')
         self.BC_mask = BC != 0
