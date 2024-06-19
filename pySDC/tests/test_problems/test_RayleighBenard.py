@@ -183,7 +183,10 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
 
     expect = {}
     for q in ['T', 'v']:
-        expect[q] = (BCs[f'{q}_top'] - BCs[f'{q}_bottom']) / 2 * P.Z + (BCs[f'{q}_top'] + BCs[f'{q}_bottom']) / 2
+        if nz == 2:
+            expect[q] = (BCs[f'{q}_top'] - BCs[f'{q}_bottom']) / 2 * P.Z + (BCs[f'{q}_top'] + BCs[f'{q}_bottom']) / 2
+        else:
+            raise NotImplementedError
     zero = np.zeros_like(expect['T'])
 
     # import matplotlib.pyplot as plt
@@ -204,7 +207,66 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
         assert np.allclose(sol[i], expect[P.index_to_name[i]]), f'Unexpected BCs in {P.index_to_name[i]}'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
+def test_vorticity(nx, nz, cheby_mode, direction):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    assert nz > 3
+
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+
+    u = P.u_init
+
+    if direction == 'x':
+        u[P.iv] = np.sin(P.X)
+        u[P.iu] = np.cos(P.X)
+        expect = np.cos(P.X)
+    elif direction == 'z':
+        u[P.iv] = P.Z**2
+        u[P.iu] = P.Z**3
+        expect = 3 * P.Z**2
+    elif direction == 'mixed':
+        u[P.iv] = np.sin(P.X) * P.Z**2
+        u[P.iu] = np.cos(P.X) * P.Z**3
+        expect = np.cos(P.X) * P.Z**2 + np.cos(P.X) * 3 * P.Z**2
+    else:
+        raise NotImplementedError
+
+    assert np.allclose(P.compute_vorticiy(u), expect)
+
+
+def test_solver(nx, nz, cheby_mode):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+    import matplotlib.pyplot as plt
+
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+
+    zero = P.u_init
+    u = P.u_exact()
+    t = 0
+
+    nsteps = 1000
+    dt = 1e0
+    for i in range(nsteps):
+        t += dt
+        u = P.solve_system(u, dt)
+
+        im = plt.pcolormesh(P.X, P.Z, u[P.iT].real)
+        plt.title(t)
+        # plt.colorbar(im)
+        plt.pause(1e-8)
+    plt.show()
+
+
 if __name__ == '__main__':
     # test_derivatives(4, 4, 'mixed', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(2, 2**1, 'T2T', 1, -2, 3, 2)
+    # test_BCs(2, 2**1, 'T2T', 1, -2, 3, 2)
+    # test_solver(2**6, 2**6, 'T2T')
+    test_vorticity(4, 4, 'T2T', 'x')

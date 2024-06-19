@@ -147,12 +147,14 @@ class RayleighBenard(ptype):
         self.BC_zero_idx = self.xp.arange(self.nx * self.nz * S)[mask]
 
     def transform(self, u):
+        assert u.ndim > 1, 'u must not be flattened here!'
         u_hat = u * 0
         _u_hat = self.fft.transform(u, axis=-2)
         u_hat[:] = self.cheby.transform(_u_hat, axis=-1)
         return u_hat
 
     def itransform(self, u_hat):
+        assert u_hat.ndim > 1, 'u_hat must not be flattened here!'
         u = u_hat * 0
         _u = self.fft.itransform(u_hat, axis=-2)
         u[:] = self.cheby.itransform(_u, axis=-1)
@@ -222,14 +224,13 @@ class RayleighBenard(ptype):
     def _put_BCs_in_rhs(self, rhs):
         assert rhs.ndim > 1, 'Right hand side must not be flattened here!'
 
-        # _rhs_hat = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
         _rhs_hat = self.cheby.transform(rhs, axis=-1)
 
         # _rhs_hat[self.iua, :, -1] = self.BCs.get('u_top', 0)
         # _rhs_hat[self.iub, :, -1] = self.BCs.get('u_bottom', 0)
         _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
         _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
-        _rhs_hat[self.iT, :, -1] = self.BCs.get('T_top', 0)
+        _rhs_hat[self.iT, :, -1] = self.BCs.get('T_top', 1)
         _rhs_hat[self.iTz, :, -1] = self.BCs.get('T_bottom', 0)
         _rhs_hat[self.ip, :, -1] = self.BCs.get('p_top', 0)
 
@@ -244,16 +245,22 @@ class RayleighBenard(ptype):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        # _rhs = (self.T2U @ self.cheby.transform(rhs, axis=-1).flatten()).reshape(rhs.shape)
-        # _rhs[0, :, -1] = self.bc_lower
-        # _rhs[1, :, -1] = self.bc_upper
-        # rhs_hat = self.fft.transform(_rhs, axis=-2)
+        _rhs = self._put_BCs_in_rhs(rhs)
+        rhs_hat = self.transform(_rhs)
 
-        # A = (self.M + factor * self.L).tolil()
-        # A[self.BC != 0] = self.BC[self.BC != 0]
+        A = self.M + factor * self.L
+        A = self._put_BCs_in_matrix(A)
 
-        # res = sp.linalg.spsolve(A.tocsc(), rhs_hat.flatten())
+        sol_hat = self.cheby.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten()).reshape(sol.shape)
 
-        # sol_hat = res.reshape(sol.shape)
-        # sol[:] = self.itransform(sol_hat)
+        sol[:] = self.itransform(sol_hat)
         return sol
+
+    def compute_vorticiy(self, u):
+        u_hat = self.transform(u)
+        Dz = self.U2T @ self.Dz
+        Dx = self.U2T @ self.Dx
+        print(self.U2T.toarray())
+        print(self.Dx.toarray())
+        vorticity_hat = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[self.iu].flatten()).reshape(u[self.iu].shape)
+        return self.itransform(vorticity_hat)
