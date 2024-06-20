@@ -65,10 +65,10 @@ class RayleighBenard(ptype):
         Dz = sp.kron(Ix1D, Dz1D)
         I = sp.kron(Ix1D, Iz1D)
         O = I * 0
-        S2D = sp.kron(Ix1D, Sz1D) + sp.kron(Sx1D, Iz1D)
         self.Dx = Dx
         self.Dz = Dz
         self.U2T = sp.kron(Ix1D, U2T1D)
+        S2D = sp.kron(Ix1D, U2T1D) @ sp.kron(Ix1D, Sz1D) @ self.U2T @ sp.kron(Sx1D, sp.eye(nz))
 
         # construct operators
         L = self.cheby.get_empty_operator_matrix(S, O)
@@ -92,15 +92,15 @@ class RayleighBenard(ptype):
         L[self.ip][self.ip] = S2D
 
         # differential terms
-        L[self.iu][self.ip] = Pr * Dx
-        L[self.iu][self.iux] = -Pr * Dx
+        L[self.iu][self.ip] = -Pr * Dx
+        L[self.iu][self.iux] = Pr * Dx
 
-        L[self.iv][self.ip] = Pr * Dz
-        L[self.iv][self.ivz] = -Pr * Dz
-        L[self.iv][self.iT] = -Pr * Ra * I
+        L[self.iv][self.ip] = -Pr * Dz
+        L[self.iv][self.ivz] = Pr * Dz
+        L[self.iv][self.iT] = Pr * Ra * I
 
-        L[self.iT][self.iTx] = -Dx
-        L[self.iT][self.iTz] = -Dz
+        L[self.iT][self.iTx] = Dx
+        L[self.iT][self.iTz] = Dz
 
         # mass matrix
         for i in [self.iu, self.iv, self.iT]:
@@ -206,13 +206,13 @@ class RayleighBenard(ptype):
 
         me = self.u_init
 
-        # fill everything with random noise
-        me[:] = self.xp.random.rand(*me.shape) * 1e-3
-
         # linear temperature gradient
         Ttop = 1.0
         Tbottom = 0.0
         me[self.iT] = (Ttop - Tbottom) / 2 * self.Z + (Ttop + Tbottom) / 2.0
+
+        # perturb slightly
+        me[self.iT] += self.xp.random.rand(*me[self.iT].shape) * 1e-3
 
         # evaluate derivatives
         derivatives = self._compute_derivatives(me)
@@ -260,7 +260,62 @@ class RayleighBenard(ptype):
         u_hat = self.transform(u)
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
-        print(self.U2T.toarray())
-        print(self.Dx.toarray())
         vorticity_hat = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[self.iu].flatten()).reshape(u[self.iu].shape)
         return self.itransform(vorticity_hat)
+
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 3)))
+        self.cax = []
+        divider = make_axes_locatable(axs[0])
+        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
+        divider2 = make_axes_locatable(axs[1])
+        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+        return self.fig
+
+    def plot(self, u, t=None, fig=None):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        axs = fig.axes
+
+        vmin = u.min()
+        vmax = u.max()
+
+        imT = axs[0].pcolormesh(self.X, self.Z, u[self.iT].real)
+        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticiy(u).real)
+
+        for i, label in zip([0, 1], [r'$T$', 'vorticity']):
+            axs[i].set_aspect(1)
+            axs[i].set_title(label)
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2e}')
+        axs[1].set_xlabel(r'$x$')
+        axs[1].set_ylabel(r'$z$')
+        fig.colorbar(imT, self.cax[0])
+        fig.colorbar(imV, self.cax[1])
