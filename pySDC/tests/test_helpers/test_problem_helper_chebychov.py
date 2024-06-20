@@ -132,7 +132,7 @@ def test_integration_matrix(N, variant):
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
-    x = np.cos(np.pi / N * (np.arange(N) + 0.5))
+    x = cheby.get_1dgrid()
     coeffs = np.random.random(N)
     coeffs[-1] = 0
     norm = cheby.get_norm()
@@ -156,8 +156,8 @@ def test_integration_matrix(N, variant):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [4])
-@pytest.mark.parametrize('nz', [4])
+@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 def test_integration_matrix2D(nx, nz, variant, direction):
@@ -179,46 +179,35 @@ def test_integration_matrix2D(nx, nz, variant, direction):
     Sx = fft.get_integration_matrix()
     Sz = cheby.get_integration_matrix()
 
-    u = np.sin(X) * Z**2
+    u = np.sin(X) * Z**2 + np.cos(X) * Z**3
     if direction == 'x':
         S = sp.kron(Sx, Iz)
-        expect = -np.cos(X) * Z**2
+        expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
     elif direction == 'z':
         S = sp.kron(Ix, Sz)
-        expect = np.sin(X) * Z**3 / 3
+        expect = np.sin(X) * Z**3 / 3 + np.cos(X) * Z**4 / 4
     elif direction == 'mixed':
         S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
-        expect = -np.cos(X) * Z**3 / 3
+        expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
 
     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
     S_u_hat = (S @ conv @ u_hat.flatten()).reshape(u_hat.shape)
-    # print(S_u_hat)
     S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
-
-    # print(expect.real)
-    # print(S_u.real)
-    # print(S_u/expect)
 
     import matplotlib.pyplot as plt
 
     fig, axs = plt.subplots(1, 2)
     axs[0].pcolormesh(X, Z, (expect).real)
     im = axs[1].pcolormesh(X, Z, (S_u).real)
-    # im = axs[1].pcolormesh(X, Z, (S_u-expect).real)
+    im = axs[1].pcolormesh(X, Z, (S_u - expect).real)
     fig.colorbar(im)
-
-    ratio = (S_u[expect > 0] / expect[expect > 0]).flatten()
-    error = abs(ratio - ratio[0])
-    print(max(error), max(ratio), np.max(abs((S_u - expect))))
-    print((S_u - expect).real)
-    print((S_u - expect).imag)
-    # plt.show()
+    plt.show()
     assert np.allclose(S_u, expect, atol=1e-12)
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [4])
-@pytest.mark.parametrize('nz', [4])
+@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 def test_differentiation_matrix2D(nx, nz, variant, direction):
@@ -240,40 +229,21 @@ def test_differentiation_matrix2D(nx, nz, variant, direction):
     Dx = fft.get_differentiation_matrix()
     Dz = cheby.get_differentiation_matrix()
 
-    u = np.sin(X) * Z**2
+    u = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
     if direction == 'x':
         D = sp.kron(Dx, Iz)
-        expect = np.cos(X) * Z**2
+        expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
     elif direction == 'z':
         D = sp.kron(Ix, Dz)
-        expect = np.sin(X) * Z * 2
+        expect = np.sin(X) * Z * 2 + Z**2 * 3
     elif direction == 'mixed':
-        D = sp.kron(Ix, Dz) @ sp.kron(Dx, sp.eye(nz))
-        expect = -np.cos(X) * Z * 2
+        D = sp.kron(Ix, Dz) + sp.kron(Dx, Iz)
+        expect = np.cos(X) * Z**2 + np.sin(X) * 2 * Z + Z**2 * 3 - 2 * np.sin(2 * X)
 
     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
-    # print(D_u_hat)
     D_u = fft.itransform(cheby.itransform(D_u_hat, axis=-1), axis=-2)
 
-    # print(expect.real)
-    # print(D_u.real)
-    # print(D_u/expect)
-
-    import matplotlib.pyplot as plt
-
-    fig, axs = plt.subplots(1, 2)
-    axs[0].pcolormesh(X, Z, (expect).real)
-    im = axs[1].pcolormesh(X, Z, (D_u).real)
-    # im = axs[1].pcolormesh(X, Z, (D_u-expect).real)
-    fig.colorbar(im)
-
-    ratio = (D_u[expect > 0] / expect[expect > 0]).flatten()
-    error = abs(ratio - ratio[0])
-    print(max(error), max(ratio), np.max(abs((D_u - expect))))
-    print((D_u - expect).real)
-    print((D_u - expect).imag)
-    plt.show()
     assert np.allclose(D_u, expect, atol=1e-12)
 
 
@@ -565,5 +535,5 @@ if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
     # test_integration_matrix(4, 'T2U')
-    # test_integration_matrix2D(2**8, 2**8, 'T2T', 'mixed')
-    test_differentiation_matrix2D(2**8, 2**8, 'T2U', 'mixed')
+    # test_integration_matrix2D(2**8, 2**8, 'T2T', 'z')
+    test_differentiation_matrix2D(2**7, 2**7, 'T2T', 'mixed')

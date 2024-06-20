@@ -333,4 +333,4 @@ if __name__ == '__main__':
     # test_BCs(2**6, 2**6, 'T2T', 1, -2, 3, 2)
     # test_solver(2**6, 2**6, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
-    test_linear_operator(2**8, 2**8, 'T2U', 'x')
+    test_linear_operator(2**7, 2**7, 'T2T', 'x')
