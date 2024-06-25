@@ -286,6 +286,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
                     'restart_at_maxiter': True,
                     'factor_if_not_converged': 4.0,
                 },
+                'problem_params': {'mu': 1000},
             }
         else:
             force_params = {}
@@ -293,6 +294,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
             strategy=strategy(useMPI=False),
             force_params=force_params,
             hook_class=[LogLocalErrorPostStep, LogData, LogWork],
+            Tend=1000,
         )
         plot_error(stats, axs[1], axs[2], strategy())
 
@@ -455,9 +457,9 @@ def plot_vdp_solution():  # pragma: no cover
     else:
         fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 1.0, 0.33))
 
-    custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}}
+    custom_description = {'convergence_controllers': {Adaptivity: {'e_tol': 1e-7}}, 'problem_params': {'mu': 1000}}
 
-    stats, _, _ = run_vdp(custom_description=custom_description, Tend=28.6)
+    stats, _, _ = run_vdp(custom_description=custom_description, Tend=1000)
 
     u = get_sorted(stats, type='u')
     ax.plot([me[0] for me in u], [me[1][0] for me in u], color='black')
@@ -524,16 +526,16 @@ def make_plots_for_paper():  # pragma: no cover
 
     plot_adaptivity_stuff()
 
-    work_precision()
+    # work_precision()
 
-    plot_vdp_solution()
-    plot_AC_solution()
-    plot_quench_solution()
+    # plot_vdp_solution()
+    # plot_AC_solution()
+    # plot_quench_solution()
 
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    compare_recovery_rate_problems(num_procs=1, strategy_type='SDC')
+    # plot_recovery_rate(get_stats(run_vdp))
+    # plot_fault_vdp(0)
+    # plot_fault_vdp(13)
+    # compare_recovery_rate_problems(num_procs=1, strategy_type='SDC')
 
 
 def make_plots_for_notes():  # pragma: no cover

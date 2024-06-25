@@ -617,7 +617,7 @@ def execute_configurations(
                     problem_args=config.get('problem_args', {}),
                     param_range=config.get('param_range', None),
                     hooks=config.get('hooks', None),
-                    Tend=Tend,
+                    Tend=config.get('Tend') if Tend is None else Tend,
                     mode=mode,
                 )
             if plotting and comm_world.rank == 0:
@@ -866,9 +866,18 @@ def get_configs(mode, problem):
         """
         Run van der Pol with different parameter for the nonlinear term, which controls the stiffness.
         """
-        from pySDC.projects.Resilience.strategies import AdaptivityStrategy, ERKStrategy, ESDIRKStrategy
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            ERKStrategy,
+            ESDIRKStrategy,
+            AdaptivityPolynomialError,
+        )
+        from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+            generic_implicit_MPI as parallel_sweeper,
+        )
 
         mu = float(mode[14:])
+        Tend = 1000
 
         problem_desc = {'problem_params': {'mu': mu}}
 
@@ -883,40 +892,64 @@ def get_configs(mode, problem):
             3: '-.',
             4: ':',
             5: ':',
+            'MIN-SR-S': '-',
+            'MIN-SR-NS': '--',
+            'MIN-SR-FLEX': '-.',
         }
 
-        for num_procs in [5]:
-            plotting_params = {'ls': ls[num_procs], 'label': f'GSSDC {num_procs} procs'}
-            configurations[num_procs] = {
-                'strategies': [AdaptivityStrategy(True)],
-                'custom_description': desc,
-                'num_procs': num_procs,
-                'plotting_params': plotting_params,
-                'handle': mode,
+        #         configurations[1] = {
+        #             'strategies': [AdaptivityStrategy(useMPI=True)],
+        #             'custom_description': desc,
+        #             'num_procs': 1,
+        #             'plotting_params': {'ls': ls[1], 'label': 'SDC'},
+        #             'handle': mode,
+        #                 'Tend': Tend,
+        #         }
+        #         configurations[4] = {
+        #             'strategies': [ESDIRKStrategy(useMPI=True)],
+        #             'num_procs': 1,
+        #             'handle': mode,
+        #             'plotting_params': {'label': 'ESDIRK5(3)'},
+        #             'custom_description': problem_desc,
+        #                 'Tend': Tend,
+        #         }
+
+        # configurations[2] = {
+        #     'strategies': [ERKStrategy(useMPI=True)],
+        #     'num_procs': 1,
+        #     'handle': mode,
+        #     'plotting_params': {'label': 'CP5(4)'},
+        #     'custom_description': problem_desc,
+        # 'Tend': Tend,
+        # }
+        # for QI, i in zip(['MIN-SR-S', 'MIN-SR-NS', 'MIN-SR-FLEX'], [9991, 12123127391, 1231723109247102731092]):
+        for QI, i in zip(
+            [
+                'MIN-SR-S',
+            ],
+            [9991, 12123127391, 1231723109247102731092],
+        ):
+            configurations[i] = {
+                'custom_description': {
+                    'sweeper_params': {'num_nodes': 3, 'QI': QI},
+                    'problem_params': desc["problem_params"],
+                },
+                # 'custom_description': {'sweeper_params': {'num_nodes': 3, 'QI': QI}, 'sweeper_class': parallel_sweeper, 'problem_params': desc["problem_params"]},
+                'strategies': [
+                    AdaptivityPolynomialError(
+                        useMPI=True, newton_inexactness=False, linear_inexactness=False, max_slope=8
+                    )
+                ],
+                'num_procs_sweeper': 1,
+                'num_procs': 1,
+                'plotting_params': {
+                    'ls': ls.get(QI, '-'),
+                    'label': rf'$\Delta t$-$k$-adaptivity $N$={1}x3',
+                },
+                'handle': f'{mode}-{QI}',
+                'Tend': Tend,
             }
 
-        configurations[1] = {
-            'strategies': [AdaptivityStrategy(True)],
-            'custom_description': desc,
-            'num_procs': 1,
-            'plotting_params': {'ls': ls[1], 'label': 'SDC'},
-            'handle': mode,
-        }
-
-        configurations[2] = {
-            'strategies': [ERKStrategy(useMPI=True)],
-            'num_procs': 1,
-            'handle': mode,
-            'plotting_params': {'label': 'CP5(4)'},
-            'custom_description': problem_desc,
-        }
-        configurations[4] = {
-            'strategies': [ESDIRKStrategy(useMPI=True)],
-            'num_procs': 1,
-            'handle': mode,
-            'plotting_params': {'label': 'ESDIRK5(3)'},
-            'custom_description': problem_desc,
-        }
     elif mode == 'inexactness':
         """
         Compare inexact SDC to exact SDC
@@ -1498,22 +1531,24 @@ def aggregate_parallel_efficiency_plot():  # pragma: no cover
 if __name__ == "__main__":
     comm_world = MPI.COMM_WORLD
 
-    # record = False
-    # for mode in [
-    #     'compare_strategies',
-    #     'RK_comp',
-    #     'parallel_efficiency',
-    # ]:
-    #     params = {
-    #         'mode': mode,
-    #         'runs': 5,
-    #         'plotting': comm_world.rank == 0,
-    #     }
-    #     params_single = {
-    #         **params,
-    #         'problem': run_AC,
-    #     }
-    #     single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+    record = True
+    for mode in [
+        #'compare_strategies',
+        #'RK_comp',
+        #'parallel_efficiency',
+        'vdp_stiffness-1000',
+    ]:
+        params = {
+            'mode': mode,
+            'runs': 1,
+            'plotting': comm_world.rank == 0,
+        }
+        params_single = {
+            **params,
+            'problem': run_vdp,
+        }
+        single_problem(**params_single, work_key='t', precision_key='e_global_rel', record=record)
+        single_problem(**params_single, work_key='k_Newton', precision_key='e_global_rel', record=False)
 
     all_params = {
         'record': True,
@@ -1524,9 +1559,9 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'RK_comp',
-        'parallel_efficiency',
-        'compare_strategies',
+        # 'RK_comp',
+        # 'parallel_efficiency',
+        # 'compare_strategies',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

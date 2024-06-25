@@ -281,7 +281,7 @@ class Strategy:
         from pySDC.implementations.convergence_controller_classes.crash import StopAtMaxRuntime
 
         max_runtime = {
-            'run_vdp': 60,
+            'run_vdp': 60 * 5,
             'run_Lorenz': 60,
             'run_Schroedinger': 150,
             'run_quench': 150,
@@ -1813,7 +1813,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
     Adaptivity based on extrapolation between collocation nodes as a resilience strategy
     '''
 
-    def __init__(self, interpolate_between_restarts=False, use_restol_rel=True, **kwargs):
+    def __init__(self, interpolate_between_restarts=False, use_restol_rel=True, max_slope=4, **kwargs):
         '''
         Initialization routine
         '''
@@ -1830,6 +1830,7 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
         self.precision_parameter_loc = ['convergence_controllers', AdaptivityPolynomialError, 'e_tol']
         self.interpolate_between_restarts = interpolate_between_restarts
         self.use_restol_rel = use_restol_rel
+        self.max_slope = max_slope
 
     def get_custom_description(self, problem, num_procs):
         '''
@@ -1849,7 +1850,6 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
         custom_description = {}
 
         dt_max = np.inf
-        max_slope = 4.0
         restol_rel = 1e-4
         restol_min = 1e-12
         level_params = {}
@@ -1883,12 +1883,12 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
                 'restol_rel': restol_rel if self.use_restol_rel else 1e-11,
                 'restol_min': restol_min if self.use_restol_rel else 1e-12,
                 'restart_at_maxiter': True,
-                'factor_if_not_converged': max_slope,
+                'factor_if_not_converged': self.max_slope,
                 'interpolate_between_restarts': self.interpolate_between_restarts,
             },
             StepSizeLimiter: {
                 'dt_max': dt_max,
-                'dt_slope_max': max_slope,
+                'dt_slope_max': self.max_slope,
             },
         }
         custom_description['level_params'] = level_params
