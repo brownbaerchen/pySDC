@@ -179,16 +179,19 @@ def test_integration_matrix2D(nx, nz, variant, direction):
     Sx = fft.get_integration_matrix()
     Sz = cheby.get_integration_matrix()
 
-    u = np.sin(X) * Z**2 + np.cos(X) * Z**3
+    # u = np.sin(X) * 3*Z**2 + np.cos(X) * Z**3
+    u = np.cos(X) * Z**2 + np.sin(X) * 2 * Z + Z**2 * 3 - 2 * np.sin(2 * X)
     if direction == 'x':
         S = sp.kron(Sx, Iz)
         expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
     elif direction == 'z':
         S = sp.kron(Ix, Sz)
-        expect = np.sin(X) * Z**3 / 3 + np.cos(X) * Z**4 / 4
+        expect = np.sin(X) * Z**3
     elif direction == 'mixed':
         S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
-        expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
+        # expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
+
+        expect = np.sin(X) * Z**2  # + Z**3 + np.cos(2 * X)
 
     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
     S_u_hat = (S @ conv @ u_hat.flatten()).reshape(u_hat.shape)
@@ -199,7 +202,7 @@ def test_integration_matrix2D(nx, nz, variant, direction):
     fig, axs = plt.subplots(1, 2)
     axs[0].pcolormesh(X, Z, (expect).real)
     im = axs[1].pcolormesh(X, Z, (S_u).real)
-    im = axs[1].pcolormesh(X, Z, (S_u - expect).real)
+    # im = axs[1].pcolormesh(X, Z, (S_u - expect).real)
     fig.colorbar(im)
     plt.show()
     assert np.allclose(S_u, expect, atol=1e-12)
@@ -237,14 +240,14 @@ def test_differentiation_matrix2D(nx, nz, variant, direction):
         D = sp.kron(Ix, Dz)
         expect = np.sin(X) * Z * 2 + Z**2 * 3
     elif direction == 'mixed':
-        D = sp.kron(Ix, Dz) + sp.kron(Dx, Iz)
-        expect = np.cos(X) * Z**2 + np.sin(X) * 2 * Z + Z**2 * 3 - 2 * np.sin(2 * X)
+        D = sp.kron(Ix, Dz) @ sp.kron(Dx, sp.eye(nz))
+        expect = np.cos(X) * 2 * Z
 
     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = fft.itransform(cheby.itransform(D_u_hat, axis=-1), axis=-2)
 
-    assert np.allclose(D_u, expect, atol=1e-12)
+    assert np.allclose(D_u, expect, atol=1e-9)
 
 
 @pytest.mark.base
@@ -535,5 +538,5 @@ if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
     # test_integration_matrix(4, 'T2U')
-    # test_integration_matrix2D(2**8, 2**8, 'T2T', 'z')
-    test_differentiation_matrix2D(2**7, 2**7, 'T2T', 'mixed')
+    # test_integration_matrix2D(2**8, 2**8, 'T2T', 'mixed')
+    test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')

@@ -211,7 +211,9 @@ class Heat2d(ptype):
         U2T = self.cheby.get_conv(mode[::-1])
 
         # generate 2D matrices
-        D = sp.kron(Ix, Dz) + sp.kron(Dx, Iz)
+        D = sp.kron(Ix, Dz) + sp.kron(
+            Dx, Iz
+        )  # TODO: I think this is wrong! I think I need separate components for the directional derivatives
         Dnu = sp.kron(Ix, nu * Dz) + sp.kron(nu * Dx, Iz)
         I = sp.kron(Ix, Iz)
         O = I * 0
