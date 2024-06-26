@@ -1,11 +1,11 @@
 import numpy as np
 
-from pySDC.core.Problem import ptype
+from pySDC.core.problem import Problem
 from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 
-class RayleighBenard(ptype):
+class RayleighBenard(Problem):
 
     dtype_u = mesh
     dtype_f = imex_mesh

@@ -2,13 +2,13 @@ import numpy as np
 import scipy
 from scipy import sparse as sp
 
-from pySDC.core.Problem import ptype
+from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.mesh import mesh
 
 from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
 
 
-class Heat1DChebychev(ptype):
+class Heat1DChebychev(Problem):
     dtype_u = mesh
     dtype_f = mesh
 
@@ -168,7 +168,7 @@ class Heat1DChebychev(ptype):
         return me
 
 
-class Heat2d(ptype):
+class Heat2d(Problem):
     dtype_u = mesh
     dtype_f = mesh
 
