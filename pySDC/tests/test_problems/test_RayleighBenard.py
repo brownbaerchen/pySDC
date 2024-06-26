@@ -245,7 +245,7 @@ def test_vorticity(nx, nz, cheby_mode, direction):
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('direction', ['x'])
+@pytest.mark.parametrize('direction', ['x', 'mixed'])
 def test_linear_operator(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -259,8 +259,8 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     for i in [P.iu, P.iv, P.iT, P.ip]:
         if direction == 'x':
             u[i] = np.sin(P.X * (i + 1))
-        elif direction == 'z':
-            u[i] = Z**2
+        elif direction == 'mixed':
+            u[i] = P.Z**2 * np.sin(P.X)
         else:
             raise NotImplementedError
 
@@ -278,8 +278,11 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
         expect[P.iTz] = 0
         expect[P.ip] = np.sin(P.X * (P.ip + 1)) * P.Z
         expect[P.ip] = -np.cos(P.X * (P.ip + 1)) / (P.ip + 1) * P.Z
-    elif direction == 'z':
-        pass  # expect[
+    elif direction == 'mixed':
+        expect[P.iu] = P.Pr * (-np.cos(P.X) - np.sin(P.X)) * P.Z**2
+        expect[P.iv] = P.Pr * (-np.sin(P.X) * 2 * P.Z + P.Ra * u[P.iT] + 2 * np.sin(P.X))
+        expect[P.iux] = 0.0
+        expect[P.ivz] = u[P.ivz]  # 4*P.Z * np.sin(P.X) #- np.cos(P.X) * P.Z**2
     else:
         raise NotImplementedError
 
@@ -287,13 +290,14 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     Lu_hat = (P.L @ u_hat.flatten()).reshape(u.shape)
     Lu = P.itransform(Lu_hat)
 
-    fig, axs = plt.subplots(1, 3)
-    i = P.ip
-    im = axs[0].pcolormesh(P.X, P.Z, u[i].real)
+    fig, axs = plt.subplots(1, 4)
+    i = P.ivz
     im = axs[1].pcolormesh(P.X, P.Z, Lu[i].real)
-    axs[2].pcolormesh(P.X, P.Z, expect[i].real)
+    # im = axs[2].pcolormesh(P.X, P.Z, expect[i].real)
+    # im = axs[3].pcolormesh(P.X, P.Z, (Lu[i]-expect[i]).real)
+    # im = axs[0].pcolormesh(P.X, P.Z, u[i].real)
     fig.colorbar(im)
-    # plt.show()
+    plt.show()
 
     for i in range(u.shape[0]):
         assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
@@ -344,4 +348,4 @@ if __name__ == '__main__':
     # test_BCs(2**6, 2**6, 'T2T', 1, -2, 3, 2)
     # test_solver(2**6, 2**6, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
-    test_linear_operator(2**7, 2**7, 'T2U', 'x')
+    test_linear_operator(2**7, 2**7, 'T2T', 'mixed')
