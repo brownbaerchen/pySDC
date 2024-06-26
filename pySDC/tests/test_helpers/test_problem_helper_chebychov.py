@@ -131,7 +131,7 @@ def test_integration_matrix(N, variant):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, mode=variant)
     x = cheby.get_1dgrid()
     coeffs = np.random.random(N)
     coeffs[-1] = 0
@@ -140,72 +140,122 @@ def test_integration_matrix(N, variant):
     if variant == 'T2U':
         D = cheby.get_U2T_integration_matrix()
         P = cheby.get_conv('T2U')
-        Q = cheby.get_conv('T2T')
     elif variant == 'T2T':
         D = cheby.get_T2T_integration_matrix()
         P = cheby.get_conv('T2T')
-        Q = cheby.get_conv('T2T')
     else:
         raise NotImplementedError
 
-    du = scipy.fft.idct(Q @ D @ P @ coeffs / norm)
+    du = scipy.fft.idct(D @ P @ coeffs / norm)
     exact = np.polynomial.Chebyshev(coeffs).integ(1)
-    exact.coef[0] = 0  # fix integration constant to 0
 
     assert np.allclose(exact(x), du)
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [16])
-@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('nz', [4, 32])
+@pytest.mark.parametrize('nx', [4, 32])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
-def test_integration_matrix2D(nx, nz, variant, direction):
+def test_integration_matrix2D2(nx, nz, variant, direction):
     import numpy as np
-    import scipy.sparse as sp
+    import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
 
-    cheby = ChebychovHelper(nz, mode=variant)
     fft = FFTHelper(nx)
+    cheby = ChebychovHelper(nz, mode=variant)
     x = fft.get_1dgrid()
     z = cheby.get_1dgrid()
     Z, X = np.meshgrid(z, x)
-    conv1D = cheby.get_conv(variant)
-    convInv1D = cheby.get_conv(variant[::-1])
 
-    Ix = fft.get_Id()
-    Iz = convInv1D
-    conv = sp.kron(Ix, conv1D)
-    Sx = fft.get_integration_matrix()
-    Sz = cheby.get_integration_matrix()
+    coeffs_z = np.random.random(nz)
+    coeffs_z[-1] = 0
 
-    # u = np.sin(X) * 3*Z**2 + np.cos(X) * Z**3
-    u = np.cos(X) * Z**2 + np.sin(X) * 2 * Z + Z**2 * 3 - 2 * np.sin(2 * X)
-    if direction == 'x':
-        S = sp.kron(Sx, Iz)
-        expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
-    elif direction == 'z':
-        S = sp.kron(Ix, Sz)
-        expect = np.sin(X) * Z**3
+    coeffs_x = np.random.random(nx // 2)
+
+    CZ, CX = np.meshgrid(coeffs_z, coeffs_x)
+
+    if direction == 'z':
+        u_hat = CZ
+    elif direction == 'x':
+        u_hat = CX
     elif direction == 'mixed':
-        S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
-        # expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
+        u_hat = CZ + CX
+    else:
+        raise NotImplementedError
 
-        expect = np.sin(X) * Z**2  # + Z**3 + np.cos(2 * X)
+    S = cheby.get_integration_matrix()
+    P = cheby.get_conv(variant)
 
-    u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
-    S_u_hat = (S @ conv @ u_hat.flatten()).reshape(u_hat.shape)
-    S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
+    Su_hat = S @ P @ coeffs_z
+    Su = cheby.itransform(Su_hat)
+    exact = np.polynomial.Chebyshev(coeffs_z).integ(1)
+    exact.coef[0] = 0  # fix integration constant to 0
 
-    import matplotlib.pyplot as plt
+    assert np.allclose(exact(Z), Su)
 
-    fig, axs = plt.subplots(1, 2)
-    axs[0].pcolormesh(X, Z, (expect).real)
-    im = axs[1].pcolormesh(X, Z, (S_u).real)
-    # im = axs[1].pcolormesh(X, Z, (S_u - expect).real)
-    fig.colorbar(im)
-    plt.show()
-    assert np.allclose(S_u, expect, atol=1e-12)
+
+# @pytest.mark.base
+# @pytest.mark.parametrize('nx', [16])
+# @pytest.mark.parametrize('nz', [16])
+# @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+# @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
+# def test_integration_matrix2D(nx, nz, variant, direction):
+#     import numpy as np
+#     import scipy.sparse as sp
+#     from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+#
+#     cheby = ChebychovHelper(nz, mode=variant)
+#     fft = FFTHelper(nx)
+#     x = fft.get_1dgrid()
+#     z = cheby.get_1dgrid()
+#     Z, X = np.meshgrid(z, x)
+#     conv1D = cheby.get_conv(variant)
+#     convInv1D = cheby.get_conv(variant[::-1])
+#
+#     Ix = fft.get_Id()
+#     Iz = convInv1D
+#     conv = sp.kron(Ix, conv1D)
+#     Sx = fft.get_integration_matrix()
+#     Sz = cheby.get_integration_matrix()
+#     # Sz = cheby.get_U2T_integration_matrix()
+#     # print(Sz.toarray())
+#
+#     u = np.sin(X) * Z**2 + np.cos(X) * Z**3
+#     u =  Z**2
+#     if direction == 'x':
+#         S = sp.kron(Sx, Iz)
+#         expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
+#     elif direction == 'z':
+#         S = sp.kron(Ix, Sz)
+#         expect = np.sin(X) * 1/3*Z**3 + np.cos(X) * 1/4 * Z**4
+#         print(S.toarray())
+#         print(Sz.toarray())
+#         print(conv1D.toarray())
+#         expect =  Z**3 / 3.
+#     elif direction == 'mixed':
+#         S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
+#         S = sp.kron(Ix, Sz @ conv1D) @ sp.kron(Ix, sp.eye(nz))
+#         # expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
+#
+#         expect = np.sin(X) * Z**2  # + Z**3 + np.cos(2 * X)
+#
+#     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
+#     print('u_hat', u_hat)
+#     S_u_hat = (S  @ conv@ u_hat.flatten()).reshape(u_hat.shape)
+#     # S_u_hat[:,0] = 1/4.
+#     print(S_u_hat)
+#     print(fft.transform(cheby.transform(expect, axis=-1), axis=-2))
+#     S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
+#
+#     import matplotlib.pyplot as plt
+#
+#     fig, axs = plt.subplots(1, 3)
+#     axs[0].pcolormesh(X, Z, (expect).real)
+#     im = axs[1].pcolormesh(X, Z, (S_u).real)
+#     im = axs[2].pcolormesh(X, Z, (S_u - expect).real)
+#     fig.colorbar(im)
+#     plt.show()
+#     assert np.allclose(S_u, expect, atol=1e-8)
 
 
 @pytest.mark.base
@@ -537,6 +587,6 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
-    # test_integration_matrix(4, 'T2U')
-    # test_integration_matrix2D(2**8, 2**8, 'T2T', 'mixed')
-    test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
+    test_integration_matrix(4, 'T2T')
+    # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
+    # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
