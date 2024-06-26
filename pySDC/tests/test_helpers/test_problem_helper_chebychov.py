@@ -150,109 +150,45 @@ def test_integration_matrix(N, variant):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nz', [4, 32])
-@pytest.mark.parametrize('nx', [4, 32])
+@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-def test_integration_matrix2D2(nx, nz, variant, direction):
+@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
+def test_integration_matrix2D(nx, nz, variant, direction):
     import numpy as np
-    import scipy
+    import scipy.sparse as sp
     from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
 
-    fft = FFTHelper(nx)
     cheby = ChebychovHelper(nz, mode=variant)
+    fft = FFTHelper(nx)
     x = fft.get_1dgrid()
     z = cheby.get_1dgrid()
     Z, X = np.meshgrid(z, x)
+    conv1D = cheby.get_conv(variant)
+    convInv1D = cheby.get_conv(variant[::-1])
 
-    coeffs_z = np.random.random(nz)
-    coeffs_z[-1] = 0
+    Ix = fft.get_Id()
+    Iz = conv1D
+    conv = sp.kron(Ix, convInv1D)
+    Sx = fft.get_integration_matrix()
+    Sz = cheby.get_integration_matrix()
 
-    coeffs_x = np.random.random(nx // 2)
-
-    CZ, CX = np.meshgrid(coeffs_z, coeffs_x)
-
-    if direction == 'z':
-        u_hat = CZ
-    elif direction == 'x':
-        u_hat = CX
+    u = np.sin(X) * Z**2 + np.cos(X) * Z**3
+    if direction == 'x':
+        S = sp.kron(Sx, Iz)
+        expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
+    elif direction == 'z':
+        S = sp.kron(Ix, Sz)
+        expect = np.sin(X) * 1 / 3 * Z**3 + np.cos(X) * 1 / 4 * Z**4
     elif direction == 'mixed':
-        u_hat = CZ + CX
-    else:
-        raise NotImplementedError
+        S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
+        expect = -np.cos(X) * 1 / 3 * Z**3 + np.sin(X) * 1 / 4 * Z**4
 
-    S = cheby.get_integration_matrix()
-    P = cheby.get_conv(variant)
+    u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
+    S_u_hat = (conv @ S @ u_hat.flatten()).reshape(u_hat.shape)
+    S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
 
-    Su_hat = S @ P @ coeffs_z
-    Su = cheby.itransform(Su_hat)
-    exact = np.polynomial.Chebyshev(coeffs_z).integ(1)
-    exact.coef[0] = 0  # fix integration constant to 0
-
-    assert np.allclose(exact(Z), Su)
-
-
-# @pytest.mark.base
-# @pytest.mark.parametrize('nx', [16])
-# @pytest.mark.parametrize('nz', [16])
-# @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-# @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
-# def test_integration_matrix2D(nx, nz, variant, direction):
-#     import numpy as np
-#     import scipy.sparse as sp
-#     from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
-#
-#     cheby = ChebychovHelper(nz, mode=variant)
-#     fft = FFTHelper(nx)
-#     x = fft.get_1dgrid()
-#     z = cheby.get_1dgrid()
-#     Z, X = np.meshgrid(z, x)
-#     conv1D = cheby.get_conv(variant)
-#     convInv1D = cheby.get_conv(variant[::-1])
-#
-#     Ix = fft.get_Id()
-#     Iz = convInv1D
-#     conv = sp.kron(Ix, conv1D)
-#     Sx = fft.get_integration_matrix()
-#     Sz = cheby.get_integration_matrix()
-#     # Sz = cheby.get_U2T_integration_matrix()
-#     # print(Sz.toarray())
-#
-#     u = np.sin(X) * Z**2 + np.cos(X) * Z**3
-#     u =  Z**2
-#     if direction == 'x':
-#         S = sp.kron(Sx, Iz)
-#         expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
-#     elif direction == 'z':
-#         S = sp.kron(Ix, Sz)
-#         expect = np.sin(X) * 1/3*Z**3 + np.cos(X) * 1/4 * Z**4
-#         print(S.toarray())
-#         print(Sz.toarray())
-#         print(conv1D.toarray())
-#         expect =  Z**3 / 3.
-#     elif direction == 'mixed':
-#         S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
-#         S = sp.kron(Ix, Sz @ conv1D) @ sp.kron(Ix, sp.eye(nz))
-#         # expect = -np.cos(X) * Z**3 / 3 + np.sin(X) / 4 * Z**4
-#
-#         expect = np.sin(X) * Z**2  # + Z**3 + np.cos(2 * X)
-#
-#     u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
-#     print('u_hat', u_hat)
-#     S_u_hat = (S  @ conv@ u_hat.flatten()).reshape(u_hat.shape)
-#     # S_u_hat[:,0] = 1/4.
-#     print(S_u_hat)
-#     print(fft.transform(cheby.transform(expect, axis=-1), axis=-2))
-#     S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
-#
-#     import matplotlib.pyplot as plt
-#
-#     fig, axs = plt.subplots(1, 3)
-#     axs[0].pcolormesh(X, Z, (expect).real)
-#     im = axs[1].pcolormesh(X, Z, (S_u).real)
-#     im = axs[2].pcolormesh(X, Z, (S_u - expect).real)
-#     fig.colorbar(im)
-#     plt.show()
-#     assert np.allclose(S_u, expect, atol=1e-8)
+    assert np.allclose(S_u, expect, atol=1e-12)
 
 
 @pytest.mark.base
