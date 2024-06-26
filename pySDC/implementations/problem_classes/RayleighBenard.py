@@ -68,7 +68,7 @@ class RayleighBenard(ptype):
         self.Dx = Dx
         self.Dz = Dz
         self.U2T = sp.kron(Ix1D, U2T1D)
-        S2D = sp.kron(Ix1D, Sz1D @ T2U1D) @ sp.kron(Ix1D, sp.eye(nz))  # TODO: fix
+        S2D = sp.kron(Ix1D, Sz1D) @ sp.kron(Sx1D, sp.eye(nz))
 
         # construct operators
         L = self.cheby.get_empty_operator_matrix(S, O)

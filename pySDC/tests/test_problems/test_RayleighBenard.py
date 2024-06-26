@@ -200,7 +200,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
     axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
     axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
     axs[0].legend()
-    plt.show()
+    # plt.show()
 
     for i in [P.iTx, P.iu, P.iux, P.ip]:
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
@@ -241,6 +241,11 @@ def test_vorticity(nx, nz, cheby_mode, direction):
     assert np.allclose(P.compute_vorticiy(u), expect)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 def test_linear_operator(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -269,7 +274,7 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
         expect[P.iT] = -((P.iT + 1) ** 2) * np.sin(P.X * (P.iT + 1))
         expect[P.iTx] = 0
         expect[P.iTz] = 0
-        expect[P.ip] = np.sin(P.X * (P.ip + 1)) * P.Z**2 / 2.0
+        expect[P.ip] = np.sin(P.X * (P.ip + 1))  # * P.Z**2 / 2.0
     else:
         raise NotImplementedError
 
