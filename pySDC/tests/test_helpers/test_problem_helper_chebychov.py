@@ -128,28 +128,25 @@ def test_differentiation_matrix(N, variant):
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 def test_integration_matrix(N, variant):
     import numpy as np
-    import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N, mode=variant)
-    x = cheby.get_1dgrid()
     coeffs = np.random.random(N)
     coeffs[-1] = 0
-    norm = cheby.get_norm()
+
+    D = cheby.get_integration_matrix()
 
     if variant == 'T2U':
-        D = cheby.get_U2T_integration_matrix()
-        P = cheby.get_conv('T2U')
+        P = cheby.get_conv('U2T')
     elif variant == 'T2T':
-        D = cheby.get_T2T_integration_matrix()
         P = cheby.get_conv('T2T')
     else:
         raise NotImplementedError
 
-    du = scipy.fft.idct(D @ P @ coeffs / norm)
+    du = P @ D @ coeffs
     exact = np.polynomial.Chebyshev(coeffs).integ(1)
 
-    assert np.allclose(exact(x), du)
+    assert np.allclose(exact.coef[:-1], du)
 
 
 @pytest.mark.base
@@ -587,6 +584,6 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 if __name__ == '__main__':
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
-    test_integration_matrix(4, 'T2T')
+    test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
     # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
