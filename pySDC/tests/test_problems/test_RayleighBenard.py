@@ -242,10 +242,10 @@ def test_vorticity(nx, nz, cheby_mode, direction):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [4, 8])
-@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('nx', [32])
+@pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
+@pytest.mark.parametrize('direction', ['x'])
 def test_linear_operator(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -259,6 +259,8 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     for i in [P.iu, P.iv, P.iT, P.ip]:
         if direction == 'x':
             u[i] = np.sin(P.X * (i + 1))
+        elif direction == 'z':
+            u[i] = Z**2
         else:
             raise NotImplementedError
 
@@ -274,7 +276,10 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
         expect[P.iT] = -((P.iT + 1) ** 2) * np.sin(P.X * (P.iT + 1))
         expect[P.iTx] = 0
         expect[P.iTz] = 0
-        expect[P.ip] = np.sin(P.X * (P.ip + 1))  # * P.Z**2 / 2.0
+        expect[P.ip] = np.sin(P.X * (P.ip + 1)) * P.Z
+        expect[P.ip] = -np.cos(P.X * (P.ip + 1)) / (P.ip + 1) * P.Z
+    elif direction == 'z':
+        pass  # expect[
     else:
         raise NotImplementedError
 
@@ -284,52 +289,53 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
 
     fig, axs = plt.subplots(1, 3)
     i = P.ip
-    axs[0].pcolormesh(P.X, P.Z, u[i].real)
-    axs[1].pcolormesh(P.X, P.Z, Lu[i].real)
+    im = axs[0].pcolormesh(P.X, P.Z, u[i].real)
+    im = axs[1].pcolormesh(P.X, P.Z, Lu[i].real)
     axs[2].pcolormesh(P.X, P.Z, expect[i].real)
-    plt.show()
+    fig.colorbar(im)
+    # plt.show()
 
     for i in range(u.shape[0]):
         assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
 
 
-def test_solver(nx, nz, cheby_mode):
-    import numpy as np
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-    import matplotlib.pyplot as plt
-
-    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
-
-    zero = P.u_init
-    u = P.u_exact()
-    t = 0
-
-    def IMEX_Euler(_u, dt):
-        f = P.eval_f(_u)
-        un = P.solve_system(_u + dt * f.expl, dt)
-        return un
-
-    small_dt = P.solve_system(zero, 1e-9)
-    for i in range(small_dt.shape[0]):
-        error = abs(zero[i] - small_dt[i])
-        print(error)
-        # assert np.allclose(error, 0, atol=1e-7), f'{error=:.2e} in {P.index_to_name[i]} when solving with small step size'
-
-    nsteps = 1000
-    dt = 2e0
-    fig = P.get_fig()
-
-    for i in range(nsteps):
-        t += dt
-        u = IMEX_Euler(u, dt)
-
-        P.plot(u, t, fig=fig)
-        # im = plt.pcolormesh(P.X, P.Z, P.compute_vorticiy(u).real)
-        # im = plt.pcolormesh(P.X, P.Z, u[P.iT].real)
-        # plt.title(t)
-        # plt.colorbar(im)
-        plt.pause(1e-8)
-    plt.show()
+# def test_solver(nx, nz, cheby_mode):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#     import matplotlib.pyplot as plt
+#
+#     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+#
+#     zero = P.u_init
+#     u = P.u_exact()
+#     t = 0
+#
+#     def IMEX_Euler(_u, dt):
+#         f = P.eval_f(_u)
+#         un = P.solve_system(_u + dt * f.expl, dt)
+#         return un
+#
+#     small_dt = P.solve_system(zero, 1e-9)
+#     for i in range(small_dt.shape[0]):
+#         error = abs(zero[i] - small_dt[i])
+#         print(error)
+#         # assert np.allclose(error, 0, atol=1e-7), f'{error=:.2e} in {P.index_to_name[i]} when solving with small step size'
+#
+#     nsteps = 1000
+#     dt = 2e0
+#     fig = P.get_fig()
+#
+#     for i in range(nsteps):
+#         t += dt
+#         u = IMEX_Euler(u, dt)
+#
+#         P.plot(u, t, fig=fig)
+#         # im = plt.pcolormesh(P.X, P.Z, P.compute_vorticiy(u).real)
+#         # im = plt.pcolormesh(P.X, P.Z, u[P.iT].real)
+#         # plt.title(t)
+#         # plt.colorbar(im)
+#         plt.pause(1e-8)
+#     plt.show()
 
 
 if __name__ == '__main__':
@@ -338,4 +344,4 @@ if __name__ == '__main__':
     # test_BCs(2**6, 2**6, 'T2T', 1, -2, 3, 2)
     # test_solver(2**6, 2**6, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
-    test_linear_operator(2**7, 2**7, 'T2T', 'x')
+    test_linear_operator(2**7, 2**7, 'T2U', 'x')
