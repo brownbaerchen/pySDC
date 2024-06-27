@@ -11,8 +11,16 @@ class RayleighBenard(Problem):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, Pr=1, Ra=1, nx=8, nz=8, cheby_mode='T2T', BCs=None, **kwargs):
+    def __init__(self, Pr=1, Ra=1, nx=8, nz=8, cheby_mode='T2T', BCs=None):
         BCs = {} if BCs is None else BCs
+        BCs = {
+            'T_top': 1,
+            'T_bottom': 0,
+            'v_top': 0,
+            'v_bottom': 0,
+            'p_top': 0,
+            **BCs,
+        }
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         S = 8  # number of variables
@@ -68,7 +76,7 @@ class RayleighBenard(Problem):
         self.Dx = Dx
         self.Dz = Dz
         self.U2T = sp.kron(Ix1D, U2T1D)
-        S2D = self.U2T @ sp.kron(Ix1D, Sz1D) @ sp.kron(Sx1D, sp.eye(nz))
+        S2D = sp.kron(Ix1D, Sz1D) @ sp.kron(Sx1D, sp.eye(nz))
 
         # construct operators
         L = self.cheby.get_empty_operator_matrix(S, O)
@@ -77,16 +85,18 @@ class RayleighBenard(Problem):
         # relations between quantities and derivatives
         L[self.iux][self.iu] = Dx.copy()
         L[self.iux][self.iux] = -I
-        L[self.ivz][self.iv] = Dz.copy()
-        L[self.ivz][self.ivz] = -I
+        # L[self.ivz][self.iv] = Dz.copy()
+        # L[self.ivz][self.ivz] = -I
+        L[self.ivz][self.iux] = -I
+        L[self.ivz][self.ivz] = I.copy()
         L[self.iTx][self.iT] = Dx.copy()
         L[self.iTx][self.iTx] = -I
         L[self.iTz][self.iT] = Dz.copy()
         L[self.iTz][self.iTz] = -I
 
         # divergence-free constraint
-        L[self.ivz][self.ivz] = I.copy()
-        L[self.ivz][self.iux] = -I.copy()
+        # L[self.ip][self.ivz] = I.copy()
+        # L[self.ip][self.iux] = -I.copy()
 
         # pressure gauge
         L[self.ip][self.ip] = S2D
@@ -160,7 +170,7 @@ class RayleighBenard(Problem):
         u[:] = self.cheby.itransform(_u, axis=-1)
         return u
 
-    def _compute_derivatives(self, u, skip_transform=False):
+    def compute_derivatives(self, u, skip_transform=False):
         me_hat = self.u_init
 
         u_hat = u if skip_transform else self.transform(u)
@@ -203,19 +213,23 @@ class RayleighBenard(Problem):
 
     def u_exact(self, t=0):
         assert t == 0
+        assert (
+            self.BCs['v_top'] == self.BCs['v_bottom']
+        ), 'Initial conditions are only implemented for zero velocity gradient'
 
         me = self.u_init
 
         # linear temperature gradient
-        Ttop = 1.0
-        Tbottom = 0.0
-        me[self.iT] = (Ttop - Tbottom) / 2 * self.Z + (Ttop + Tbottom) / 2.0
+        for i, n in zip([self.iT, self.iv], ['T', 'v']):
+            me[i] = (self.BCs[f'{n}_top'] - self.BCs[f'{n}_bottom']) / 2 * self.Z + (
+                self.BCs[f'{n}_top'] + self.BCs[f'{n}_bottom']
+            ) / 2.0
 
         # perturb slightly
-        me[self.iT] += self.xp.random.rand(*me[self.iT].shape) * 1e-3
+        # me[self.iT] += self.xp.random.rand(*me[self.iT].shape) * 1e-3
 
         # evaluate derivatives
-        derivatives = self._compute_derivatives(me)
+        derivatives = self.compute_derivatives(me)
         for i in [self.iTx, self.iTz, self.iux, self.ivz]:
             me[i] = derivatives[i]
 
@@ -226,13 +240,14 @@ class RayleighBenard(Problem):
 
         _rhs_hat = self.cheby.transform(rhs, axis=-1)
 
-        # _rhs_hat[self.iua, :, -1] = self.BCs.get('u_top', 0)
-        # _rhs_hat[self.iub, :, -1] = self.BCs.get('u_bottom', 0)
-        _rhs_hat[self.iv, :, -1] = self.BCs.get('v_top', 0)
-        _rhs_hat[self.ivz, :, -1] = self.BCs.get('v_bottom', 0)
-        _rhs_hat[self.iT, :, -1] = self.BCs.get('T_top', 1)
-        _rhs_hat[self.iTz, :, -1] = self.BCs.get('T_bottom', 0)
-        _rhs_hat[self.ip, :, -1] = self.BCs.get('p_top', 0)
+        # _rhs_hat[self.iua, :, -1] = self.BCs['u_top']
+        # _rhs_hat[self.iub, :, -1] = self.BCs['u_bottom']
+        _rhs_hat[self.iv, :, -1] = self.BCs['v_top']
+        _rhs_hat[self.ivz, :, -1] = self.BCs['v_bottom']
+        _rhs_hat[self.iT, :, -1] = self.BCs['T_top']
+        _rhs_hat[self.iTz, :, -1] = self.BCs['T_bottom']
+        _rhs_hat[self.ip, :, -1] = self.BCs['p_top']
+        # TODO: I don't think the tau terms are properly distributed!
 
         return self.cheby.itransform(_rhs_hat, axis=-1)
 
@@ -262,6 +277,18 @@ class RayleighBenard(Problem):
         Dx = self.U2T @ self.Dx
         vorticity_hat = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[self.iu].flatten()).reshape(u[self.iu].shape)
         return self.itransform(vorticity_hat)
+
+    def compute_constraint_violation(self, u):
+        derivatives = self.compute_derivatives(u)
+
+        violations = {}
+
+        for i in [self.iux, self.ivz, self.iTx, self.iTz]:
+            violations[self.index_to_name[i]] = derivatives[i] - u[i]
+
+        violations['divergence'] = u[self.iux] - u[self.ivz]
+
+        return violations
 
     def get_fig(self):  # pragma: no cover
         """
