@@ -263,6 +263,7 @@ def record_work_precision(
         exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
+            exponents = [-1, 0, 1, 2]
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3][::-1]
@@ -877,7 +878,7 @@ def get_configs(mode, problem):
         )
 
         mu = float(mode[14:])
-        Tend = 1000
+        Tend = 200
 
         problem_desc = {'problem_params': {'mu': mu}}
 
@@ -897,22 +898,22 @@ def get_configs(mode, problem):
             'MIN-SR-FLEX': '-.',
         }
 
-        #         configurations[1] = {
-        #             'strategies': [AdaptivityStrategy(useMPI=True)],
-        #             'custom_description': desc,
-        #             'num_procs': 1,
-        #             'plotting_params': {'ls': ls[1], 'label': 'SDC'},
-        #             'handle': mode,
-        #                 'Tend': Tend,
-        #         }
-        #         configurations[4] = {
-        #             'strategies': [ESDIRKStrategy(useMPI=True)],
-        #             'num_procs': 1,
-        #             'handle': mode,
-        #             'plotting_params': {'label': 'ESDIRK5(3)'},
-        #             'custom_description': problem_desc,
-        #                 'Tend': Tend,
-        #         }
+        # configurations[1] = {
+        #     'strategies': [AdaptivityStrategy(useMPI=True)],
+        #     'custom_description': desc,
+        #     'num_procs': 1,
+        #     'plotting_params': {'ls': ls[1], 'label': 'SDC'},
+        #     'handle': mode,
+        #         'Tend': Tend,
+        # }
+        # configurations[4] = {
+        #     'strategies': [ESDIRKStrategy(useMPI=True)],
+        #     'num_procs': 1,
+        #     'handle': mode,
+        #     'plotting_params': {'label': 'ESDIRK5(3)'},
+        #     'custom_description': problem_desc,
+        #         'Tend': Tend,
+        # }
 
         # configurations[2] = {
         #     'strategies': [ERKStrategy(useMPI=True)],
@@ -1536,7 +1537,7 @@ if __name__ == "__main__":
         #'compare_strategies',
         #'RK_comp',
         #'parallel_efficiency',
-        'vdp_stiffness-1000',
+        'vdp_stiffness-50',
     ]:
         params = {
             'mode': mode,
