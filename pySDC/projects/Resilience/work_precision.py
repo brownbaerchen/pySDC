@@ -263,7 +263,6 @@ def record_work_precision(
         exponents = [-3, -2, -1, 0, 1, 2, 3][::-1]
         if problem.__name__ == 'run_vdp':
             exponents = [-4, -3, -2, -1, 0, 1, 2]
-            exponents = [-1, 0, 1, 2]
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3][::-1]
@@ -878,7 +877,7 @@ def get_configs(mode, problem):
         )
 
         mu = float(mode[14:])
-        Tend = 200
+        Tend = 300
 
         problem_desc = {'problem_params': {'mu': mu}}
 
@@ -898,22 +897,22 @@ def get_configs(mode, problem):
             'MIN-SR-FLEX': '-.',
         }
 
-        # configurations[1] = {
-        #     'strategies': [AdaptivityStrategy(useMPI=True)],
-        #     'custom_description': desc,
-        #     'num_procs': 1,
-        #     'plotting_params': {'ls': ls[1], 'label': 'SDC'},
-        #     'handle': mode,
-        #         'Tend': Tend,
-        # }
-        # configurations[4] = {
-        #     'strategies': [ESDIRKStrategy(useMPI=True)],
-        #     'num_procs': 1,
-        #     'handle': mode,
-        #     'plotting_params': {'label': 'ESDIRK5(3)'},
-        #     'custom_description': problem_desc,
-        #         'Tend': Tend,
-        # }
+        configurations[1] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 1,
+            'plotting_params': {'ls': ls[1], 'label': 'SDC'},
+            'handle': mode,
+            'Tend': Tend,
+        }
+        configurations[4] = {
+            'strategies': [ESDIRKStrategy(useMPI=True)],
+            'num_procs': 1,
+            'handle': mode,
+            'plotting_params': {'label': 'ESDIRK5(3)'},
+            'custom_description': problem_desc,
+            'Tend': Tend,
+        }
 
         # configurations[2] = {
         #     'strategies': [ERKStrategy(useMPI=True)],
@@ -927,6 +926,7 @@ def get_configs(mode, problem):
         for QI, i in zip(
             [
                 'MIN-SR-S',
+                'MIN-SR-FLEX',
             ],
             [9991, 12123127391, 1231723109247102731092],
         ):
@@ -934,14 +934,14 @@ def get_configs(mode, problem):
                 'custom_description': {
                     'sweeper_params': {'num_nodes': 3, 'QI': QI},
                     'problem_params': desc["problem_params"],
+                    'sweeper_class': parallel_sweeper,
                 },
-                # 'custom_description': {'sweeper_params': {'num_nodes': 3, 'QI': QI}, 'sweeper_class': parallel_sweeper, 'problem_params': desc["problem_params"]},
                 'strategies': [
                     AdaptivityPolynomialError(
                         useMPI=True, newton_inexactness=False, linear_inexactness=False, max_slope=8
                     )
                 ],
-                'num_procs_sweeper': 1,
+                'num_procs_sweeper': 3,
                 'num_procs': 1,
                 'plotting_params': {
                     'ls': ls.get(QI, '-'),
@@ -1537,7 +1537,7 @@ if __name__ == "__main__":
         #'compare_strategies',
         #'RK_comp',
         #'parallel_efficiency',
-        'vdp_stiffness-50',
+        'vdp_stiffness-100',
     ]:
         params = {
             'mode': mode,
