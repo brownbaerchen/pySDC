@@ -7,7 +7,7 @@ channels:
 dependencies:
   - dill>=0.2.6
   - numpy
-  - scipy>=0.17.1
+  - scipy>=1.14
   - matplotlib>=3.0
   - pip
   - pip:

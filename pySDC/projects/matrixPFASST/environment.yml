@@ -6,7 +6,7 @@ channels:
   - defaults
 dependencies:
   - numpy
-  - scipy>=0.17.1
+  - scipy>=1.14
   - dill>=0.2.6
   - pip
   - pip:
