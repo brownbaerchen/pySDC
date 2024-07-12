@@ -198,21 +198,26 @@ class ChebychovHelper(SpectralHelperBase):
 
         N = self.N
         k = np.arange(N)
+        norm = self.get_norm()
 
         # forwards transform
         self.fft_utils['fwd']['shuffle'] = np.append(np.arange((N + 1) // 2) * 2, -np.arange(N // 2) * 2 - 1 - N % 2)
-        self.fft_utils['fwd']['shift'] = 2 * np.exp(-1j * np.pi * k / (2 * N))
+        self.fft_utils['fwd']['shift'] = 2 * np.exp(-1j * np.pi * k / (2 * N)) * norm
+        # self.fft_utils['fwd']['shift'][0] += 2j
 
         # backwards transform
-        shift = np.exp(1j * np.pi * k / (2 * N))
-        shift[0] /= 2
-        self.fft_utils['bck']['shift'] = shift
-
         mask = np.zeros(N, dtype=int)
         mask[: N - N % 2 : 2] = np.arange(N // 2)
         mask[1::2] = N - np.arange(N // 2) - 1
         mask[-1] = N // 2
         self.fft_utils['bck']['shuffle'] = mask
+
+        shift = np.exp(1j * np.pi * k / (2 * N))
+        shift[0] /= 2
+        self.fft_utils['bck']['shift'] = shift / norm
+
+        # self.fft_utils['fwd']['shift'][...] = 1
+        # self.fft_utils['fwd']['shuffle'] = slice(0, N, 1)
 
         return self.fft_utils
 
@@ -220,6 +225,8 @@ class ChebychovHelper(SpectralHelperBase):
         if self.transform_type == 'dct':
             return self.fft_lib.dct(u, axis=axis) * self.norm
         elif self.transform_type == 'fft':
+            result = u.copy()
+
             slices = [slice(0, s, 1) for s in u.shape]
             slices[axis] = self.fft_utils['fwd']['shuffle']
 
@@ -231,7 +238,15 @@ class ChebychovHelper(SpectralHelperBase):
             expansion[axis] = slice(0, u.shape[axis], 1)
 
             V *= self.fft_utils['fwd']['shift'][*expansion]
-            return V.real * self.norm
+
+            # # prune complex part
+            # expansion1 = [slice(0, s, 1) for s in u.shape]
+            # expansion1[axis] = slice(1, self.N, 1)
+            # expansion2 = [slice(0, s, 1) for s in u.shape]
+            # expansion2[axis] = slice(self.N, 0, -1)
+            # V[*expansion1] += V.real[*expansion2]*1j
+            result.real[...] = V.real[...]
+            return result
         else:
             raise NotImplementedError
 
@@ -242,16 +257,19 @@ class ChebychovHelper(SpectralHelperBase):
             return self.fft_lib.idct(u / self.norm, axis=axis)
             # return self.fft_lib.idct(u / self.norm.reshape(u.shape), axis=axis)
         elif self.transform_type == 'fft':
+            result = u.copy()
+
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
 
-            v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][*expansion] / self.norm, axis=axis).real
+            v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][*expansion], axis=axis)
 
             slices = [slice(0, s, 1) for s in u.shape]
             slices[axis] = self.fft_utils['bck']['shuffle']
             V = v[*slices]
 
-            return V
+            result.real[...] = V.real[...]
+            return result
         else:
             raise NotImplementedError
 
@@ -334,28 +352,135 @@ class FFTHelper(SpectralHelperBase):
     def itransform(self, u, axis=-1):
         return self.fft_lib.ifft(u, axis=axis)
 
+    def get_fft_utils(self):
+        """
+        No need to do anything. We just want a common interface with the dct of Chebychov.
+        """
+        self.fft_utils = {
+            'fwd': {},
+            'bck': {},
+        }
+
+        N = self.N
+
+        # forwards transform
+        self.fft_utils['fwd']['shuffle'] = slice(0, N, 1)
+        self.fft_utils['fwd']['shift'] = self.xp.ones(N)
+
+        # backwards transform
+        self.fft_utils['bck']['shuffle'] = slice(0, N, 1)
+        self.fft_utils['bck']['shift'] = self.xp.ones(N)
+
+        return self.fft_utils
+
 
 class SpectralHelper:
     xp = np
     allowed_directions = ['x', 'y', 'z']
+    fft_lib = scipy.fft
 
     def __init__(self):
-        self.axes = {}
+        self.axes = []
 
-    def add_axis(self, base, direction, *args, **kwargs):
-        assert (
-            direction in self.allowed_directions
-        ), f'{direction=!r} is not allowed! Please choose from {self.allowed_directions}!'
-        assert direction not in self.axes.keys(), f'Already added an axis in {direction=!r}!'
+    def add_axis(self, base, *args, **kwargs):
 
         if base.lower() in ['chebychov', 'chebychev', 'cheby']:
-            self.axes[direction] = ChebychovHelper(*args, **kwargs)
+            self.axes.append(ChebychovHelper(*args, **kwargs, transform_type='fft'))
         elif base.lower() in ['fft', 'fourier']:
-            self.axes[direction] = FFTHelper(*args, **kwargs)
+            self.axes.append(FFTHelper(*args, **kwargs))
         else:
             raise NotImplementedError(f'{base=!r} is not implemented!')
 
+        self.axes[-1].get_fft_utils()
+
     def get_grid(self):
-        return self.xp.meshgrid(
-            *[self.axes[key].get_1dgrid() for key in self.allowed_directions[::-1] if key in self.axes.keys()]
-        )
+        return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
+
+    def setup_fft(self, useMPI=False):
+        if len(self.axes) > 1:
+            assert all(
+                type(me) != ChebychovHelper for me in self.axes[:-1]
+            ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
+
+        if useMPI:
+            raise NotImplementedError
+        else:
+            self.fft = self.xp.fft.fftn
+            self.ifft = self.xp.fft.ifftn
+
+    def _transform_fft(self, u, axes):
+        return self.fft(u, axes=axes)
+
+    def _transform_dct(self, u, axes):
+        result = u.copy()
+
+        v = u.copy()
+
+        for axis in axes:
+            slices = [slice(0, s, 1) for s in u.shape]
+            slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
+            v = v[*slices]
+
+        V = self.fft(v, axes=axes)
+
+        for axis in axes:
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, u.shape[axis], 1)
+            V *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
+
+        result.real[...] = V.real[...]
+        return result
+
+    def transform(self, u, axes):
+        trfs = {
+            ChebychovHelper: self._transform_dct,
+            FFTHelper: self._transform_fft,
+        }
+
+        result = u.copy()
+
+        axes_base = []
+        for base in trfs.keys():
+            axes_base = [me for me in axes if type(self.axes[me]) == base]
+            result = trfs[base](result, axes=axes_base)
+
+        return result
+
+    def _transform_ifft(self, u, axes):
+        return self.ifft(u, axes=axes)
+
+    def _transform_idct(self, u, axes):
+        result = u.copy()
+
+        v = self.xp.empty(u.shape, dtype='complex')
+        v[...] = u[...]
+
+        for axis in axes:
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, u.shape[axis], 1)
+
+            v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
+
+        V = self.ifft(v, axes=axes)
+
+        for axis in axes:
+            slices = [slice(0, s, 1) for s in u.shape]
+            slices[axis] = self.axes[axis].fft_utils['bck']['shuffle']
+            V = V[*slices]
+
+        result.real[...] = V.real[...]
+        return result
+
+    def itransform(self, u, axes):
+        trfs = {
+            FFTHelper: self._transform_ifft,
+            ChebychovHelper: self._transform_idct,
+        }
+
+        result = u.copy()
+
+        for base in trfs.keys():
+            axes_base = [me for me in axes if type(self.axes[me]) == base]
+            result = trfs[base](result, axes=axes_base)
+
+        return result

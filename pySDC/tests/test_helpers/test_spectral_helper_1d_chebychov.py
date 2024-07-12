@@ -163,13 +163,15 @@ def test_transform(N, d, transform_type):
     norm = cheby.get_norm()
     x = cheby.get_1dgrid()
 
-    itransform = cheby.itransform(u, axis=-1)
+    itransform = cheby.itransform(u, axis=-1).real
 
-    assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axis=-1))
-    assert np.allclose(scipy.fft.idct(u / norm, axis=-1), itransform)
-    assert np.allclose(u.shape, itransform.shape)
     for i in range(d):
         assert np.allclose(np.polynomial.Chebyshev(u[i])(x), itransform[i])
+    assert np.allclose(u.shape, itransform.shape)
+    assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axis=-1).real)
+    assert np.allclose(scipy.fft.idct(u / norm, axis=-1), itransform)
+    assert np.allclose(cheby.transform(cheby.itransform(u)), u)
+    assert np.allclose(cheby.itransform(cheby.transform(u)), u)
 
 
 @pytest.mark.base
@@ -435,7 +437,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 
 if __name__ == '__main__':
-    test_transform(1, 2, 'fft')
+    test_transform(6, 1, 'fft')
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
     # test_integration_matrix(5, 'T2U')
