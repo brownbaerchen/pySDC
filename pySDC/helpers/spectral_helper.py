@@ -378,6 +378,7 @@ class SpectralHelper:
     xp = np
     allowed_directions = ['x', 'y', 'z']
     fft_lib = scipy.fft
+    sparse_lib = scipy.sparse
 
     def __init__(self):
         self.axes = []
@@ -484,3 +485,31 @@ class SpectralHelper:
             result = trfs[base](result, axes=axes_base)
 
         return result
+
+    def get_integration_matrix(self, axes):
+        sp = self.sparse_lib
+        S = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
+        ndim = len(self.axes)
+
+        if ndim == 2:
+            for axis in axes:
+                axis2 = (axis + 1) % ndim
+                S1D = self.axes[axis].get_integration_matrix()
+
+                if len(axes) > 1:
+                    I1D = sp.eye(self.axes[axis2].N)
+                else:
+                    I1D = self.axes[axis2].get_Id()
+
+                mats = [None] * ndim
+                mats[axis] = S1D
+                mats[axis2] = I1D
+
+                if axis == axes[0]:
+                    S += sp.kron(*mats)
+                else:
+                    S = S @ sp.kron(*mats)
+        else:
+            raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
+
+        return S
