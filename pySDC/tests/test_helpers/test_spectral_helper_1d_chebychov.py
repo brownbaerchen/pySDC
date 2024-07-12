@@ -5,7 +5,7 @@ import pytest
 @pytest.mark.parametrize('N', [4, 32])
 def test_D2T_conversion_matrices(N):
     import numpy as np
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
 
@@ -31,7 +31,7 @@ def test_D2T_conversion_matrices(N):
 def test_T_U_conversion(N):
     import numpy as np
     from scipy.special import chebyt, chebyu
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
 
@@ -61,7 +61,7 @@ def test_T_U_conversion(N):
 @pytest.mark.base
 @pytest.mark.parametrize('name', ['T2U', 'T2D', 'U2D', 'T2T'])
 def test_conversion_inverses(name):
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
     import numpy as np
 
     N = 8
@@ -75,7 +75,7 @@ def test_conversion_inverses(name):
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('convs', [['D2T', 'T2U'], ['U2D', 'D2T'], ['T2U', 'U2D'], ['T2U', 'U2D', 'D2T']])
 def test_multi_conversion(N, convs):
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
     import numpy as np
 
     N = 8
@@ -95,7 +95,7 @@ def test_multi_conversion(N, convs):
 def test_differentiation_matrix(N, variant):
     import numpy as np
     import scipy
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N)
     x = np.cos(np.pi / N * (np.arange(N) + 0.5))
@@ -128,7 +128,7 @@ def test_differentiation_matrix(N, variant):
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 def test_integration_matrix(N, variant):
     import numpy as np
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
 
     cheby = ChebychovHelper(N, mode=variant)
     coeffs = np.random.random(N)
@@ -150,98 +150,15 @@ def test_integration_matrix(N, variant):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [16])
-@pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
-def test_integration_matrix2D(nx, nz, variant, direction):
-    import numpy as np
-    import scipy.sparse as sp
-    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
-
-    cheby = ChebychovHelper(nz, mode=variant)
-    fft = FFTHelper(nx)
-    x = fft.get_1dgrid()
-    z = cheby.get_1dgrid()
-    Z, X = np.meshgrid(z, x)
-    conv1D = cheby.get_conv(variant)
-    convInv1D = cheby.get_conv(variant[::-1])
-
-    Ix = fft.get_Id()
-    Iz = conv1D
-    conv = sp.kron(Ix, convInv1D)
-    Sx = fft.get_integration_matrix()
-    Sz = cheby.get_integration_matrix()
-
-    u = np.sin(X) * Z**2 + np.cos(X) * Z**3
-    if direction == 'x':
-        S = sp.kron(Sx, Iz)
-        expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
-    elif direction == 'z':
-        S = sp.kron(Ix, Sz)
-        expect = np.sin(X) * 1 / 3 * Z**3 + np.cos(X) * 1 / 4 * Z**4
-    elif direction == 'mixed':
-        S = sp.kron(Ix, Sz) @ sp.kron(Sx, sp.eye(nz))
-        expect = -np.cos(X) * 1 / 3 * Z**3 + np.sin(X) * 1 / 4 * Z**4
-
-    u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
-    S_u_hat = (conv @ S @ u_hat.flatten()).reshape(u_hat.shape)
-    S_u = fft.itransform(cheby.itransform(S_u_hat, axis=-1), axis=-2)
-
-    assert np.allclose(S_u, expect, atol=1e-12)
-
-
-@pytest.mark.base
-@pytest.mark.parametrize('nx', [16])
-@pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-@pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
-def test_differentiation_matrix2D(nx, nz, variant, direction):
-    import numpy as np
-    import scipy.sparse as sp
-    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
-
-    cheby = ChebychovHelper(nz, mode=variant)
-    fft = FFTHelper(nx)
-    x = fft.get_1dgrid()
-    z = cheby.get_1dgrid()
-    Z, X = np.meshgrid(z, x)
-    conv1D = cheby.get_conv(variant[::-1])
-    convInv1D = cheby.get_conv(variant)
-
-    Ix = fft.get_Id()
-    Iz = convInv1D
-    conv = sp.kron(Ix, conv1D)
-    Dx = fft.get_differentiation_matrix()
-    Dz = cheby.get_differentiation_matrix()
-
-    u = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
-    if direction == 'x':
-        D = sp.kron(Dx, Iz)
-        expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
-    elif direction == 'z':
-        D = sp.kron(Ix, Dz)
-        expect = np.sin(X) * Z * 2 + Z**2 * 3
-    elif direction == 'mixed':
-        D = sp.kron(Ix, Dz) @ sp.kron(Dx, sp.eye(nz))
-        expect = np.cos(X) * 2 * Z
-
-    u_hat = fft.transform(cheby.transform(u, axis=-1), axis=-2)
-    D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
-    D_u = fft.itransform(cheby.itransform(D_u_hat, axis=-1), axis=-2)
-
-    assert np.allclose(D_u, expect, atol=1e-9)
-
-
-@pytest.mark.base
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('d', [1, 2, 3])
-def test_transform(N, d):
+@pytest.mark.parametrize('transform_type', ['dct', 'fft'])
+def test_transform(N, d, transform_type):
     import scipy
     import numpy as np
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N)
+    cheby = ChebychovHelper(N, transform_type=transform_type)
     u = np.random.random((d, N))
     norm = cheby.get_norm()
     x = cheby.get_1dgrid()
@@ -258,7 +175,7 @@ def test_transform(N, d):
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
 def test_norm(N):
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
     import numpy as np
     import scipy
 
@@ -289,7 +206,7 @@ def test_tau_method(mode, bc, N, bc_val):
 
     The test verifies that the solution satisfies the perturbed equation and the boundary condition.
     '''
-    from pySDC.helpers.problem_helper import ChebychovHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper
     import numpy as np
     import scipy.sparse as sp
 
@@ -367,7 +284,7 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
     '''
-    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper, FFTHelper
     import numpy as np
     import scipy.sparse as sp
 
@@ -444,7 +361,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
     '''
     Solve a Poisson problem with funny Dirichlet BCs in z-direction and periodic in x-direction.
     '''
-    from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+    from pySDC.helpers.spectral_helper import ChebychovHelper, FFTHelper
     import numpy as np
     import scipy.sparse as sp
 
@@ -518,8 +435,9 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 
 if __name__ == '__main__':
+    test_transform(1, 2, 'fft')
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
-    test_integration_matrix(5, 'T2U')
+    # test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
     # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
