@@ -176,6 +176,7 @@ def test_heat2d(mode, nx, nz, plot=False):
 
 
 if __name__ == '__main__':
+    test_SDC(True)
     # test_heat1d_chebychev('T2U', False, plot=True)
-    test_heat2d('T2T', 1, 2, True)
+    # test_heat2d('T2T', 1, 2, True)
     # test_AdvectionDiffusion(plot=True)

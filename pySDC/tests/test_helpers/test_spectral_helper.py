@@ -17,7 +17,7 @@ def test_integration_matrix2D(nx, nz, variant, axes):
 
     Z, X = helper.get_grid()
 
-    conv = helper.get_basis_change_mat()
+    conv = helper.get_basis_change_matrix()
     S = helper.get_integration_matrix(axes=axes)
 
     u = np.sin(X) * Z**2 + np.cos(X) * Z**3
@@ -50,7 +50,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
     helper.setup_fft()
 
     Z, X = helper.get_grid()
-    conv = helper.get_basis_change_mat()
+    conv = helper.get_basis_change_matrix()
     D = helper.get_differentiation_matrix(axes)
 
     u = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
@@ -66,6 +66,39 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
     D_u = helper.itransform(D_u_hat, axes=(1, 0))
 
     assert np.allclose(D_u, expect, atol=1e-12)
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('base', ['cheby'])
+@pytest.mark.parametrize('type', ['diff', 'int'])
+def test_matrix1D(N, base, type):
+    import numpy as np
+    import scipy
+    from pySDC.helpers.spectral_helper import ChebychovHelper, SpectralHelper
+
+    coeffs = np.random.random(N)
+
+    helper = SpectralHelper()
+    helper.add_axis(base=base, N=N)
+    helper.setup_fft()
+
+    x = helper.get_grid()
+
+    if type == 'diff':
+        D = helper.get_differentiation_matrix(axes=(0,))
+    elif type == 'int':
+        D = helper.get_integration_matrix(axes=(0,))
+
+    C = helper.get_basis_change_matrix()
+    du = helper.itransform(C @ D @ coeffs, axes=(0,))
+
+    if type == 'diff':
+        exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
+    elif type == 'int':
+        exact = np.polynomial.Chebyshev(coeffs).integ(1)(x)
+
+    assert np.allclose(exact, du)
 
 
 @pytest.mark.base
@@ -149,3 +182,4 @@ if __name__ == '__main__':
 
     # test_transform_MPI(4, 3, 'cheby')
     # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
+    test_matrix1D(4, 'cheby', 'int')

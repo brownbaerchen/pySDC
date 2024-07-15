@@ -36,7 +36,7 @@ class SpectralHelperBase:
         """
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_basis_change_mat(self):
+    def get_basis_change_matrix(self):
         return self.sparse_lib.eye(self.N)
 
 
@@ -142,7 +142,7 @@ class ChebychovHelper(SpectralHelperBase):
         self.cache[name] = mat
         return mat
 
-    def get_basis_change_mat(self):
+    def get_basis_change_matrix(self):
         return self.get_conv(self.mode[::-1])
 
     def get_T2U_differentiation_matrix(self):
@@ -539,7 +539,9 @@ class SpectralHelper:
         D = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
-        if ndim == 2:
+        if ndim == 1:
+            D = self.axes[0].get_differentiation_matrix()
+        elif ndim == 2:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
                 D1D = self.axes[axis].get_differentiation_matrix()
@@ -576,7 +578,9 @@ class SpectralHelper:
         S = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
-        if ndim == 2:
+        if ndim == 1:
+            S = self.axes[0].get_integration_matrix()
+        elif ndim == 2:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
                 S1D = self.axes[axis].get_integration_matrix()
@@ -599,7 +603,7 @@ class SpectralHelper:
 
         return S
 
-    def get_basis_change_mat(self):
+    def get_basis_change_matrix(self):
         """
         Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
         the original basis afterwards.
@@ -611,10 +615,12 @@ class SpectralHelper:
         C = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil()
         ndim = len(self.axes)
 
-        if ndim == 2:
+        if ndim == 1:
+            C = self.axes[0].get_basis_change_matrix()
+        elif ndim == 2:
             mats = [None] * ndim
-            mats[0] = self.axes[0].get_basis_change_mat()
-            mats[1] = self.axes[1].get_basis_change_mat()
+            mats[0] = self.axes[0].get_basis_change_matrix()
+            mats[1] = self.axes[1].get_basis_change_matrix()
 
             C = C @ sp.kron(*mats)
         else:
