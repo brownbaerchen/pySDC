@@ -176,15 +176,17 @@ def test_tau_method(bc, N, bc_val):
 
     The test verifies that the solution satisfies the perturbed equation and the boundary condition.
     '''
-    from pySDC.helpers.spectral_helper import ChebychovHelper, SpectralHelper
+    from pySDC.helpers.spectral_helper import SpectralHelper
     import numpy as np
     import scipy.sparse as sp
 
-    cheby = ChebychovHelper(N)
-
     helper = SpectralHelper()
-    helper.add_axis(base='cheby', N=N)
     helper.add_component('u')
+    helper.add_axis(base='cheby', N=N)
+    helper.setup_fft()
+
+    helper.add_BC('u', 'u', 0, bc, bc_val)
+    helper.setup_BCs()
 
     x = helper.get_grid()
 
@@ -198,13 +200,10 @@ def test_tau_method(bc, N, bc_val):
     Id = helper.get_Id()
 
     _A = helper.get_empty_operator_matrix()
-    _A[helper.index('u')] = D - Id
+    _A[helper.index('u')][helper.index('u')] = D - Id
     A = helper.convert_operator_matrix_to_operator(_A)
 
-    _BCs = helper.get_empty_operator_matrix()
-    # _BCs[helper.index('u')] = helper.add_BC(axis=0, x=-1, v=bc_val)
-
-    A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+    A = helper.put_BCs_in_matrix(A)
 
     sol_hat = sp.linalg.spsolve(A, rhs)
 
@@ -235,8 +234,8 @@ if __name__ == '__main__':
     if args.test == 'transform':
         test_transform(**vars(args))
 
-    test_transform(4, 3, 'cheby', False)
+    # test_transform(4, 3, 'cheby', False)
     # test_transform_MPI(4, 3, 'cheby')
     # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
     # test_matrix1D(4, 'cheby', 'int')
-    # test_tau_method(-1, 8, -1)
+    test_tau_method(-1, 8, -1)

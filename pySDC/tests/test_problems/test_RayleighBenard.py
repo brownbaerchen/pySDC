@@ -173,7 +173,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
 
     rhs = P._put_BCs_in_rhs(P.u_init)
     _A = 1e-1 * P.L + P.M
-    A = P._put_BCs_in_matrix(_A)
+    A = P.helper.put_BCs_in_matrix(_A)
 
     print(rhs[P.ivz])
     rhs_hat = P.transform(rhs).flatten()

@@ -112,32 +112,15 @@ class RayleighBenard(Problem):
         BC_down = self.helper.get_BC(1, -1)
 
         # TODO: distribute tau terms sensibly
-        # self.iub = self.ip
-        # self.iua = self.iu
-        BC = self.helper.get_empty_operator_matrix()
-        # BC[self.iua][self.iu] = BC_up
-        # BC[self.iub][self.iu] = BC_down
-        BC[self.ip][self.ip] = BC_up
-        BC[self.iv][self.iv] = BC_up
-        BC[self.ivz][self.iv] = BC_down
-        BC[self.iT][self.iT] = BC_up
-        BC[self.iTz][self.iT] = BC_down
+        self.helper.add_BC(component='p', equation='p', axis=1, x=1, v=self.BCs['p_top'])
+        self.helper.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'])
+        self.helper.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'])
+        self.helper.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'])
+        self.helper.add_BC(component='T', equation='Tz', axis=1, x=-1, v=self.BCs['T_bottom'])
+        self.helper.setup_BCs()
 
-        BC = self.helper.convert_operator_matrix_to_operator(BC)
-        self.BC_mask = BC != 0
-        self.BC = BC[self.BC_mask]
-
-        # prepare mask to zero rows that we put BCs into
-        rhs_BC_hat = self.u_init
-        # rhs_BC_hat[self.iua, :, -1] = 1
-        # rhs_BC_hat[self.iub, :, -1] = 1
-        rhs_BC_hat[self.iv, :, -1] = 1
-        rhs_BC_hat[self.ip, :, -1] = 1
-        rhs_BC_hat[self.ivz, :, -1] = 1
-        rhs_BC_hat[self.iT, :, -1] = 1
-        rhs_BC_hat[self.iTz, :, -1] = 1
-        mask = rhs_BC_hat.flatten() == 1
-        self.BC_zero_idx = self.xp.arange(self.nx * self.nz * S)[mask]
+        self.BC = self.helper._BCs
+        self.BC_zero_idx = self.helper.BC_zero_index
 
     def transform(self, u):
         assert u.ndim > 1, 'u must not be flattened here!'
@@ -230,12 +213,6 @@ class RayleighBenard(Problem):
 
         return self.helper.itransform(_rhs_hat, axes=(-1,))
 
-    def _put_BCs_in_matrix(self, A):
-        A = A.tolil()
-        A[self.BC_zero_idx, :] = 0
-        A[self.BC_mask] = self.BC
-        return A.tocsc()
-
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
@@ -243,7 +220,7 @@ class RayleighBenard(Problem):
         rhs_hat = self.transform(_rhs)
 
         A = self.M + factor * self.L
-        A = self._put_BCs_in_matrix(A)
+        A = self.helper.put_BCs_in_matrix(A)
 
         sol_hat = self.helper.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten()).reshape(sol.shape)
 

@@ -430,7 +430,7 @@ class SpectralHelper:
     def get_BC(self, axis, x):
         base = self.axes[axis]
         assert type(base) == ChebychovHelper
-        assert x in [-1, 1]
+        assert x in [-1, 0, 1]
 
         BC = base.get_Id().tolil() * 0
         BC[-1, :] = base.get_Dirichlet_BC_row_T(x)
@@ -442,21 +442,38 @@ class SpectralHelper:
             Id = self.axes[(axis + 1) % ndim].get_Id()
             return self.sparse_lib.kron(Id, BC)
 
-    def add_BC(self, component, axis, x, v):
-        self.BC_mat = self.BC_mat if self.BC_mat is not None else self.get_empty_operator_matrix()
+    def add_BC(self, component, equation, axis, x, v):
 
-        base = self.axes[axis]
-        assert x in [-1, 1]
-        assert type(base) == ChebychovHelper
+        _BC = self.get_BC(axis=axis, x=x)
+        self.BC_mat[self.index(equation)][self.index(component)] = _BC
 
-        O = self.get_Id() * 0
-        O[-1, :] = base.get_Dirichlet_BC_row_T(x)
+        slices = (
+            [self.index(equation)]
+            + [slice(0, self.axes[i].N) for i in range(axis)]
+            + [-1]
+            + [slice(0, self.axes[i].N) for i in range(axis + 1, len(self.axes))]
+        )
+        # assert all(self.BC_rhs_mask[*slices] == False), f'There is already a BC in equation for {equation}!'
+        self.BC_rhs_mask[*slices] = True
 
-        return O
+    def setup_BCs(self):
+        BC = self.convert_operator_matrix_to_operator(self.BC_mat)
+
+        self.BC_mask = BC != 0
+        self._BCs = BC[self.BC_mask]
+        self.BC_zero_index = self.xp.arange(np.prod([me.N for me in self.axes]) * len(self.components))[
+            self.BC_rhs_mask.flatten()
+        ]
+
+    def put_BCs_in_matrix(self, A):
+        A = A.tolil()
+        A[self.BC_zero_index, :] = 0
+        A[self.BC_mask] = self._BCs
+        return A.tocsc()
 
     def convert_operator_matrix_to_operator(self, M):
         if len(self.components) == 1:
-            return M[0]
+            return M[0][0]
         else:
             return self.sparse_lib.bmat(M, format='lil')
 
@@ -506,6 +523,22 @@ class SpectralHelper:
             else:
                 self.fft[axis] = self.xp.fft.fftn
                 self.ifft[axis] = self.xp.fft.ifftn
+
+        self.BC_mat = self.get_empty_operator_matrix()
+        self.BC_mask = self.xp.zeros(
+            shape=[
+                len(self.components),
+            ]
+            + shape,
+            dtype=bool,
+        )
+        self.BC_rhs_mask = self.xp.zeros(
+            shape=[
+                len(self.components),
+            ]
+            + shape,
+            dtype=bool,
+        )
 
     def _transform_fft(self, u, axes):
         return self.fft[axes](u, axes=axes)
