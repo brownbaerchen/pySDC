@@ -36,6 +36,9 @@ class SpectralHelperBase:
         """
         return [[O for _ in range(S)] for _ in range(S)]
 
+    def get_basis_change_mat(self):
+        return self.sparse_lib.eye(self.N)
+
 
 class ChebychovHelper(SpectralHelperBase):
 
@@ -138,6 +141,9 @@ class ChebychovHelper(SpectralHelperBase):
 
         self.cache[name] = mat
         return mat
+
+    def get_basis_change_mat(self):
+        return self.get_conv(self.mode[::-1])
 
     def get_T2U_differentiation_matrix(self):
         '''
@@ -487,6 +493,15 @@ class SpectralHelper:
         return result
 
     def get_integration_matrix(self, axes):
+        """
+        Get integration matrix to integrate along specified axis.
+
+        Args:
+            axes (tuple): Axes along which to integrate over.
+
+        Returns:
+            sparse integration matrix
+        """
         sp = self.sparse_lib
         S = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
@@ -513,3 +528,26 @@ class SpectralHelper:
             raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
 
         return S
+
+    def get_basis_change_mat(self):
+        """
+        Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
+        the original basis afterwards.
+
+        Returns:
+            sparse basis change matrix
+        """
+        sp = self.sparse_lib
+        C = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil()
+        ndim = len(self.axes)
+
+        if ndim == 2:
+            mats = [None] * ndim
+            mats[0] = self.axes[0].get_basis_change_mat()
+            mats[1] = self.axes[1].get_basis_change_mat()
+
+            C = C @ sp.kron(*mats)
+        else:
+            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+
+        return C

@@ -8,8 +8,7 @@ import pytest
 @pytest.mark.parametrize('axes', [(0,), (1,), (0, 1)])
 def test_integration_matrix2D(nx, nz, variant, axes):
     import numpy as np
-    import scipy.sparse as sp
-    from pySDC.helpers.spectral_helper import ChebychovHelper, FFTHelper, SpectralHelper
+    from pySDC.helpers.spectral_helper import SpectralHelper
 
     helper = SpectralHelper()
     helper.add_axis(base='fft', N=nx)
@@ -18,14 +17,7 @@ def test_integration_matrix2D(nx, nz, variant, axes):
 
     Z, X = helper.get_grid()
 
-    cheby = ChebychovHelper(nz, mode=variant, transform_type='fft')
-    fft = FFTHelper(nx)
-    conv1D = cheby.get_conv(variant)
-    convInv1D = cheby.get_conv(variant[::-1])
-
-    Ix = fft.get_Id()
-    conv = sp.kron(Ix, convInv1D)
-
+    conv = helper.get_basis_change_mat()
     S = helper.get_integration_matrix(axes=axes)
 
     u = np.sin(X) * Z**2 + np.cos(X) * Z**3
