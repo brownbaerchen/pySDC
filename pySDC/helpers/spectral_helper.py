@@ -227,7 +227,7 @@ class ChebychovHelper(SpectralHelperBase):
 
         return self.fft_utils
 
-    def transform(self, u, axis=-1):
+    def transform(self, u, axis=-1, **kwargs):
         if self.transform_type == 'dct':
             return self.fft_lib.dct(u, axis=axis) * self.norm
         elif self.transform_type == 'fft':
@@ -238,7 +238,7 @@ class ChebychovHelper(SpectralHelperBase):
 
             v = u[*slices]
 
-            V = self.fft_lib.fft(v, axis=axis)
+            V = self.fft_lib.fft(v, axis=axis, **kwargs)
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
@@ -352,8 +352,8 @@ class FFTHelper(SpectralHelperBase):
     def get_Id(self):
         return self.sparse_lib.eye(self.N, format=self.sparse_format)
 
-    def transform(self, u, axis=-1):
-        return self.fft_lib.fft(u, axis=axis)
+    def transform(self, u, axis=-1, **kwargs):
+        return self.fft_lib.fft(u, axis=axis, **kwargs)
 
     def itransform(self, u, axis=-1):
         return self.fft_lib.ifft(u, axis=axis)
@@ -382,7 +382,6 @@ class FFTHelper(SpectralHelperBase):
 
 class SpectralHelper:
     xp = np
-    allowed_directions = ['x', 'y', 'z']
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
 
@@ -403,20 +402,52 @@ class SpectralHelper:
     def get_grid(self):
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
 
-    def setup_fft(self, useMPI=False):
+    def setup_fft(self, useMPI=False, comm=None):
         if len(self.axes) > 1:
             assert all(
                 type(me) != ChebychovHelper for me in self.axes[:-1]
             ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
 
-        if useMPI:
-            raise NotImplementedError
-        else:
-            self.fft = self.xp.fft.fftn
-            self.ifft = self.xp.fft.ifftn
+        shape = [me.N for me in self.axes]
+        self.fft = {}
+        self.ifft = {}
+
+        bases = [ChebychovHelper, FFTHelper]
+
+        indeces = np.array([i for i in range(len(self.axes))])
+        axes = [tuple(indeces), tuple(indeces[::-1])]
+        for base in bases:
+            mask = [i for i in indeces if type(self.axes[i]) == base]
+            if len(mask) > 0:
+                axes.append(tuple(indeces[mask]))
+                if len(indeces[mask]) > 1:
+                    axes.append(tuple(indeces[mask][::-1]))
+
+        for axis in axes:
+
+            if useMPI:
+                from mpi4py import MPI
+                from mpi4py_fft import PFFT
+
+                comm = comm if comm else MPI.COMM_WORLD
+
+                _fft = PFFT(
+                    comm=comm,
+                    shape=shape,
+                    axes=axis,
+                    dtype='D',
+                    collapse=True,
+                    # backend=self.fft_backend,
+                    # comm_backend=self.fft_comm_backend,
+                )
+                self.fft[axis] = _fft.forward
+                self.ifft[axis] = _fft.backward
+            else:
+                self.fft[axis] = self.xp.fft.fftn
+                self.ifft[axis] = self.xp.fft.ifftn
 
     def _transform_fft(self, u, axes):
-        return self.fft(u, axes=axes)
+        return self.fft[axes](u, axes=axes)
 
     def _transform_dct(self, u, axes):
         result = u.copy()
@@ -428,7 +459,7 @@ class SpectralHelper:
             slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
             v = v[*slices]
 
-        V = self.fft(v, axes=axes)
+        V = self.fft[axes](v, axes=axes)
 
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
@@ -448,13 +479,14 @@ class SpectralHelper:
 
         axes_base = []
         for base in trfs.keys():
-            axes_base = [me for me in axes if type(self.axes[me]) == base]
-            result = trfs[base](result, axes=axes_base)
+            axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+            if len(axes_base) > 0:
+                result = trfs[base](result, axes=axes_base)
 
         return result
 
     def _transform_ifft(self, u, axes):
-        return self.ifft(u, axes=axes)
+        return self.ifft[axes](u, axes=axes)
 
     def _transform_idct(self, u, axes):
         result = u.copy()
@@ -468,7 +500,7 @@ class SpectralHelper:
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-        V = self.ifft(v, axes=axes)
+        V = self.ifft[axes](v, axes=axes)
 
         for axis in axes:
             slices = [slice(0, s, 1) for s in u.shape]
@@ -487,8 +519,9 @@ class SpectralHelper:
         result = u.copy()
 
         for base in trfs.keys():
-            axes_base = [me for me in axes if type(self.axes[me]) == base]
-            result = trfs[base](result, axes=axes_base)
+            axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+            if len(axes_base) > 0:
+                result = trfs[base](result, axes=axes_base)
 
         return result
 

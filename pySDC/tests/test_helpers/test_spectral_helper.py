@@ -72,7 +72,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-def test_transform(nx, nz, bz):
+def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     import numpy as np
     import scipy
     from pySDC.helpers.spectral_helper import SpectralHelper
@@ -82,7 +82,7 @@ def test_transform(nx, nz, bz):
     helper = SpectralHelper()
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
-    helper.setup_fft()
+    helper.setup_fft(useMPI=useMPI)
 
     u = np.random.random((nx, nz))
     axes = (1, 0)
@@ -90,7 +90,8 @@ def test_transform(nx, nz, bz):
     expect_trf = u.copy()
     for i in axes:
         base = helper.axes[i]
-        expect_trf = base.transform(expect_trf, axis=i)
+        norm = base.N if useMPI else 1.0
+        expect_trf = base.transform(expect_trf, axis=i) / norm
 
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
@@ -99,6 +100,52 @@ def test_transform(nx, nz, bz):
     assert np.allclose(expect_trf, trf), 'Forward transform is unexpected'
 
 
+def run_MPI_test(num_procs, **kwargs):
+    import os
+    import subprocess
+
+    # Set python path once
+    my_env = os.environ.copy()
+    my_env['PYTHONPATH'] = '../../..:.'
+    my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
+
+    cmd = f"mpirun -np {num_procs} python {__file__}"
+
+    for key, value in kwargs.items():
+        cmd += f' --{key}={value}'
+    p = subprocess.Popen(cmd.split(), env=my_env, cwd=".")
+
+    p.wait()
+    assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
+        p.returncode,
+        num_procs,
+    )
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nx', [3, 8])
+@pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+def test_transform_MPI(nx, nz, bz):
+    run_MPI_test(num_procs=1, test='transform', nx=nx, nz=nz, bz=bz)
+
+
 if __name__ == '__main__':
-    # test_transform(4, 3, 'cheby')
-    test_differentiation_matrix2D(2, 2, 'T2U', (0,))
+    str_to_bool = lambda me: False if me == 'False' else True
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--nx', type=int, help='Dof in x direction')
+    parser.add_argument('--nz', type=int, help='Dof in z direction')
+    parser.add_argument('--bz', type=str, help='Base in z direction')
+    parser.add_argument('--bx', type=str, help='Base in x direction')
+    parser.add_argument('--test', type=str, help='type of test', choices=['transform'])
+    parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
+    args = parser.parse_args()
+
+    if args.test == 'transform':
+        test_transform(**vars(args))
+
+    # test_transform_MPI(4, 3, 'cheby')
+    # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
