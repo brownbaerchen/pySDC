@@ -492,6 +492,43 @@ class SpectralHelper:
 
         return result
 
+    def get_differentiation_matrix(self, axes):
+        """
+        Get differentiation matrix along specified axis.
+
+        Args:
+            axes (tuple): Axes along which to differentiate.
+
+        Returns:
+            sparse differentiation matrix
+        """
+        sp = self.sparse_lib
+        D = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
+        ndim = len(self.axes)
+
+        if ndim == 2:
+            for axis in axes:
+                axis2 = (axis + 1) % ndim
+                D1D = self.axes[axis].get_differentiation_matrix()
+
+                if len(axes) > 1:
+                    I1D = sp.eye(self.axes[axis2].N)
+                else:
+                    I1D = self.axes[axis2].get_Id()
+
+                mats = [None] * ndim
+                mats[axis] = D1D
+                mats[axis2] = I1D
+
+                if axis == axes[0]:
+                    D += sp.kron(*mats)
+                else:
+                    D = D @ sp.kron(*mats)
+        else:
+            raise NotImplementedError(f'Differentiation matrix not implemented for {ndim} dimension!')
+
+        return D
+
     def get_integration_matrix(self, axes):
         """
         Get integration matrix to integrate along specified axis.
