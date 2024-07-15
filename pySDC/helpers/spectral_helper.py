@@ -387,6 +387,9 @@ class SpectralHelper:
 
     def __init__(self):
         self.axes = []
+        self.components = []
+        self.BC_mat = None
+        self.BCs = None
 
     def add_axis(self, base, *args, **kwargs):
 
@@ -398,6 +401,49 @@ class SpectralHelper:
             raise NotImplementedError(f'{base=!r} is not implemented!')
 
         self.axes[-1].get_fft_utils()
+
+    def add_component(self, name):
+        if type(name) in [list, tuple]:
+            for me in name:
+                self.add_component(me)
+        elif type(name) in [str]:
+            if name in self.components:
+                raise Exception(f'{name=!r} is already added to this problem!')
+            self.components.append(name)
+        else:
+            raise NotImplementedError
+
+    def index(self, name):
+        return self.components.index(name)
+
+    def get_empty_operator_matrix(self):
+        """
+        Return a matrix of operators to be filled with the connections between the solution components.
+
+        Returns:
+            list containing sparse zeros
+        """
+        S = len(self.components)
+        O = self.get_Id() * 0
+        return [[O for _ in range(S)] for _ in range(S)]
+
+    def add_BC(self, component, axis, x, v):
+        self.BC_mat = self.BC_mat if self.BC_mat is not None else self.get_empty_operator_matrix()
+
+        base = self.axes[axis]
+        assert x in [-1, 1]
+        assert type(base) == ChebychovHelper
+
+        O = self.get_Id() * 0
+        O[-1, :] = base.get_Dirichlet_BC_row_T(x)
+
+        return O
+
+    def convert_operator_matrix_to_operator(self, M):
+        if len(self.components) == 1:
+            return M[0]
+        else:
+            return self.sparse_lib.bmat(M)
 
     def get_grid(self):
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
@@ -414,7 +460,7 @@ class SpectralHelper:
 
         bases = [ChebychovHelper, FFTHelper]
 
-        indeces = np.array([i for i in range(len(self.axes))])
+        indeces = np.array([-i - 1 for i in range(len(self.axes))][::-1])
         axes = [tuple(indeces), tuple(indeces[::-1])]
         for base in bases:
             mask = [i for i in indeces if type(self.axes[i]) == base]
@@ -602,6 +648,25 @@ class SpectralHelper:
             raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
 
         return S
+
+    def get_Id(self):
+        """
+        Get identity matrix
+
+        Returns:
+            sparse identity matrix
+        """
+        sp = self.sparse_lib
+        ndim = len(self.axes)
+
+        if ndim == 1:
+            I = self.axes[0].get_Id()
+        elif ndim == 2:
+            I = sp.kron(*[me.get_Id() for me in self.axes])
+        else:
+            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+
+        return I
 
     def get_basis_change_matrix(self):
         """

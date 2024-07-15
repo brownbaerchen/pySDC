@@ -5,10 +5,26 @@ from scipy import sparse as sp
 from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.mesh import mesh
 
-from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper, SpectralHelper
 
 
-class Heat1DChebychev(Problem):
+class Heat1DChebychov(Problem):
+    dtype_u = mesh
+    dtype_f = mesh
+
+    def __init__(
+        self,
+        nvars=128,
+        a=0,
+        b=0,
+        poly_coeffs=None,
+        nu=1.0,
+    ):
+        poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+
+class Heat1DChebychovPreconditioning(Problem):
     dtype_u = mesh
     dtype_f = mesh
 

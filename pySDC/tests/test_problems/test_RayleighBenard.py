@@ -77,7 +77,6 @@ def test_derivatives(nx, nz, direction, cheby_mode):
             raise NotImplementedError
 
     derivatives = P.compute_derivatives(u)
-    i = P.iu
 
     for i in [P.iux, P.iTx]:
         assert np.allclose(derivatives[i], expect_x), f'Got unexpected x-derivative in component {i}'
@@ -203,7 +202,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
     axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
     axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
     axs[0].legend()
-    plt.show()
+    # plt.show()
 
     for i in [P.iTx, P.iu, P.iux, P.ip]:
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
@@ -241,7 +240,7 @@ def test_vorticity(nx, nz, cheby_mode, direction):
     else:
         raise NotImplementedError
 
-    assert np.allclose(P.compute_vorticiy(u), expect)
+    assert np.allclose(P.compute_vorticity(u), expect)
 
 
 @pytest.mark.base
@@ -415,10 +414,10 @@ def test_solver(nx, nz, cheby_mode):
 
 
 if __name__ == '__main__':
-    # test_derivatives(4, 4, 'mixed', 'T2U')
-    # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(2**1, 2**8, 'T2T', 0, 0, 3, 0)
+    test_derivatives(64, 64, 'mixed', 'T2U')
+    test_eval_f(128, 129, 'T2T', 'z')
+    # test_BCs(2**1, 2**8, 'T2T', 0, 0, 3, 0)
     # test_solver(2**0, 2**2, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'mixed')
-    # test_initial_conditions(4, 5, 0, 1, 1, 1)
+    test_initial_conditions(4, 5, 0, 1, 1, 1)

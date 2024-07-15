@@ -88,7 +88,7 @@ class ResidualHook(Hooks):
 def plot_residual():
     import numpy as np
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychev
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychovPreconditioning
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.stats_helper import get_sorted
 
@@ -104,7 +104,7 @@ def plot_residual():
     sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'LU'
 
-    problem_params = {'a': -9, 'b': 3, 'poly_coeffs': (0, 0, 0, -1, 1), 'nvars': 2**5, 'mode': 'D2U'}
+    problem_params = {'a': -9, 'b': 3, 'poly_coeffs': (0, 0, 0, -1, 1), 'nvars': 2**5}
 
     step_params = {}
     step_params['maxiter'] = 100
@@ -114,7 +114,7 @@ def plot_residual():
     controller_params['hook_class'] = [ResidualHook]
 
     description = {}
-    description['problem_class'] = Heat1DChebychev
+    description['problem_class'] = Heat1DChebychovPreconditioning
     description['problem_params'] = problem_params
     description['sweeper_class'] = generic_implicit
     description['sweeper_params'] = sweeper_params

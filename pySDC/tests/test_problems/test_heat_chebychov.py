@@ -4,14 +4,14 @@ import pytest
 @pytest.mark.base
 @pytest.mark.parametrize('mode', ['T2U', 'D2U'])
 @pytest.mark.parametrize('preconditioning', [True, False])
-def test_heat1d_chebychov(mode, preconditioning, plot=False):
+def test_heat1d_chebychov_preconditioning(mode, preconditioning, plot=False):
     import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychev
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychovPreconditioning
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
     N = 2**6
-    P = Heat1DChebychev(
+    P = Heat1DChebychovPreconditioning(
         nvars=N,
         a=-2,
         b=3,
@@ -70,7 +70,7 @@ def test_heat1d_chebychov(mode, preconditioning, plot=False):
 def test_SDC(plotting=False):
     import numpy as np
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychev
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychovPreconditioning
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 
     dt = 1
@@ -95,7 +95,7 @@ def test_SDC(plotting=False):
     controller_params['hook_class'] = []
 
     description = {}
-    description['problem_class'] = Heat1DChebychev
+    description['problem_class'] = Heat1DChebychovPreconditioning
     description['problem_params'] = problem_params
     description['sweeper_class'] = generic_implicit
     description['sweeper_params'] = sweeper_params
@@ -177,6 +177,6 @@ def test_heat2d(mode, nx, nz, plot=False):
 
 if __name__ == '__main__':
     test_SDC(True)
-    # test_heat1d_chebychev('T2U', False, plot=True)
+    # test_heat1d_chebychov('T2U', False, plot=True)
     # test_heat2d('T2T', 1, 2, True)
     # test_AdvectionDiffusion(plot=True)

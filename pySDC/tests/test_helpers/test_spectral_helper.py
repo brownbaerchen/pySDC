@@ -5,7 +5,7 @@ import pytest
 @pytest.mark.parametrize('nx', [16])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-@pytest.mark.parametrize('axes', [(0,), (1,), (0, 1)])
+@pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 def test_integration_matrix2D(nx, nz, variant, axes):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
@@ -21,16 +21,16 @@ def test_integration_matrix2D(nx, nz, variant, axes):
     S = helper.get_integration_matrix(axes=axes)
 
     u = np.sin(X) * Z**2 + np.cos(X) * Z**3
-    if axes == (0,):
+    if axes == (-2,):
         expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
-    elif axes == (1,):
+    elif axes == (-1,):
         expect = np.sin(X) * 1 / 3 * Z**3 + np.cos(X) * 1 / 4 * Z**4
-    elif axes == (0, 1):
+    elif axes == (-2, -1):
         expect = -np.cos(X) * 1 / 3 * Z**3 + np.sin(X) * 1 / 4 * Z**4
 
-    u_hat = helper.transform(u, axes=(0, 1))
+    u_hat = helper.transform(u, axes=(-2, -1))
     S_u_hat = (conv @ S @ u_hat.flatten()).reshape(u_hat.shape)
-    S_u = helper.itransform(S_u_hat, axes=(1, 0))
+    S_u = helper.itransform(S_u_hat, axes=(-1, -2))
 
     assert np.allclose(S_u, expect, atol=1e-12)
 
@@ -39,7 +39,7 @@ def test_integration_matrix2D(nx, nz, variant, axes):
 @pytest.mark.parametrize('nx', [16])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-@pytest.mark.parametrize('axes', [(0,), (1,), (0, 1)])
+@pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 def test_differentiation_matrix2D(nx, nz, variant, axes):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
@@ -54,16 +54,16 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
     D = helper.get_differentiation_matrix(axes)
 
     u = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
-    if axes == (0,):
+    if axes == (-2,):
         expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
-    elif axes == (1,):
+    elif axes == (-1,):
         expect = np.sin(X) * Z * 2 + Z**2 * 3
-    elif axes == (0, 1):
+    elif axes == (-2, -1):
         expect = np.cos(X) * 2 * Z
 
-    u_hat = helper.transform(u, axes=(0, 1))
+    u_hat = helper.transform(u, axes=(-2, -1))
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
-    D_u = helper.itransform(D_u_hat, axes=(1, 0))
+    D_u = helper.itransform(D_u_hat, axes=(-1, -2))
 
     assert np.allclose(D_u, expect, atol=1e-12)
 
@@ -86,12 +86,12 @@ def test_matrix1D(N, base, type):
     x = helper.get_grid()
 
     if type == 'diff':
-        D = helper.get_differentiation_matrix(axes=(0,))
+        D = helper.get_differentiation_matrix(axes=(-1,))
     elif type == 'int':
-        D = helper.get_integration_matrix(axes=(0,))
+        D = helper.get_integration_matrix(axes=(-1,))
 
     C = helper.get_basis_change_matrix()
-    du = helper.itransform(C @ D @ coeffs, axes=(0,))
+    du = helper.itransform(C @ D @ coeffs, axes=(-1,))
 
     if type == 'diff':
         exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
@@ -118,7 +118,7 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     helper.setup_fft(useMPI=useMPI)
 
     u = np.random.random((nx, nz))
-    axes = (1, 0)
+    axes = (-1, -2)
 
     expect_trf = u.copy()
     for i in axes:
@@ -163,6 +163,61 @@ def test_transform_MPI(nx, nz, bz):
     run_MPI_test(num_procs=1, test='transform', nx=nx, nz=nz, bz=bz)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('bc', [-1, 0, 1])
+@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('bc_val', [-99, 3.1415])
+def test_tau_method(bc, N, bc_val):
+    '''
+    solve u_x - u + tau P = 0, u(bc) = bc_val
+
+    We choose P = T_N or U_N. We replace the last row in the matrix with the boundary condition to get a
+    unique solution for the given resolution.
+
+    The test verifies that the solution satisfies the perturbed equation and the boundary condition.
+    '''
+    from pySDC.helpers.spectral_helper import ChebychovHelper, SpectralHelper
+    import numpy as np
+    import scipy.sparse as sp
+
+    cheby = ChebychovHelper(N)
+
+    helper = SpectralHelper()
+    helper.add_axis(base='cheby', N=N)
+    helper.add_component('u')
+
+    x = helper.get_grid()
+
+    coef = np.append(np.zeros(N - 1), [1])
+    rhs = np.append(np.zeros(N - 1), [bc_val])
+
+    C = helper.get_basis_change_matrix()
+
+    P = np.polynomial.Chebyshev(C @ coef)
+    D = helper.get_differentiation_matrix(axes=(-1,))
+    Id = helper.get_Id()
+
+    _A = helper.get_empty_operator_matrix()
+    _A[helper.index('u')] = D - Id
+    A = helper.convert_operator_matrix_to_operator(_A)
+
+    _BCs = helper.get_empty_operator_matrix()
+    # _BCs[helper.index('u')] = helper.add_BC(axis=0, x=-1, v=bc_val)
+
+    A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+
+    sol_hat = sp.linalg.spsolve(A, rhs)
+
+    sol_poly = np.polynomial.Chebyshev(sol_hat)
+    d_sol_poly = sol_poly.deriv(1)
+    x = np.linspace(-1, 1, 100)
+
+    assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
+
+    tau = (d_sol_poly(x) - sol_poly(x)) / P(x)
+    assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
+
+
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
 
@@ -180,6 +235,8 @@ if __name__ == '__main__':
     if args.test == 'transform':
         test_transform(**vars(args))
 
+    test_transform(4, 3, 'cheby', False)
     # test_transform_MPI(4, 3, 'cheby')
     # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
-    test_matrix1D(4, 'cheby', 'int')
+    # test_matrix1D(4, 'cheby', 'int')
+    # test_tau_method(-1, 8, -1)

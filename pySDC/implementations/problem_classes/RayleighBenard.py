@@ -1,7 +1,7 @@
 import numpy as np
 
 from pySDC.core.problem import Problem
-from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
+from pySDC.helpers.spectral_helper import SpectralHelper, ChebychovHelper, FFTHelper
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 
@@ -24,6 +24,12 @@ class RayleighBenard(Problem):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         S = 8  # number of variables
+
+        self.helper = SpectralHelper()
+        self.helper.add_axis(base='fft', N=nx)
+        self.helper.add_axis(base='cheby', N=nz, mode=cheby_mode)
+        self.helper.add_component(['u', 'v', 'ux', 'vz', 'T', 'Tx', 'Tz', 'p'])
+        self.helper.setup_fft()
 
         super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
 
@@ -49,44 +55,33 @@ class RayleighBenard(Problem):
         self.iTz = self.indices['Tz']  # derivative of temperature wrt z
         self.ip = self.indices['p']  # pressure
 
-        self.cheby = ChebychovHelper(N=nz, mode=cheby_mode)
+        self.cheby = ChebychovHelper(N=nz, mode=cheby_mode, transform_type='fft')
         self.fft = FFTHelper(N=nx)
         sp = self.cheby.sparse_lib
 
-        # construct grid
-        x = self.fft.get_1dgrid()
-        z = self.cheby.get_1dgrid()
-        self.Z, self.X = np.meshgrid(z, x)
+        self.Z, self.X = self.helper.get_grid()
 
         # construct 1D matrices
-        Dx1D = self.fft.get_differentiation_matrix()
         Ix1D = self.fft.get_Id()
-        Dz1D = self.cheby.get_differentiation_matrix()
-        Iz1D = self.cheby.get_Id()
-        T2U1D = self.cheby.get_conv(cheby_mode)
-        U2T1D = self.cheby.get_conv(cheby_mode[::-1])
-        Sx1D = self.fft.get_integration_matrix()
-        Sz1D = self.cheby.get_integration_matrix()
 
         # construct 2D matrices
-        Dx = sp.kron(Dx1D, Iz1D)
-        Dz = sp.kron(Ix1D, Dz1D)
-        I = sp.kron(Ix1D, Iz1D)
-        O = I * 0
+        Dx = self.helper.get_differentiation_matrix(axes=(0,))
+        Dz = self.helper.get_differentiation_matrix(axes=(1,))
+        I = self.helper.get_Id()
         self.Dx = Dx
         self.Dz = Dz
-        self.U2T = sp.kron(Ix1D, U2T1D)
-        S2D = sp.kron(Ix1D, Sz1D) @ sp.kron(Sx1D, sp.eye(nz))
+        self.U2T = self.helper.get_basis_change_matrix()
+        S2D = self.helper.get_integration_matrix(axes=(0, 1))
 
         # construct operators
-        L = self.cheby.get_empty_operator_matrix(S, O)
-        M = self.cheby.get_empty_operator_matrix(S, O)
+        L = self.helper.get_empty_operator_matrix()
+        M = self.helper.get_empty_operator_matrix()
 
         # relations between quantities and derivatives
         L[self.iux][self.iu] = Dx.copy()
         L[self.iux][self.iux] = -I
-        # L[self.ivz][self.iv] = Dz.copy()
-        # L[self.ivz][self.ivz] = -I
+        L[self.ivz][self.iv] = Dz.copy()
+        L[self.ivz][self.ivz] = -I
         L[self.ivz][self.iux] = -I
         L[self.ivz][self.ivz] = I.copy()
         L[self.iTx][self.iT] = Dx.copy()
@@ -131,7 +126,7 @@ class RayleighBenard(Problem):
         # TODO: distribute tau terms sensibly
         # self.iub = self.ip
         # self.iua = self.iu
-        BC = self.cheby.get_empty_operator_matrix(S, O)
+        BC = self.helper.get_empty_operator_matrix()
         # BC[self.iua][self.iu] = BC_up
         # BC[self.iub][self.iu] = BC_down
         BC[self.ip][self.ip] = BC_up
@@ -158,16 +153,12 @@ class RayleighBenard(Problem):
 
     def transform(self, u):
         assert u.ndim > 1, 'u must not be flattened here!'
-        u_hat = u * 0
-        _u_hat = self.fft.transform(u, axis=-2)
-        u_hat[:] = self.cheby.transform(_u_hat, axis=-1)
+        u_hat = self.helper.transform(u, axes=(-1, -2))
         return u_hat
 
     def itransform(self, u_hat):
         assert u_hat.ndim > 1, 'u_hat must not be flattened here!'
-        u = u_hat * 0
-        _u = self.fft.itransform(u_hat, axis=-2)
-        u[:] = self.cheby.itransform(_u, axis=-1)
+        u = self.helper.itransform(u_hat, axes=(-2, -1))
         return u
 
     def compute_derivatives(self, u, skip_transform=False):
@@ -271,7 +262,7 @@ class RayleighBenard(Problem):
         sol[:] = self.itransform(sol_hat)
         return sol
 
-    def compute_vorticiy(self, u):
+    def compute_vorticity(self, u):
         u_hat = self.transform(u)
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
@@ -334,7 +325,7 @@ class RayleighBenard(Problem):
         vmax = u.max()
 
         imT = axs[0].pcolormesh(self.X, self.Z, u[self.iT].real)
-        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticiy(u).real)
+        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
 
         for i, label in zip([0, 1], [r'$T$', 'vorticity']):
             axs[i].set_aspect(1)
