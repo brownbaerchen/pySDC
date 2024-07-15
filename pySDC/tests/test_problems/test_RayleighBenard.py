@@ -259,7 +259,7 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     u = P.u_init
     expect = P.u_init
 
-    conv = sp.kron(sp.eye(u.shape[0]), sp.kron(P.fft.get_Id(), P.cheby.get_conv(cheby_mode[::-1])))
+    conv = sp.kron(sp.eye(u.shape[0]), sp.kron(P.helper.axes[0].get_Id(), P.helper.axes[1].get_conv(cheby_mode[::-1])))
 
     for i in [P.iu, P.iv, P.iT, P.ip]:
         if direction == 'x':
@@ -414,7 +414,7 @@ def test_solver(nx, nz, cheby_mode):
 
 
 if __name__ == '__main__':
-    test_derivatives(64, 64, 'mixed', 'T2U')
+    test_derivatives(64, 64, 'z', 'T2U')
     test_eval_f(128, 129, 'T2T', 'z')
     # test_BCs(2**1, 2**8, 'T2T', 0, 0, 3, 0)
     # test_solver(2**0, 2**2, 'T2T')

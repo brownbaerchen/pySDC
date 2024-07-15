@@ -55,14 +55,7 @@ class RayleighBenard(Problem):
         self.iTz = self.indices['Tz']  # derivative of temperature wrt z
         self.ip = self.indices['p']  # pressure
 
-        self.cheby = ChebychovHelper(N=nz, mode=cheby_mode, transform_type='fft')
-        self.fft = FFTHelper(N=nx)
-        sp = self.cheby.sparse_lib
-
         self.Z, self.X = self.helper.get_grid()
-
-        # construct 1D matrices
-        Ix1D = self.fft.get_Id()
 
         # construct 2D matrices
         Dx = self.helper.get_differentiation_matrix(axes=(0,))
@@ -111,17 +104,12 @@ class RayleighBenard(Problem):
         for i in [self.iu, self.iv, self.iT]:
             M[i][i] = I
 
-        self.L = sp.bmat(L)
-        self.M = sp.bmat(M)
+        self.L = self.helper.convert_operator_matrix_to_operator(L)
+        self.M = self.helper.convert_operator_matrix_to_operator(M)
 
         # prepare BCs
-        BC_up = sp.eye(nz, format='lil') * 0
-        BC_up[-1, :] = self.cheby.get_Dirichlet_BC_row_T(1)
-        BC_up = sp.kron(Ix1D, BC_up, format='lil')
-
-        BC_down = sp.eye(nz, format='lil') * 0
-        BC_down[-1, :] = self.cheby.get_Dirichlet_BC_row_T(-1)
-        BC_down = sp.kron(Ix1D, BC_down, format='lil')
+        BC_up = self.helper.get_BC(1, 1)
+        BC_down = self.helper.get_BC(1, -1)
 
         # TODO: distribute tau terms sensibly
         # self.iub = self.ip
@@ -135,7 +123,7 @@ class RayleighBenard(Problem):
         BC[self.iT][self.iT] = BC_up
         BC[self.iTz][self.iT] = BC_down
 
-        BC = sp.bmat(BC, format='lil')
+        BC = self.helper.convert_operator_matrix_to_operator(BC)
         self.BC_mask = BC != 0
         self.BC = BC[self.BC_mask]
 
@@ -229,7 +217,7 @@ class RayleighBenard(Problem):
     def _put_BCs_in_rhs(self, rhs):
         assert rhs.ndim > 1, 'Right hand side must not be flattened here!'
 
-        _rhs_hat = self.cheby.transform(rhs, axis=-1)
+        _rhs_hat = self.helper.transform(rhs, axes=(-1,))
 
         # _rhs_hat[self.iua, :, -1] = self.BCs['u_top']
         # _rhs_hat[self.iub, :, -1] = self.BCs['u_bottom']
@@ -240,7 +228,7 @@ class RayleighBenard(Problem):
         _rhs_hat[self.ip, :, -1] = self.BCs['p_top']
         # TODO: I don't think the tau terms are properly distributed!
 
-        return self.cheby.itransform(_rhs_hat, axis=-1)
+        return self.helper.itransform(_rhs_hat, axes=(-1,))
 
     def _put_BCs_in_matrix(self, A):
         A = A.tolil()
@@ -257,7 +245,7 @@ class RayleighBenard(Problem):
         A = self.M + factor * self.L
         A = self._put_BCs_in_matrix(A)
 
-        sol_hat = self.cheby.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten()).reshape(sol.shape)
+        sol_hat = self.helper.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten()).reshape(sol.shape)
 
         sol[:] = self.itransform(sol_hat)
         return sol

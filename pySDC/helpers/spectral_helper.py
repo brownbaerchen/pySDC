@@ -427,6 +427,21 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
+    def get_BC(self, axis, x):
+        base = self.axes[axis]
+        assert type(base) == ChebychovHelper
+        assert x in [-1, 1]
+
+        BC = base.get_Id().tolil() * 0
+        BC[-1, :] = base.get_Dirichlet_BC_row_T(x)
+
+        ndim = len(self.axes)
+        if ndim == 1:
+            return BC
+        elif ndim == 2:
+            Id = self.axes[(axis + 1) % ndim].get_Id()
+            return self.sparse_lib.kron(Id, BC)
+
     def add_BC(self, component, axis, x, v):
         self.BC_mat = self.BC_mat if self.BC_mat is not None else self.get_empty_operator_matrix()
 
@@ -443,7 +458,7 @@ class SpectralHelper:
         if len(self.components) == 1:
             return M[0]
         else:
-            return self.sparse_lib.bmat(M)
+            return self.sparse_lib.bmat(M, format='lil')
 
     def get_grid(self):
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
