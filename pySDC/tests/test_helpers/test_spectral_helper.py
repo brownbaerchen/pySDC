@@ -232,9 +232,9 @@ if __name__ == '__main__':
 
     if args.test == 'transform':
         test_transform(**vars(args))
-
-    # test_transform(4, 3, 'cheby', False)
-    # test_transform_MPI(4, 3, 'cheby')
-    # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
-    # test_matrix1D(4, 'cheby', 'int')
-    test_tau_method(-1, 8, -1)
+    else:
+        # test_transform(4, 3, 'cheby', False)
+        # test_transform_MPI(4, 3, 'cheby')
+        # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
+        # test_matrix1D(4, 'cheby', 'int')
+        test_tau_method(-1, 8, -1)
