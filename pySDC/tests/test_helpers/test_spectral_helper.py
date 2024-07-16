@@ -191,7 +191,7 @@ def test_tau_method(bc, N, bc_val):
     Id = helper.get_Id()
 
     _A = helper.get_empty_operator_matrix()
-    helper.add_equation(_A, 'u', {'u': D - Id})
+    helper.add_equation_lhs(_A, 'u', {'u': D - Id})
     A = helper.convert_operator_matrix_to_operator(_A)
     A = helper.put_BCs_in_matrix(A)
 
@@ -248,7 +248,7 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
 
     # generate operator
     _A = helper.get_empty_operator_matrix()
-    helper.add_equation(_A, 'u', {'u': Dz - Dxx * 1e-1 - Dx})
+    helper.add_equation_lhs(_A, 'u', {'u': Dz - Dxx * 1e-1 - Dx})
     A = helper.convert_operator_matrix_to_operator(_A)
 
     # prepare system to solve

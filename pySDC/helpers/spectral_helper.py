@@ -495,7 +495,7 @@ class SpectralHelper:
 
         return rhs
 
-    def add_equation(self, A, equation, relations):
+    def add_equation_lhs(self, A, equation, relations):
         for k, v in relations.items():
             A[self.index(equation)][self.index(k)] = v
 

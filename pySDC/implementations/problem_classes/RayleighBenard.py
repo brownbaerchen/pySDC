@@ -81,10 +81,10 @@ class RayleighBenard(Problem):
         # L[self.iTx][self.iTx] = -I
         # L[self.iTz][self.iT] = Dz.copy()
         # L[self.iTz][self.iTz] = -I
-        self.helper.add_equation(L, 'ux', {'u': Dx, 'ux': -I})
-        self.helper.add_equation(L, 'vz', {'v': Dz, 'vz': -I})
-        self.helper.add_equation(L, 'Tx', {'T': Dx, 'Tx': -I})
-        self.helper.add_equation(L, 'Tz', {'T': Dz, 'Tz': -I})
+        self.helper.add_equation_lhs(L, 'ux', {'u': Dx, 'ux': -I})
+        self.helper.add_equation_lhs(L, 'vz', {'v': Dz, 'vz': -I})
+        self.helper.add_equation_lhs(L, 'Tx', {'T': Dx, 'Tx': -I})
+        self.helper.add_equation_lhs(L, 'Tz', {'T': Dz, 'Tz': -I})
 
         # divergence-free constraint
         # L[self.ip][self.ivz] = I.copy()
@@ -104,10 +104,10 @@ class RayleighBenard(Problem):
         # L[self.iT][self.iTx] = Dx
         # L[self.iT][self.iTz] = Dz
 
-        self.helper.add_equation(L, 'u', {'p': -Pr * Dx, 'ux': Pr * Dx})
-        self.helper.add_equation(L, 'v', {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I})
-        self.helper.add_equation(L, 'T', {'Tx': Dx, 'Tz': Dz})
-        self.helper.add_equation(L, 'p', {'p': S2D})
+        self.helper.add_equation_lhs(L, 'u', {'p': -Pr * Dx, 'ux': Pr * Dx})
+        self.helper.add_equation_lhs(L, 'v', {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I})
+        self.helper.add_equation_lhs(L, 'T', {'Tx': Dx, 'Tz': Dz})
+        self.helper.add_equation_lhs(L, 'p', {'p': S2D})
 
         # mass matrix
         for i in [self.iu, self.iv, self.iT]:
