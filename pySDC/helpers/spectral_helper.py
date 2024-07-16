@@ -462,7 +462,7 @@ class SpectralHelper:
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
 
         self.BC_mask = BC != 0
-        self._BCs = BC[self.BC_mask]
+        self._BCs = BC.tolil()[self.BC_mask]
         self.BC_zero_index = self.xp.arange(np.prod([me.N for me in self.axes]) * len(self.components))[
             self.BC_rhs_mask.flatten()
         ]
@@ -487,8 +487,9 @@ class SpectralHelper:
             )
 
             for bc in self.full_BCs:
-                _slice = [self.index(bc['equation'])] + slices
-                _rhs_hat[*_slice] = bc['v']
+                if axis == bc['axis']:
+                    _slice = [self.index(bc['equation'])] + slices
+                    _rhs_hat[*_slice] = bc['v']
 
             rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
 
@@ -646,7 +647,7 @@ class SpectralHelper:
 
         return result
 
-    def get_differentiation_matrix(self, axes):
+    def get_differentiation_matrix(self, axes, **kwargs):
         """
         Get differentiation matrix along specified axis.
 
@@ -661,11 +662,11 @@ class SpectralHelper:
         ndim = len(self.axes)
 
         if ndim == 1:
-            D = self.axes[0].get_differentiation_matrix()
+            D = self.axes[0].get_differentiation_matrix(**kwargs)
         elif ndim == 2:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
-                D1D = self.axes[axis].get_differentiation_matrix()
+                D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
 
                 if len(axes) > 1:
                     I1D = sp.eye(self.axes[axis2].N)

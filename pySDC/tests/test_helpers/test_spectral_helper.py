@@ -216,6 +216,86 @@ def test_tau_method(bc, N, bc_val):
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('bc', [-1, 1])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('bc_val', [-2, 1.0])
+def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
+    '''
+    solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
+    problem. We do FFT in x-direction and Chebychov in z-direction.
+    '''
+    from pySDC.helpers.spectral_helper import SpectralHelper
+    import numpy as np
+
+    helper = SpectralHelper()
+    helper.add_axis('fft', N=nx)
+    helper.add_axis('cheby', N=nz, mode=mode)
+    helper.add_component(['u'])
+    helper.setup_fft()
+
+    x = helper.axes[0].get_1dgrid()
+    z = helper.axes[1].get_1dgrid()
+    Z, X = helper.get_grid()
+
+    bcs = np.sin(bc_val * x)
+    helper.add_BC('u', 'u', 1, bc, bcs)
+    helper.setup_BCs()
+
+    rhs = helper.put_BCs_in_rhs(np.zeros(((1,) + X.shape)))
+    rhs_hat = helper.transform(rhs, axes=(-1, -2))
+
+    # generate matrices
+    Dz = helper.get_differentiation_matrix(axes=(1,))
+    Dx = helper.get_differentiation_matrix(axes=(0,))
+    Dxx = helper.get_differentiation_matrix(axes=(0,), p=2)
+
+    _A = helper.get_empty_operator_matrix()
+    helper.add_equation(_A, 'u', {'u': Dz - Dxx * 1e-1 - Dx})
+    A = helper.convert_operator_matrix_to_operator(_A)
+
+    # put BCs in the system matrix
+    A = helper.put_BCs_in_matrix(A)
+
+    # solve the system
+    sol_hat = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
+
+    # transform back to real space
+    sol = helper.itransform(sol_hat, axes=(-2, -1)).real
+    sol_cheby = helper.itransform(sol_hat, axes=(-2,))  # transform only half way for testing
+
+    # construct polynomials for testing
+    polys = [np.polynomial.Chebyshev(sol_cheby[i, :]) for i in range(nx)]
+    # d_polys = [me.deriv(1) for me in polys]
+    # _z = np.linspace(-1, 1, 100)
+
+    if plotting:
+        import matplotlib.pyplot as plt
+
+        im = plt.pcolormesh(X, Z, sol)
+        plt.colorbar(im)
+        plt.xlabel('x')
+        plt.ylabel('t')
+        plt.show()
+
+    for i in range(nx):
+
+        assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
+
+        assert np.allclose(
+            polys[i](z), sol[i, :]
+        ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
+
+        # coef = np.append(np.zeros(nz - 1), [1])
+        # Pz = np.polynomial.Chebyshev(coef)
+        # tau = (d_polys[i](_z) - polys[i](_z)) / Pz(_z)
+        # plt.plot(_z, tau)
+        # plt.show()
+        # assert np.allclose(tau, tau[0]), f'Solution does not satisfy perturbed equation at x={x[i]}'
+
+
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
 
@@ -237,4 +317,5 @@ if __name__ == '__main__':
         # test_transform_MPI(4, 3, 'cheby')
         # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(-1, 8, -1)
+        # test_tau_method(-1, 8, -1)
+        test_tau_method2D('T2U', -1, 2**8, 2**9, -2, True)
