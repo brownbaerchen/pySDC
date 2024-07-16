@@ -70,43 +70,14 @@ class RayleighBenard(Problem):
         L = self.helper.get_empty_operator_matrix()
         M = self.helper.get_empty_operator_matrix()
 
-        # relations between quantities and derivatives
-        # L[self.iux][self.iu] = Dx.copy()
-        # L[self.iux][self.iux] = -I
-        # L[self.ivz][self.iv] = Dz.copy()
-        # L[self.ivz][self.ivz] = -I
-        L[self.ivz][self.iux] = -I  # TODO: where does this go?
-        L[self.ivz][self.ivz] = I.copy()  # TODO: where does this go?
-        # L[self.iTx][self.iT] = Dx.copy()
-        # L[self.iTx][self.iTx] = -I
-        # L[self.iTz][self.iT] = Dz.copy()
-        # L[self.iTz][self.iTz] = -I
         self.helper.add_equation_lhs(L, 'ux', {'u': Dx, 'ux': -I})
         self.helper.add_equation_lhs(L, 'vz', {'v': Dz, 'vz': -I})
         self.helper.add_equation_lhs(L, 'Tx', {'T': Dx, 'Tx': -I})
         self.helper.add_equation_lhs(L, 'Tz', {'T': Dz, 'Tz': -I})
-
-        # divergence-free constraint
-        # L[self.ip][self.ivz] = I.copy()
-        # L[self.ip][self.iux] = -I.copy()
-
-        # pressure gauge
-        # L[self.ip][self.ip] = S2D
-
-        # differential terms
-        # L[self.iu][self.ip] = -Pr * Dx
-        # L[self.iu][self.iux] = Pr * Dx
-
-        # L[self.iv][self.ip] = -Pr * Dz
-        # L[self.iv][self.ivz] = Pr * Dz
-        # L[self.iv][self.iT] = Pr * Ra * I
-
-        # L[self.iT][self.iTx] = Dx
-        # L[self.iT][self.iTz] = Dz
-
         self.helper.add_equation_lhs(L, 'u', {'p': -Pr * Dx, 'ux': Pr * Dx})
         self.helper.add_equation_lhs(L, 'v', {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I})
         self.helper.add_equation_lhs(L, 'T', {'Tx': Dx, 'Tz': Dz})
+        self.helper.add_equation_lhs(L, 'p', {'ux': -I, 'vz': I})
         self.helper.add_equation_lhs(L, 'p', {'p': S2D})
 
         # mass matrix
