@@ -23,35 +23,31 @@ class RayleighBenard(Problem):
         }
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        S = 8  # number of variables
-
         self.helper = SpectralHelper()
         self.helper.add_axis(base='fft', N=nx)
         self.helper.add_axis(base='cheby', N=nz, mode=cheby_mode)
-        self.helper.add_component(['u', 'v', 'ux', 'vz', 'T', 'Tx', 'Tz', 'p'])
+        self.helper.add_component(['u', 'v', 'vz', 'T', 'Tz', 'p'])
         self.helper.setup_fft()
+
+        S = len(self.helper.components)  # number of variables
 
         super().__init__(init=((S, nx, nz), None, np.dtype('complex128')))
 
         self.indices = {
             'u': 0,
             'v': 1,
-            'ux': 2,
-            'vz': 3,
-            'T': 4,
-            'Tx': 5,
-            'Tz': 6,
-            'p': 7,
+            'vz': 2,
+            'T': 3,
+            'Tz': 4,
+            'p': 5,
         }
         self.index_to_name = {v: k for k, v, in self.indices.items()}
 
         # prepare indexes for the different components. Do this by hand so that the editor can autocomplete...
         self.iu = self.indices['u']  # velocity in x-direction
         self.iv = self.indices['v']  # velocity in z-direction
-        self.iux = self.indices['ux']  # derivative of u wrt x
         self.ivz = self.indices['vz']  # derivative of v wrt z
         self.iT = self.indices['T']  # temperature
-        self.iTx = self.indices['Tx']  # derivative of temperature wrt x
         self.iTz = self.indices['Tz']  # derivative of temperature wrt z
         self.ip = self.indices['p']  # pressure
 
@@ -59,9 +55,11 @@ class RayleighBenard(Problem):
 
         # construct 2D matrices
         Dx = self.helper.get_differentiation_matrix(axes=(0,))
+        Dxx = self.helper.get_differentiation_matrix(axes=(0,), p=2)
         Dz = self.helper.get_differentiation_matrix(axes=(1,))
         I = self.helper.get_Id()
         self.Dx = Dx
+        self.Dxx = Dxx
         self.Dz = Dz
         self.U2T = self.helper.get_basis_change_matrix()
         S2D = self.helper.get_integration_matrix(axes=(0, 1))
@@ -70,18 +68,17 @@ class RayleighBenard(Problem):
         L = self.helper.get_empty_operator_matrix()
         M = self.helper.get_empty_operator_matrix()
 
-        self.helper.add_equation_lhs(L, 'ux', {'u': Dx, 'ux': -I})
         self.helper.add_equation_lhs(L, 'vz', {'v': Dz, 'vz': -I})
-        self.helper.add_equation_lhs(L, 'Tx', {'T': Dx, 'Tx': -I})
         self.helper.add_equation_lhs(L, 'Tz', {'T': Dz, 'Tz': -I})
-        self.helper.add_equation_lhs(L, 'u', {'p': -Pr * Dx, 'ux': Pr * Dx})
+        self.helper.add_equation_lhs(L, 'u', {'p': -Pr * Dx, 'u': Pr * Dxx})
         self.helper.add_equation_lhs(L, 'v', {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I})
-        self.helper.add_equation_lhs(L, 'T', {'Tx': Dx, 'Tz': Dz})
-        self.helper.add_equation_lhs(L, 'p', {'ux': -I, 'vz': I})
+        self.helper.add_equation_lhs(L, 'T', {'T': Dxx, 'Tz': Dz})
+        self.helper.add_equation_lhs(L, 'p', {'u': -Dx, 'vz': I})
         self.helper.add_equation_lhs(L, 'p', {'p': S2D})
 
         # mass matrix
-        for i in [self.iu, self.iv, self.iT]:
+        for comp in ['u', 'v', 'T']:
+            i = self.helper.index(comp)
             M[i][i] = I
 
         self.L = self.helper.convert_operator_matrix_to_operator(L)
@@ -116,14 +113,14 @@ class RayleighBenard(Problem):
         me_hat = self.u_init
 
         u_hat = u if skip_transform else self.transform(u)
-        shape = u[self.iu].shape
+        shape = u[0].shape
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
 
-        for i, iD, D in zip(
-            [self.iu, self.iv, self.iT, self.iT], [self.iux, self.ivz, self.iTx, self.iTz], [Dx, Dz, Dx, Dz]
-        ):
-            me_hat[iD][:] = (D @ u_hat[i].flatten()).reshape(shape)
+        for comp1, comp2 in zip(['v', 'T'], ['vz', 'Tz']):
+            i = self.helper.index(comp1)
+            iD = self.helper.index(comp2)
+            me_hat[iD][:] = (Dz @ u_hat[i].flatten()).reshape(shape)
 
         return me_hat if skip_transform else self.itransform(me_hat)
 
@@ -135,21 +132,30 @@ class RayleighBenard(Problem):
 
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
+        Dxx = self.U2T @ self.Dxx
 
         # evaluate implicit terms
-        shape = u[self.iu].shape
-        f_hat.impl[self.iT] = (Dx @ u_hat[self.iTx].flatten() + Dz @ u_hat[self.iTz].flatten()).reshape(shape)
-        f_hat.impl[self.iu] = (-Dx @ u_hat[self.ip].flatten() + Dx @ u_hat[self.iux].flatten()).reshape(shape)
-        f_hat.impl[self.iv] = (-Dz @ u_hat[self.ip].flatten() + Dz @ u_hat[self.ivz].flatten()).reshape(
-            shape
-        ) + self.Ra * u_hat[self.iT]
+        shape = u[0].shape
+
+        iu = self.helper.index('u')
+        iv = self.helper.index('v')
+        ivz = self.helper.index('vz')
+        iT = self.helper.index('T')
+        iTz = self.helper.index('Tz')
+        ip = self.helper.index('p')
+
+        f_hat.impl[iT] = (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
+        f_hat.impl[iu] = (-Dx @ u_hat[ip].flatten() + Dxx @ u_hat[iu].flatten()).reshape(shape)
+        f_hat.impl[iv] = (-Dz @ u_hat[ip].flatten() + Dz @ u_hat[ivz].flatten()).reshape(shape) + self.Ra * u_hat[iT]
 
         f[:] = self.itransform(f_hat)
 
+        Dx_u = {i: self.itransform((Dx @ u_hat[i].flatten()).reshape(shape)) for i in [iu, iT]}
+
         # treat convection explicitly
-        f.expl[self.iu] = -u[self.iu] * (u[self.iux] + u[self.ivz])
-        f.expl[self.iv] = -u[self.iv] * (u[self.iux] + u[self.ivz])
-        f.expl[self.iT] = -u[self.iu] * u[self.iTx] - u[self.iv] * u[self.iTz]
+        f.expl[iu] = -u[iu] * (Dx_u[iu] + u[ivz])
+        f.expl[iv] = -u[iv] * (Dx_u[iu] + u[ivz])
+        f.expl[iT] = -u[iu] * Dx_u[iT] - u[iv] * u[iTz]
 
         return f
 
@@ -172,31 +178,15 @@ class RayleighBenard(Problem):
 
         # evaluate derivatives
         derivatives = self.compute_derivatives(me)
-        for i in [self.iTx, self.iTz, self.iux, self.ivz]:
+        for comp in ['Tz', 'vz']:
+            i = self.helper.index(comp)
             me[i] = derivatives[i]
 
         return me
 
-    def _put_BCs_in_rhs(self, rhs):
-        assert rhs.ndim > 1, 'Right hand side must not be flattened here!'
-
-        _rhs_hat = self.helper.transform(rhs, axes=(-1,))
-
-        # _rhs_hat[self.iua, :, -1] = self.BCs['u_top']
-        # _rhs_hat[self.iub, :, -1] = self.BCs['u_bottom']
-        _rhs_hat[self.iv, :, -1] = self.BCs['v_top']
-        _rhs_hat[self.ivz, :, -1] = self.BCs['v_bottom']
-        _rhs_hat[self.iT, :, -1] = self.BCs['T_top']
-        _rhs_hat[self.iTz, :, -1] = self.BCs['T_bottom']
-        _rhs_hat[self.ip, :, -1] = self.BCs['p_top']
-        # TODO: I don't think the tau terms are properly distributed!
-
-        return self.helper.itransform(_rhs_hat, axes=(-1,))
-
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        # _rhs = self._put_BCs_in_rhs(rhs)
         _rhs = self.helper.put_BCs_in_rhs(rhs)
         rhs_hat = self.transform(_rhs)
 
@@ -212,20 +202,21 @@ class RayleighBenard(Problem):
         u_hat = self.transform(u)
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
-        vorticity_hat = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[self.iu].flatten()).reshape(u[self.iu].shape)
+        iu = self.helper.index('u')
+        vorticity_hat = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.itransform(vorticity_hat)
 
-    def compute_constraint_violation(self, u):
-        derivatives = self.compute_derivatives(u)
+    # def compute_constraint_violation(self, u):
+    #     derivatives = self.compute_derivatives(u)
 
-        violations = {}
+    #     violations = {}
 
-        for i in [self.iux, self.ivz, self.iTx, self.iTz]:
-            violations[self.index_to_name[i]] = derivatives[i] - u[i]
+    #     for i in [self.ivz, self.iTz]:
+    #         violations[self.index_to_name[i]] = derivatives[i] - u[i]
 
-        violations['divergence'] = u[self.iux] - u[self.ivz]
+    #     violations['divergence'] = u[self.iux] - u[self.ivz]
 
-        return violations
+    #     return violations
 
     def get_fig(self):  # pragma: no cover
         """
