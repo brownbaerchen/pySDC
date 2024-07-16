@@ -189,23 +189,22 @@ def test_tau_method(bc, N, bc_val):
     helper.setup_BCs()
 
     x = helper.get_grid()
-
     coef = np.append(np.zeros(N - 1), [1])
-    rhs = np.append(np.zeros(N - 1), [bc_val])
+    P = np.polynomial.Chebyshev(C @ coef)
 
     C = helper.get_basis_change_matrix()
-
-    P = np.polynomial.Chebyshev(C @ coef)
     D = helper.get_differentiation_matrix(axes=(-1,))
     Id = helper.get_Id()
 
     _A = helper.get_empty_operator_matrix()
     _A[helper.index('u')][helper.index('u')] = D - Id
     A = helper.convert_operator_matrix_to_operator(_A)
-
     A = helper.put_BCs_in_matrix(A)
 
-    sol_hat = sp.linalg.spsolve(A, rhs)
+    rhs = helper.put_BCs_in_rhs(np.zeros((1, N)))
+    rhs_hat = helper.transform(rhs, axes=(-1,))
+
+    sol_hat = sp.linalg.spsolve(A, rhs_hat.flatten())
 
     sol_poly = np.polynomial.Chebyshev(sol_hat)
     d_sol_poly = sol_poly.deriv(1)

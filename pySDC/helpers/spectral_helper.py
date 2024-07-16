@@ -388,6 +388,7 @@ class SpectralHelper:
     def __init__(self):
         self.axes = []
         self.components = []
+        self.full_BCs = []
         self.BC_mat = None
         self.BCs = None
 
@@ -446,6 +447,7 @@ class SpectralHelper:
 
         _BC = self.get_BC(axis=axis, x=x)
         self.BC_mat[self.index(equation)][self.index(component)] = _BC
+        self.full_BCs += [{'component': component, 'equation': equation, 'axis': axis, 'x': x, 'v': v}]
 
         slices = (
             [self.index(equation)]
@@ -470,6 +472,28 @@ class SpectralHelper:
         A[self.BC_zero_index, :] = 0
         A[self.BC_mask] = self._BCs
         return A.tocsc()
+
+    def put_BCs_in_rhs(self, rhs):
+        assert rhs.ndim > 1, 'rhs must not be flattened here!'
+
+        _rhs = rhs.copy()
+        ndim = len(self.axes)
+
+        for axis in range(ndim):
+            _rhs_hat = self.transform(_rhs, axes=(axis - ndim,))
+            slices = (
+                [slice(0, self.axes[i].N) for i in range(axis)]
+                + [-1]
+                + [slice(0, self.axes[i].N) for i in range(axis + 1, len(self.axes))]
+            )
+
+            for bc in self.full_BCs:
+                _slice = [self.index(bc['equation'])] + slices
+                _rhs_hat[*_slice] = bc['v']
+
+            _rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
+
+        return _rhs
 
     def convert_operator_matrix_to_operator(self, M):
         if len(self.components) == 1:

@@ -216,7 +216,8 @@ class RayleighBenard(Problem):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        _rhs = self._put_BCs_in_rhs(rhs)
+        # _rhs = self._put_BCs_in_rhs(rhs)
+        _rhs = self.helper.put_BCs_in_rhs(rhs)
         rhs_hat = self.transform(_rhs)
 
         A = self.M + factor * self.L
