@@ -155,6 +155,8 @@ def test_heat2d(mode, nx, nz, plot=False):
 
     if plot:
 
+        import matplotlib.pyplot as plt
+
         fig, axs = plt.subplots(1, 4, figsize=(12, 3))
         args = {'vmin': P.a * 1.2, 'vmax': P.b * 1.2}
         axs[0].pcolormesh(P.X, P.Z, u0[0], **args)
@@ -176,7 +178,7 @@ def test_heat2d(mode, nx, nz, plot=False):
 
 
 if __name__ == '__main__':
-    test_SDC(True)
+    # test_SDC(True)
     # test_heat1d_chebychov('T2U', False, plot=True)
-    # test_heat2d('T2T', 1, 2, True)
+    test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)

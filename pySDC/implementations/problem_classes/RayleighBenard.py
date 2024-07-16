@@ -1,7 +1,7 @@
 import numpy as np
 
 from pySDC.core.problem import Problem
-from pySDC.helpers.spectral_helper import SpectralHelper, ChebychovHelper, FFTHelper
+from pySDC.helpers.spectral_helper import SpectralHelper
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 
@@ -69,7 +69,7 @@ class RayleighBenard(Problem):
         M = self.helper.get_empty_operator_matrix()
 
         self.helper.add_equation_lhs(L, 'vz', {'v': Dz, 'vz': -I})
-        self.helper.add_equation_lhs(L, 'Tz', {'T': Dz, 'Tz': -I})
+        self.helper.add_equation_lhs(L, 'Tz', {'T': -Dz, 'Tz': I})
         self.helper.add_equation_lhs(L, 'u', {'p': -Pr * Dx, 'u': Pr * Dxx})
         self.helper.add_equation_lhs(L, 'v', {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I})
         self.helper.add_equation_lhs(L, 'T', {'T': Dxx, 'Tz': Dz})
@@ -83,10 +83,6 @@ class RayleighBenard(Problem):
 
         self.L = self.helper.convert_operator_matrix_to_operator(L)
         self.M = self.helper.convert_operator_matrix_to_operator(M)
-
-        # prepare BCs
-        BC_up = self.helper.get_BC(1, 1)
-        BC_down = self.helper.get_BC(1, -1)
 
         # TODO: distribute tau terms sensibly
         self.helper.add_BC(component='p', equation='p', axis=1, x=1, v=self.BCs['p_top'])
@@ -187,7 +183,8 @@ class RayleighBenard(Problem):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        _rhs = self.helper.put_BCs_in_rhs(rhs)
+        _rhs = (self.M @ rhs.flatten()).reshape(sol.shape)
+        _rhs = self.helper.put_BCs_in_rhs(_rhs)
         rhs_hat = self.transform(_rhs)
 
         A = self.M + factor * self.L
