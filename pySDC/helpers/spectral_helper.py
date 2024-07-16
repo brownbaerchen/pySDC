@@ -476,11 +476,10 @@ class SpectralHelper:
     def put_BCs_in_rhs(self, rhs):
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
 
-        _rhs = rhs.copy()
         ndim = len(self.axes)
 
         for axis in range(ndim):
-            _rhs_hat = self.transform(_rhs, axes=(axis - ndim,))
+            _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
             slices = (
                 [slice(0, self.axes[i].N) for i in range(axis)]
                 + [-1]
@@ -491,9 +490,13 @@ class SpectralHelper:
                 _slice = [self.index(bc['equation'])] + slices
                 _rhs_hat[*_slice] = bc['v']
 
-            _rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
+            rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
 
-        return _rhs
+        return rhs
+
+    def add_equation(self, A, equation, relations):
+        for k, v in relations.items():
+            A[self.index(equation)][self.index(k)] = v
 
     def convert_operator_matrix_to_operator(self, M):
         if len(self.components) == 1:
