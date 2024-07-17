@@ -36,7 +36,7 @@ class SpectralHelperBase:
         """
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_basis_change_matrix(self):
+    def get_basis_change_matrix(self, *args, **kwargs):
         return self.sparse_lib.eye(self.N)
 
 
@@ -135,15 +135,18 @@ class ChebychovHelper(SpectralHelperBase):
         except NotImplementedError as E:
             try:
                 fwd = get_forward_conv(name[::-1])
-                mat = self.sparse_lib.linalg.inv(fwd)
+                mat = self.sparse_lib.linalg.inv(fwd.tocsc())
             except NotImplementedError:
                 raise E
 
         self.cache[name] = mat
         return mat
 
-    def get_basis_change_matrix(self):
-        return self.get_conv(self.mode[::-1])
+    def get_basis_change_matrix(self, direction='backward'):
+        if direction == 'forward':
+            return self.get_conv(self.mode)
+        else:
+            return self.get_conv(self.mode[::-1])
 
     def get_T2U_differentiation_matrix(self):
         '''
@@ -473,13 +476,16 @@ class SpectralHelper:
         A[self.BC_mask] = self._BCs
         return A.tocsc()
 
-    def put_BCs_in_rhs(self, rhs):
+    def put_BCs_in_rhs(self, rhs, istransformed=False):
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
 
         ndim = len(self.axes)
 
         for axis in range(ndim):
-            _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
+            if istransformed:
+                _rhs_hat = rhs
+            else:
+                _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
             slices = (
                 [slice(0, self.axes[i].N) for i in range(axis)]
                 + [-1]
@@ -491,7 +497,10 @@ class SpectralHelper:
                     _slice = [self.index(bc['equation'])] + slices
                     _rhs_hat[*_slice] = bc['v']
 
-            rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
+            if istransformed:
+                rhs = _rhs_hat
+            else:
+                rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
 
         return rhs
 
@@ -744,7 +753,7 @@ class SpectralHelper:
 
         return I
 
-    def get_basis_change_matrix(self):
+    def get_basis_change_matrix(self, direction='backward'):
         """
         Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
         the original basis afterwards.
@@ -757,11 +766,11 @@ class SpectralHelper:
         ndim = len(self.axes)
 
         if ndim == 1:
-            C = self.axes[0].get_basis_change_matrix()
+            C = self.axes[0].get_basis_change_matrix(direction=direction)
         elif ndim == 2:
             mats = [None] * ndim
-            mats[0] = self.axes[0].get_basis_change_matrix()
-            mats[1] = self.axes[1].get_basis_change_matrix()
+            mats[0] = self.axes[0].get_basis_change_matrix(direction=direction)
+            mats[1] = self.axes[1].get_basis_change_matrix(direction=direction)
 
             C = C @ sp.kron(*mats)
         else:

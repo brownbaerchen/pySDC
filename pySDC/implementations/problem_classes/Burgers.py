@@ -21,7 +21,7 @@ class Burgers1D(Problem):
 
         S = len(self.helper.components)  # number of variables
 
-        super().__init__(init=((S, N), None, np.dtype('complex128')))
+        super().__init__(init=((S, N), None, np.dtype('float64')))
 
         self.x = self.helper.get_grid()[0]
 
@@ -71,17 +71,14 @@ class Burgers1D(Problem):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        _rhs = (self.M @ rhs.flatten()).reshape(sol.shape)
-        _rhs = self.helper.put_BCs_in_rhs(_rhs)
-        rhs_hat = self.helper.transform(_rhs, axes=(-1,))
+        rhs_hat = self.helper.transform(rhs, axes=(-1,))
+        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
+        rhs_hat = self.helper.put_BCs_in_rhs(rhs_hat, istransformed=True)
 
         A = self.M + factor * self.L
         A = self.helper.put_BCs_in_matrix(A)
 
         sol_hat = (self.helper.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten())).reshape(sol.shape)
-
-        for i in range(sol.shape[0]):
-            sol_hat[i] = self.C @ sol_hat[i]
 
         sol[:] = self.helper.itransform(sol_hat, axes=(-1,))
         return sol
