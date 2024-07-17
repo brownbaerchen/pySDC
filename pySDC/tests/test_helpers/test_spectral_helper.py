@@ -115,10 +115,20 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft(useMPI=useMPI)
 
-    u = np.random.random((nx, nz))
     axes = (-1, -2)
+    u = np.random.random(helper.local_shape_real[axes])
 
-    expect_trf = u.copy()
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+        u_all = np.array(comm.allgather(u.T)).reshape(helper.global_shape[1:]).T
+    else:
+        rank = 0
+        u_all = u
+
+    expect_trf = u_all.copy()
     for i in axes:
         base = helper.axes[i]
         norm = base.N if useMPI else 1.0
@@ -127,8 +137,10 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
+    expect_local = expect_trf[trf.shape[0] * rank : trf.shape[0] * (rank + 1), :]
+
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
-    assert np.allclose(expect_trf, trf), 'Forward transform is unexpected'
+    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -154,9 +166,10 @@ def run_MPI_test(num_procs, **kwargs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('nx', [2, 8])
+@pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('num_procs', [1, 2])
 def test_transform_MPI(nx, nz, bz):
     run_MPI_test(num_procs=1, test='transform', nx=nx, nz=nz, bz=bz)
 
@@ -305,10 +318,13 @@ if __name__ == '__main__':
 
     if args.test == 'transform':
         test_transform(**vars(args))
-    else:
+    elif args._test is None:
         # test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
         # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
         test_tau_method2D('T2U', 2**2, 2**5, -2, plotting=True)
+    else:
+        raise NotImplementedError
+    print('done')

@@ -391,6 +391,7 @@ class SpectralHelper:
     def __init__(self):
         self.axes = []
         self.components = []
+
         self.full_BCs = []
         self.BC_mat = None
         self.BCs = None
@@ -524,8 +525,12 @@ class SpectralHelper:
             ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
 
         shape = [me.N for me in self.axes]
+        self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
+
         self.fft = {}
         self.ifft = {}
+        self.local_shape_real = {}
+        self.local_shape_spectral = {}
 
         bases = [ChebychovHelper, FFTHelper]
 
@@ -542,7 +547,7 @@ class SpectralHelper:
 
             if useMPI:
                 from mpi4py import MPI
-                from mpi4py_fft import PFFT
+                from mpi4py_fft import PFFT, newDistArray
 
                 comm = comm if comm else MPI.COMM_WORLD
 
@@ -557,9 +562,14 @@ class SpectralHelper:
                 )
                 self.fft[axis] = _fft.forward
                 self.ifft[axis] = _fft.backward
+                _u = newDistArray(_fft, False)
+                _u_hat = newDistArray(_fft, True)
+                self.local_shape_real[axis] = _u.shape
+                self.local_shape_spectral[axis] = _u_hat.shape
             else:
                 self.fft[axis] = self.xp.fft.fftn
                 self.ifft[axis] = self.xp.fft.ifftn
+                self.local_shape = self.global_shape
 
         self.BC_mat = self.get_empty_operator_matrix()
         self.BC_mask = self.xp.zeros(
