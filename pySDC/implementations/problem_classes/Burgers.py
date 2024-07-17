@@ -47,14 +47,20 @@ class Burgers1D(Problem):
         self.helper.add_BC(component='u', equation='ux', axis=0, x=-1, v=BCl)
         self.helper.setup_BCs()
 
-    def u_exact(self, *args, **kwargs):
+    def u_exact(self, t=0, *args, **kwargs):
         me = self.u_init
-        me[self.helper.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
-            self.x * np.pi * self.f
-        )
-        me[self.helper.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
-            (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
-        ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
+        if t == 0:
+            me[self.helper.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
+                self.x * np.pi * self.f
+            )
+            me[self.helper.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
+                (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
+            ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
+        elif t == np.inf and self.f == 0:
+            me[0] = (self.BCl * np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + self.BCr) / (
+                np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + 1
+            )
+
         return me
 
     def eval_f(self, u, *args, **kwargs):

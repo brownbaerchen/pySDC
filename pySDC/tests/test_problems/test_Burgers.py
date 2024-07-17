@@ -22,7 +22,7 @@ def test_Burgers_f(mode):
 
 @pytest.mark.base
 @pytest.mark.parametrize('mode', ['T2T', 'T2U'])
-def test_Burgers_solver(mode, N=2**4):
+def test_Burgers_solver(mode, N=2**8, plotting=False):
     import numpy as np
     import matplotlib.pyplot as plt
     from pySDC.implementations.problem_classes.Burgers import Burgers1D
@@ -42,21 +42,27 @@ def test_Burgers_solver(mode, N=2**4):
 
     assert np.allclose(u[0], small_step[0], atol=small_step_size * 1e1)
 
-    return None
+    u_exact_steady = P.u_exact(np.inf)
     dt = 1e-2
+    tol = 1e-4
     for i in range(900):
+        u_old = u.copy()
         u, f = imex_euler(u, f, dt)
-        plt.plot(P.x, u[0])
-        plt.pause(1e-8)
-        plt.cla()
 
-    # un = P.solve_system(u + dt*f.expl, dt)
+        if plotting:
+            plt.plot(P.x, u[0])
+            plt.plot(P.x, u_exact_steady[0])
+            plt.title(f't={i*dt:.2e}')
+            plt.pause(1e-8)
+            plt.cla()
 
-    plt.plot(P.x, u[0])
-    # plt.plot(P.x, un[0])
-    plt.show()
+        if abs(u_old[0] - u[0]) < tol:
+            print(f'stopping after {i} steps')
+            break
+
+    assert np.allclose(u[0], u_exact_steady[0], atol=tol * 1e1)
 
 
 if __name__ == '__main__':
-    test_Burgers_solver('T2U')
+    test_Burgers_solver('T2U', N=2**8)
     print('done')
