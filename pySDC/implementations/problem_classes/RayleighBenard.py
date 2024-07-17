@@ -183,8 +183,12 @@ class RayleighBenard(Problem):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        _rhs = (self.M @ rhs.flatten()).reshape(sol.shape)
+        _rhs_hat = self.transform(rhs)
+        rhs_hat = (self.M @ _rhs_hat.flatten()).reshape(sol.shape)
+
+        _rhs = self.itransform(rhs_hat)
         _rhs = self.helper.put_BCs_in_rhs(_rhs)
+
         rhs_hat = self.transform(_rhs)
 
         A = self.M + factor * self.L

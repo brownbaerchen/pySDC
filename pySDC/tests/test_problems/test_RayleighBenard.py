@@ -377,7 +377,7 @@ def test_solver(nx, nz, cheby_mode):
         error = np.array([abs(u1[i] - u2[i]) for i in range(u1.shape[0])])
         false_idx = np.arange(u1.shape[0])[error > thresh]
         msgs = [f'{error[i]:.2e} in {P.index_to_name[i]}' for i in false_idx]
-        # assert len(false_idx) == 0, f'Errors too large when solving {msg}: {msgs}'
+        assert len(false_idx) == 0, f'Errors too large when solving {msg}: {msgs}'
 
         # violations = P.compute_constraint_violation(u2)
         # for key in violations.keys():
@@ -413,9 +413,8 @@ def test_solver(nx, nz, cheby_mode):
 if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    # test_BCs(2**1, 2**1, 'T2U', 0, 0, 3, 0)
-    test_solver(2**0, 2**1, 'T2U')
+    test_BCs(2**1, 2**1, 'T2U', 0, 0, 3, 0)
+    # test_solver(2**5, 2**5, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'mixed')
     # test_initial_conditions(4, 5, 0, 1, 1, 1)
-    print('done')
