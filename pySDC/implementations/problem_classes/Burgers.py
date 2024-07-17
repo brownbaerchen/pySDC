@@ -11,11 +11,11 @@ class Burgers1D(Problem):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0):
+    def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U'):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         self.helper = SpectralHelper()
-        self.helper.add_axis(base='cheby', N=N, mode='T2T')
+        self.helper.add_axis(base='cheby', N=N, mode=mode)
         self.helper.add_component(['u', 'ux'])
         self.helper.setup_fft()
 
