@@ -49,6 +49,15 @@ class Burgers1D(Problem):
 
     def u_exact(self, t=0, *args, **kwargs):
         me = self.u_init
+
+        # g = 4 * (1 + np.exp(-(4 * self.x + t)/self.epsilon/32))
+        # g_x = 4 * np.exp(-(4 * self.x + t)/self.epsilon/32) * (-4/self.epsilon/32)
+
+        # me[0] = 3./4. - 1./g
+        # me[1] = 1/g**2 * g_x
+
+        # return me
+
         if t == 0:
             me[self.helper.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
                 self.x * np.pi * self.f
@@ -56,10 +65,12 @@ class Burgers1D(Problem):
             me[self.helper.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
                 (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
             ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
-        elif t == np.inf and self.f == 0:
+        elif t == np.inf and self.f == 0 and self.BCl == -self.BCr:
             me[0] = (self.BCl * np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + self.BCr) / (
                 np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + 1
             )
+        else:
+            raise NotImplementedError
 
         return me
 

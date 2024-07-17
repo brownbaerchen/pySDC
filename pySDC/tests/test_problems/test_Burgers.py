@@ -64,5 +64,5 @@ def test_Burgers_solver(mode, N=2**8, plotting=False):
 
 
 if __name__ == '__main__':
-    test_Burgers_solver('T2U', N=2**8)
+    test_Burgers_solver('T2U', N=2**10, plotting=True)
     print('done')
