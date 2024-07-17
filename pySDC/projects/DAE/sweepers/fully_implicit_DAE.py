@@ -1,7 +1,7 @@
 import numpy as np
 from scipy import optimize
 
-from pySDC.core.Errors import ParameterError
+from pySDC.core.errors import ParameterError
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.projects.DAE.misc.DAEMesh import DAEMesh
 
@@ -59,7 +59,7 @@ class fully_implicit_DAE(generic_implicit):
         if self.coll.left_is_node:
             raise ParameterError(msg)
 
-        self.QI = self.get_Qdelta_implicit(coll=self.coll, qd_type=self.params.QI)
+        self.QI = self.get_Qdelta_implicit(qd_type=self.params.QI)
 
     def update_nodes(self):
         r"""
@@ -148,7 +148,7 @@ class fully_implicit_DAE(generic_implicit):
         .. math::
             ||F(t, u, u')||
 
-        for computing the residual.
+        for computing the residual in a chosen norm.
 
         Parameters
         ----------
@@ -194,7 +194,7 @@ class fully_implicit_DAE(generic_implicit):
 
     def compute_end_point(self):
         """
-        Compute u at the right point of the interval
+        Compute u at the right point of the interval.
 
         The value uend computed here is a full evaluation of the Picard formulation unless do_full_update==False
 
