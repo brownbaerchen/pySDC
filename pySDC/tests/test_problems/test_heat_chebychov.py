@@ -10,12 +10,12 @@ def test_heat1d_chebychov_preconditioning(mode, preconditioning, plot=False):
     import scipy
     from pySDC.helpers.problem_helper import ChebychovHelper
 
-    N = 2**6
+    N = 2**2
     P = Heat1DChebychovPreconditioning(
         nvars=N,
         a=-2,
         b=3,
-        poly_coeffs=[0, 0, 0, -1, 1],
+        poly_coeffs=[-1, 1],
         mode=mode,
         nu=1e-1,
         preconditioning=preconditioning,
@@ -180,5 +180,6 @@ def test_heat2d(mode, nx, nz, plot=False):
 if __name__ == '__main__':
     # test_SDC(True)
     # test_heat1d_chebychov('T2U', False, plot=True)
-    test_heat2d('T2T', 2**4, 2**5, True)
+    # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
+    test_heat1d_chebychov_preconditioning('D2U', True)

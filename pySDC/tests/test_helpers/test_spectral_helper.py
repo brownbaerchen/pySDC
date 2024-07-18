@@ -345,12 +345,12 @@ if __name__ == '__main__':
     if args.test == 'transform':
         test_transform(**vars(args))
     elif args.test is None:
-        test_transform(4, 3, 'cheby', False)
+        # test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
         # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        # test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
+        test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')

@@ -12,7 +12,7 @@ class DummyCommunicator:
         return 1
 
 
-class SpectralHelperBase:
+class SpectralHelper1D:
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
     xp = np
@@ -49,7 +49,7 @@ class SpectralHelperBase:
         return self.sparse_lib.eye(self.N)
 
 
-class ChebychovHelper(SpectralHelperBase):
+class ChebychovHelper(SpectralHelper1D):
 
     def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', **kwargs):
         super().__init__(*args, **kwargs)
@@ -333,7 +333,7 @@ class ChebychovHelper(SpectralHelperBase):
     #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
 
 
-class FFTHelper(SpectralHelperBase):
+class FFTHelper(SpectralHelper1D):
 
     def __init__(self, *args, x0=0, L=2 * np.pi, **kwargs):
         self.x0 = x0
@@ -568,10 +568,10 @@ class SpectralHelper:
         return self.fft_cache[key]
 
     def setup_fft(self, useMPI=False, comm=None):
-        if len(self.axes) > 1:
-            assert all(
-                type(me) != ChebychovHelper for me in self.axes[:-1]
-            ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
+        # if len(self.axes) > 1:
+        #     assert all(
+        #         type(me) != ChebychovHelper for me in self.axes[:-1]
+        #     ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
 
         if len(self.components) == 0:
             self.add_component('u')
