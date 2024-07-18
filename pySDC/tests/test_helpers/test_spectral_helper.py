@@ -156,15 +156,13 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
         expect_trf = base.transform(expect_trf, axis=i) / norm
 
     trf = helper.transform(u, axes=axes)
-    # itrf = helper.itransform(trf, axes=axes)
+    itrf = helper.itransform(trf, axes=axes)
 
     expect_local = expect_trf[:, :, trf.shape[2] * rank : trf.shape[2] * (rank + 1)]
 
-    # print(u / itrf)
-    print(expect_local)
-    print(trf)
+    print(u, '\n', itrf)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
-    # assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -193,7 +191,7 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nx', [2, 8])
 @pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('num_procs', [1, 2])
+@pytest.mark.parametrize('num_procs', [2, 1])
 @pytest.mark.parametrize('axes', ["-1", "-1,-2"])
 def test_transform_MPI(nx, nz, bz, num_procs, axes):
     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz, axes=axes)

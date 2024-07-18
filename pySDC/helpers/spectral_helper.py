@@ -736,8 +736,7 @@ class SpectralHelper:
         # return scipy.fft.idctn(u, axes=axes)
         result = u.copy()
 
-        v = self.xp.empty(u.shape, dtype='complex')
-        v[...] = u[...]
+        v = u.copy().astype(complex)
 
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
@@ -756,7 +755,7 @@ class SpectralHelper:
         result.real[...] = V.real[...]
         return result
 
-    def itransform(self, u, axes):
+    def itransform2(self, u, axes):
         trfs = {
             FFTHelper: self._transform_ifft,
             ChebychovHelper: self._transform_idct,
@@ -773,6 +772,43 @@ class SpectralHelper:
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
                 if len(axes_base) > 0:
                     result[i] = trfs[base](_res, axes=axes_base)
+
+        return result
+
+    def itransform(self, u, axes):
+        trfs = {
+            FFTHelper: self._transform_ifft,
+            ChebychovHelper: self._transform_idct,
+        }
+
+        result = u.copy().astype(complex)
+
+        for comp in self.components:
+            i = self.index(comp)
+
+            axes_base = []
+            for base in trfs.keys():
+                axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+
+                if len(axes_base) > 0:
+                    fft = self.get_fft(self.global_shape[1:], axes_base, 'object')
+                    if fft:
+                        from mpi4py_fft import newDistArray
+
+                        _out = newDistArray(fft, False)
+                        _in = newDistArray(fft, True).redistribute(0)
+                        _in[...] = result[i]
+                        _in = _in.redistribute(axes_base[0])
+                    else:
+                        _in = result[i]
+                        _out = _in
+
+                    _out[...] = trfs[base](_in, axes=axes_base)
+
+                    if fft:
+                        result[i] = _out.redistribute(0)
+                    else:
+                        result[i] = _out
 
         return result
 
