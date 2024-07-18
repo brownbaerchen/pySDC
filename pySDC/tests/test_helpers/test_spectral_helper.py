@@ -110,7 +110,15 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
 
     bx = 'fft'
 
-    helper = SpectralHelper()
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft(useMPI=useMPI)
@@ -119,9 +127,6 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     u = np.random.random(helper.local_shape_real[axes])
 
     if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
         rank = comm.rank
         u_all = np.array(comm.allgather(u.T)).reshape(helper.global_shape[1:]).T
     else:
@@ -139,8 +144,8 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
 
     expect_local = expect_trf[trf.shape[0] * rank : trf.shape[0] * (rank + 1), :]
 
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+    assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -170,8 +175,8 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('num_procs', [1, 2])
-def test_transform_MPI(nx, nz, bz):
-    run_MPI_test(num_procs=1, test='transform', nx=nx, nz=nz, bz=bz)
+def test_transform_MPI(nx, nz, bz, num_procs):
+    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz)
 
 
 @pytest.mark.base
@@ -318,13 +323,13 @@ if __name__ == '__main__':
 
     if args.test == 'transform':
         test_transform(**vars(args))
-    elif args._test is None:
-        # test_transform(4, 3, 'cheby', False)
+    elif args.test is None:
+        test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
         # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        test_tau_method2D('T2U', 2**2, 2**5, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**2, 2**5, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')
