@@ -20,7 +20,8 @@ def test_integration_matrix2D(nx, nz, variant, axes):
     conv = helper.get_basis_change_matrix()
     S = helper.get_integration_matrix(axes=axes)
 
-    u = np.sin(X) * Z**2 + np.cos(X) * Z**3
+    u = helper.u_init
+    u[0, ...] = np.sin(X) * Z**2 + np.cos(X) * Z**3
     if axes == (-2,):
         expect = -np.cos(X) * Z**2 + np.sin(X) * Z**3
     elif axes == (-1,):
@@ -53,13 +54,16 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
     conv = helper.get_basis_change_matrix()
     D = helper.get_differentiation_matrix(axes)
 
-    u = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
+    u = helper.u_init
+    u[0, ...] = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
     if axes == (-2,):
         expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
     elif axes == (-1,):
         expect = np.sin(X) * Z * 2 + Z**2 * 3
     elif axes == (-2, -1):
         expect = np.cos(X) * 2 * Z
+    else:
+        raise NotImplementedError
 
     u_hat = helper.transform(u, axes=(-2, -1))
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
@@ -90,7 +94,10 @@ def test_matrix1D(N, base, type):
         D = helper.get_integration_matrix(axes=(-1,))
 
     C = helper.get_basis_change_matrix()
-    du = helper.itransform(C @ D @ coeffs, axes=(-1,))
+
+    u = helper.u_init
+    u[0] = C @ D @ coeffs
+    du = helper.itransform(u, axes=(-1,))
 
     if type == 'diff':
         exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
@@ -124,11 +131,11 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     helper.setup_fft(useMPI=useMPI)
 
     axes = (-1, -2)
-    u = np.random.random(helper.local_shape_real[axes])
+    u = np.random.random((1, nx, nz))[*helper.local_slice]
 
     if useMPI:
         rank = comm.rank
-        u_all = np.array(comm.allgather(u.T)).reshape(helper.global_shape[1:]).T
+        u_all = np.array(comm.allgather(u.T)).reshape(helper.global_shape).T
     else:
         rank = 0
         u_all = u
@@ -144,7 +151,8 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
 
     expect_local = expect_trf[trf.shape[0] * rank : trf.shape[0] * (rank + 1), :]
 
-    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+    print(u / itrf)
+    assert np.allclose(expect_local, trf[0]), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
 
@@ -275,12 +283,13 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
     rhs_hat = helper.transform(rhs, axes=(-1, -2))
 
     # solve the system
-    sol_hat = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
+    sol_hat = helper.u_init
+    sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
     sol = helper.itransform(sol_hat, axes=(-2, -1)).real
 
     # construct polynomials for testing
     sol_cheby = helper.itransform(sol_hat, axes=(-2,))
-    polys = [np.polynomial.Chebyshev(sol_cheby[i, :]) for i in range(nx)]
+    polys = [np.polynomial.Chebyshev(sol_cheby[0, i, :]) for i in range(nx)]
 
     Pz = np.polynomial.Chebyshev(np.append(np.zeros(nz - 1), [1]))
     tau_term, _ = np.meshgrid(Pz(z), np.ones(nx))
@@ -289,7 +298,7 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
     if plotting:
         import matplotlib.pyplot as plt
 
-        im = plt.pcolormesh(X, Z, sol)
+        im = plt.pcolormesh(X, Z, sol[0])
         # im = plt.pcolormesh(X, Z, error)
         plt.colorbar(im)
         plt.xlabel('x')
@@ -301,7 +310,7 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
         assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
 
         assert np.allclose(
-            polys[i](z), sol[i, :]
+            polys[i](z), sol[0, i, :]
         ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
 
     assert np.allclose(error, error[0, 0]), 'Solution does not satisfy perturbed equation'
@@ -324,12 +333,12 @@ if __name__ == '__main__':
     if args.test == 'transform':
         test_transform(**vars(args))
     elif args.test is None:
-        test_transform(4, 3, 'cheby', False)
+        # test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
-        # test_differentiation_matrix2D(2, 2, 'T2U', (0,))
+        # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        # test_tau_method2D('T2U', 2**2, 2**5, -2, plotting=True)
+        test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')

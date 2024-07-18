@@ -19,9 +19,7 @@ class Burgers1D(Problem):
         self.helper.add_component(['u', 'ux'])
         self.helper.setup_fft()
 
-        S = len(self.helper.components)  # number of variables
-
-        super().__init__(init=((S, N), None, np.dtype('float64')))
+        super().__init__(init=self.helper.init)
 
         self.x = self.helper.get_grid()[0]
 
@@ -79,9 +77,11 @@ class Burgers1D(Problem):
         iu, iux = self.helper.index('u'), self.helper.index('ux')
 
         u_hat = self.helper.transform(u, axes=(-1,))
-        f.impl[iu] = -self.epsilon * self.helper.itransform(
-            (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape), axes=(-1,)
-        )
+
+        Dx_u_hat = self.u_init
+        Dx_u_hat[iu] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
+
+        f.impl[iu] = -self.epsilon * self.helper.itransform(Dx_u_hat, axes=(-1,))[iu]
         f.expl[iu] = u[iu] * u[iux]
         return f
 

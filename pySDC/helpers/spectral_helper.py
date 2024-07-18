@@ -393,10 +393,14 @@ class FFTHelper(SpectralHelperBase):
         return self.fft_utils
 
 
+from pySDC.implementations.datatype_classes.mesh import mesh
+
+
 class SpectralHelper:
     xp = np
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
+    dtype = mesh
 
     def __init__(self, comm=None):
         self.comm = comm
@@ -409,6 +413,10 @@ class SpectralHelper:
         self.BCs = None
 
         self.fft_cache = {}
+
+    @property
+    def u_init(self):
+        return self.dtype(self.init)
 
     def add_axis(self, base, *args, **kwargs):
 
@@ -541,15 +549,19 @@ class SpectralHelper:
                     self.fft_cache[key] = self.xp.fft.fftn
                 elif direction == 'backward':
                     self.fft_cache[key] = self.xp.fft.ifftn
+                elif direction == 'object':
+                    self.fft_cache[key] = None
             else:
                 from mpi4py_fft import PFFT, newDistArray
 
+                print(shape, axes)
                 _fft = PFFT(
                     comm=self.comm,
                     shape=shape,
-                    axes=axes,
+                    axes=list(axes),
                     dtype='D',
-                    collapse=True,
+                    collapse=False,
+                    grid=[-1],
                     # backend=self.fft_backend,
                     # comm_backend=self.fft_comm_backend,
                 )
@@ -557,6 +569,8 @@ class SpectralHelper:
                     self.fft_cache[key] = _fft.forward
                 elif direction == 'backward':
                     self.fft_cache[key] = _fft.backward
+                elif direction == 'object':
+                    self.fft_cache[key] = _fft
 
         return self.fft_cache[key]
 
@@ -566,47 +580,58 @@ class SpectralHelper:
                 type(me) != ChebychovHelper for me in self.axes[:-1]
             ), 'Due to handling of imaginary part, we can only have Chebychov in the last dimension!'
 
+        if len(self.components) == 0:
+            self.add_component('u')
+
         shape = [me.N for me in self.axes]
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
+        self.local_slice = [slice(0, me.N) for me in self.axes]
 
-        self.local_shape_real = {}
-        self.local_shape_spectral = {}
+        axes = tuple(i for i in range(len(self.axes)))
+        # axes = (1, 2)
+        # print(axes, self.global_shape)
+        self.fft_obj = self.get_fft(shape=self.global_shape[1:], axes=axes, direction='object')
+        if self.fft_obj is not None:
+            self.local_slice = self.fft_obj.local_slice()
+            # print(self.local_slice)
 
-        bases = [ChebychovHelper, FFTHelper]
+        self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('complex128'))
 
-        indeces = np.array([-i - 1 for i in range(len(self.axes))][::-1])
-        axes = [tuple(indeces), tuple(indeces[::-1])]
-        for base in bases:
-            mask = [i for i in indeces if type(self.axes[i]) == base]
-            if len(mask) > 0:
-                axes.append(tuple(indeces[mask]))
-                if len(indeces[mask]) > 1:
-                    axes.append(tuple(indeces[mask][::-1]))
+        # self.local_shape_real = {}
+        # self.local_shape_spectral = {}
 
-        for axis in axes:
+        # bases = [ChebychovHelper, FFTHelper]
 
-            if useMPI:
-                from mpi4py import MPI
-                from mpi4py_fft import PFFT, newDistArray
+        # indeces = np.array([-i - 1 for i in range(len(self.axes))][::-1])
+        # axes = [tuple(indeces), tuple(indeces[::-1])]
+        # for base in bases:
+        #     mask = [i for i in indeces if type(self.axes[i]) == base]
+        #     if len(mask) > 0:
+        #         axes.append(tuple(indeces[mask]))
+        #         if len(indeces[mask]) > 1:
+        #             axes.append(tuple(indeces[mask][::-1]))
 
-                comm = comm if comm else MPI.COMM_WORLD
+        # for axis in axes:
 
-                _fft = PFFT(
-                    comm=comm,
-                    shape=shape,
-                    axes=axis,
-                    dtype='D',
-                    collapse=True,
-                    # backend=self.fft_backend,
-                    # comm_backend=self.fft_comm_backend,
-                )
-                _u = newDistArray(_fft, False)
-                _u_hat = newDistArray(_fft, True)
-                self.local_shape_real[axis] = _u.shape
-                self.local_shape_spectral[axis] = _u_hat.shape
-            else:
-                self.local_shape_real[axis] = self.global_shape
-                self.local_shape_spectral[axis] = self.global_shape
+        #     if useMPI:
+        #         from mpi4py import MPI
+        #         from mpi4py_fft import PFFT, newDistArray
+
+        #         comm = comm if comm else MPI.COMM_WORLD
+
+        #         _fft = PFFT(
+        #             comm=comm,
+        #             shape=shape,
+        #             axes=axis,
+        #             dtype='D',
+        #             collapse=True,
+        #             # backend=self.fft_backend,
+        #             # comm_backend=self.fft_comm_backend,
+        #         )
+        #         _u = newDistArray(_fft, False)
+        #         _u_hat = newDistArray(_fft, True)
+        #         self.local_shape_real[axis] = _u.shape
+        #         self.local_shape_spectral[axis] = _u_hat.shape
 
         # self.comm = DummyCommunicator if comm is None else comm
 
@@ -634,7 +659,7 @@ class SpectralHelper:
 
     def _transform_fft(self, u, axes):
         # return scipy.fft.fftn(u, axes=axes)
-        fft = self.get_fft(u.shape, axes, 'forward')
+        fft = self.get_fft(self.global_shape[1:], axes, 'forward')
         return fft(u, axes=axes)
 
     def _transform_dct(self, u, axes):
@@ -675,24 +700,30 @@ class SpectralHelper:
             FFTHelper: self._transform_fft,
         }
 
-        result = u.copy()
+        result = u.copy().astype(complex)
 
-        axes_base = []
-        for base in trfs.keys():
-            axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+        for comp in self.components:
+            i = self.index(comp)
 
-            if len(axes_base) > 0:
-                # if self.comm is not None:
-                #     from mpi4py_fft import newDistArray
-                #     fft = self.get_fft(result.shape, axes, 'object')
-                #     result_aligned = newDistArray(fft, False)
-                #     result_aligned[:] = result[:]
-                #     # result_aligned = result_aligned.redistribute(axis=axes_base[0])
-                #     # print(base, axes_base[0], result.shape, result_aligned.shape, axes)
+            if self.fft_obj is not None:
+                from mpi4py_fft import newDistArray
 
-                result_aligned = result
-                result_aligned = trfs[base](result_aligned, axes=axes_base)
-                result = result_aligned
+                _result = newDistArray(self.fft_obj, True)
+                _result[:] = result[i]
+            else:
+                _result = result[i]
+
+            axes_base = []
+            for base in trfs.keys():
+                axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+                # print(self.comm.rank, axes_base)
+
+                if len(axes_base) > 0:
+                    pass
+                    # result = result.redistribute(axis=axes_base[0])
+                    # print(base, axes_base[0], result.shape, result.shape, axes)
+
+                    result[i] = trfs[base](_result, axes=axes_base)
 
         return result
 
@@ -731,12 +762,17 @@ class SpectralHelper:
             ChebychovHelper: self._transform_idct,
         }
 
-        result = u.copy()
+        result = u.copy().astype(complex)
 
-        for base in trfs.keys():
-            axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
-            if len(axes_base) > 0:
-                result = trfs[base](result, axes=axes_base)
+        for comp in self.components:
+            i = self.index(comp)
+
+            _res = result[i]
+
+            for base in trfs.keys():
+                axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
+                if len(axes_base) > 0:
+                    result[i] = trfs[base](_res, axes=axes_base)
 
         return result
 
