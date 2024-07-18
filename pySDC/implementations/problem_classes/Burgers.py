@@ -95,7 +95,7 @@ class Burgers1D(Problem):
         A = self.M + factor * self.L
         A = self.helper.put_BCs_in_matrix(A)
 
-        sol_hat = (self.helper.sparse_lib.linalg.spsolve(A.tocsc(), rhs_hat.flatten())).reshape(sol.shape)
+        sol_hat = (self.helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
         sol[:] = self.helper.itransform(sol_hat, axes=(-1,))
         return sol

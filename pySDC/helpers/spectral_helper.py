@@ -17,9 +17,8 @@ class SpectralHelperBase:
     sparse_lib = scipy.sparse
     xp = np
 
-    def __init__(self, N, sparse_format='lil'):
+    def __init__(self, N):
         self.N = N
-        self.sparse_format = sparse_format
 
     def get_Id(self):
         raise NotImplementedError
@@ -123,19 +122,14 @@ class ChebychovHelper(SpectralHelperBase):
 
         def get_forward_conv(name):
             if name == 'T2U':
-                mat = (
-                    self.sparse_lib.eye(N, format=self.sparse_format)
-                    - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2, format=self.sparse_format)
-                ) / 2.0
+                mat = (self.sparse_lib.eye(N) - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2)) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
-                mat = self.sparse_lib.eye(N, format=self.sparse_format) - self.sparse_lib.diags(
-                    self.xp.ones(N - 2), offsets=+2, format=self.sparse_format
-                )
+                mat = self.sparse_lib.eye(N) - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2)
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
             elif name[0] == name[-1]:
-                mat = self.sparse_lib.eye(self.N, format=self.sparse_format)
+                mat = self.sparse_lib.eye(self.N)
             else:
                 raise NotImplementedError(f'Don\'t have conversion matrix {name!r}')
             return mat
@@ -166,11 +160,11 @@ class ChebychovHelper(SpectralHelperBase):
         Returns:
             scipy.sparse: Sparse differentiation matrix
         '''
-        return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1, format=self.sparse_format)
+        return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1)
 
     def get_U2T_integration_matrix(self):
         # TODO: missing integration constant, use T2T instead!
-        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1, format=self.sparse_format).tolil()
+        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1).tolil()
         return S
 
     def get_T2T_integration_matrix(self):
@@ -363,7 +357,7 @@ class FFTHelper(SpectralHelperBase):
         return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
     def get_Id(self):
-        return self.sparse_lib.eye(self.N, format=self.sparse_format)
+        return self.sparse_lib.eye(self.N)
 
     def transform(self, u, axis=-1, **kwargs):
         return self.fft_lib.fft(u, axis=axis, **kwargs)
