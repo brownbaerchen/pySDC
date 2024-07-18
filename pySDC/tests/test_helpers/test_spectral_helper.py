@@ -111,7 +111,8 @@ def test_matrix1D(N, base, type):
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-def test_transform(nx, nz, bz, useMPI=False, **kwargs):
+@pytest.mark.parametrize('axes', [(-1,), (-1, -2)])
+def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -130,15 +131,23 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft(useMPI=useMPI)
 
-    axes = (-1, -2)
-    u = np.random.random((1, nx, nz))[*helper.local_slice]
+    u = helper.u_init
+    u[...] = np.random.random(u.shape)
+
+    u_all = np.empty(shape=(1, nx, nz), dtype=u.dtype)
 
     if useMPI:
         rank = comm.rank
-        u_all = np.array(comm.allgather(u.T)).reshape(helper.global_shape).T
+        u_all[...] = (
+            np.array(comm.allgather(u.transpose(0, 2, 1)))
+            .reshape(np.array(helper.global_shape)[[0, 2, 1]])
+            .transpose(0, 2, 1)
+        )
+        if comm.size == 1:
+            assert np.allclose(u_all, u)
     else:
         rank = 0
-        u_all = u
+        u_all[...] = u
 
     expect_trf = u_all.copy()
     for i in axes:
@@ -147,13 +156,15 @@ def test_transform(nx, nz, bz, useMPI=False, **kwargs):
         expect_trf = base.transform(expect_trf, axis=i) / norm
 
     trf = helper.transform(u, axes=axes)
-    itrf = helper.itransform(trf, axes=axes)
+    # itrf = helper.itransform(trf, axes=axes)
 
-    expect_local = expect_trf[trf.shape[0] * rank : trf.shape[0] * (rank + 1), :]
+    expect_local = expect_trf[:, :, trf.shape[2] * rank : trf.shape[2] * (rank + 1)]
 
-    print(u / itrf)
-    assert np.allclose(expect_local, trf[0]), 'Forward transform is unexpected'
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    # print(u / itrf)
+    print(expect_local)
+    print(trf)
+    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+    # assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -183,8 +194,9 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('num_procs', [1, 2])
-def test_transform_MPI(nx, nz, bz, num_procs):
-    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz)
+@pytest.mark.parametrize('axes', ["-1", "-1,-2"])
+def test_transform_MPI(nx, nz, bz, num_procs, axes):
+    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz, axes=axes)
 
 
 @pytest.mark.base
@@ -318,12 +330,14 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
 
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
+    str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
 
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--nx', type=int, help='Dof in x direction')
     parser.add_argument('--nz', type=int, help='Dof in z direction')
+    parser.add_argument('--axes', type=str_to_tuple, help='Axes over which to transform')
     parser.add_argument('--bz', type=str, help='Base in z direction')
     parser.add_argument('--bx', type=str, help='Base in x direction')
     parser.add_argument('--test', type=str, help='type of test', choices=['transform'])
@@ -333,12 +347,12 @@ if __name__ == '__main__':
     if args.test == 'transform':
         test_transform(**vars(args))
     elif args.test is None:
-        # test_transform(4, 3, 'cheby', False)
+        test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
         # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')

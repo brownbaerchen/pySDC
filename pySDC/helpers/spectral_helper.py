@@ -541,6 +541,7 @@ class SpectralHelper:
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
 
     def get_fft(self, shape, axes, direction):
+        shape = self.global_shape[1:]
         key = (shape, axes, direction)
 
         if key not in self.fft_cache.keys():
@@ -554,14 +555,12 @@ class SpectralHelper:
             else:
                 from mpi4py_fft import PFFT, newDistArray
 
-                print(shape, axes)
                 _fft = PFFT(
                     comm=self.comm,
                     shape=shape,
                     axes=list(axes),
                     dtype='D',
                     collapse=False,
-                    grid=[-1],
                     # backend=self.fft_backend,
                     # comm_backend=self.fft_comm_backend,
                 )
@@ -588,12 +587,9 @@ class SpectralHelper:
         self.local_slice = [slice(0, me.N) for me in self.axes]
 
         axes = tuple(i for i in range(len(self.axes)))
-        # axes = (1, 2)
-        # print(axes, self.global_shape)
         self.fft_obj = self.get_fft(shape=self.global_shape[1:], axes=axes, direction='object')
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice()
-            # print(self.local_slice)
 
         self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('complex128'))
 
@@ -681,7 +677,7 @@ class SpectralHelper:
             slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
             v = v[*slices]
 
-        fft = self.get_fft(u.shape, axes, 'forward')
+        fft = self.get_fft(self.global_shape[1:], axes, 'forward')
         V = fft(v, axes=axes)
         # print(type(v), type(V), type(u))
 
@@ -705,25 +701,29 @@ class SpectralHelper:
         for comp in self.components:
             i = self.index(comp)
 
-            if self.fft_obj is not None:
-                from mpi4py_fft import newDistArray
-
-                _result = newDistArray(self.fft_obj, True)
-                _result[:] = result[i]
-            else:
-                _result = result[i]
-
             axes_base = []
             for base in trfs.keys():
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
-                # print(self.comm.rank, axes_base)
 
                 if len(axes_base) > 0:
-                    pass
-                    # result = result.redistribute(axis=axes_base[0])
-                    # print(base, axes_base[0], result.shape, result.shape, axes)
+                    fft = self.get_fft(self.global_shape[1:], axes_base, 'object')
+                    if fft:
+                        from mpi4py_fft import newDistArray
 
-                    result[i] = trfs[base](_result, axes=axes_base)
+                        _out = newDistArray(fft, True)
+                        _in = newDistArray(fft, False).redistribute(0)
+                        _in[...] = result[i]
+                        _in = _in.redistribute(axes_base[-1])
+                    else:
+                        _in = result[i]
+                        _out = _in
+
+                    _out[...] = trfs[base](_in, axes=axes_base)
+
+                    if fft:
+                        result[i] = _out.redistribute(0)
+                    else:
+                        result[i] = _out
 
         return result
 
