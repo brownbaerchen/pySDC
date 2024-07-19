@@ -164,8 +164,7 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
     expect_trf = u_all.copy()
     for i in axes:
         base = helper.axes[i]
-        norm = base.N if useMPI else 1.0
-        expect_trf = base.transform(expect_trf, axis=i) / norm
+        expect_trf = base.transform(expect_trf, axis=i)
 
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
@@ -355,13 +354,12 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
         plt.ylabel('t')
         plt.show()
 
-    norm = nz if useMPI else 1
     for i in range(shape[0]):
 
         assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
 
         assert np.allclose(
-            polys[i](z), sol[0, i, :] / norm
+            polys[i](z), sol[0, i, :]
         ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
 
     assert np.allclose(error, error[0, 0]), 'Solution does not satisfy perturbed equation'

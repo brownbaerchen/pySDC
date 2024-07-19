@@ -149,10 +149,10 @@ class Burgers2D(Problem):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, nx=64, nz=64, epsilon=0.1, mode='T2U'):
+    def __init__(self, nx=64, nz=64, epsilon=0.1, mode='T2U', comm=None):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        self.helper = SpectralHelper()
+        self.helper = SpectralHelper(comm=comm)
         self.helper.add_axis(base='fft', N=nx)
         self.helper.add_axis(base='cheby', N=nz, mode=mode)
         self.helper.add_component(['u', 'v', 'ux', 'vz'])

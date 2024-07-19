@@ -668,7 +668,7 @@ class SpectralHelper:
                     _out[...] = trfs[base](_in, axes=axes_base)
 
                     if fft:
-                        result[i] = _out.redistribute(-1)
+                        result[i] = _out.redistribute(-1) * np.prod([self.axes[i].N for i in axes_base])
                     else:
                         result[i] = _out
 
@@ -723,7 +723,7 @@ class SpectralHelper:
                         _out = newDistArray(fft, False)
                         _in = newDistArray(fft, True).redistribute(-1)
                         _in[...] = result[i]
-                        _in = _in.redistribute(axes_base[0])
+                        _in = _in.redistribute(axes_base[0]) / np.prod([self.axes[i].N for i in axes_base])
                     else:
                         _in = result[i]
                         _out = _in

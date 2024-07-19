@@ -122,7 +122,14 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     import matplotlib.pyplot as plt
     from pySDC.implementations.problem_classes.Burgers import Burgers2D
 
-    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-1, mode=mode)
+    try:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    except ModuleNotFoundError:
+        comm = None
+
+    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-1, mode=mode, comm=comm)
 
     iu, iv, iux, ivz = P.helper.index(P.helper.components)
 
