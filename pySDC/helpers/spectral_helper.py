@@ -195,7 +195,7 @@ class ChebychovHelper(SpectralHelper1D):
                 D[k, j] = 2 * j * ((j - k) % 2)
 
         D[0, :] /= 2
-        return self.xp.linalg.matrix_power(D, p)
+        return self.sparse_lib.csr_matrix(self.xp.linalg.matrix_power(D, p))
 
     def get_norm(self):
         '''get normalization for converting Chebychev coefficients and DCT'''
@@ -758,6 +758,9 @@ class SpectralHelper:
 
         return result
 
+    def get_local_slice_of_1D_matrix(self, M, axis):
+        return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
+
     def get_differentiation_matrix(self, axes, **kwargs):
         """
         Get differentiation matrix along specified axis.
@@ -769,7 +772,7 @@ class SpectralHelper:
             sparse differentiation matrix
         """
         sp = self.sparse_lib
-        D = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
+        D = sp.eye(np.prod(self.init[0]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
@@ -778,7 +781,6 @@ class SpectralHelper:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
                 D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
-                # print(D1D.toarray())
 
                 if len(axes) > 1:
                     I1D = sp.eye(self.axes[axis2].N)
@@ -786,14 +788,13 @@ class SpectralHelper:
                     I1D = self.axes[axis2].get_Id()
 
                 mats = [None] * ndim
-                mats[axis] = D1D
-                mats[axis2] = I1D
+                mats[axis] = self.get_local_slice_of_1D_matrix(D1D, axis)
+                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
 
                 if axis == axes[0]:
                     D += sp.kron(*mats)
                 else:
                     D = D @ sp.kron(*mats)
-                # print(D.shape, D1D.shape, self.local_slice, self.u_init.shape)
         else:
             raise NotImplementedError(f'Differentiation matrix not implemented for {ndim} dimension!')
 
@@ -866,15 +867,17 @@ class SpectralHelper:
             sparse basis change matrix
         """
         sp = self.sparse_lib
-        C = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil()
+        C = sp.eye(np.prod(self.init[0]), dtype=complex).tolil()
         ndim = len(self.axes)
 
         if ndim == 1:
             C = self.axes[0].get_basis_change_matrix(direction=direction)
         elif ndim == 2:
             mats = [None] * ndim
-            mats[0] = self.axes[0].get_basis_change_matrix(direction=direction)
-            mats[1] = self.axes[1].get_basis_change_matrix(direction=direction)
+            for i in range(ndim):
+                mats[i] = self.get_local_slice_of_1D_matrix(
+                    self.axes[i].get_basis_change_matrix(direction=direction), i
+                )
 
             C = C @ sp.kron(*mats)
         else:
