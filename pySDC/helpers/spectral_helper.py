@@ -772,7 +772,7 @@ class SpectralHelper:
             sparse differentiation matrix
         """
         sp = self.sparse_lib
-        D = sp.eye(np.prod(self.init[0]), dtype=complex).tolil() * 0
+        D = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
@@ -867,7 +867,7 @@ class SpectralHelper:
             sparse basis change matrix
         """
         sp = self.sparse_lib
-        C = sp.eye(np.prod(self.init[0]), dtype=complex).tolil()
+        C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
         ndim = len(self.axes)
 
         if ndim == 1:
