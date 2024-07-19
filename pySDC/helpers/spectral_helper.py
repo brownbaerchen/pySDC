@@ -811,7 +811,7 @@ class SpectralHelper:
             sparse integration matrix
         """
         sp = self.sparse_lib
-        S = sp.eye(np.prod([me.N for me in self.axes]), dtype=complex).tolil() * 0
+        S = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
@@ -827,8 +827,8 @@ class SpectralHelper:
                     I1D = self.axes[axis2].get_Id()
 
                 mats = [None] * ndim
-                mats[axis] = S1D
-                mats[axis2] = I1D
+                mats[axis] = self.get_local_slice_of_1D_matrix(S1D, axis)
+                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
 
                 if axis == axes[0]:
                     S += sp.kron(*mats)
