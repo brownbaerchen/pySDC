@@ -562,7 +562,7 @@ class SpectralHelper:
                 _fft = PFFT(
                     comm=self.comm,
                     shape=shape,
-                    axes=sorted(list(axes))[::-1],
+                    axes=sorted(list(axes)),
                     dtype='D',
                     collapse=False,
                     # backend=self.fft_backend,
@@ -677,7 +677,7 @@ class SpectralHelper:
                         from mpi4py_fft import newDistArray
 
                         _out = newDistArray(fft, True)
-                        _in = newDistArray(fft, False).redistribute(0)
+                        _in = newDistArray(fft, False).redistribute(-1)
                         _in[...] = result[i]
                         _in = _in.redistribute(axes_base[-1])
                     else:
@@ -687,7 +687,7 @@ class SpectralHelper:
                     _out[...] = trfs[base](_in, axes=axes_base)
 
                     if fft:
-                        result[i] = _out.redistribute(0)
+                        result[i] = _out.redistribute(-1)
                     else:
                         result[i] = _out
 
@@ -721,26 +721,6 @@ class SpectralHelper:
         result.real[...] = V.real[...]
         return result
 
-    def itransform2(self, u, axes):
-        trfs = {
-            FFTHelper: self._transform_ifft,
-            ChebychovHelper: self._transform_idct,
-        }
-
-        result = u.copy().astype(complex)
-
-        for comp in self.components:
-            i = self.index(comp)
-
-            _res = result[i]
-
-            for base in trfs.keys():
-                axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
-                if len(axes_base) > 0:
-                    result[i] = trfs[base](_res, axes=axes_base)
-
-        return result
-
     def itransform(self, u, axes):
         trfs = {
             FFTHelper: self._transform_ifft,
@@ -762,7 +742,7 @@ class SpectralHelper:
                         from mpi4py_fft import newDistArray
 
                         _out = newDistArray(fft, False)
-                        _in = newDistArray(fft, True).redistribute(0)
+                        _in = newDistArray(fft, True).redistribute(-1)
                         _in[...] = result[i]
                         _in = _in.redistribute(axes_base[0])
                     else:
@@ -772,7 +752,7 @@ class SpectralHelper:
                     _out[...] = trfs[base](_in, axes=axes_base)
 
                     if fft:
-                        result[i] = _out.redistribute(0)
+                        result[i] = _out.redistribute(-1)
                     else:
                         result[i] = _out
 
@@ -798,8 +778,7 @@ class SpectralHelper:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
                 D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
-
-                print(D1D.shape, self.local_slice)
+                # print(D1D.toarray())
 
                 if len(axes) > 1:
                     I1D = sp.eye(self.axes[axis2].N)
@@ -814,6 +793,7 @@ class SpectralHelper:
                     D += sp.kron(*mats)
                 else:
                     D = D @ sp.kron(*mats)
+                # print(D.shape, D1D.shape, self.local_slice, self.u_init.shape)
         else:
             raise NotImplementedError(f'Differentiation matrix not implemented for {ndim} dimension!')
 

@@ -118,7 +118,7 @@ def test_matrix1D(N, base, type):
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-1, -2)])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2)])
 def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
@@ -145,11 +145,7 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
 
     if useMPI:
         rank = comm.rank
-        u_all[...] = (
-            np.array(comm.allgather(u.transpose(0, 2, 1)))
-            .reshape(np.array(helper.global_shape)[[0, 2, 1]])
-            .transpose(0, 2, 1)
-        )
+        u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
         if comm.size == 1:
             assert np.allclose(u_all, u)
     else:
@@ -165,8 +161,10 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
-    expect_local = expect_trf[:, :, trf.shape[2] * rank : trf.shape[2] * (rank + 1)]
+    expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
 
+    print(expect_local)
+    print(trf)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
@@ -198,8 +196,10 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('num_procs', [2, 1])
-@pytest.mark.parametrize('axes', ["-1", "-1,-2"])
+@pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
 def test_transform_MPI(nx, nz, bz, num_procs, axes):
+    if bz == 'fft' and axes == '-1,-2':
+        axes = "-2,-1"
     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz, axes=axes)
 
 
@@ -364,9 +364,8 @@ if __name__ == '__main__':
     elif args.test == 'diff':
         test_differentiation_matrix2D(**vars(args))
     elif args.test is None:
-        # test_transform(4, 3, 'cheby', False)
-        # test_transform_MPI(4, 3, 'cheby')
-        test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
+        test_transform(3, 2, 'cheby', (-1, -2))
+        # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
         # test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
