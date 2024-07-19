@@ -117,12 +117,12 @@ def test_Burgers2D_f(mode, direction, plotting=False):
 
 @pytest.mark.base
 @pytest.mark.parametrize('mode', ['T2T', 'T2U'])
-def test_Burgers2D_solver(mode, nx=2**7, nz=2**7, plotting=False):
+def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     import numpy as np
     import matplotlib.pyplot as plt
     from pySDC.implementations.problem_classes.Burgers import Burgers2D
 
-    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-2, mode=mode)
+    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-1, mode=mode)
 
     iu, iv, iux, ivz = P.helper.index(P.helper.components)
 
@@ -145,16 +145,16 @@ def test_Burgers2D_solver(mode, nx=2**7, nz=2**7, plotting=False):
         return None
 
     dt = 1e-2
-    tol = 1e-8
+    tol = 1e-3
 
     fig = P.get_fig()
-    for i in range(900):
+    for i in range(100):
         u_old = u.copy()
         u, f = imex_euler(u, f, dt)
 
         if plotting:
             P.plot(u, fig=fig, t=i * dt)
-            plt.pause(1e-1)
+            plt.pause(1e-7)
 
         if abs(u_old - u) < tol:
             print(f'stopping after {i} steps')

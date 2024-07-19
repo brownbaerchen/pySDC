@@ -185,7 +185,6 @@ class Burgers2D(Problem):
         self.M = self.helper.convert_operator_matrix_to_operator(M)
 
         # boundary conditions
-        # self.helper.add_BC(component='u', equation='ux', axis=0, x=-1, v=1)
         self.BCtop = 1
         self.BCbottom = -self.BCtop
         self.helper.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1)
@@ -195,14 +194,6 @@ class Burgers2D(Problem):
     def u_exact(self, t=0, *args, **kwargs):
         me = self.u_init
 
-        # g = 4 * (1 + np.exp(-(4 * self.x + t)/self.epsilon/32))
-        # g_x = 4 * np.exp(-(4 * self.x + t)/self.epsilon/32) * (-4/self.epsilon/32)
-
-        # me[0] = 3./4. - 1./g
-        # me[1] = 1/g**2 * g_x
-
-        # return me
-
         iu, iv, iux, ivz = self.helper.index(self.helper.components)
         if t == 0:
             me[iu] = self.xp.cos(self.X)
@@ -211,8 +202,6 @@ class Burgers2D(Problem):
             me[iv] = (self.BCtop + self.BCbottom) / 2 + (self.BCtop - self.BCbottom) / 2 * self.Z
             me[ivz] = (self.BCtop - self.BCbottom) / 2 * self.xp.ones_like(me[iv])
 
-            # me[iv] = self.xp.sin(self.Z * np.pi) * self.xp.cos(self.X)
-            # me[ivz] = self.xp.cos(self.Z * np.pi) * self.xp.cos(self.X) * np.pi
         else:
             raise NotImplementedError
 
@@ -256,6 +245,15 @@ class Burgers2D(Problem):
         )
         return sol
 
+    def compute_vorticity(self, u):
+        me = self.u_init
+
+        u_hat = self.helper.transform(u, axes=(-1, -2))
+        iu, iv = self.helper.index(['u', 'v'])
+
+        me[iu] = (self.C @ self.Dx * u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        return self.helper.itransform(me, axes=(-2, -1))[iu]
+
     def get_fig(self):  # pragma: no cover
         """
         Get a figure suitable to plot the solution of this problem
@@ -268,12 +266,14 @@ class Burgers2D(Problem):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 5)))
+        self.fig, axs = plt.subplots(3, 1, sharex=True, sharey=True, figsize=((8, 7)))
         self.cax = []
         divider = make_axes_locatable(axs[0])
         self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
         divider2 = make_axes_locatable(axs[1])
         self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+        divider3 = make_axes_locatable(axs[2])
+        self.cax += [divider3.append_axes('right', size='3%', pad=0.03)]
         return self.fig
 
     def plot(self, u, t=None, fig=None):  # pragma: no cover
@@ -300,14 +300,16 @@ class Burgers2D(Problem):
 
         imU = axs[0].pcolormesh(self.X, self.Z, u[iu].real)
         imV = axs[1].pcolormesh(self.X, self.Z, u[iv].real)
+        imVort = axs[2].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
 
-        for i, label in zip([0, 1], [r'$u$', '$v$']):
+        for i, label in zip([0, 1, 2], [r'$u$', '$v$', 'vorticity']):
             axs[i].set_aspect(1)
             axs[i].set_title(label)
 
         if t is not None:
             fig.suptitle(f't = {t:.2e}')
-        axs[1].set_xlabel(r'$x$')
-        axs[1].set_ylabel(r'$z$')
+        axs[-1].set_xlabel(r'$x$')
+        axs[-1].set_ylabel(r'$z$')
         fig.colorbar(imU, self.cax[0])
         fig.colorbar(imV, self.cax[1])
+        fig.colorbar(imVort, self.cax[2])
