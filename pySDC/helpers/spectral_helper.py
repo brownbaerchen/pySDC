@@ -544,9 +544,9 @@ class SpectralHelper:
 
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
 
-    def get_fft(self, shape, axes, direction):
+    def get_fft(self, axes, direction):
         shape = self.global_shape[1:]
-        key = (shape, axes, direction)
+        key = (axes, direction)
 
         if key not in self.fft_cache.keys():
             if self.comm is None:
@@ -591,7 +591,7 @@ class SpectralHelper:
         self.local_slice = [slice(0, me.N) for me in self.axes]
 
         axes = tuple(i for i in range(len(self.axes)))
-        self.fft_obj = self.get_fft(shape=self.global_shape[1:], axes=axes, direction='object')
+        self.fft_obj = self.get_fft(axes=axes, direction='object')
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice(False)
 
@@ -621,7 +621,7 @@ class SpectralHelper:
 
     def _transform_fft(self, u, axes):
         # return scipy.fft.fftn(u, axes=axes)
-        fft = self.get_fft(self.global_shape[1:], axes, 'forward')
+        fft = self.get_fft(axes, 'forward')
         return fft(u, axes=axes)
 
     def _transform_dct(self, u, axes):
@@ -643,7 +643,7 @@ class SpectralHelper:
             slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
             v = v[*slices]
 
-        fft = self.get_fft(self.global_shape[1:], axes, 'forward')
+        fft = self.get_fft(axes, 'forward')
         V = fft(v, axes=axes)
         # print(type(v), type(V), type(u))
 
@@ -672,7 +672,7 @@ class SpectralHelper:
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
 
                 if len(axes_base) > 0:
-                    fft = self.get_fft(self.global_shape[1:], axes_base, 'object')
+                    fft = self.get_fft(axes_base, 'object')
                     if fft:
                         from mpi4py_fft import newDistArray
 
@@ -695,7 +695,7 @@ class SpectralHelper:
 
     def _transform_ifft(self, u, axes):
         # return scipy.fft.ifftn(u, axes=axes)
-        ifft = self.get_fft(u.shape, axes, 'backward')
+        ifft = self.get_fft(axes, 'backward')
         return ifft(u, axes=axes)
 
     def _transform_idct(self, u, axes):
@@ -710,7 +710,7 @@ class SpectralHelper:
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-        ifft = self.get_fft(u.shape, axes, 'backward')
+        ifft = self.get_fft(axes, 'backward')
         V = ifft(v, axes=axes)
 
         for axis in axes:
@@ -757,7 +757,7 @@ class SpectralHelper:
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
 
                 if len(axes_base) > 0:
-                    fft = self.get_fft(self.global_shape[1:], axes_base, 'object')
+                    fft = self.get_fft(axes_base, 'object')
                     if fft:
                         from mpi4py_fft import newDistArray
 
