@@ -37,15 +37,22 @@ def test_integration_matrix2D(nx, nz, variant, axes):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
-def test_differentiation_matrix2D(nx, nz, variant, axes):
+def test_differentiation_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    helper = SpectralHelper()
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm)
     helper.add_axis(base='fft', N=nx)
     helper.add_axis(base='cheby', N=nz, mode=variant)
     helper.setup_fft()
@@ -60,7 +67,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes):
         expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
     elif axes == (-1,):
         expect = np.sin(X) * Z * 2 + Z**2 * 3
-    elif axes == (-2, -1):
+    elif axes in [(-2, -1), (-1, -2)]:
         expect = np.cos(X) * 2 * Z
     else:
         raise NotImplementedError
@@ -129,7 +136,7 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
     helper = SpectralHelper(comm=comm)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
-    helper.setup_fft(useMPI=useMPI)
+    helper.setup_fft()
 
     u = helper.u_init
     u[...] = np.random.random(u.shape)
@@ -160,7 +167,6 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
 
     expect_local = expect_trf[:, :, trf.shape[2] * rank : trf.shape[2] * (rank + 1)]
 
-    print(u, '\n', itrf)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
@@ -195,6 +201,16 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('axes', ["-1", "-1,-2"])
 def test_transform_MPI(nx, nz, bz, num_procs, axes):
     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz, axes=axes)
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nx', [8])
+@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('num_procs', [2, 1])
+@pytest.mark.parametrize('axes', ["-1", "-1,-2"])
+def test_differentiation_MPI(nx, nz, bz, num_procs, axes):
+    run_MPI_test(num_procs=num_procs, test='diff', nx=nx, nz=nz, bz=bz, axes=axes)
 
 
 @pytest.mark.base
@@ -338,19 +354,22 @@ if __name__ == '__main__':
     parser.add_argument('--axes', type=str_to_tuple, help='Axes over which to transform')
     parser.add_argument('--bz', type=str, help='Base in z direction')
     parser.add_argument('--bx', type=str, help='Base in x direction')
-    parser.add_argument('--test', type=str, help='type of test', choices=['transform'])
+    parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff'])
+    parser.add_argument('--variant', type=str, help='Chebychov mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
     args = parser.parse_args()
 
     if args.test == 'transform':
         test_transform(**vars(args))
+    elif args.test == 'diff':
+        test_differentiation_matrix2D(**vars(args))
     elif args.test is None:
         # test_transform(4, 3, 'cheby', False)
         # test_transform_MPI(4, 3, 'cheby')
-        # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
+        test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')

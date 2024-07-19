@@ -537,6 +537,11 @@ class SpectralHelper:
             return self.sparse_lib.bmat(M, format='lil')
 
     def get_grid(self):
+        grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
+        # print('1d', grids)
+        # print('2d', self.xp.meshgrid(*grids))
+        return self.xp.meshgrid(*grids)
+
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
 
     def get_fft(self, shape, axes, direction):
@@ -557,7 +562,7 @@ class SpectralHelper:
                 _fft = PFFT(
                     comm=self.comm,
                     shape=shape,
-                    axes=list(axes),
+                    axes=sorted(list(axes))[::-1],
                     dtype='D',
                     collapse=False,
                     # backend=self.fft_backend,
@@ -572,7 +577,7 @@ class SpectralHelper:
 
         return self.fft_cache[key]
 
-    def setup_fft(self, useMPI=False, comm=None):
+    def setup_fft(self):
         # if len(self.axes) > 1:
         #     assert all(
         #         type(me) != ChebychovHelper for me in self.axes[:-1]
@@ -588,47 +593,9 @@ class SpectralHelper:
         axes = tuple(i for i in range(len(self.axes)))
         self.fft_obj = self.get_fft(shape=self.global_shape[1:], axes=axes, direction='object')
         if self.fft_obj is not None:
-            self.local_slice = self.fft_obj.local_slice()
+            self.local_slice = self.fft_obj.local_slice(False)
 
         self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('complex128'))
-
-        # self.local_shape_real = {}
-        # self.local_shape_spectral = {}
-
-        # bases = [ChebychovHelper, FFTHelper]
-
-        # indeces = np.array([-i - 1 for i in range(len(self.axes))][::-1])
-        # axes = [tuple(indeces), tuple(indeces[::-1])]
-        # for base in bases:
-        #     mask = [i for i in indeces if type(self.axes[i]) == base]
-        #     if len(mask) > 0:
-        #         axes.append(tuple(indeces[mask]))
-        #         if len(indeces[mask]) > 1:
-        #             axes.append(tuple(indeces[mask][::-1]))
-
-        # for axis in axes:
-
-        #     if useMPI:
-        #         from mpi4py import MPI
-        #         from mpi4py_fft import PFFT, newDistArray
-
-        #         comm = comm if comm else MPI.COMM_WORLD
-
-        #         _fft = PFFT(
-        #             comm=comm,
-        #             shape=shape,
-        #             axes=axis,
-        #             dtype='D',
-        #             collapse=True,
-        #             # backend=self.fft_backend,
-        #             # comm_backend=self.fft_comm_backend,
-        #         )
-        #         _u = newDistArray(_fft, False)
-        #         _u_hat = newDistArray(_fft, True)
-        #         self.local_shape_real[axis] = _u.shape
-        #         self.local_shape_spectral[axis] = _u_hat.shape
-
-        # self.comm = DummyCommunicator if comm is None else comm
 
         self.BC_mat = self.get_empty_operator_matrix()
         self.BC_mask = self.xp.zeros(
@@ -831,6 +798,8 @@ class SpectralHelper:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
                 D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
+
+                print(D1D.shape, self.local_slice)
 
                 if len(axes) > 1:
                     I1D = sp.eye(self.axes[axis2].N)
