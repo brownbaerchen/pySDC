@@ -101,10 +101,53 @@ class Burgers1D(Problem):
         sol[:] = self.helper.itransform(sol_hat, axes=(-1,))
         return sol
 
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots()
+        return self.fig
+
+    def plot(self, u, t=None, fig=None, comp='u'):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        ax = fig.axes[0]
+
+        ax.plot(self.x, u[self.helper.index(comp)])
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2e}')
+
+        ax.set_xlabel(r'$x$')
+        ax.set_ylabel(r'$u$')
+
 
 class Burgers2D(Problem):
     dtype_u = mesh
     dtype_f = imex_mesh
+    xp = np
 
     def __init__(self, nx=64, nz=64, epsilon=0.1, mode='T2U'):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
@@ -120,7 +163,7 @@ class Burgers2D(Problem):
         self.Z, self.X = self.helper.get_grid()
 
         # prepare matrices
-        Dx = -self.helper.get_differentiation_matrix(axes=(0,))
+        Dx = self.helper.get_differentiation_matrix(axes=(0,))
         Dz = self.helper.get_differentiation_matrix(axes=(1,))
         I = self.helper.get_Id()
         self.Dx = Dx
@@ -138,12 +181,15 @@ class Burgers2D(Problem):
         # construct mass matrix
         M = self.helper.get_empty_operator_matrix()
         self.helper.add_equation_lhs(M, 'u', {'u': I})
+        self.helper.add_equation_lhs(M, 'v', {'v': I})
         self.M = self.helper.convert_operator_matrix_to_operator(M)
 
         # boundary conditions
         # self.helper.add_BC(component='u', equation='ux', axis=0, x=-1, v=1)
-        self.helper.add_BC(component='v', equation='v', axis=1, x=1, v=-1)
-        self.helper.add_BC(component='v', equation='vz', axis=1, x=-1, v=1)
+        self.BCtop = 1
+        self.BCbottom = -self.BCtop
+        self.helper.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1)
+        self.helper.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1)
         self.helper.setup_BCs()
 
     def u_exact(self, t=0, *args, **kwargs):
@@ -157,17 +203,16 @@ class Burgers2D(Problem):
 
         # return me
 
+        iu, iv, iux, ivz = self.helper.index(self.helper.components)
         if t == 0:
-            me[self.helper.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
-                self.x * np.pi * self.f
-            )
-            me[self.helper.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
-                (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
-            ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
-        elif t == np.inf and self.f == 0 and self.BCl == -self.BCr:
-            me[0] = (self.BCl * np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + self.BCr) / (
-                np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + 1
-            )
+            me[iu] = self.xp.cos(self.X)
+            me[iux] = -self.xp.sin(self.X)
+
+            me[iv] = (self.BCtop + self.BCbottom) / 2 + (self.BCtop - self.BCbottom) / 2 * self.Z
+            me[ivz] = (self.BCtop - self.BCbottom) / 2 * self.xp.ones_like(me[iv])
+
+            # me[iv] = self.xp.sin(self.Z * np.pi) * self.xp.cos(self.X)
+            # me[ivz] = self.xp.cos(self.Z * np.pi) * self.xp.cos(self.X) * np.pi
         else:
             raise NotImplementedError
 
@@ -183,21 +228,86 @@ class Burgers2D(Problem):
         f_hat[iv] = -self.epsilon * (self.C @ self.Dz @ u_hat[ivz].flatten()).reshape(u_hat[iux].shape)
         f.impl[...] = self.helper.itransform(f_hat, axes=(-2, -1))
 
-        f.expl[iu] = u[iu] * u[iux]
-        f.expl[iv] = u[iv] * u[ivz]
+        f.expl[iu] = u[iu] * u[iux] + u[iv] * u[ivz]
+        f.expl[iv] = f.expl[iu]
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        rhs_hat = self.helper.transform(rhs, axes=(-1,))
+        rhs_hat = self.helper.transform(rhs, axes=(-1, -2))
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
-        rhs_hat = self.helper.put_BCs_in_rhs(rhs_hat, istransformed=True)
+
+        rhs = self.helper.itransform(rhs_hat, axes=(-2, -1))
+        rhs = self.helper.put_BCs_in_rhs(rhs)
+        rhs_hat = self.helper.transform(rhs, axes=(-1, -2))
 
         A = self.M + factor * self.L
         A = self.helper.put_BCs_in_matrix(A)
 
         sol_hat = (self.helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
-        sol[:] = self.helper.itransform(sol_hat, axes=(-1,))
+        sol[:] = self.helper.itransform(
+            sol_hat,
+            axes=(
+                -2,
+                -1,
+            ),
+        )
         return sol
+
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 5)))
+        self.cax = []
+        divider = make_axes_locatable(axs[0])
+        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
+        divider2 = make_axes_locatable(axs[1])
+        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+        return self.fig
+
+    def plot(self, u, t=None, fig=None):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        axs = fig.axes
+
+        iu, iv = self.helper.index(['u', 'v'])
+
+        imU = axs[0].pcolormesh(self.X, self.Z, u[iu].real)
+        imV = axs[1].pcolormesh(self.X, self.Z, u[iv].real)
+
+        for i, label in zip([0, 1], [r'$u$', '$v$']):
+            axs[i].set_aspect(1)
+            axs[i].set_title(label)
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2e}')
+        axs[1].set_xlabel(r'$x$')
+        axs[1].set_ylabel(r'$z$')
+        fig.colorbar(imU, self.cax[0])
+        fig.colorbar(imV, self.cax[1])

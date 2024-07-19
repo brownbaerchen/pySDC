@@ -45,16 +45,17 @@ def test_Burgers_solver(mode, N=2**8, plotting=False):
     u_exact_steady = P.u_exact(np.inf)
     dt = 1e-2
     tol = 1e-4
+    fig = P.get_fig()
+    ax = fig.get_axes()[0]
     for i in range(900):
         u_old = u.copy()
         u, f = imex_euler(u, f, dt)
 
         if plotting:
-            plt.plot(P.x, u[0])
-            plt.plot(P.x, u_exact_steady[0])
-            plt.title(f't={i*dt:.2e}')
+            P.plot(u, t=i * dt, fig=fig)
+            P.plot(u_exact_steady, fig=fig)
             plt.pause(1e-8)
-            plt.cla()
+            ax.cla()
 
         if abs(u_old[0] - u[0]) < tol:
             print(f'stopping after {i} steps')
@@ -75,14 +76,14 @@ def test_Burgers2D_f(mode, direction, plotting=False):
     P = Burgers2D(nx=nx, nz=nz, epsilon=8e-3, mode=mode)
 
     u = P.u_init
-    iu, iv, iux, ivz = (P.helper.index(comp) for comp in P.helper.components)
+    iu, iv, iux, ivz = P.helper.index(P.helper.components)
 
     f_expect = P.f_init
 
     if direction == 'x':
         u[iu] = np.sin(P.X * 2)
         u[iux] = np.cos(P.X * 2) * 2
-        f_expect.impl[iu] = -P.epsilon * u[iu] * 2**2
+        f_expect.impl[iu] = P.epsilon * u[iu] * 2**2
     elif direction == 'z':
         u[iv] = P.Z**3 + 2
         u[ivz] = P.Z**2 * 3
@@ -92,18 +93,18 @@ def test_Burgers2D_f(mode, direction, plotting=False):
         u[iv] = np.sin(P.X * 2) * (P.Z**3 + 2)
         u[iux] = np.cos(P.X * 2) * 2 * (P.Z**3 + 2)
         u[ivz] = np.sin(P.X * 2) * P.Z**2 * 3
-        f_expect.impl[iu] = -P.epsilon * np.sin(P.X * 2) * 2**2 * (P.Z**3 + 2)
+        f_expect.impl[iu] = P.epsilon * np.sin(P.X * 2) * 2**2 * (P.Z**3 + 2)
         f_expect.impl[iv] = -P.epsilon * np.sin(P.X * 2) * P.Z * 6
 
     f = P.eval_f(u)
-    f_expect.expl[iu] = u[iu] * u[iux]
-    f_expect.expl[iv] = u[iv] * u[ivz]
+    f_expect.expl[iu] = u[iu] * u[iux] + u[iv] * u[ivz]
+    f_expect.expl[iv] = f_expect.expl[iu]
 
     if plotting:
         import matplotlib.pyplot as plt
 
         fig, axs = plt.subplots(1, 2)
-        i = iv
+        i = iu
         axs[0].pcolormesh(P.X, P.Z, f_expect.impl[i].real)
         axs[1].pcolormesh(P.X, P.Z, (f.impl[i]).real)
         plt.show()
@@ -114,6 +115,55 @@ def test_Burgers2D_f(mode, direction, plotting=False):
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Error in component {comp}!'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+def test_Burgers2D_solver(mode, nx=2**7, nz=2**7, plotting=False):
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from pySDC.implementations.problem_classes.Burgers import Burgers2D
+
+    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-2, mode=mode)
+
+    iu, iv, iux, ivz = P.helper.index(P.helper.components)
+
+    u = P.u_exact()
+    f = P.eval_f(u)
+
+    def imex_euler(u, f, dt):
+        u = P.solve_system(u + dt * f.expl, dt)
+        f = P.eval_f(u)
+        return u, f
+
+    small_step_size = 1e-9
+    small_step, _ = imex_euler(u.copy(), f.copy(), small_step_size)
+
+    for comp in ['u', 'v', 'ux']:
+        i = P.helper.index(comp)
+        assert np.allclose(u[i], small_step[i], atol=small_step_size * 1e1), f'Error in component {comp}!'
+
+    if not plotting:
+        return None
+
+    dt = 1e-2
+    tol = 1e-8
+
+    fig = P.get_fig()
+    for i in range(900):
+        u_old = u.copy()
+        u, f = imex_euler(u, f, dt)
+
+        if plotting:
+            P.plot(u, fig=fig, t=i * dt)
+            plt.pause(1e-1)
+
+        if abs(u_old - u) < tol:
+            print(f'stopping after {i} steps')
+            break
+
+    plt.show()
+
+
 if __name__ == '__main__':
     # test_Burgers_solver('T2U', plotting=True)
-    test_Burgers2D_f('T2T', 'mixed')
+    # test_Burgers2D_f('T2T', 'x', plotting=True)
+    test_Burgers2D_solver('T2T', plotting=True)

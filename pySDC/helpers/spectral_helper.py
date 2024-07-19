@@ -435,7 +435,12 @@ class SpectralHelper:
             raise NotImplementedError
 
     def index(self, name):
-        return self.components.index(name)
+        if type(name) in [str, int]:
+            return self.components.index(name)
+        elif type(name) in [list, tuple]:
+            return (self.index(me) for me in name)
+        else:
+            raise NotImplementedError(f'Don\'t know how to compute index for {type(name)=}')
 
     def get_empty_operator_matrix(self):
         """
