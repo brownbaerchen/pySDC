@@ -489,7 +489,6 @@ class SpectralHelper:
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
 
         self.BC_mask = BC != 0
-        print(BC.shape, self.init, self.xp.arange(np.prod(self.init[0])).shape, self.BC_rhs_mask.shape)
         self._BCs = BC.tolil()[self.BC_mask]
         self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
 
@@ -510,9 +509,9 @@ class SpectralHelper:
             else:
                 _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
             slices = (
-                [slice(0, self.axes[i].N) for i in range(axis)]
+                [slice(0, self.init[0][i + 1]) for i in range(axis)]
                 + [-1]
-                + [slice(0, self.axes[i].N) for i in range(axis + 1, len(self.axes))]
+                + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
             )
 
             for bc in self.full_BCs:
@@ -539,8 +538,6 @@ class SpectralHelper:
 
     def get_grid(self):
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
-        # print('1d', grids)
-        # print('2d', self.xp.meshgrid(*grids))
         return self.xp.meshgrid(*grids)
 
         return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])

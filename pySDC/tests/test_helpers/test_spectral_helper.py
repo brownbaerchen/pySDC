@@ -308,9 +308,10 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     helper.add_component(['u'])
     helper.setup_fft()
 
-    x = helper.axes[0].get_1dgrid()
-    z = helper.axes[1].get_1dgrid()
     Z, X = helper.get_grid()
+    x = X[:, 0]
+    z = Z[0, :]
+    shape = helper.init[0][1:]
 
     bcs = np.sin(bc_val * x)
     helper.add_BC('u', 'u', 1, bc, bcs)
@@ -328,7 +329,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
 
     # prepare system to solve
     A = helper.put_BCs_in_matrix(A)
-    rhs = helper.put_BCs_in_rhs(np.zeros(((1,) + X.shape)))
+    rhs = helper.put_BCs_in_rhs(helper.u_init)
     rhs_hat = helper.transform(rhs, axes=(-1, -2))
 
     # solve the system
@@ -337,11 +338,11 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     sol = helper.itransform(sol_hat, axes=(-2, -1)).real
 
     # construct polynomials for testing
-    sol_cheby = helper.itransform(sol_hat, axes=(-2,))
-    polys = [np.polynomial.Chebyshev(sol_cheby[0, i, :]) for i in range(nx)]
+    sol_cheby = helper.transform(sol, axes=(-1,))
+    polys = [np.polynomial.Chebyshev(sol_cheby[0, i, :]) for i in range(shape[0])]
 
     Pz = np.polynomial.Chebyshev(np.append(np.zeros(nz - 1), [1]))
-    tau_term, _ = np.meshgrid(Pz(z), np.ones(nx))
+    tau_term, _ = np.meshgrid(Pz(z), np.ones(shape[0]))
     error = ((A @ sol_hat.flatten()).reshape(X.shape) / tau_term).real
 
     if plotting:
@@ -354,15 +355,26 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
         plt.ylabel('t')
         plt.show()
 
-    for i in range(nx):
+    norm = nz if useMPI else 1
+    for i in range(shape[0]):
 
         assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
 
         assert np.allclose(
-            polys[i](z), sol[0, i, :]
+            polys[i](z), sol[0, i, :] / norm
         ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
 
     assert np.allclose(error, error[0, 0]), 'Solution does not satisfy perturbed equation'
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('variant', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('bc_val', [-2])
+@pytest.mark.parametrize('num_procs', [2, 1])
+def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
+    run_MPI_test(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
 
 
 if __name__ == '__main__':
