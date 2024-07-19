@@ -465,7 +465,8 @@ class SpectralHelper:
         if ndim == 1:
             return BC
         elif ndim == 2:
-            Id = self.axes[(axis + 1) % ndim].get_Id()
+            axis2 = (axis + 1) % ndim
+            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id(), axis=axis2)
             return self.sparse_lib.kron(Id, BC)
 
     def add_BC(self, component, equation, axis, x, v):
@@ -474,11 +475,12 @@ class SpectralHelper:
         self.BC_mat[self.index(equation)][self.index(component)] = _BC
         self.full_BCs += [{'component': component, 'equation': equation, 'axis': axis, 'x': x, 'v': v}]
 
+        shape = self.init[0][1:]
         slices = (
             [self.index(equation)]
-            + [slice(0, self.axes[i].N) for i in range(axis)]
+            + [slice(0, self.init[0][i + 1]) for i in range(axis)]
             + [-1]
-            + [slice(0, self.axes[i].N) for i in range(axis + 1, len(self.axes))]
+            + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
         )
         # assert all(self.BC_rhs_mask[*slices] == False), f'There is already a BC in equation for {equation}!'
         self.BC_rhs_mask[*slices] = True
@@ -487,10 +489,9 @@ class SpectralHelper:
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
 
         self.BC_mask = BC != 0
+        print(BC.shape, self.init, self.xp.arange(np.prod(self.init[0])).shape, self.BC_rhs_mask.shape)
         self._BCs = BC.tolil()[self.BC_mask]
-        self.BC_zero_index = self.xp.arange(np.prod([me.N for me in self.axes]) * len(self.components))[
-            self.BC_rhs_mask.flatten()
-        ]
+        self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
 
     def put_BCs_in_matrix(self, A):
         A = A.tolil()
@@ -599,17 +600,11 @@ class SpectralHelper:
 
         self.BC_mat = self.get_empty_operator_matrix()
         self.BC_mask = self.xp.zeros(
-            shape=[
-                len(self.components),
-            ]
-            + shape,
+            shape=self.init[0],
             dtype=bool,
         )
         self.BC_rhs_mask = self.xp.zeros(
-            shape=[
-                len(self.components),
-            ]
-            + shape,
+            shape=self.init[0],
             dtype=bool,
         )
 
@@ -620,24 +615,15 @@ class SpectralHelper:
             return u.redistribute(axis)
 
     def _transform_fft(self, u, axes):
-        # return scipy.fft.fftn(u, axes=axes)
         fft = self.get_fft(axes, 'forward')
         return fft(u, axes=axes)
 
     def _transform_dct(self, u, axes):
-        # assert len(axes) == 1
-        # axis = axes[0]
-        # assert u.shape[axis] == self.axes[axis].N
-        # return self.axes[axis].transform(u, axis=axis)
-        # return scipy.fft.dctn(u, axes=axes)
-        # rank = self.comm.rank
         result = u.copy()
 
         v = u.copy()
 
         for axis in axes:
-            # v = self._redistribute(u, axis)
-            # local_slice = slice(rank * u.shape[axis], (rank+1) * u.shape[axis])
 
             slices = [slice(0, s, 1) for s in u.shape]
             slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
@@ -645,12 +631,10 @@ class SpectralHelper:
 
         fft = self.get_fft(axes, 'forward')
         V = fft(v, axes=axes)
-        # print(type(v), type(V), type(u))
 
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, v.shape[axis], 1)
-            # print(rank, V.shape, expansion)
             V *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
 
         result.real[...] = V.real[...]
@@ -694,12 +678,10 @@ class SpectralHelper:
         return result
 
     def _transform_ifft(self, u, axes):
-        # return scipy.fft.ifftn(u, axes=axes)
         ifft = self.get_fft(axes, 'backward')
         return ifft(u, axes=axes)
 
     def _transform_idct(self, u, axes):
-        # return scipy.fft.idctn(u, axes=axes)
         result = u.copy()
 
         v = u.copy().astype(complex)
@@ -852,7 +834,7 @@ class SpectralHelper:
         if ndim == 1:
             I = self.axes[0].get_Id()
         elif ndim == 2:
-            I = sp.kron(*[me.get_Id() for me in self.axes])
+            I = sp.kron(*[self.get_local_slice_of_1D_matrix(self.axes[i].get_Id(), i) for i in range(len(self.axes))])
         else:
             raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
 

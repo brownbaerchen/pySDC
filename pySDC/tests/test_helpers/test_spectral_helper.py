@@ -283,11 +283,11 @@ def test_tau_method(bc, N, bc_val):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
+def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=False, **kwargs):
     '''
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
@@ -295,9 +295,16 @@ def test_tau_method2D(mode, nz, nx, bc_val, bc=-1, plotting=False):
     from pySDC.helpers.spectral_helper import SpectralHelper
     import numpy as np
 
-    helper = SpectralHelper()
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm)
     helper.add_axis('fft', N=nx)
-    helper.add_axis('cheby', N=nz, mode=mode)
+    helper.add_axis('cheby', N=nz, mode=variant)
     helper.add_component(['u'])
     helper.setup_fft()
 
@@ -370,7 +377,8 @@ if __name__ == '__main__':
     parser.add_argument('--axes', type=str_to_tuple, help='Axes over which to transform')
     parser.add_argument('--bz', type=str, help='Base in z direction')
     parser.add_argument('--bx', type=str, help='Base in x direction')
-    parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int'])
+    parser.add_argument('--bc_val', type=int, help='Value of boundary condition')
+    parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau'])
     parser.add_argument('--variant', type=str, help='Chebychov mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
     args = parser.parse_args()
@@ -381,12 +389,14 @@ if __name__ == '__main__':
         test_differentiation_matrix2D(**vars(args))
     elif args.test == 'int':
         test_integration_matrix2D(**vars(args))
+    elif args.test == 'tau':
+        test_tau_method2D(**vars(args))
     elif args.test is None:
-        test_transform(3, 2, 'cheby', (-1, -2))
+        # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2, 2, 'T2U', (-1,))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, -1)
-        # test_tau_method2D('T2U', 2**7, 2**5, -2, plotting=True)
+        test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
     else:
         raise NotImplementedError
     print('done')
