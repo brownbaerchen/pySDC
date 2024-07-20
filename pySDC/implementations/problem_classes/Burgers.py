@@ -251,7 +251,7 @@ class Burgers2D(Problem):
         u_hat = self.helper.transform(u, axes=(-1, -2))
         iu, iv = self.helper.index(['u', 'v'])
 
-        me[iu] = (self.C @ self.Dx * u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        me[iu] = (self.C @ self.Dx @ u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.helper.itransform(me, axes=(-2, -1))[iu]
 
     def get_fig(self):  # pragma: no cover
@@ -276,7 +276,7 @@ class Burgers2D(Problem):
         self.cax += [divider3.append_axes('right', size='3%', pad=0.03)]
         return self.fig
 
-    def plot(self, u, t=None, fig=None):  # pragma: no cover
+    def plot(self, u, t=None, fig=None, vmin=None, vmax=None):  # pragma: no cover
         r"""
         Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
 
@@ -298,8 +298,8 @@ class Burgers2D(Problem):
 
         iu, iv = self.helper.index(['u', 'v'])
 
-        imU = axs[0].pcolormesh(self.X, self.Z, u[iu].real)
-        imV = axs[1].pcolormesh(self.X, self.Z, u[iv].real)
+        imU = axs[0].pcolormesh(self.X, self.Z, u[iu].real, vmin=vmin, vmax=vmax)
+        imV = axs[1].pcolormesh(self.X, self.Z, u[iv].real, vmin=vmin, vmax=vmax)
         imVort = axs[2].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
 
         for i, label in zip([0, 1, 2], [r'$u$', '$v$', 'vorticity']):
