@@ -227,10 +227,10 @@ class ChebychovHelper(SpectralHelper1D):
         elif self.transform_type == 'fft':
             result = u.copy()
 
-            slices = [slice(0, s, 1) for s in u.shape]
-            slices[axis] = self.fft_utils['fwd']['shuffle']
+            shuffle = [slice(0, s, 1) for s in u.shape]
+            shuffle[axis] = self.fft_utils['fwd']['shuffle']
 
-            v = u[*slices]
+            v = u[*shuffle]
 
             V = self.fft_lib.fft(v, axis=axis, **kwargs)
 
@@ -257,9 +257,9 @@ class ChebychovHelper(SpectralHelper1D):
 
             v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][*expansion], axis=axis)
 
-            slices = [slice(0, s, 1) for s in u.shape]
-            slices[axis] = self.fft_utils['bck']['shuffle']
-            V = v[*slices]
+            shuffle = [slice(0, s, 1) for s in u.shape]
+            shuffle[axis] = self.fft_utils['bck']['shuffle']
+            V = v[*shuffle]
 
             result.real[...] = V.real[...]
             return result
@@ -580,9 +580,9 @@ class SpectralHelper:
 
         for axis in axes:
 
-            slices = [slice(0, s, 1) for s in u.shape]
-            slices[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
-            v = v[*slices]
+            shuffle = [slice(0, s, 1) for s in u.shape]
+            shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
+            v = v[*shuffle]
 
         fft = self.get_fft(axes, 'forward')
         V = fft(v, axes=axes)
@@ -653,9 +653,9 @@ class SpectralHelper:
         V = ifft(v, axes=axes)
 
         for axis in axes:
-            slices = [slice(0, s, 1) for s in u.shape]
-            slices[axis] = self.axes[axis].fft_utils['bck']['shuffle']
-            V = V[*slices]
+            shuffle = [slice(0, s, 1) for s in u.shape]
+            shuffle[axis] = self.axes[axis].fft_utils['bck']['shuffle']
+            V = V[*shuffle]
 
         result.real[...] = V.real[...]
         return result
