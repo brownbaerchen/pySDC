@@ -579,23 +579,22 @@ class SpectralHelper:
         result = u.copy()
 
         if len(axes) > 1:
-            v = self._transform_dct(u, axes[1:])
+            v = self._transform_dct(self._transform_dct(u, axes[1:]), (axes[0],))
         else:
 
             v = u.copy()
+            axis = axes[0]
 
-            for axis in axes:
+            shuffle = [slice(0, s, 1) for s in u.shape]
+            shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
+            v = v[*shuffle]
 
-                shuffle = [slice(0, s, 1) for s in u.shape]
-                shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
-                v = v[*shuffle]
+            fft = self.get_fft(axes, 'forward')
+            v = fft(v, axes=axes)
 
-                fft = self.get_fft((axis,), 'forward')
-                v = fft(v, axes=(axis,))
-
-                expansion = [np.newaxis for _ in u.shape]
-                expansion[axis] = slice(0, v.shape[axis], 1)
-                v *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, v.shape[axis], 1)
+            v *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
 
         result.real[...] = v.real[...]
         return result
@@ -648,14 +647,18 @@ class SpectralHelper:
 
         v = u.copy().astype(complex)
 
-        for axis in axes:
+        if len(axes) > 1:
+            v = self._transform_idct(self._transform_idct(u, axes[1:]), (axes[0],))
+        else:
+            axis = axes[0]
+
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-            ifft = self.get_fft((axis,), 'backward')
-            v = ifft(v, axes=(axis,))
+            ifft = self.get_fft(axes, 'backward')
+            v = ifft(v, axes=axes)
 
             shuffle = [slice(0, s, 1) for s in u.shape]
             shuffle[axis] = self.axes[axis].fft_utils['bck']['shuffle']
