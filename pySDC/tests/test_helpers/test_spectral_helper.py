@@ -178,7 +178,6 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
 
     expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
 
-    print(itrf / u)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
 

@@ -596,7 +596,7 @@ class SpectralHelper:
             expansion[axis] = slice(0, v.shape[axis], 1)
             v *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
 
-        result.real[...] = v.real[...]
+        result.real[...] = v.real
         return result
 
     def transform(self, u, axes=None):
@@ -664,7 +664,7 @@ class SpectralHelper:
             shuffle[axis] = self.axes[axis].fft_utils['bck']['shuffle']
             v = v[*shuffle]
 
-        result.real[...] = v.real[...]
+        result.real[...] = v.real
         return result
 
     def itransform(self, u, axes=None):
