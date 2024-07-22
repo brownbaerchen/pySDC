@@ -2,6 +2,25 @@ import pytest
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('a', [-2, 19])
+@pytest.mark.parametrize('b', [-7.3, 66])
+@pytest.mark.parametrize('f', [0, 1])
+def test_heat1d_chebychov(a, b, f, nvars=2**4):
+    import numpy as np
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychov
+
+    P = Heat1DChebychov(nvars=nvars, a=a, b=b, f=f, nu=1e-3)
+
+    u0 = P.u_exact(0)
+    dt = 1e-1
+    u = P.solve_system(u0, dt)
+    u02 = u - dt * P.eval_f(u)
+
+    assert np.allclose(u, P.u_exact(dt), atol=1e-8), 'Error in solver'
+    assert np.allclose(u0[0], u02[0], atol=1e-3), 'Error in eval_f'
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('mode', ['T2U', 'D2U'])
 @pytest.mark.parametrize('preconditioning', [True, False])
 def test_heat1d_chebychov_preconditioning(mode, preconditioning, plot=False):
@@ -182,4 +201,5 @@ if __name__ == '__main__':
     # test_heat1d_chebychov('T2U', False, plot=True)
     # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
-    test_heat1d_chebychov_preconditioning('D2U', True)
+    # test_heat1d_chebychov_preconditioning('D2U', True)
+    test_heat1d_chebychov(-2, 0, 1)

@@ -1,14 +1,14 @@
 import numpy as np
-import scipy
 from scipy import sparse as sp
 
 from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 
-from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper, SpectralHelper
+from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
 
 
-class Heat1DChebychov(Problem):
+class Heat1DChebychov(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = mesh
 
@@ -17,11 +17,63 @@ class Heat1DChebychov(Problem):
         nvars=128,
         a=0,
         b=0,
-        poly_coeffs=None,
+        f=1,
         nu=1.0,
     ):
-        poly_coeffs = poly_coeffs if poly_coeffs else [1, 2, 3, -4, -8, 19]
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        bases = [{'base': 'chebychov', 'N': nvars}]
+        components = ['u', 'ux']
+
+        super().__init__(bases, components)
+
+        self.x = self.get_grid()[0]
+
+        I = self.get_Id()
+        Dx = self.get_differentiation_matrix(axes=(0,))
+        self.Dx = Dx
+
+        L_lhs = {
+            'ux': {'u': -Dx, 'ux': I},
+            'u': {'ux': -nu * Dx},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {'u': {'u': I}}
+        self.setup_M(M_lhs)
+
+        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a)
+        self.add_BC(component='u', equation='ux', axis=0, x=1, v=b)
+        self.setup_BCs()
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+        iu, iux = self.index(self.components)
+
+        me_hat = self.u_init
+        me_hat[:] = self.transform(u)
+        me_hat[iu] = (self.nu * self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
+        me = self.itransform(me_hat)
+
+        f[self.index("u")] = me[iu]
+        return f
+
+    def u_exact(self, t):
+        xp = self.xp
+        iu, iux = self.index(self.components)
+        u = self.u_init
+
+        u[iu] = (
+            xp.sin(self.f * np.pi * self.x) * xp.exp(-self.nu * (self.f * np.pi) ** 2 * t)
+            + (self.b - self.a) / 2 * self.x
+            + (self.b + self.a) / 2
+        )
+        u[iux] = (
+            self.f * np.pi * xp.cos(self.f * np.pi * self.x) * xp.exp(-self.nu * (self.f * np.pi) ** 2 * t)
+            + (self.b - self.a) / 2
+        )
+
+        return u
 
 
 class Heat1DChebychovPreconditioning(Problem):

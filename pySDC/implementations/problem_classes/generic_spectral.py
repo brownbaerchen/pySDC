@@ -61,11 +61,18 @@ class GenericSpectralLinear(Problem):
 
     def setup_M(self, LHS):
         '''
-        See documentation of ``GenericSpectralLinear.setup_L``.
+        Setup mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
         '''
         self.M = self._setup_operator(LHS)
 
-    def solve_system(self, rhs, factor, *args, **kwargs):
+    def solve_system(self, rhs, dt, *args, **kwargs):
+        """
+        Solve (M + dt*L)u=rhs. This requires that you setup the operators before using the functions ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``. Note that the mass matrix need not be invertible, as long as (M + dt*L) is. This allows to solve some differential algebraic equations.
+
+        Note that in implicit Euler, the right hand side will be composed of the initial conditions. We don't want that in lines that don't depend on time. Therefore, we multiply the right hand side by the mass matrix. This means you can only do algebraic conditions that add up to zero. But you can easily overload this function with something more generic if needed.
+
+        We use a tau method to enforce boundary conditions in Chebychov methods. This means we replace a line in the system matrix by the polynomials evaluated at a boundary and put the value we want there in the rhs at the respective position. Since we have to do that in spectral space along only the axis we want to apply the boundary condition to, we transform back to real space after applying the mass matrix, and then transform only along one axis, apply the boundary conditions and transform back. Then we transform along all dimensions again. If you desire speed, you may wish to overload this function with something less generic that avoids a few transformations.
+        """
         sol = self.u_init
 
         rhs_hat = self.spectral.transform(rhs)
@@ -75,12 +82,10 @@ class GenericSpectralLinear(Problem):
         rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.spectral.transform(rhs)
 
-        A = self.M + factor * self.L
+        A = self.M + dt * self.L
         A = self.spectral.put_BCs_in_matrix(A)
 
         sol_hat = (self.spectral.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
-        sol[:] = self.spectral.itransform(
-            sol_hat,
-        )
+        sol[:] = self.spectral.itransform(sol_hat)
         return sol
