@@ -368,6 +368,10 @@ class SpectralHelper:
     def u_init(self):
         return self.dtype(self.init)
 
+    @property
+    def ndim(self):
+        return len(self.axes)
+
     def add_axis(self, base, *args, **kwargs):
 
         if base.lower() in ['chebychov', 'chebychev', 'cheby']:
@@ -591,11 +595,13 @@ class SpectralHelper:
         result.real[...] = V.real[...]
         return result
 
-    def transform(self, u, axes):
+    def transform(self, u, axes=None):
         trfs = {
             ChebychovHelper: self._transform_dct,
             FFTHelper: self._transform_fft,
         }
+
+        axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
 
         result = u.copy().astype(complex)
 
@@ -654,11 +660,13 @@ class SpectralHelper:
         result.real[...] = V.real[...]
         return result
 
-    def itransform(self, u, axes):
+    def itransform(self, u, axes=None):
         trfs = {
             FFTHelper: self._transform_ifft,
             ChebychovHelper: self._transform_idct,
         }
+
+        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
 
         result = u.copy().astype(complex)
 

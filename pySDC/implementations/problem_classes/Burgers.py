@@ -77,19 +77,19 @@ class Burgers1D(Problem):
         f = self.f_init
         iu, iux = self.helper.index('u'), self.helper.index('ux')
 
-        u_hat = self.helper.transform(u, axes=(-1,))
+        u_hat = self.helper.transform(u)
 
         Dx_u_hat = self.u_init
         Dx_u_hat[iu] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
 
-        f.impl[iu] = -self.epsilon * self.helper.itransform(Dx_u_hat, axes=(-1,))[iu]
+        f.impl[iu] = -self.epsilon * self.helper.itransform(Dx_u_hat)[iu]
         f.expl[iu] = u[iu] * u[iux]
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        rhs_hat = self.helper.transform(rhs, axes=(-1,))
+        rhs_hat = self.helper.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
         rhs_hat = self.helper.put_BCs_in_rhs(rhs_hat, istransformed=True)
 
@@ -98,7 +98,7 @@ class Burgers1D(Problem):
 
         sol_hat = (self.helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
-        sol[:] = self.helper.itransform(sol_hat, axes=(-1,))
+        sol[:] = self.helper.itransform(sol_hat)
         return sol
 
     def get_fig(self):  # pragma: no cover
@@ -224,12 +224,12 @@ class Burgers2D(Problem):
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        rhs_hat = self.helper.transform(rhs, axes=(-1, -2))
+        rhs_hat = self.helper.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
 
-        rhs = self.helper.itransform(rhs_hat, axes=(-2, -1))
+        rhs = self.helper.itransform(rhs_hat)
         rhs = self.helper.put_BCs_in_rhs(rhs)
-        rhs_hat = self.helper.transform(rhs, axes=(-1, -2))
+        rhs_hat = self.helper.transform(rhs)
 
         A = self.M + factor * self.L
         A = self.helper.put_BCs_in_matrix(A)
@@ -238,21 +238,17 @@ class Burgers2D(Problem):
 
         sol[:] = self.helper.itransform(
             sol_hat,
-            axes=(
-                -2,
-                -1,
-            ),
         )
         return sol
 
     def compute_vorticity(self, u):
         me = self.u_init
 
-        u_hat = self.helper.transform(u, axes=(-1, -2))
+        u_hat = self.helper.transform(u)
         iu, iv = self.helper.index(['u', 'v'])
 
         me[iu] = (self.C @ self.Dx @ u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.helper.itransform(me, axes=(-2, -1))[iu]
+        return self.helper.itransform(me)[iu]
 
     def get_fig(self):  # pragma: no cover
         """
