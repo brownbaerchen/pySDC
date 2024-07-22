@@ -1,15 +1,6 @@
 import numpy as np
 import scipy
-
-
-class DummyCommunicator:
-    @staticmethod
-    def rank():
-        return 0
-
-    @staticmethod
-    def size():
-        return 1
+from pySDC.implementations.datatype_classes.mesh import mesh
 
 
 class SpectralHelper1D:
@@ -216,7 +207,6 @@ class ChebychovHelper(SpectralHelper1D):
         # forwards transform
         self.fft_utils['fwd']['shuffle'] = np.append(np.arange((N + 1) // 2) * 2, -np.arange(N // 2) * 2 - 1 - N % 2)
         self.fft_utils['fwd']['shift'] = 2 * np.exp(-1j * np.pi * k / (2 * N)) * norm
-        # self.fft_utils['fwd']['shift'][0] += 2j
 
         # backwards transform
         mask = np.zeros(N, dtype=int)
@@ -228,9 +218,6 @@ class ChebychovHelper(SpectralHelper1D):
         shift = np.exp(1j * np.pi * k / (2 * N))
         shift[0] /= 2
         self.fft_utils['bck']['shift'] = shift / norm
-
-        # self.fft_utils['fwd']['shift'][...] = 1
-        # self.fft_utils['fwd']['shuffle'] = slice(0, N, 1)
 
         return self.fft_utils
 
@@ -252,12 +239,6 @@ class ChebychovHelper(SpectralHelper1D):
 
             V *= self.fft_utils['fwd']['shift'][*expansion]
 
-            # # prune complex part
-            # expansion1 = [slice(0, s, 1) for s in u.shape]
-            # expansion1[axis] = slice(1, self.N, 1)
-            # expansion2 = [slice(0, s, 1) for s in u.shape]
-            # expansion2[axis] = slice(self.N, 0, -1)
-            # V[*expansion1] += V.real[*expansion2]*1j
             result.real[...] = V.real[...]
             return result
         else:
@@ -268,7 +249,6 @@ class ChebychovHelper(SpectralHelper1D):
 
         if self.transform_type == 'dct':
             return self.fft_lib.idct(u / self.norm, axis=axis)
-            # return self.fft_lib.idct(u / self.norm.reshape(u.shape), axis=axis)
         elif self.transform_type == 'fft':
             result = u.copy()
 
@@ -365,30 +345,6 @@ class FFTHelper(SpectralHelper1D):
     def itransform(self, u, axis=-1):
         return self.fft_lib.ifft(u, axis=axis)
 
-    def get_fft_utils(self):
-        """
-        No need to do anything. We just want a common interface with the dct of Chebychov.
-        """
-        self.fft_utils = {
-            'fwd': {},
-            'bck': {},
-        }
-
-        N = self.N
-
-        # forwards transform
-        self.fft_utils['fwd']['shuffle'] = slice(0, N, 1)
-        self.fft_utils['fwd']['shift'] = self.xp.ones(N)
-
-        # backwards transform
-        self.fft_utils['bck']['shuffle'] = slice(0, N, 1)
-        self.fft_utils['bck']['shift'] = self.xp.ones(N)
-
-        return self.fft_utils
-
-
-from pySDC.implementations.datatype_classes.mesh import mesh
-
 
 class SpectralHelper:
     xp = np
@@ -420,8 +376,6 @@ class SpectralHelper:
             self.axes.append(FFTHelper(*args, **kwargs))
         else:
             raise NotImplementedError(f'{base=!r} is not implemented!')
-
-        self.axes[-1].get_fft_utils()
 
     def add_component(self, name):
         if type(name) in [list, tuple]:
@@ -833,7 +787,7 @@ class SpectralHelper:
         elif ndim == 2:
             I = sp.kron(*[self.get_local_slice_of_1D_matrix(self.axes[i].get_Id(), i) for i in range(len(self.axes))])
         else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+            raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
 
         return I
 

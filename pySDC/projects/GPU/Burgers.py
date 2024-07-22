@@ -73,29 +73,43 @@ def plot_Burgers(size):
     import matplotlib.pyplot as plt
     from pySDC.implementations.hooks.log_solution import LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
 
     fig, ax = plt.subplots()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes('right', size='3%', pad=0.03)
 
-    for i in range(99):
+    for i in range(400):
+        buffer = {}
+        vmin = 0
+        vmax = 0
         for rank in range(size):
             LogToFile.file_name = f'Burgers-{rank}'
             LogGrid.file_name = f'Burgers-grid-{rank}'
 
-            u = LogToFile.load(i)
-            Z, X = LogGrid.load()
-            ax.pcolormesh(X, Z, u['vorticity'].real, vmin=-1, vmax=5)
-            ax.set_title(f't={u["t"]:.2e}')
-            ax.set_xlabel('')
+            buffer[f'u-{rank}'] = LogToFile.load(i)
+            buffer[f'Z-{rank}'], buffer[f'X-{rank}'] = LogGrid.load()
+
+            vmin = min([vmin, buffer[f'u-{rank}']['vorticity'].real.min()])
+            vmax = max([vmax, buffer[f'u-{rank}']['vorticity'].real.max()])
+
+        for rank in range(size):
+            im = ax.pcolormesh(
+                buffer[f'X-{rank}'], buffer[f'Z-{rank}'], buffer[f'u-{rank}']['vorticity'].real, vmin=vmin, vmax=vmax
+            )
+            ax.set_title(f't={buffer[f"u-{rank}"]["t"]:.2e}')
+            ax.set_xlabel('x')
             ax.set_ylabel('z')
+            fig.colorbar(im, cax)
         plt.pause(1e-9)
         fig.savefig(f'simulation_plots/Burgers_{i:06d}.png', dpi=300, bbox_inches='tight')
     plt.show()
 
 
 if __name__ == '__main__':
-    run_Burgers()
+    # run_Burgers()
     if MPI.COMM_WORLD.rank == 0:
         plot_Burgers(MPI.COMM_WORLD.size)
