@@ -32,6 +32,7 @@ class Heat1DChebychov(GenericSpectralLinear):
         I = self.get_Id()
         Dx = self.get_differentiation_matrix(axes=(0,))
         self.Dx = Dx
+        self.U2T = self.get_basis_change_matrix()
 
         L_lhs = {
             'ux': {'u': -Dx, 'ux': I},
@@ -52,7 +53,7 @@ class Heat1DChebychov(GenericSpectralLinear):
 
         me_hat = self.u_init
         me_hat[:] = self.transform(u)
-        me_hat[iu] = (self.nu * self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
+        me_hat[iu] = (self.nu * self.U2T @ self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat)
 
         f[self.index("u")] = me[iu]
@@ -72,6 +73,91 @@ class Heat1DChebychov(GenericSpectralLinear):
             self.f * np.pi * xp.cos(self.f * np.pi * self.x) * xp.exp(-self.nu * (self.f * np.pi) ** 2 * t)
             + (self.b - self.a) / 2
         )
+
+        return u
+
+
+class Heat2DChebychov(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = mesh
+
+    def __init__(
+        self,
+        nx=128,
+        ny=128,
+        base_x='fft',
+        base_y='chebychov',
+        a=0,
+        b=0,
+        c=0,
+        fx=1,
+        fy=1,
+        nu=1.0,
+    ):
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
+        components = ['u', 'ux', 'uy']
+
+        super().__init__(bases, components)
+
+        self.Y, self.X = self.get_grid()
+
+        I = self.get_Id()
+        self.Dx = self.get_differentiation_matrix(axes=(0,))
+        self.Dy = self.get_differentiation_matrix(axes=(1,))
+        self.U2Tx = self.get_basis_change_matrix(axes=(0,))
+        self.U2Ty = self.get_basis_change_matrix(axes=(1,))
+
+        L_lhs = {
+            'ux': {'u': -self.Dx, 'ux': I},
+            'uy': {'u': -self.Dy, 'uy': I},
+            'u': {'ux': -nu * self.Dx, 'uy': -nu * self.Dy},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {'u': {'u': I}}
+        self.setup_M(M_lhs)
+
+        # if base_x == 'chebychov':
+        # self.add_BC(component='u', equation='u', axis=0, x=-1, v=a)
+        #     self.add_BC(component='u', equation='ux', axis=0, x=1, v=b)
+        if base_y == 'chebychov':
+            self.add_BC(component='u', equation='u', axis=1, x=-1, v=a)
+            self.add_BC(component='u', equation='uy', axis=1, x=1, v=c)
+        self.setup_BCs()
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+        iu, iux, iuy = self.index(self.components)
+
+        me_hat = self.u_init
+        me_hat[:] = self.transform(u)
+        me_hat[iu] = self.nu * (
+            self.U2Tx @ self.Dx @ me_hat[iux].flatten() + self.U2Ty @ self.Dy @ me_hat[iuy].flatten()
+        ).reshape(me_hat[iu].shape)
+        me = self.itransform(me_hat)
+
+        f[self.index("u")] = me[iu]
+        return f
+
+    def u_exact(self, t):
+        xp = self.xp
+        iu, iux, iuy = self.index(self.components)
+        u = self.u_init
+
+        fx = self.fx if self.base_x == 'fft' else np.pi * self.fx
+        fy = self.fy if self.base_y == 'fft' else np.pi * self.fy
+
+        time_dep = xp.exp(-self.nu * (fx**2 + fy**2) * t)
+
+        u[iu] = (
+            xp.sin(fx * self.X) * xp.sin(fy * self.Y) * time_dep
+            + (self.c - self.a) / 2.0 * self.Y
+            + (self.c + self.a) / 2.0
+        )
+        u[iux] = fx * xp.cos(fx * self.X) * xp.sin(fy * self.Y) * time_dep
+        u[iuy] = fy * xp.sin(fx * self.X) * xp.cos(fy * self.Y) * time_dep + (self.c - self.a) / 2
 
         return u
 

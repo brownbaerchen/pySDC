@@ -17,6 +17,46 @@ def test_heat1d_chebychov(a, b, f, nvars=2**4):
     u02 = u - dt * P.eval_f(u)
 
     assert np.allclose(u, P.u_exact(dt), atol=1e-8), 'Error in solver'
+    assert np.allclose(u0[0], u02[0], atol=1e-8), 'Error in eval_f'
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('a', [0, 7])
+@pytest.mark.parametrize('b', [0])
+@pytest.mark.parametrize('c', [0, 3.1415])
+@pytest.mark.parametrize('fx', [2, 1])
+@pytest.mark.parametrize('fy', [2, 1])
+@pytest.mark.parametrize('base_x', ['fft', 'chebychov'])
+@pytest.mark.parametrize('base_y', ['fft', 'chebychov'])
+def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
+    import numpy as np
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DChebychov
+
+    if base_y == 'fft' and (a != 0 or c != 0):
+        return None
+    if base_x == 'fft' and (b != 0):
+        return None
+
+    P = Heat2DChebychov(nx=nx, ny=ny, a=a, b=b, c=c, fx=fx, fy=fy, base_x=base_x, base_y=base_y, nu=1e-3)
+
+    u0 = P.u_exact(0)
+    dt = 1e-1
+    u = P.solve_system(u0, dt)
+    u02 = u - dt * P.eval_f(u)
+
+    import matplotlib.pyplot as plt
+
+    fig, axs = plt.subplots(1, 2)
+    idx = 0
+    im = axs[0].pcolormesh(P.X, P.Y, (u[idx] - P.u_exact(dt)[idx]).real)
+    im2 = axs[1].pcolormesh(P.X, P.Y, (u0 - u02)[idx].real)
+    fig.colorbar(im)
+    fig.colorbar(im2)
+    # plt.show()
+
+    print(u - P.u_exact(dt))
+
+    assert np.allclose(u, P.u_exact(dt), atol=1e-4), 'Error in solver'
     assert np.allclose(u0[0], u02[0], atol=1e-3), 'Error in eval_f'
 
 
@@ -202,4 +242,4 @@ if __name__ == '__main__':
     # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat1d_chebychov(-2, 0, 1)
+    test_heat2d_chebychov(0, 0, 0, 2, 2, 'fft', 'chebychov', 2**6, 2**6)

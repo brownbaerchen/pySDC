@@ -424,7 +424,9 @@ class SpectralHelper:
             return BC
         elif ndim == 2:
             axis2 = (axis + 1) % ndim
-            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id(), axis=axis2)
+            Id = self.get_local_slice_of_1D_matrix(
+                self.axes[axis2].get_basis_change_matrix() @ self.axes[axis2].get_Id(), axis=axis2
+            )
             return self.sparse_lib.kron(Id, BC)
 
     def add_BC(self, component, equation, axis, x, v):
@@ -799,29 +801,72 @@ class SpectralHelper:
 
         return I
 
-    def get_basis_change_matrix(self, direction='backward'):
+    # def get_basis_change_matrix(self, direction='backward'):
+    #     """
+    #     Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
+    #     the original basis afterwards.
+
+    #     Returns:
+    #         sparse basis change matrix
+    #     """
+    #     sp = self.sparse_lib
+    #     C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
+    #     ndim = len(self.axes)
+
+    #     if ndim == 1:
+    #         C = self.axes[0].get_basis_change_matrix(direction=direction)
+    #     elif ndim == 2:
+    #         mats = [None] * ndim
+    #         for i in range(ndim):
+    #             mats[i] = self.get_local_slice_of_1D_matrix(
+    #                 self.axes[i].get_basis_change_matrix(direction=direction), i
+    #             )
+
+    #         C = C @ sp.kron(*mats)
+    #     else:
+    #         raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+
+    #     return C
+
+    def get_basis_change_matrix(self, axes=None, direction='backward'):
         """
         Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
         the original basis afterwards.
 
+        Args:
+            axes (tuple): Axes along which to change basis.
+            direction (str): Direction of the basis change
+
         Returns:
             sparse basis change matrix
         """
+        axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
+
         sp = self.sparse_lib
-        C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
+        C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
             C = self.axes[0].get_basis_change_matrix(direction=direction)
         elif ndim == 2:
-            mats = [None] * ndim
-            for i in range(ndim):
-                mats[i] = self.get_local_slice_of_1D_matrix(
-                    self.axes[i].get_basis_change_matrix(direction=direction), i
-                )
+            for axis in axes:
+                axis2 = (axis + 1) % ndim
+                C1D = self.axes[axis].get_basis_change_matrix(direction=direction)
 
-            C = C @ sp.kron(*mats)
+                if len(axes) > 1:
+                    I1D = sp.eye(self.axes[axis2].N)
+                else:
+                    I1D = self.axes[axis2].get_Id()
+
+                mats = [None] * ndim
+                mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
+                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
+
+                if axis == axes[0]:
+                    C += sp.kron(*mats)
+                else:
+                    C = C @ sp.kron(*mats)
         else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+            raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
 
         return C
