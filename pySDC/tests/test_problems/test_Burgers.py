@@ -76,7 +76,7 @@ def test_Burgers2D_f(mode, direction, plotting=False):
     P = Burgers2D(nx=nx, nz=nz, epsilon=8e-3, mode=mode)
 
     u = P.u_init
-    iu, iv, iux, ivz = P.helper.index(P.helper.components)
+    iu, iv, iux, ivz = P.index(P.components)
 
     f_expect = P.f_init
 
@@ -109,8 +109,8 @@ def test_Burgers2D_f(mode, direction, plotting=False):
         axs[1].pcolormesh(P.X, P.Z, (f.impl[i]).real)
         plt.show()
 
-    for comp in P.helper.components:
-        i = P.helper.index(comp)
+    for comp in P.components:
+        i = P.index(comp)
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Error in component {comp}!'
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Error in component {comp}!'
 
@@ -131,7 +131,7 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
 
     P = Burgers2D(nx=nx, nz=nz, epsilon=1e-1, mode=mode, comm=comm)
 
-    iu, iv, iux, ivz = P.helper.index(P.helper.components)
+    iu, iv, iux, ivz = P.index(P.components)
 
     u = P.u_exact()
     f = P.eval_f(u)
@@ -145,7 +145,7 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     small_step, _ = imex_euler(u.copy(), f.copy(), small_step_size)
 
     for comp in ['u', 'v', 'ux']:
-        i = P.helper.index(comp)
+        i = P.index(comp)
         assert np.allclose(u[i], small_step[i], atol=small_step_size * 1e1), f'Error in component {comp}!'
 
     if not plotting:

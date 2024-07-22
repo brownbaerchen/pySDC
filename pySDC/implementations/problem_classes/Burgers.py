@@ -1,11 +1,10 @@
 import numpy as np
 
-from pySDC.core.problem import Problem
-from pySDC.helpers.spectral_helper import SpectralHelper
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 
 
-class Burgers1D(Problem):
+class Burgers1D(GenericSpectralLinear):
 
     dtype_u = mesh
     dtype_f = imex_mesh
@@ -14,36 +13,31 @@ class Burgers1D(Problem):
     def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U'):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        self.helper = SpectralHelper()
-        self.helper.add_axis(base='cheby', N=N, mode=mode)
-        self.helper.add_component(['u', 'ux'])
-        self.helper.setup_fft()
+        bases = [{'base': 'cheby', 'N': N, 'mode': mode}]
+        components = ['u', 'ux']
 
-        super().__init__(init=self.helper.init)
+        super().__init__(bases=bases, components=components)
 
-        self.x = self.helper.get_grid()[0]
+        self.x = self.get_grid()[0]
 
         # prepare matrices
-        Dx = self.helper.get_differentiation_matrix(axes=(0,))
-        I = self.helper.get_Id()
+        Dx = self.get_differentiation_matrix(axes=(0,))
+        I = self.get_Id()
         self.Dx = Dx
-        self.C = self.helper.get_basis_change_matrix()
+        self.C = self.get_basis_change_matrix()
 
         # construct linear operator
-        L = self.helper.get_empty_operator_matrix()
-        self.helper.add_equation_lhs(L, 'u', {'ux': -epsilon * Dx})
-        self.helper.add_equation_lhs(L, 'ux', {'u': -Dx, 'ux': I})
-        self.L = self.helper.convert_operator_matrix_to_operator(L)
+        L_lhs = {'u': {'ux': -epsilon * Dx}, 'ux': {'u': -Dx, 'ux': I}}
+        self.setup_L(L_lhs)
 
         # construct mass matrix
-        M = self.helper.get_empty_operator_matrix()
-        self.helper.add_equation_lhs(M, 'u', {'u': I})
-        self.M = self.helper.convert_operator_matrix_to_operator(M)
+        M_lhs = {'u': {'u': I}}
+        self.setup_M(M_lhs)
 
         # boundary conditions
-        self.helper.add_BC(component='u', equation='u', axis=0, x=1, v=BCr)
-        self.helper.add_BC(component='u', equation='ux', axis=0, x=-1, v=BCl)
-        self.helper.setup_BCs()
+        self.add_BC(component='u', equation='u', axis=0, x=1, v=BCr)
+        self.add_BC(component='u', equation='ux', axis=0, x=-1, v=BCl)
+        self.setup_BCs()
 
     def u_exact(self, t=0, *args, **kwargs):
         me = self.u_init
@@ -58,10 +52,10 @@ class Burgers1D(Problem):
         # return me
 
         if t == 0:
-            me[self.helper.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
+            me[self.index('u')][:] = ((self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x) * np.cos(
                 self.x * np.pi * self.f
             )
-            me[self.helper.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
+            me[self.index('ux')][:] = (self.BCr - self.BCl) / 2 * np.cos(self.x * np.pi * self.f) + (
                 (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
             ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
         elif t == np.inf and self.f == 0 and self.BCl == -self.BCr:
@@ -75,30 +69,30 @@ class Burgers1D(Problem):
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-        iu, iux = self.helper.index('u'), self.helper.index('ux')
+        iu, iux = self.index('u'), self.index('ux')
 
-        u_hat = self.helper.transform(u)
+        u_hat = self.transform(u)
 
         Dx_u_hat = self.u_init
         Dx_u_hat[iu] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
 
-        f.impl[iu] = -self.epsilon * self.helper.itransform(Dx_u_hat)[iu]
+        f.impl[iu] = -self.epsilon * self.itransform(Dx_u_hat)[iu]
         f.expl[iu] = u[iu] * u[iux]
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
         sol = self.u_init
 
-        rhs_hat = self.helper.transform(rhs)
+        rhs_hat = self.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
-        rhs_hat = self.helper.put_BCs_in_rhs(rhs_hat, istransformed=True)
+        rhs_hat = self.put_BCs_in_rhs(rhs_hat, istransformed=True)
 
         A = self.M + factor * self.L
-        A = self.helper.put_BCs_in_matrix(A)
+        A = self.put_BCs_in_matrix(A)
 
-        sol_hat = (self.helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
+        sol_hat = (self.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
-        sol[:] = self.helper.itransform(sol_hat)
+        sol[:] = self.itransform(sol_hat)
         return sol
 
     def get_fig(self):  # pragma: no cover
@@ -135,7 +129,7 @@ class Burgers1D(Problem):
         fig = self.get_fig() if fig is None else fig
         ax = fig.axes[0]
 
-        ax.plot(self.x, u[self.helper.index(comp)])
+        ax.plot(self.x, u[self.index(comp)])
 
         if t is not None:
             fig.suptitle(f't = {t:.2e}')
@@ -144,7 +138,7 @@ class Burgers1D(Problem):
         ax.set_ylabel(r'$u$')
 
 
-class Burgers2D(Problem):
+class Burgers2D(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
     xp = np
@@ -152,49 +146,50 @@ class Burgers2D(Problem):
     def __init__(self, nx=64, nz=64, epsilon=0.1, mode='T2U', comm=None):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        self.helper = SpectralHelper(comm=comm)
-        self.helper.add_axis(base='fft', N=nx)
-        self.helper.add_axis(base='cheby', N=nz, mode=mode)
-        self.helper.add_component(['u', 'v', 'ux', 'vz'])
-        self.helper.setup_fft()
+        bases = [
+            {'base': 'fft', 'N': nx},
+            {'base': 'cheby', 'N': nz, 'mode': mode},
+        ]
+        components = ['u', 'v', 'ux', 'vz']
+        super().__init__(bases=bases, components=components, comm=comm)
 
-        super().__init__(init=self.helper.init)
-
-        self.Z, self.X = self.helper.get_grid()
+        self.Z, self.X = self.get_grid()
 
         # prepare matrices
-        Dx = self.helper.get_differentiation_matrix(axes=(0,))
-        Dz = self.helper.get_differentiation_matrix(axes=(1,))
-        I = self.helper.get_Id()
+        Dx = self.get_differentiation_matrix(axes=(0,))
+        Dz = self.get_differentiation_matrix(axes=(1,))
+        I = self.get_Id()
         self.Dx = Dx
         self.Dz = Dz
-        self.C = self.helper.get_basis_change_matrix()
+        self.C = self.get_basis_change_matrix()
 
         # construct linear operator
-        L = self.helper.get_empty_operator_matrix()
-        self.helper.add_equation_lhs(L, 'u', {'ux': -epsilon * Dx})
-        self.helper.add_equation_lhs(L, 'v', {'vz': -epsilon * Dz})
-        self.helper.add_equation_lhs(L, 'ux', {'u': -Dx, 'ux': I})
-        self.helper.add_equation_lhs(L, 'vz', {'v': -Dz, 'vz': I})
-        self.L = self.helper.convert_operator_matrix_to_operator(L)
+        L_lhs = {
+            'u': {'ux': -epsilon * Dx},
+            'v': {'vz': -epsilon * Dz},
+            'ux': {'u': -Dx, 'ux': I},
+            'vz': {'v': -Dz, 'vz': I},
+        }
+        self.setup_L(L_lhs)
 
         # construct mass matrix
-        M = self.helper.get_empty_operator_matrix()
-        self.helper.add_equation_lhs(M, 'u', {'u': I})
-        self.helper.add_equation_lhs(M, 'v', {'v': I})
-        self.M = self.helper.convert_operator_matrix_to_operator(M)
+        M_lhs = {
+            'u': {'u': I},
+            'v': {'v': I},
+        }
+        self.setup_M(M_lhs)
 
         # boundary conditions
         self.BCtop = 1
         self.BCbottom = -self.BCtop
-        self.helper.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1)
-        self.helper.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1)
-        self.helper.setup_BCs()
+        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1)
+        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1)
+        self.setup_BCs()
 
     def u_exact(self, t=0, *args, **kwargs):
         me = self.u_init
 
-        iu, iv, iux, ivz = self.helper.index(self.helper.components)
+        iu, iv, iux, ivz = self.index(self.components)
         if t == 0:
             me[iu] = self.xp.cos(self.X)
             me[iux] = -self.xp.sin(self.X)
@@ -209,46 +204,26 @@ class Burgers2D(Problem):
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
-        iu, iv, iux, ivz = (self.helper.index(comp) for comp in self.helper.components)
+        iu, iv, iux, ivz = (self.index(comp) for comp in self.components)
 
-        u_hat = self.helper.transform(u, axes=(-1, -2))
+        u_hat = self.transform(u, axes=(-1, -2))
         f_hat = self.u_init
         f_hat[iu] = -self.epsilon * (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iux].shape)
         f_hat[iv] = -self.epsilon * (self.C @ self.Dz @ u_hat[ivz].flatten()).reshape(u_hat[iux].shape)
-        f.impl[...] = self.helper.itransform(f_hat, axes=(-2, -1))
+        f.impl[...] = self.itransform(f_hat, axes=(-2, -1))
 
         f.expl[iu] = u[iu] * u[iux] + u[iv] * u[ivz]
         f.expl[iv] = f.expl[iu]
         return f
 
-    def solve_system(self, rhs, factor, *args, **kwargs):
-        sol = self.u_init
-
-        rhs_hat = self.helper.transform(rhs)
-        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
-
-        rhs = self.helper.itransform(rhs_hat)
-        rhs = self.helper.put_BCs_in_rhs(rhs)
-        rhs_hat = self.helper.transform(rhs)
-
-        A = self.M + factor * self.L
-        A = self.helper.put_BCs_in_matrix(A)
-
-        sol_hat = (self.helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
-
-        sol[:] = self.helper.itransform(
-            sol_hat,
-        )
-        return sol
-
     def compute_vorticity(self, u):
         me = self.u_init
 
-        u_hat = self.helper.transform(u)
-        iu, iv = self.helper.index(['u', 'v'])
+        u_hat = self.transform(u)
+        iu, iv = self.index(['u', 'v'])
 
         me[iu] = (self.C @ self.Dx @ u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.helper.itransform(me)[iu]
+        return self.itransform(me)[iu]
 
     def get_fig(self):  # pragma: no cover
         """
@@ -292,7 +267,7 @@ class Burgers2D(Problem):
         fig = self.get_fig() if fig is None else fig
         axs = fig.axes
 
-        iu, iv = self.helper.index(['u', 'v'])
+        iu, iv = self.index(['u', 'v'])
 
         imU = axs[0].pcolormesh(self.X, self.Z, u[iu].real, vmin=vmin, vmax=vmax)
         imV = axs[1].pcolormesh(self.X, self.Z, u[iv].real, vmin=vmin, vmax=vmax)
