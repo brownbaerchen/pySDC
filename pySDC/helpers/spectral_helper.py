@@ -578,23 +578,26 @@ class SpectralHelper:
     def _transform_dct(self, u, axes):
         result = u.copy()
 
-        v = u.copy()
+        if len(axes) > 1:
+            v = self._transform_dct(u, axes[1:])
+        else:
 
-        for axis in axes:
+            v = u.copy()
 
-            shuffle = [slice(0, s, 1) for s in u.shape]
-            shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
-            v = v[*shuffle]
+            for axis in axes:
 
-        fft = self.get_fft(axes, 'forward')
-        V = fft(v, axes=axes)
+                shuffle = [slice(0, s, 1) for s in u.shape]
+                shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
+                v = v[*shuffle]
 
-        for axis in axes:
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, v.shape[axis], 1)
-            V *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
+                fft = self.get_fft((axis,), 'forward')
+                v = fft(v, axes=(axis,))
 
-        result.real[...] = V.real[...]
+                expansion = [np.newaxis for _ in u.shape]
+                expansion[axis] = slice(0, v.shape[axis], 1)
+                v *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
+
+        result.real[...] = v.real[...]
         return result
 
     def transform(self, u, axes=None):
@@ -651,15 +654,14 @@ class SpectralHelper:
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-        ifft = self.get_fft(axes, 'backward')
-        V = ifft(v, axes=axes)
+            ifft = self.get_fft((axis,), 'backward')
+            v = ifft(v, axes=(axis,))
 
-        for axis in axes:
             shuffle = [slice(0, s, 1) for s in u.shape]
             shuffle[axis] = self.axes[axis].fft_utils['bck']['shuffle']
-            V = V[*shuffle]
+            v = v[*shuffle]
 
-        result.real[...] = V.real[...]
+        result.real[...] = v.real[...]
         return result
 
     def itransform(self, u, axes=None):
@@ -800,33 +802,6 @@ class SpectralHelper:
             raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
 
         return I
-
-    # def get_basis_change_matrix(self, direction='backward'):
-    #     """
-    #     Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
-    #     the original basis afterwards.
-
-    #     Returns:
-    #         sparse basis change matrix
-    #     """
-    #     sp = self.sparse_lib
-    #     C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
-    #     ndim = len(self.axes)
-
-    #     if ndim == 1:
-    #         C = self.axes[0].get_basis_change_matrix(direction=direction)
-    #     elif ndim == 2:
-    #         mats = [None] * ndim
-    #         for i in range(ndim):
-    #             mats[i] = self.get_local_slice_of_1D_matrix(
-    #                 self.axes[i].get_basis_change_matrix(direction=direction), i
-    #             )
-
-    #         C = C @ sp.kron(*mats)
-    #     else:
-    #         raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
-
-    #     return C
 
     def get_basis_change_matrix(self, axes=None, direction='backward'):
         """

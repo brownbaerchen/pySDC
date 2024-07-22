@@ -127,12 +127,11 @@ def test_matrix1D(N, base, type):
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2)])
-def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
+@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
-
-    bx = 'fft'
 
     if useMPI:
         from mpi4py import MPI
@@ -162,7 +161,15 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
         u_all[...] = u
 
     expect_trf = u_all.copy()
-    for i in axes:
+
+    if bx == 'fft' and bz == 'cheby':
+        axes_1d = sorted(axes)[::-1]
+    elif bx == 'cheby' and bz == 'fft':
+        axes_1d = sorted(axes)
+    else:
+        axes_1d = axes
+
+    for i in axes_1d:
         base = helper.axes[i]
         expect_trf = base.transform(expect_trf, axis=i)
 
@@ -171,6 +178,7 @@ def test_transform(nx, nz, bz, axes, useMPI=False, **kwargs):
 
     expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
 
+    print(expect_local / trf)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
@@ -201,12 +209,11 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nx', [2, 8])
 @pytest.mark.parametrize('nz', [2, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('num_procs', [2, 1])
 @pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
-def test_transform_MPI(nx, nz, bz, num_procs, axes):
-    if bz == 'fft' and axes == '-1,-2':
-        axes = "-2,-1"
-    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bz=bz, axes=axes)
+def test_transform_MPI(nx, nz, bx, bz, num_procs, axes):
+    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, nz=nz, bx=bx, bz=bz, axes=axes)
 
 
 @pytest.mark.mpi4py
