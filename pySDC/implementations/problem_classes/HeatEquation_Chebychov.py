@@ -81,25 +81,13 @@ class Heat2DChebychov(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(
-        self,
-        nx=128,
-        ny=128,
-        base_x='fft',
-        base_y='chebychov',
-        a=0,
-        b=0,
-        c=0,
-        fx=1,
-        fy=1,
-        nu=1.0,
-    ):
+    def __init__(self, nx=128, ny=128, base_x='fft', base_y='chebychov', a=0, b=0, c=0, fx=1, fy=1, nu=1.0, comm=None):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
         components = ['u', 'ux', 'uy']
 
-        super().__init__(bases, components)
+        super().__init__(bases, components, comm)
 
         self.Y, self.X = self.get_grid()
 

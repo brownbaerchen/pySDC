@@ -79,7 +79,7 @@ def test_derivatives(nx, nz, direction, cheby_mode):
     derivatives = P.compute_derivatives(u)
 
     for comp in ['vz', 'Tz']:
-        i = P.helper.index(comp)
+        i = P.spectral.index(comp)
         assert np.allclose(derivatives[i], expect_z), f'Got unexpected z-derivative in component {comp}'
 
 
@@ -139,8 +139,8 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -Pr * y_z + Pr * Ra * y + y_zz
 
-    for comp in P.helper.components:
-        i = P.helper.index(comp)
+    for comp in P.spectral.components:
+        i = P.spectral.index(comp)
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
 
@@ -170,14 +170,14 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
     _A = 1e-1 * P.L + P.M
-    # _A = P.helper.get_empty_operator_matrix()
-    # Id = P.helper.get_Id()
-    # for comp in P.helper.components:
-    #     P.helper.add_equation_lhs(_A, comp, {comp: Id})
-    # _A = P.helper.convert_operator_matrix_to_operator(_A)
-    A = P.helper.put_BCs_in_matrix(_A)
+    # _A = P.spectral.get_empty_operator_matrix()
+    # Id = P.spectral.get_Id()
+    # for comp in P.spectral.components:
+    #     P.spectral.add_equation_lhs(_A, comp, {comp: Id})
+    # _A = P.spectral.convert_operator_matrix_to_operator(_A)
+    A = P.spectral.put_BCs_in_matrix(_A)
 
-    rhs = P.helper.put_BCs_in_rhs(P.u_init)
+    rhs = P.spectral.put_BCs_in_rhs(P.u_init)
     rhs_hat = P.transform(rhs).flatten()
 
     sol_hat = sp.linalg.spsolve(A, rhs_hat)
@@ -197,7 +197,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
     # axs[0].imshow(np.log(abs(_A.toarray())))
     # axs[1].imshow(np.log(abs(A.toarray())))
     # plt.show()
-    for i in range(len(P.helper.components)):
+    for i in range(len(P.spectral.components)):
         axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
         axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
     axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
@@ -260,7 +260,9 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     u = P.u_init
     expect = P.u_init
 
-    conv = sp.kron(sp.eye(u.shape[0]), sp.kron(P.helper.axes[0].get_Id(), P.helper.axes[1].get_conv(cheby_mode[::-1])))
+    conv = sp.kron(
+        sp.eye(u.shape[0]), sp.kron(P.spectral.axes[0].get_Id(), P.spectral.axes[1].get_conv(cheby_mode[::-1]))
+    )
 
     for i in [P.iu, P.iv, P.iT, P.ip]:
         if direction == 'x':

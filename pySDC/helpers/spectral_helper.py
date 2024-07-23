@@ -450,7 +450,6 @@ class SpectralHelper:
         # if any(self.BC_rhs_mask[*slices]):
         #     raise Exception('There is already a boundary condition here!')
         self.BC_rhs_mask[*slices] = True
-        print(component, equation, axis, slices)
 
     def setup_BCs(self):
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
