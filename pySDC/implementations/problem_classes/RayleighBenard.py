@@ -58,12 +58,13 @@ class RayleighBenard(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'vz': {'v': Dz, 'vz': -I},
+            'vz': {'v': -Dz, 'vz': I},
             'Tz': {'T': -Dz, 'Tz': I},
-            'u': {'p': -Pr * Dx, 'u': Pr * Dxx},
-            'v': {'p': -Pr * Dz, 'vz': Pr * Dz, 'T': Pr * Ra * I},
-            'T': {'T': Dxx, 'Tz': Dz},
-            'p': {'u': -Dx, 'vz': I, 'p': S2D},
+            'p': {'u': -Dx, 'vz': I},  # divergence free constraint
+            'u': {'p': Pr * Dx, 'u': -Pr * Dxx},
+            'v': {'p': Pr * Dz, 'vz': -Pr * Dz, 'T': -Pr * Ra * I},
+            'T': {'T': -Dxx, 'Tz': -Dz},
+            # 'p': {'u': -Dx, 'vz': I, 'p': S2D},
         }
         self.setup_L(L_lhs)
 
@@ -135,19 +136,20 @@ class RayleighBenard(GenericSpectralLinear):
         me = self.u_init
 
         # linear temperature gradient
-        for i, n in zip([self.iT, self.iv], ['T', 'v']):
-            me[i] = (self.BCs[f'{n}_top'] - self.BCs[f'{n}_bottom']) / 2 * self.Z + (
-                self.BCs[f'{n}_top'] + self.BCs[f'{n}_bottom']
-            ) / 2.0
+        for comp in ['T', 'v']:
+            a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
+            b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
+            me[self.index(comp)] = a * self.Z + b
+            me[self.index(f'{comp}z')] = a
 
         # perturb slightly
         # me[self.iT] += self.xp.random.rand(*me[self.iT].shape) * 1e-3
 
         # evaluate derivatives
-        derivatives = self.compute_derivatives(me)
-        for comp in ['Tz', 'vz']:
-            i = self.index(comp)
-            me[i] = derivatives[i]
+        # derivatives = self.compute_derivatives(me)
+        # for comp in ['Tz', 'vz']:
+        #     i = self.index(comp)
+        #     me[i] = derivatives[i]
 
         return me
 

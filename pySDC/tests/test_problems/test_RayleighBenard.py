@@ -147,13 +147,12 @@ def test_eval_f(nx, nz, cheby_mode, direction):
 
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [1, 4])
-@pytest.mark.parametrize('nz', [2])
+@pytest.mark.parametrize('nz', [8])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('T_top', [2])
 @pytest.mark.parametrize('T_bottom', [3.14])
 @pytest.mark.parametrize('v_top', [2.77])
-@pytest.mark.parametrize('v_bottom', [-90])
-def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
+def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -162,26 +161,15 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, v_bottom):
         'T_top': T_top,
         'T_bottom': T_bottom,
         'v_top': v_top,
-        'v_bottom': v_bottom,
+        'v_bottom': v_top,
         'p_top': 0,
-        # 'u_top': 1,
-        # 'u_bottom': -1,
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
     _A = 1e-1 * P.L + P.M
-    # _A = P.spectral.get_empty_operator_matrix()
-    # Id = P.spectral.get_Id()
-    # for comp in P.spectral.components:
-    #     P.spectral.add_equation_lhs(_A, comp, {comp: Id})
-    # _A = P.spectral.convert_operator_matrix_to_operator(_A)
-    A = P.spectral.put_BCs_in_matrix(_A)
 
-    rhs = P.spectral.put_BCs_in_rhs(P.u_init)
-    rhs_hat = P.transform(rhs).flatten()
-
-    sol_hat = sp.linalg.spsolve(A, rhs_hat)
-    sol = P.itransform(sol_hat.reshape(P.u_init.shape))
+    rhs = P.u_exact(0)
+    sol = P.solve_system(rhs, 1e0)
 
     expect = {}
     for q in ['T', 'v']:
@@ -415,7 +403,7 @@ def test_solver(nx, nz, cheby_mode):
 if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(2**1, 2**1, 'T2U', 0, 0, 3, 0)
+    test_BCs(2**2, 2**4, 'T2U', -1, 0, 1, 1)
     # test_solver(2**5, 2**5, 'T2T')
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'mixed')
