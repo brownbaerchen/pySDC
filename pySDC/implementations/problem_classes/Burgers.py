@@ -35,8 +35,8 @@ class Burgers1D(GenericSpectralLinear):
         self.setup_M(M_lhs)
 
         # boundary conditions
-        self.add_BC(component='u', equation='u', axis=0, x=1, v=BCr)
-        self.add_BC(component='u', equation='ux', axis=0, x=-1, v=BCl)
+        self.add_BC(component='u', equation='u', axis=0, x=1, v=BCr, kind='Dirichlet')
+        self.add_BC(component='u', equation='ux', axis=0, x=-1, v=BCl, kind='Dirichlet')
         self.setup_BCs()
 
     def u_exact(self, t=0, *args, **kwargs):
@@ -182,8 +182,8 @@ class Burgers2D(GenericSpectralLinear):
         # boundary conditions
         self.BCtop = 1
         self.BCbottom = -self.BCtop
-        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1)
-        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1)
+        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet')
+        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet')
         self.setup_BCs()
 
     def u_exact(self, t=0, *args, **kwargs):

@@ -73,11 +73,11 @@ class RayleighBenard(GenericSpectralLinear):
         self.setup_M(M_lhs)
 
         # TODO: distribute tau terms sensibly
-        self.add_BC(component='p', equation='p', axis=1, x=1, v=self.BCs['p_top'])
-        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'])
-        self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'])
-        self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'])
-        self.add_BC(component='T', equation='Tz', axis=1, x=-1, v=self.BCs['T_bottom'])
+        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_top'], kind='integral')
+        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet')
+        self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
+        self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        self.add_BC(component='T', equation='Tz', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
         self.setup_BCs()
 
     def compute_derivatives(self, u, skip_transform=False):

@@ -43,8 +43,8 @@ class Heat1DChebychov(GenericSpectralLinear):
         M_lhs = {'u': {'u': I}}
         self.setup_M(M_lhs)
 
-        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a)
-        self.add_BC(component='u', equation='ux', axis=0, x=1, v=b)
+        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet")
+        self.add_BC(component='u', equation='ux', axis=0, x=1, v=b, kind="Dirichlet")
         self.setup_BCs()
 
     def eval_f(self, u, *args, **kwargs):
@@ -116,14 +116,14 @@ class Heat2DChebychov(GenericSpectralLinear):
         if base_x == 'chebychov':
             y = self.Y[0, :]
             if self.base_y == 'fft':
-                self.add_BC(component='u', equation='u', axis=0, x=-1, v=beta * y - alpha + gamma)
-            self.add_BC(component='u', equation='ux', axis=0, x=1, v=beta * y + alpha + gamma)
+                self.add_BC(component='u', equation='u', axis=0, x=-1, v=beta * y - alpha + gamma, kind='Dirichlet')
+            self.add_BC(component='u', equation='ux', axis=0, x=1, v=beta * y + alpha + gamma, kind='Dirichlet')
         else:
             assert a == b, f'Need periodic boundary conditions in x for {base_x} method!'
         if base_y == 'chebychov':
             x = self.X[:, 0]
-            self.add_BC(component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma)
-            self.add_BC(component='u', equation='uy', axis=1, x=1, v=alpha * x + beta + gamma)
+            self.add_BC(component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma, kind='Dirichlet')
+            self.add_BC(component='u', equation='uy', axis=1, x=1, v=alpha * x + beta + gamma, kind='Dirichlet')
         else:
             assert c == b, f'Need periodic boundary conditions in y for {base_y} method!'
         self.setup_BCs()

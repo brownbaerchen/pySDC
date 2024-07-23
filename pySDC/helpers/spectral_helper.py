@@ -39,6 +39,9 @@ class SpectralHelper1D:
     def get_basis_change_matrix(self, *args, **kwargs):
         return self.sparse_lib.eye(self.N)
 
+    def get_BC(self, kind, **kwargs):
+        raise NotImplementedError(f'No boundary conditions of {kind=!r} implemented!')
+
 
 class ChebychovHelper(SpectralHelper1D):
 
@@ -266,6 +269,27 @@ class ChebychovHelper(SpectralHelper1D):
         else:
             raise NotImplementedError
 
+    def get_BC(self, kind, **kwargs):
+        if kind.lower() == 'integral':
+            return self.get_integ_BC_row_T(**kwargs)
+        elif kind.lower() == 'dirichlet':
+            return self.get_Dirichlet_BC_row_T(**kwargs)
+        else:
+            return super().get_BC(kind, **kwargs)
+
+    def get_integ_BC_row_T(self):
+        """
+        Get a row for generating integral BCs with T polynomials.
+        It returns the values of the T polynomials at x.
+
+        Returns:
+            self.xp.ndarray: Row to put into a matrix
+        """
+        n = np.arange(self.N) + 1
+        me = self.xp.ones_like(n)
+        me[1:] = ((-1) ** n[1:] + 1) / (1 - n[1:] ** 2)
+        return me
+
     def get_Dirichlet_BC_row_T(self, x):
         """
         Get a row for generating Dirichlet BCs at x with T polynomials.
@@ -411,13 +435,11 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_BC(self, axis, x):
+    def get_BC(self, axis, kind, **kwargs):
         base = self.axes[axis]
-        assert type(base) == ChebychovHelper
-        assert x in [-1, 0, 1]
 
         BC = base.get_Id().tolil() * 0
-        BC[-1, :] = base.get_Dirichlet_BC_row_T(x)
+        BC[-1, :] = base.get_BC(kind=kind, **kwargs)
 
         ndim = len(self.axes)
         if ndim == 1:
@@ -434,11 +456,11 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def add_BC(self, component, equation, axis, x, v):
+    def add_BC(self, component, equation, axis, kind, v, **kwargs):
 
-        _BC = self.get_BC(axis=axis, x=x)
+        _BC = self.get_BC(axis=axis, kind=kind, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] = _BC
-        self.full_BCs += [{'component': component, 'equation': equation, 'axis': axis, 'x': x, 'v': v}]
+        self.full_BCs += [{'component': component, 'equation': equation, 'axis': axis, 'kind': kind, 'v': v, **kwargs}]
 
         shape = self.init[0][1:]
         slices = (

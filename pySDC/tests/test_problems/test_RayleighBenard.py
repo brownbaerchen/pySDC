@@ -162,11 +162,11 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
         'T_bottom': T_bottom,
         'v_top': v_top,
         'v_bottom': v_top,
-        'p_top': -1,
+        'p_top': 0,
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
-    rhs = P.u_exact(0, noise_level=0.0)
+    rhs = P.u_exact(0, noise_level=0.1)
     sol = P.solve_system(rhs, 1e0)
 
     expect = {}
@@ -191,7 +191,8 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
     axs[0].legend()
     plt.show()
 
-    for i in [P.iu, P.ip]:
+    print('hi', np.sum(sol[P.ip]))
+    for i in [P.iu]:
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
     for i in [P.iT, P.iv]:
         assert np.allclose(sol[i], expect[P.index_to_name[i]]), f'Unexpected BCs in {P.index_to_name[i]}'

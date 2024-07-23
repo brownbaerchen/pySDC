@@ -271,10 +271,17 @@ def test_integration_MPI(nx, nz, num_procs, axes):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('N', [8, 32])
+@pytest.mark.parametrize('bc_val', [0, 3.1415])
+def test_tau_method_integral(N, bc_val):
+    test_tau_method(bc=0, N=N, bc_val=bc_val, kind='integral')
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
 @pytest.mark.parametrize('N', [8, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
-def test_tau_method(bc, N, bc_val):
+def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     '''
     solve u_x - u + tau P = 0, u(bc) = bc_val
 
@@ -292,7 +299,10 @@ def test_tau_method(bc, N, bc_val):
     helper.add_axis(base='cheby', N=N)
     helper.setup_fft()
 
-    helper.add_BC('u', 'u', 0, bc, bc_val)
+    if kind == 'integral':
+        helper.add_BC('u', 'u', 0, v=bc_val, kind='integral')
+    else:
+        helper.add_BC('u', 'u', 0, x=bc, v=bc_val, kind='Dirichlet')
     helper.setup_BCs()
 
     C = helper.get_basis_change_matrix()
@@ -317,7 +327,11 @@ def test_tau_method(bc, N, bc_val):
     d_sol_poly = sol_poly.deriv(1)
     x = np.linspace(-1, 1, 100)
 
-    assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
+    if kind == 'integral':
+        integral = sol_poly.integ(1)
+        assert np.isclose(integral(1), bc_val), 'Solution does not satisfy boundary condition'
+    else:
+        assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
 
     tau = (d_sol_poly(x) - sol_poly(x)) / P(x)
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
@@ -355,7 +369,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     shape = helper.init[0][1:]
 
     bcs = np.sin(bc_val * x)
-    helper.add_BC('u', 'u', 1, bc, bcs)
+    helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
     # generate matrices
@@ -447,7 +461,7 @@ if __name__ == '__main__':
         # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(0, 5, -99)
+        test_tau_method(0, 5, 4, kind='integral')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
     else:
         raise NotImplementedError
