@@ -60,7 +60,7 @@ class RayleighBenard(GenericSpectralLinear):
         L_lhs = {
             'vz': {'v': -Dz, 'vz': I},
             'Tz': {'T': -Dz, 'Tz': I},
-            'p': {'u': -Dx, 'vz': I},  # divergence free constraint
+            'p': {'u': Dx, 'vz': -I},  # divergence free constraint
             'u': {'p': Pr * Dx, 'u': -Pr * Dxx},
             'v': {'p': Pr * Dz, 'vz': -Pr * Dz, 'T': -Pr * Ra * I},
             'T': {'T': -Dxx, 'Tz': -Dz},
@@ -127,7 +127,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         return f
 
-    def u_exact(self, t=0):
+    def u_exact(self, t=0, noise_level=1e-3):
         assert t == 0
         assert (
             self.BCs['v_top'] == self.BCs['v_bottom']
@@ -143,13 +143,15 @@ class RayleighBenard(GenericSpectralLinear):
             me[self.index(f'{comp}z')] = a
 
         # perturb slightly
-        # me[self.iT] += self.xp.random.rand(*me[self.iT].shape) * 1e-3
+        noise = self.xp.random.rand(*me[self.iT].shape) * noise_level * (self.Z + 1) * (self.Z - 1)
+        me[self.iT] += noise
 
         # evaluate derivatives
-        # derivatives = self.compute_derivatives(me)
-        # for comp in ['Tz', 'vz']:
-        #     i = self.index(comp)
-        #     me[i] = derivatives[i]
+        derivatives = self.compute_derivatives(me)
+        for comp in ['Tz', 'vz']:
+            i = self.index(comp)
+            me[i] = derivatives[i]
+        print(me[self.index('vz')])
 
         return me
 
@@ -187,7 +189,7 @@ class RayleighBenard(GenericSpectralLinear):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 3)))
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 5)))
         self.cax = []
         divider = make_axes_locatable(axs[0])
         self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
