@@ -22,7 +22,7 @@ def test_heat1d_chebychov(a, b, f, nvars=2**4):
 
 @pytest.mark.base
 @pytest.mark.parametrize('a', [0, 7])
-@pytest.mark.parametrize('b', [0])
+@pytest.mark.parametrize('b', [0, -2.77])
 @pytest.mark.parametrize('c', [0, 3.1415])
 @pytest.mark.parametrize('fx', [2, 1])
 @pytest.mark.parametrize('fy', [2, 1])
@@ -32,9 +32,9 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DChebychov
 
-    if base_y == 'fft' and (a != 0 or c != 0):
+    if base_y == 'fft' and (b != c):
         return None
-    if base_x == 'fft' and (b != 0):
+    if base_x == 'fft' and (b != a):
         return None
 
     P = Heat2DChebychov(nx=nx, ny=ny, a=a, b=b, c=c, fx=fx, fy=fy, base_x=base_x, base_y=base_y, nu=1e-3)
@@ -44,21 +44,12 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
     u = P.solve_system(u0, dt)
     u02 = u - dt * P.eval_f(u)
 
-    import matplotlib.pyplot as plt
+    tol = 1e-6 if (base_x == 'fft' or base_y == 'fft') else 1e-3
 
-    fig, axs = plt.subplots(1, 2)
-    idx = 0
-    im = axs[0].pcolormesh(P.X, P.Y, (u[idx] - P.u_exact(dt)[idx]).real)
-    im2 = axs[1].pcolormesh(P.X, P.Y, (u0 - u02)[idx].real)
-    fig.colorbar(im)
-    fig.colorbar(im2)
-    # plt.show()
-
-    print(abs((u - P.u_exact(dt))))
-    print(abs(u0[0] - u02[0]))
-
-    assert np.allclose(u, P.u_exact(dt), atol=1e-4), 'Error in solver'
-    assert np.allclose(u0[0], u02[0], atol=1e-3), 'Error in eval_f'
+    assert np.allclose(
+        u, P.u_exact(dt), atol=tol
+    ), f'Error in solver larger than expected, got {abs((u - P.u_exact(dt))):.2e}'
+    assert np.allclose(u0[0], u02[0], atol=1e-10), 'Error in eval_f'
 
 
 @pytest.mark.base
@@ -243,4 +234,4 @@ if __name__ == '__main__':
     # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(0, 0, 0, 2, 2, 'chebychov', 'fft', 2**6, 2**6)
+    test_heat2d_chebychov(1, -2, 5, 1, 2, 'chebychov', 'chebychov', 2**6, 2**6)

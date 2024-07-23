@@ -106,8 +106,7 @@ class Heat2DChebychov(GenericSpectralLinear):
         I = self.get_Id()
         self.Dx = self.get_differentiation_matrix(axes=(0,))
         self.Dy = self.get_differentiation_matrix(axes=(1,))
-        self.U2Tx = self.get_basis_change_matrix(axes=(0,))
-        self.U2Ty = self.get_basis_change_matrix(axes=(1,))
+        self.U2T = self.get_basis_change_matrix()
 
         L_lhs = {
             'ux': {'u': -self.Dx, 'ux': I},
@@ -119,12 +118,26 @@ class Heat2DChebychov(GenericSpectralLinear):
         M_lhs = {'u': {'u': I}}
         self.setup_M(M_lhs)
 
-        # if base_x == 'chebychov':
-        # self.add_BC(component='u', equation='u', axis=0, x=-1, v=a)
-        #     self.add_BC(component='u', equation='ux', axis=0, x=1, v=b)
+        for base in [base_x, base_y]:
+            assert base in ['chebychov', 'fft']
+
+        alpha = (self.b - self.a) / 2.0
+        beta = (self.c - self.b) / 2.0
+        gamma = (self.c + self.a) / 2.0
+
+        if base_x == 'chebychov':
+            y = self.Y[0, :]
+            if self.base_y == 'fft':
+                self.add_BC(component='u', equation='u', axis=0, x=-1, v=beta * y - alpha + gamma)
+            self.add_BC(component='u', equation='ux', axis=0, x=1, v=beta * y + alpha + gamma)
+        else:
+            assert a == b, f'Need periodic boundary conditions in x for {base_x} method!'
         if base_y == 'chebychov':
-            self.add_BC(component='u', equation='u', axis=1, x=-1, v=a)
-            self.add_BC(component='u', equation='uy', axis=1, x=1, v=c)
+            x = self.X[:, 0]
+            self.add_BC(component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma)
+            self.add_BC(component='u', equation='uy', axis=1, x=1, v=alpha * x + beta + gamma)
+        else:
+            assert c == b, f'Need periodic boundary conditions in y for {base_y} method!'
         self.setup_BCs()
 
     def eval_f(self, u, *args, **kwargs):
@@ -134,7 +147,7 @@ class Heat2DChebychov(GenericSpectralLinear):
         me_hat = self.u_init
         me_hat[:] = self.transform(u)
         me_hat[iu] = self.nu * (
-            self.U2Tx @ self.Dx @ me_hat[iux].flatten() + self.U2Ty @ self.Dy @ me_hat[iuy].flatten()
+            self.U2T @ self.Dx @ me_hat[iux].flatten() + self.U2T @ self.Dy @ me_hat[iuy].flatten()
         ).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat)
 
@@ -151,13 +164,13 @@ class Heat2DChebychov(GenericSpectralLinear):
 
         time_dep = xp.exp(-self.nu * (fx**2 + fy**2) * t)
 
-        u[iu] = (
-            xp.sin(fx * self.X) * xp.sin(fy * self.Y) * time_dep
-            + (self.c - self.a) / 2.0 * self.Y
-            + (self.c + self.a) / 2.0
-        )
-        u[iux] = fx * xp.cos(fx * self.X) * xp.sin(fy * self.Y) * time_dep
-        u[iuy] = fy * xp.sin(fx * self.X) * xp.cos(fy * self.Y) * time_dep + (self.c - self.a) / 2
+        alpha = (self.b - self.a) / 2.0
+        beta = (self.c - self.b) / 2.0
+        gamma = (self.c + self.a) / 2.0
+
+        u[iu] = xp.sin(fx * self.X) * xp.sin(fy * self.Y) * time_dep + alpha * self.X + beta * self.Y + gamma
+        u[iux] = fx * xp.cos(fx * self.X) * xp.sin(fy * self.Y) * time_dep + alpha
+        u[iuy] = fy * xp.sin(fx * self.X) * xp.cos(fy * self.Y) * time_dep + beta
 
         return u
 

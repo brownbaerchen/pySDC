@@ -90,6 +90,41 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, useMPI=False, **kwa
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('nx', [32])
+@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+@pytest.mark.parametrize('bx', ['cheby', 'fft'])
+def test_identity_matrix2D(nx, nz, variant, bx, useMPI=False, **kwargs):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm)
+    helper.add_axis(base=bx, N=nx)
+    helper.add_axis(base='cheby', N=nz, mode=variant)
+    helper.setup_fft()
+
+    Z, X = helper.get_grid()
+    conv = helper.get_basis_change_matrix()
+    I = helper.get_Id()
+
+    u = helper.u_init
+    u[0, ...] = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
+
+    u_hat = helper.transform(u, axes=(-2, -1))
+    I_u_hat = (conv @ I @ u_hat.flatten()).reshape(u_hat.shape)
+    I_u = helper.itransform(I_u_hat, axes=(-1, -2))
+
+    assert np.allclose(I_u, u, atol=1e-12)
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
 @pytest.mark.parametrize('base', ['cheby'])
 @pytest.mark.parametrize('type', ['diff', 'int'])
@@ -237,7 +272,7 @@ def test_integration_MPI(nx, nz, num_procs, axes):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
-@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('N', [8, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
 def test_tau_method(bc, N, bc_val):
     '''
@@ -410,9 +445,9 @@ if __name__ == '__main__':
         test_tau_method2D(**vars(args))
     elif args.test is None:
         # test_transform(3, 2, 'cheby', (-1, -2))
-        test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
+        # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        # test_tau_method(-1, 8, -1)
+        test_tau_method(0, 5, -99)
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
     else:
         raise NotImplementedError

@@ -427,7 +427,12 @@ class SpectralHelper:
             Id = self.get_local_slice_of_1D_matrix(
                 self.axes[axis2].get_basis_change_matrix() @ self.axes[axis2].get_Id(), axis=axis2
             )
-            return self.sparse_lib.kron(Id, BC)
+            mats = [
+                None,
+            ] * ndim
+            mats[axis] = BC
+            mats[axis2] = Id
+            return self.sparse_lib.kron(*mats)
 
     def add_BC(self, component, equation, axis, x, v):
 
@@ -442,8 +447,10 @@ class SpectralHelper:
             + [-1]
             + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
         )
-        # assert all(self.BC_rhs_mask[*slices] == False), f'There is already a BC in equation for {equation}!'
+        # if any(self.BC_rhs_mask[*slices]):
+        #     raise Exception('There is already a boundary condition here!')
         self.BC_rhs_mask[*slices] = True
+        print(component, equation, axis, slices)
 
     def setup_BCs(self):
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
@@ -454,7 +461,7 @@ class SpectralHelper:
 
     def put_BCs_in_matrix(self, A):
         A = A.tolil()
-        A[self.BC_zero_index, :] = 0
+        # A[self.BC_zero_index, :] = 0  # TODO: do I need sth like this?
         A[self.BC_mask] = self._BCs
         return A.tocsc()
 
@@ -795,12 +802,23 @@ class SpectralHelper:
             sparse identity matrix
         """
         sp = self.sparse_lib
-        ndim = len(self.axes)
+        ndim = self.ndim
+        I = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
 
         if ndim == 1:
             I = self.axes[0].get_Id()
         elif ndim == 2:
-            I = sp.kron(*[self.get_local_slice_of_1D_matrix(self.axes[i].get_Id(), i) for i in range(len(self.axes))])
+            for axis in range(ndim):
+                axis2 = (axis + 1) % ndim
+                I1D = self.axes[axis].get_Id()
+
+                I1D2 = sp.eye(self.axes[axis2].N)
+
+                mats = [None] * ndim
+                mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
+                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D2, axis2)
+
+                I = I @ sp.kron(*mats)
         else:
             raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
 
