@@ -54,7 +54,8 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
     fig.colorbar(im2)
     # plt.show()
 
-    print(u - P.u_exact(dt))
+    print(abs((u - P.u_exact(dt))))
+    print(abs(u0[0] - u02[0]))
 
     assert np.allclose(u, P.u_exact(dt), atol=1e-4), 'Error in solver'
     assert np.allclose(u0[0], u02[0], atol=1e-3), 'Error in eval_f'
@@ -242,4 +243,4 @@ if __name__ == '__main__':
     # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(0, 0, 0, 2, 2, 'fft', 'chebychov', 2**6, 2**6)
+    test_heat2d_chebychov(0, 0, 0, 2, 2, 'chebychov', 'fft', 2**6, 2**6)
