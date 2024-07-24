@@ -9,11 +9,11 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, Pr=1, Ra=1, nx=8, nz=8, cheby_mode='T2T', BCs=None, comm=None):
+    def __init__(self, Prandl=1, Rayleigh=2e-3, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None):
         BCs = {} if BCs is None else BCs
         BCs = {
-            'T_top': 1,
-            'T_bottom': 0,
+            'T_top': 0,
+            'T_bottom': 1,
             'v_top': 0,
             'v_bottom': 0,
             'p_integral': 0,
@@ -55,14 +55,17 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dz = Dz
         self.U2T = self.get_basis_change_matrix()
 
+        kappa = (Rayleigh * Prandl) ** (-1 / 2)
+        nu = (Rayleigh / Prandl) ** (-1 / 2)
+
         # construct operators
         L_lhs = {
             'vz': {'v': -Dz, 'vz': I},
-            'Tz': {'T': -Dz, 'Tz': I},
+            'Tz': {'T': Dz, 'Tz': -I},
             'p': {'u': Dx, 'vz': -I},  # divergence free constraint
-            'u': {'p': Pr * Dx, 'u': -Pr * Dxx},
-            'v': {'p': Pr * Dz, 'vz': -Pr * Dz, 'T': -Pr * Ra * I},
-            'T': {'T': -Dxx, 'Tz': -Dz},
+            'u': {'p': Dx, 'u': -nu * Dxx},
+            'v': {'p': Dz, 'vz': -nu * Dz, 'T': -I},
+            'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
         }
         self.setup_L(L_lhs)
 
@@ -78,20 +81,19 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='T', equation='Tz', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
         self.setup_BCs()
 
-    def compute_derivatives(self, u, skip_transform=False):
+    def compute_z_derivatives(self, u):
         me_hat = self.u_init
 
-        u_hat = u if skip_transform else self.transform(u)
+        u_hat = self.transform(u)
         shape = u[0].shape
         Dz = self.U2T @ self.Dz
-        Dx = self.U2T @ self.Dx
 
-        for comp1, comp2 in zip(['v', 'T'], ['vz', 'Tz']):
-            i = self.index(comp1)
-            iD = self.index(comp2)
+        for comp in ['T', 'v']:
+            i = self.index(comp)
+            iD = self.index(f'{comp}z')
             me_hat[iD][:] = (Dz @ u_hat[i].flatten()).reshape(shape)
 
-        return me_hat if skip_transform else self.itransform(me_hat)
+        return self.itransform(me_hat)
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
@@ -106,10 +108,13 @@ class RayleighBenard(GenericSpectralLinear):
         shape = u[0].shape
         iu, iv, ivz, iT, iTz, ip = self.index(self.components)
 
+        kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
+        nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
+
         # evaluate implicit terms
-        f_hat.impl[iT] = (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
-        f_hat.impl[iu] = (-Dx @ u_hat[ip].flatten() + Dxx @ u_hat[iu].flatten()).reshape(shape)
-        f_hat.impl[iv] = (-Dz @ u_hat[ip].flatten() + Dz @ u_hat[ivz].flatten()).reshape(shape) + self.Ra * u_hat[iT]
+        f_hat.impl[iT] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
+        f_hat.impl[iu] = (-Dx @ u_hat[ip].flatten() + nu * Dxx @ u_hat[iu].flatten()).reshape(shape)
+        f_hat.impl[iv] = (-Dz @ u_hat[ip].flatten() + nu * Dz @ u_hat[ivz].flatten()).reshape(shape) + u_hat[iT]
 
         f.impl[:] = self.itransform(f_hat.impl)
 
@@ -139,23 +144,41 @@ class RayleighBenard(GenericSpectralLinear):
             a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
             b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
             me[self.index(comp)] = a * self.Z + b
-            me[self.index(f'{comp}z')] = a
 
         # perturb slightly
-        noise = self.xp.random.rand(*me[self.iT].shape) * noise_level * (self.Z + 1) * (self.Z - 1)
+        rng = self.xp.random.default_rng(seed=99)
+        noise = (
+            rng.random(me[self.iT].shape)
+            * noise_level
+            * (self.Z + 1) ** 2
+            * (self.Z - 1) ** 2
+            * (self.X - 2 * np.pi)
+            * self.X
+        )
         me[iT] += noise
 
-        S = self.get_integration_matrix(axes=(1,))
-        u_hat = self.transform(me, axes=(1,))
-        u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
-        me[...] = self.itransform(u_hat, axes=(1,))
-        me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
+        u_hat = self.transform(
+            me,
+            axes=(
+                0,
+                1,
+            ),
+        )
 
-        # evaluate derivatives
-        derivatives = self.compute_derivatives(me)
-        for comp in ['Tz', 'vz']:
-            i = self.index(comp)
-            me[i] = derivatives[i]
+        S = self.get_integration_matrix(axes=(1,))
+        u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
+
+        u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
+        u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
+
+        me[...] = self.itransform(
+            u_hat,
+            axes=(
+                0,
+                1,
+            ),
+        )
+        me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
         return me
 
@@ -201,7 +224,7 @@ class RayleighBenard(GenericSpectralLinear):
         self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
         return self.fig
 
-    def plot(self, u, t=None, fig=None):  # pragma: no cover
+    def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
         r"""
         Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
 
@@ -224,10 +247,10 @@ class RayleighBenard(GenericSpectralLinear):
         vmin = u.min()
         vmax = u.max()
 
-        imT = axs[0].pcolormesh(self.X, self.Z, u[self.iT].real)
+        imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
         imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
 
-        for i, label in zip([0, 1], [r'$T$', 'vorticity']):
+        for i, label in zip([0, 1], [rf'${quantity}$', 'vorticity']):
             axs[i].set_aspect(1)
             axs[i].set_title(label)
 
