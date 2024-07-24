@@ -286,8 +286,9 @@ class ChebychovHelper(SpectralHelper1D):
             self.xp.ndarray: Row to put into a matrix
         """
         n = np.arange(self.N) + 1
-        me = self.xp.ones_like(n)
-        me[1:] = ((-1) ** n[1:] + 1) / (1 - n[1:] ** 2)
+        me = self.xp.zeros_like(n).astype(float)
+        me[2:] = ((-1) ** n[1:-1] + 1) / (1 - n[1:-1] ** 2)
+        me[0] = 2.0
         return me
 
     def get_Dirichlet_BC_row_T(self, x):
@@ -457,6 +458,8 @@ class SpectralHelper:
             return self.sparse_lib.kron(*mats)
 
     def add_BC(self, component, equation, axis, kind, v, **kwargs):
+        if equation in [me['equation'] for me in self.full_BCs]:
+            raise Exception(f'There is already a boundary condition in equation for {equation}!')
 
         _BC = self.get_BC(axis=axis, kind=kind, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] = _BC
@@ -469,8 +472,6 @@ class SpectralHelper:
             + [-1]
             + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
         )
-        # if any(self.BC_rhs_mask[*slices]):
-        #     raise Exception('There is already a boundary condition here!')
         self.BC_rhs_mask[*slices] = True
 
     def setup_BCs(self):

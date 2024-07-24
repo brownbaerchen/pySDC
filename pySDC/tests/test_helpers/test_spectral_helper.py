@@ -328,7 +328,7 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     x = np.linspace(-1, 1, 100)
 
     if kind == 'integral':
-        integral = sol_poly.integ(1)
+        integral = sol_poly.integ(1, lbnd=-1)
         assert np.isclose(integral(1), bc_val), 'Solution does not satisfy boundary condition'
     else:
         assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
@@ -461,7 +461,7 @@ if __name__ == '__main__':
         # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(0, 5, 4, kind='integral')
+        test_tau_method(0, 8, 1, kind='integral')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
     else:
         raise NotImplementedError
