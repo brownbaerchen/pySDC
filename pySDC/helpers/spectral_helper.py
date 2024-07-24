@@ -84,11 +84,11 @@ class ChebychovHelper(SpectralHelper1D):
         else:
             raise NotImplementedError(f'{self.mode=!r} not implemented')
 
-    def get_integration_matrix(self):
+    def get_integration_matrix(self, lbnd=0):
         if self.mode == 'T2T':
-            return self.get_T2T_integration_matrix()
+            return self.get_T2T_integration_matrix(lbnd=lbnd)
         elif self.mode == 'T2U':
-            return self.get_conv('T2U') @ self.get_T2T_integration_matrix()
+            return self.get_conv('T2U') @ self.get_T2T_integration_matrix(lbnd=lbnd)
         else:
             raise NotImplementedError(f'{self.mode=!r} not implemented')
 
@@ -161,15 +161,18 @@ class ChebychovHelper(SpectralHelper1D):
         S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1).tolil()
         return S
 
-    def get_T2T_integration_matrix(self):
+    def get_T2T_integration_matrix(self, lbnd=0):
         # TODO: this is a bit fishy
         S = (self.get_U2T_integration_matrix() @ self.get_conv('T2U')).tolil()
         n = self.xp.arange(self.N)
-        S[0, 1::2] = (
-            (n / (2 * (self.xp.arange(self.N) + 1)))[1::2]
-            * (-1) ** (self.xp.arange(self.N // 2))
-            / (np.append([1], self.xp.arange(self.N // 2 - 1) + 1))
-        )
+        if lbnd == 0:
+            S[0, 1::2] = (
+                (n / (2 * (self.xp.arange(self.N) + 1)))[1::2]
+                * (-1) ** (self.xp.arange(self.N // 2))
+                / (np.append([1], self.xp.arange(self.N // 2 - 1) + 1))
+            )
+        else:
+            raise NotImplementedError
         return S
 
     def get_T2T_differentiation_matrix(self, p=1):

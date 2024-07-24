@@ -16,7 +16,7 @@ class RayleighBenard(GenericSpectralLinear):
             'T_bottom': 0,
             'v_top': 0,
             'v_bottom': 0,
-            'p_top': 0,
+            'p_integral': 0,
             **BCs,
         }
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
@@ -54,7 +54,6 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dxx = Dxx
         self.Dz = Dz
         self.U2T = self.get_basis_change_matrix()
-        S2D = self.get_integration_matrix(axes=(0, 1))
 
         # construct operators
         L_lhs = {
@@ -64,7 +63,6 @@ class RayleighBenard(GenericSpectralLinear):
             'u': {'p': Pr * Dx, 'u': -Pr * Dxx},
             'v': {'p': Pr * Dz, 'vz': -Pr * Dz, 'T': -Pr * Ra * I},
             'T': {'T': -Dxx, 'Tz': -Dz},
-            # 'p': {'u': -Dx, 'vz': I, 'p': S2D},
         }
         self.setup_L(L_lhs)
 
@@ -73,7 +71,7 @@ class RayleighBenard(GenericSpectralLinear):
         self.setup_M(M_lhs)
 
         # TODO: distribute tau terms sensibly
-        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_top'], kind='integral')
+        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral')
         self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet')
         self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
         self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
@@ -134,6 +132,7 @@ class RayleighBenard(GenericSpectralLinear):
         ), 'Initial conditions are only implemented for zero velocity gradient'
 
         me = self.u_init
+        iu, iv, ivz, iT, iTz, ip = self.index(self.components)
 
         # linear temperature gradient
         for comp in ['T', 'v']:
@@ -144,14 +143,19 @@ class RayleighBenard(GenericSpectralLinear):
 
         # perturb slightly
         noise = self.xp.random.rand(*me[self.iT].shape) * noise_level * (self.Z + 1) * (self.Z - 1)
-        me[self.iT] += noise
+        me[iT] += noise
+
+        S = self.get_integration_matrix(axes=(1,))
+        u_hat = self.transform(me, axes=(1,))
+        u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
+        me[...] = self.itransform(u_hat, axes=(1,))
+        me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
         # evaluate derivatives
         derivatives = self.compute_derivatives(me)
         for comp in ['Tz', 'vz']:
             i = self.index(comp)
             me[i] = derivatives[i]
-        print(me[self.index('vz')])
 
         return me
 

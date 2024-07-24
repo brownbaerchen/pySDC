@@ -144,7 +144,7 @@ def test_integration_matrix(N, variant):
         raise NotImplementedError
 
     du = P @ D @ coeffs
-    exact = np.polynomial.Chebyshev(coeffs).integ(1)
+    exact = np.polynomial.Chebyshev(coeffs).integ(1, lbnd=0)
 
     assert np.allclose(exact.coef[:-1], du)
 
@@ -458,7 +458,7 @@ if __name__ == '__main__':
     # test_transform(6, 1, 'fft')
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
-    # test_integration_matrix(5, 'T2U')
+    test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
     # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
-    test_integration_BC(6)
+    # test_integration_BC(6)

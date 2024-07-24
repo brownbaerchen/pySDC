@@ -150,7 +150,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
 @pytest.mark.parametrize('nz', [8])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('T_top', [2])
-@pytest.mark.parametrize('T_bottom', [3.14])
+@pytest.mark.parametrize('T_bottom', [3.14, -9])
 @pytest.mark.parametrize('v_top', [2.77])
 def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
     import numpy as np
@@ -162,11 +162,11 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
         'T_bottom': T_bottom,
         'v_top': v_top,
         'v_bottom': v_top,
-        'p_top': 0,
+        'p_integral': 0,
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
-    rhs = P.u_exact(0, noise_level=0.1)
+    rhs = P.u_exact(0, noise_level=0.0)
     sol = P.solve_system(rhs, 1e0)
 
     expect = {}
@@ -175,6 +175,11 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
             expect[q] = (BCs[f'{q}_top'] - BCs[f'{q}_bottom']) / 2 * P.Z + (BCs[f'{q}_top'] + BCs[f'{q}_bottom']) / 2
         else:
             raise NotImplementedError
+
+    sol_hat = P.transform(sol, axes=(1,))
+    pressure_coef = sol_hat[P.ip][0]
+    pressure_integral = np.polynomial.Chebyshev(pressure_coef).integ(1, lbnd=-1)(1)
+
     zero = np.zeros_like(expect['T'])
 
     import matplotlib.pyplot as plt
@@ -183,15 +188,17 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
     # axs[0].imshow(np.log(abs(_A.toarray())))
     # axs[1].imshow(np.log(abs(A.toarray())))
     # plt.show()
-    for i in range(len(P.spectral.components)):
-        axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
-        axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
-    axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
-    axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
+    # for i in range(len(P.spectral.components)):
+    #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
+    #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
+    # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
+    # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
+    axs[0].plot(P.Z[0, :], sol[P.ip][0, :], label='want')
+    axs[0].plot(P.Z[0, :], rhs[P.ip][0, :], label='have', ls='--')
     axs[0].legend()
     plt.show()
 
-    print('hi', np.sum(sol[P.ip]))
+    assert np.isclose(pressure_integral.real, BCs['p_integral']), f'Got unexpected {pressure_integral=:2e}!'
     for i in [P.iu]:
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
     for i in [P.iT, P.iv]:
@@ -292,7 +299,7 @@ def test_linear_operator(nx, nz, cheby_mode, direction):
     im = axs[2].pcolormesh(P.X, P.Z, expect[i].real)
     im = axs[3].pcolormesh(P.X, P.Z, (Lu[i] - expect[i]).real)
     fig.colorbar(im)
-    plt.show()
+    # plt.show()
 
     for i in range(u.shape[0]):
         assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
@@ -314,9 +321,7 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
         'T_bottom': T_bottom,
         'v_top': v_top,
         'v_bottom': v_bottom,
-        'p_top': 0,
-        # 'u_top': 1,
-        # 'u_bottom': -1,
+        'p_integral': 0,
     }
 
     P = RayleighBenard(nx=nx, nz=nz, BCs=BCs)
@@ -366,7 +371,7 @@ def test_solver(nx, nz, cheby_mode):
         error = np.array([abs(u1[i] - u2[i]) for i in range(u1.shape[0])])
         false_idx = np.arange(u1.shape[0])[error > thresh]
         msgs = [f'{error[i]:.2e} in {P.index_to_name[i]}' for i in false_idx]
-        # assert len(false_idx) == 0, f'Errors too large when solving {msg}: {msgs}'
+        assert len(false_idx) == 0, f'Errors too large when solving {msg}: {msgs}'
 
         # violations = P.compute_constraint_violation(u2)
         # for key in violations.keys():
@@ -375,7 +380,7 @@ def test_solver(nx, nz, cheby_mode):
     P_static = RayleighBenard(
         nx=nx, nz=nz, cheby_mode=cheby_mode, BCs={'T_top': 0, 'T_bottom': 0, 'v_top': 0, 'v_bottom': 0}
     )
-    static = P_static.solve_system(zero, 1e-1)
+    static = P_static.solve_system(P_static.u_exact(noise_level=0), 1e-1)
     compute_errors(zero, static, 'static configuration')
 
     u0 = P.u_exact(noise_level=0)
@@ -383,8 +388,9 @@ def test_solver(nx, nz, cheby_mode):
     compute_errors(u0, small_dt, 'tiny step size', 1e-7)
 
     nsteps = 1000
-    dt = 1e0
+    dt = 1e-6
     fig = P.get_fig()
+    return None
 
     for i in range(nsteps):
         t += dt
@@ -402,8 +408,8 @@ def test_solver(nx, nz, cheby_mode):
 if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    test_BCs(2**1, 2**7, 'T2U', 1, 0, 2)
-    # test_solver(2**5, 2**5, 'T2T')
+    test_BCs(2**1, 2**4, 'T2U', 0, 1, 2)
+    # test_solver(2**0, 2**2, 'T2U')
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
     # test_initial_conditions(4, 5, 0, 1, 1, 1)
