@@ -9,7 +9,7 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, Prandl=1, Rayleigh=2e-3, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None):
+    def __init__(self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
@@ -60,9 +60,9 @@ class RayleighBenard(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'vz': {'v': -Dz, 'vz': I},
-            'Tz': {'T': Dz, 'Tz': -I},
-            'p': {'u': Dx, 'vz': -I},  # divergence free constraint
+            'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
+            'Tz': {'T': Dz, 'Tz': -I},  # algebraic constraint for first derivative
+            'p': {'u': Dx, 'vz': I},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx},
             'v': {'p': Dz, 'vz': -nu * Dz, 'T': -I},
             'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
@@ -152,8 +152,8 @@ class RayleighBenard(GenericSpectralLinear):
             * noise_level
             * (self.Z + 1) ** 2
             * (self.Z - 1) ** 2
-            * (self.X - 2 * np.pi)
-            * self.X
+            # * (self.X - 2 * np.pi)
+            # * self.X
         )
         me[iT] += noise
 
