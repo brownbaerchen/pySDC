@@ -13,7 +13,7 @@ class RayleighBenard(GenericSpectralLinear):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
-            'T_bottom': 1,
+            'T_bottom': 2,
             'v_top': 0,
             'v_bottom': 0,
             'p_integral': 0,
@@ -61,7 +61,7 @@ class RayleighBenard(GenericSpectralLinear):
         # construct operators
         L_lhs = {
             'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
-            'Tz': {'T': Dz, 'Tz': -I},  # algebraic constraint for first derivative
+            'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
             'p': {'u': Dx, 'vz': I},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx},
             'v': {'p': Dz, 'vz': -nu * Dz, 'T': -I},
@@ -73,12 +73,11 @@ class RayleighBenard(GenericSpectralLinear):
         M_lhs = {i: {i: I} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
 
-        # TODO: distribute tau terms sensibly
         self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral')
         self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet')
         self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
-        self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
-        self.add_BC(component='T', equation='Tz', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
+        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
+        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -192,17 +191,29 @@ class RayleighBenard(GenericSpectralLinear):
         vorticity_hat[0] = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.itransform(vorticity_hat)[0]
 
-    # def compute_constraint_violation(self, u):
-    #     derivatives = self.compute_derivatives(u)
+    def compute_constraint_violation(self, u):
 
-    #     violations = {}
+        iu, iv, ivz, iT, iTz, ip = self.index(self.components)
+        idxu, idxv, idzu, idzv, idzT = 0, 1, 2, 3, 4
 
-    #     for i in [self.ivz, self.iTz]:
-    #         violations[self.index_to_name[i]] = derivatives[i] - u[i]
+        derivatives_hat = self.u_init
 
-    #     violations['divergence'] = u[self.iux] - u[self.ivz]
+        u_hat = self.transform(u)
+        derivatives_hat[idxu] = (self.U2T @ self.Dx @ u_hat[iu].flatten()).reshape(derivatives_hat[idxu].shape)
+        derivatives_hat[idxv] = (self.U2T @ self.Dx @ u_hat[iv].flatten()).reshape(derivatives_hat[idxu].shape)
+        derivatives_hat[idzu] = (self.U2T @ self.Dz @ u_hat[iu].flatten()).reshape(derivatives_hat[idxu].shape)
+        derivatives_hat[idzv] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(derivatives_hat[idxu].shape)
+        derivatives_hat[idzT] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(derivatives_hat[idxu].shape)
+        derivatives = self.itransform(derivatives_hat)
 
-    #     return violations
+        violations = {}
+
+        violations['Tz'] = derivatives[idzT] - u[iTz]
+        violations['vz'] = derivatives[idzv] - u[ivz]
+
+        violations['divergence'] = derivatives[idxu] + derivatives[idzv]
+
+        return violations
 
     def get_fig(self):  # pragma: no cover
         """

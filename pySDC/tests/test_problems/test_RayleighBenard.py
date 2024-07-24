@@ -367,19 +367,28 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
             error = abs(u1[i] - u2[i])
             if error > thresh:
                 msgs = f'{msgs} {error=:2e} in {comp}'
-        # assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
+        if plotting and msgs != '':
+            print(f'Errors too large when solving {msg}: {msgs}')
+        else:
+            assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
 
-        # violations = P.compute_constraint_violation(u2)
-        # for key in violations.keys():
-        #     assert np.allclose(violations[key], 0), f'Violation of constraints in {key} after solving {msg}!'
+        violations = P.compute_constraint_violation(u2)
+        for key in violations.keys():
+            if plotting and abs(violations[key]) > 1e-12:
+                print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
+            else:
+                assert np.allclose(violations[key], 0), f'Violation of constraints in {key} after solving {msg}!'
 
     u_static = P.u_exact(noise_level=0)
     static = P.solve_system(u_static, 1e-1)
     compute_errors(u_static, static, 'static configuration')
 
-    u0 = P.u_exact(noise_level=1e-8)
+    u0 = P.u_exact(noise_level=1e-6)
     small_dt = P.solve_system(u0, 1e-8)
     compute_errors(u0, small_dt, 'tiny step size', 1e-3)
+    P.plot(u0, quantity='Tz')
+    P.plot(small_dt, quantity='Tz')
+    plt.show()
 
     dt = 1e-2
     u0 = P.u_exact(noise_level=1e-4)
@@ -398,8 +407,8 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     if plotting:
         u = P.u_exact(noise_level=1e-3)
         t = 0
-        nsteps = 100
-        dt = 1e-2
+        nsteps = 3
+        dt = 2e-2
         fig = P.get_fig()
         P.plot(u, t, fig=fig, quantity='T')
 
@@ -408,7 +417,7 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
             u = IMEX_Euler(u, dt)
 
             P.plot(u, t, fig=fig, quantity='T')
-            plt.pause(1e-8)
+            plt.pause(1e0)
         plt.show()
 
 
@@ -416,7 +425,7 @@ if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
     # test_BCs(2**1, 2**5, 'T2U', 0, 1, 2)
-    test_solver(2**7, 2**6, 'T2U', plotting=True)
+    test_solver(2**7, 2**5, 'T2T', plotting=True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
     # test_initial_conditions(4, 5, 0, 1, 1, 1)
