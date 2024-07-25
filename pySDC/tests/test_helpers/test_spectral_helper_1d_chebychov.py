@@ -150,6 +150,27 @@ def test_integration_matrix(N, variant):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('N', [8])
+@pytest.mark.parametrize('kmin', [0, 3])
+@pytest.mark.parametrize('kmax', [8, 3])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+def test_filter(N, kmin, kmax, mode):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import ChebychovHelper
+
+    coef = np.random.random(N)
+
+    cheby = ChebychovHelper(N, mode=mode)
+    F = cheby.get_filter_matrix(kmin=kmin, kmax=kmax)
+    U2T = cheby.get_conv(cheby.mode[::-1])
+
+    filtered_coef = U2T @ F @ coef
+    assert np.allclose(filtered_coef[:kmin], 0)
+    assert np.allclose(filtered_coef[kmax:], 0)
+    assert np.allclose(filtered_coef[kmin:kmax], coef[kmin:kmax])
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('d', [1, 2, 3])
 @pytest.mark.parametrize('transform_type', ['dct', 'fft'])
@@ -458,7 +479,8 @@ if __name__ == '__main__':
     # test_transform(6, 1, 'fft')
     # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
-    test_integration_matrix(5, 'T2U')
+    # test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
     # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
     # test_integration_BC(6)
+    test_filter(12, 2, 5, 'T2U')

@@ -22,7 +22,7 @@ class RayleighBenard(GenericSpectralLinear):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': 'fft', 'N': nx}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
-        components = ['u', 'v', 'vz', 'T', 'Tz', 'p']
+        components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
         super().__init__(bases, components, comm)
 
         self.indices = {
@@ -55,16 +55,18 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dz = Dz
         self.U2T = self.get_basis_change_matrix()
 
-        kappa = (Rayleigh * Prandl) ** (-1 / 2)
-        nu = (Rayleigh / Prandl) ** (-1 / 2)
+        kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
+        nu = (Rayleigh / Prandl) ** (-1 / 2.0)
+        print(f'{nu=:.2e}, {kappa=:.2e}, {Prandl=:.2e}')
 
         # construct operators
         L_lhs = {
             'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
+            'uz': {'u': -Dz, 'uz': I},  # algebraic constraint for first derivative
             'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
-            'p': {'u': Dx, 'vz': I},  # divergence free constraint
-            'u': {'p': Dx, 'u': -nu * Dxx},
-            'v': {'p': Dz, 'vz': -nu * Dz, 'T': -I},
+            'p': {'u': -Dx, 'vz': -I},  # divergence free constraint
+            'u': {'p': Dx, 'u': -nu * Dxx, 'uz': -nu * Dz},
+            'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -I},
             'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
         }
         self.setup_L(L_lhs)
@@ -78,6 +80,8 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        self.add_BC(component='u', equation='u', axis=1, v=0, x=1, kind='Dirichlet')
+        self.add_BC(component='u', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet')
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -105,7 +109,7 @@ class RayleighBenard(GenericSpectralLinear):
         Dxx = self.U2T @ self.Dxx
 
         shape = u[0].shape
-        iu, iv, ivz, iT, iTz, ip = self.index(self.components)
+        iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
 
         kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
@@ -136,7 +140,7 @@ class RayleighBenard(GenericSpectralLinear):
         ), 'Initial conditions are only implemented for zero velocity gradient'
 
         me = self.u_init
-        iu, iv, ivz, iT, iTz, ip = self.index(self.components)
+        iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
 
         # linear temperature gradient
         for comp in ['T', 'v']:
@@ -146,23 +150,12 @@ class RayleighBenard(GenericSpectralLinear):
 
         # perturb slightly
         rng = self.xp.random.default_rng(seed=99)
-        noise = (
-            rng.random(me[self.iT].shape)
-            * noise_level
-            * (self.Z + 1) ** 2
-            * (self.Z - 1) ** 2
-            # * (self.X - 2 * np.pi)
-            # * self.X
-        )
-        me[iT] += noise
+        noise = self.u_init
+        noise[iT].real = rng.normal(size=me[self.iT].shape)
 
-        u_hat = self.transform(
-            me,
-            axes=(
-                0,
-                1,
-            ),
-        )
+        me[iT] += noise[iT] * (self.Z - 1) * (self.Z + 1) * noise_level
+
+        u_hat = self.transform(me)
 
         S = self.get_integration_matrix(axes=(1,))
         u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
@@ -170,14 +163,12 @@ class RayleighBenard(GenericSpectralLinear):
         u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
         u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
 
-        me[...] = self.itransform(
-            u_hat,
-            axes=(
-                0,
-                1,
-            ),
-        )
+        me[...] = self.itransform(u_hat)
         me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
+
+        violations = self.compute_constraint_violation(me)
+        for k, v in violations.items():
+            assert self.xp.allclose(v, 0), f'Initial conditions violate Constraint in {k}!'
 
         return me
 
@@ -193,7 +184,7 @@ class RayleighBenard(GenericSpectralLinear):
 
     def compute_constraint_violation(self, u):
 
-        iu, iv, ivz, iT, iTz, ip = self.index(self.components)
+        iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
         idxu, idxv, idzu, idzv, idzT = 0, 1, 2, 3, 4
 
         derivatives_hat = self.u_init
@@ -210,6 +201,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         violations['Tz'] = derivatives[idzT] - u[iTz]
         violations['vz'] = derivatives[idzv] - u[ivz]
+        violations['uz'] = derivatives[idzu] - u[iuz]
 
         violations['divergence'] = derivatives[idxu] + derivatives[idzv]
 

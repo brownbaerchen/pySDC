@@ -461,8 +461,9 @@ if __name__ == '__main__':
         # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(0, 8, 1, kind='integral')
+        # test_tau_method(0, 8, 1, kind='integral')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
+        test_filter(6, 6, (0,))
     else:
         raise NotImplementedError
     print('done')

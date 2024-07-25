@@ -76,9 +76,9 @@ class GenericSpectralLinear(Problem):
         sol = self.u_init
 
         rhs_hat = self.spectral.transform(rhs)
-        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
-
+        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs = self.spectral.itransform(rhs_hat)
+
         rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.spectral.transform(rhs)
 

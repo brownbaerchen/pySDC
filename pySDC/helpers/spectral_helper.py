@@ -23,6 +23,9 @@ class SpectralHelper1D:
     def get_integration_matrix(self):
         raise NotImplementedError()
 
+    def get_wavenumbers(self):
+        raise NotImplementedError
+
     def get_empty_operator_matrix(self, S, O):
         """
         Return a matrix of operators to be filled with the connections between the solution components.
@@ -41,6 +44,17 @@ class SpectralHelper1D:
 
     def get_BC(self, kind, **kwargs):
         raise NotImplementedError(f'No boundary conditions of {kind=!r} implemented!')
+
+    def get_filter_matrix(self, kmin=0, kmax=None):
+        k = abs(self.get_wavenumbers())
+
+        kmax = max(k) if kmax is None else kmax
+
+        mask = self.xp.logical_or(k >= kmax, k < kmin)
+
+        F = self.get_Id().tolil()
+        F[:, mask] = 0
+        return F.tocsc()
 
 
 class ChebychovHelper(SpectralHelper1D):
@@ -91,6 +105,9 @@ class ChebychovHelper(SpectralHelper1D):
             return self.get_conv('T2U') @ self.get_T2T_integration_matrix(lbnd=lbnd)
         else:
             raise NotImplementedError(f'{self.mode=!r} not implemented')
+
+    def get_wavenumbers(self):
+        return self.xp.arange(self.N)
 
     def get_conv(self, name, N=None):
         '''
@@ -400,6 +417,10 @@ class SpectralHelper:
     def ndim(self):
         return len(self.axes)
 
+    @property
+    def ncomponents(self):
+        return len(self.components)
+
     def add_axis(self, base, *args, **kwargs):
 
         if base.lower() in ['chebychov', 'chebychev', 'cheby']:
@@ -500,6 +521,7 @@ class SpectralHelper:
                 _rhs_hat = rhs
             else:
                 _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
+
             slices = (
                 [slice(0, self.init[0][i + 1]) for i in range(axis)]
                 + [-1]

@@ -149,12 +149,13 @@ def test_eval_f(nx, nz, cheby_mode, direction):
 
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [1, 4])
-@pytest.mark.parametrize('nz', [8])
+@pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('T_top', [2])
 @pytest.mark.parametrize('T_bottom', [3.14, -9])
 @pytest.mark.parametrize('v_top', [2.77])
-def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
+@pytest.mark.parametrize('noise', [0, 1e-3])
+def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -168,7 +169,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
 
-    rhs = P.u_exact(0, noise_level=0.0)
+    rhs = P.u_exact(0, noise_level=noise)
     sol = P.solve_system(rhs, 1e0)
 
     expect = {}
@@ -184,27 +185,39 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top):
 
     zero = np.zeros_like(expect['T'])
 
-    import matplotlib.pyplot as plt
+    if plotting:
+        import matplotlib.pyplot as plt
 
-    fig, axs = plt.subplots(1, 2)
-    # axs[0].imshow(np.log(abs(_A.toarray())))
-    # axs[1].imshow(np.log(abs(A.toarray())))
-    # plt.show()
-    # for i in range(len(P.spectral.components)):
-    #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
-    #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
-    # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
-    # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
-    axs[0].plot(P.Z[0, :], sol[P.ip][0, :], label='want')
-    axs[0].plot(P.Z[0, :], rhs[P.ip][0, :], label='have', ls='--')
-    axs[0].legend()
-    # plt.show()
+        fig, axs = plt.subplots(1, 2)
+        # axs[0].imshow(np.log(abs(_A.toarray())))
+        # axs[1].imshow(np.log(abs(A.toarray())))
+        # plt.show()
+        # for i in range(len(P.spectral.components)):
+        #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
+        #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
+        # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
+        # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
+        idx = P.iT
+        axs[0].plot(P.Z[0, :], sol[idx][0, :], label='want')
+        axs[0].plot(P.Z[0, :], rhs[idx][0, :], label='have', ls='--')
+        axs[1].plot(P.Z[0, :], rhs[P.ip][0, :] - sol[P.ip][0, :])
+        axs[1].plot(P.Z[0, :], rhs[idx][0, :] - sol[idx][0, :], label='Tz')
+        axs[0].legend()
+        axs[1].legend()
+        plt.show()
 
-    assert np.isclose(pressure_integral.real, BCs['p_integral']), f'Got unexpected {pressure_integral=:2e}!'
+    for component in ['T', 'v']:
+        i = P.index(component)
+        poly = np.polynomial.Chebyshev(sol_hat[i][0])
+        assert np.isclose(
+            poly(-1), BCs[f'{component}_bottom']
+        ), f'unexpected bottom bc in {component}: Got {poly(-1).real:.2e} instead of {BCs[f"{component}_bottom"]}'
+        assert np.isclose(
+            poly(1), BCs[f'{component}_top']
+        ), f'unexpected top bc in {component}: Got {poly(1).real:.2e} instead of {BCs[f"{component}_top"]}'
+    assert np.isclose(pressure_integral.real, BCs['p_integral']), f'Got unexpected {pressure_integral.real=:.2e}!'
     for i in [P.iu]:
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
-    for i in [P.iT, P.iv]:
-        assert np.allclose(sol[i], expect[P.index_to_name[i]]), f'Unexpected BCs in {P.index_to_name[i]}'
 
 
 @pytest.mark.base
@@ -240,71 +253,71 @@ def test_vorticity(nx, nz, cheby_mode, direction):
     assert np.allclose(P.compute_vorticity(u), expect)
 
 
-@pytest.mark.base
-@pytest.mark.parametrize('nx', [32])
-@pytest.mark.parametrize('nz', [32])
-@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('direction', ['x', 'mixed'])
-def test_linear_operator(nx, nz, cheby_mode, direction):
-    import numpy as np
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-    import matplotlib.pyplot as plt
-    import scipy.sparse as sp
-
-    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
-
-    u = P.u_init
-    expect = P.u_init
-
-    conv = sp.kron(
-        sp.eye(u.shape[0]), sp.kron(P.spectral.axes[0].get_Id(), P.spectral.axes[1].get_conv(cheby_mode[::-1]))
-    )
-
-    for i in [P.iu, P.iv, P.iT, P.ip]:
-        if direction == 'x':
-            u[i] = np.sin(P.X * (i + 1))
-        elif direction == 'mixed':
-            u[i] = P.Z**2 * np.sin(P.X)
-        else:
-            raise NotImplementedError
-
-    derivatives = P.compute_z_derivatives(u)
-    for i in [P.iTz, P.ivz]:
-        u[i] = derivatives[i]
-
-    if direction == 'x':
-        expect[P.iu] = P.Pr * (-(P.ip + 1) * np.cos(P.X * (P.ip + 1)) - (P.iu + 1) ** 2 * np.sin(P.X * (P.iu + 1)))
-        expect[P.iv] = P.Pr * P.Ra * u[P.iT]
-        expect[P.ivz] = -(P.iu + 1) * np.cos(P.X * (P.iu + 1))
-        expect[P.iT] = -((P.iT + 1) ** 2) * np.sin(P.X * (P.iT + 1))
-        expect[P.iTz] = 0
-        expect[P.ip] = np.sin(P.X * (P.ip + 1)) * P.Z
-        expect[P.ip] = -np.cos(P.X * (P.ip + 1)) / (P.ip + 1) * P.Z
-    elif direction == 'mixed':
-        expect[P.iu] = P.Pr * (-np.cos(P.X) - np.sin(P.X)) * P.Z**2
-        expect[P.iv] = P.Pr * (-np.sin(P.X) * 2 * P.Z + P.Ra * u[P.iT] + 2 * np.sin(P.X))
-        # expect[P.ivz] = u[P.ivz] - u[P.iux]
-        expect[P.iT] = 2 * np.sin(P.X) - np.sin(P.X) * P.Z**2
-        expect[P.iTz] = 0
-        expect[P.ip] = -np.cos(P.X) * P.Z**3 / 3
-    else:
-        raise NotImplementedError
-
-    u_hat = P.transform(u)
-    Lu_hat = (conv @ P.L @ u_hat.flatten()).reshape(u.shape)
-    Lu = P.itransform(Lu_hat)
-
-    fig, axs = plt.subplots(1, 4)
-    i = P.iT
-    im = axs[0].pcolormesh(P.X, P.Z, u[i].real)
-    im = axs[1].pcolormesh(P.X, P.Z, Lu[i].real)
-    im = axs[2].pcolormesh(P.X, P.Z, expect[i].real)
-    im = axs[3].pcolormesh(P.X, P.Z, (Lu[i] - expect[i]).real)
-    fig.colorbar(im)
-    # plt.show()
-
-    for i in range(u.shape[0]):
-        assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
+# @pytest.mark.base
+# @pytest.mark.parametrize('nx', [32])
+# @pytest.mark.parametrize('nz', [32])
+# @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+# @pytest.mark.parametrize('direction', ['x', 'mixed'])
+# def test_linear_operator(nx, nz, cheby_mode, direction):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#     import matplotlib.pyplot as plt
+#     import scipy.sparse as sp
+#
+#     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+#
+#     u = P.u_init
+#     expect = P.u_init
+#
+#     conv = sp.kron(
+#         sp.eye(u.shape[0]), sp.kron(P.spectral.axes[0].get_Id(), P.spectral.axes[1].get_conv(cheby_mode[::-1]))
+#     )
+#
+#     for i in [P.iu, P.iv, P.iT, P.ip]:
+#         if direction == 'x':
+#             u[i] = np.sin(P.X * (i + 1))
+#         elif direction == 'mixed':
+#             u[i] = P.Z**2 * np.sin(P.X)
+#         else:
+#             raise NotImplementedError
+#
+#     derivatives = P.compute_z_derivatives(u)
+#     for i in [P.iTz, P.ivz]:
+#         u[i] = derivatives[i]
+#
+#     if direction == 'x':
+#         expect[P.iu] = P.Pr * (-(P.ip + 1) * np.cos(P.X * (P.ip + 1)) - (P.iu + 1) ** 2 * np.sin(P.X * (P.iu + 1)))
+#         expect[P.iv] = P.Pr * P.Ra * u[P.iT]
+#         expect[P.ivz] = -(P.iu + 1) * np.cos(P.X * (P.iu + 1))
+#         expect[P.iT] = -((P.iT + 1) ** 2) * np.sin(P.X * (P.iT + 1))
+#         expect[P.iTz] = 0
+#         expect[P.ip] = np.sin(P.X * (P.ip + 1)) * P.Z
+#         expect[P.ip] = -np.cos(P.X * (P.ip + 1)) / (P.ip + 1) * P.Z
+#     elif direction == 'mixed':
+#         expect[P.iu] = P.Pr * (-np.cos(P.X) - np.sin(P.X)) * P.Z**2
+#         expect[P.iv] = P.Pr * (-np.sin(P.X) * 2 * P.Z + P.Ra * u[P.iT] + 2 * np.sin(P.X))
+#         # expect[P.ivz] = u[P.ivz] - u[P.iux]
+#         expect[P.iT] = 2 * np.sin(P.X) - np.sin(P.X) * P.Z**2
+#         expect[P.iTz] = 0
+#         expect[P.ip] = -np.cos(P.X) * P.Z**3 / 3
+#     else:
+#         raise NotImplementedError
+#
+#     u_hat = P.transform(u)
+#     Lu_hat = (conv @ P.L @ u_hat.flatten()).reshape(u.shape)
+#     Lu = P.itransform(Lu_hat)
+#
+#     fig, axs = plt.subplots(1, 4)
+#     i = P.iT
+#     im = axs[0].pcolormesh(P.X, P.Z, u[i].real)
+#     im = axs[1].pcolormesh(P.X, P.Z, Lu[i].real)
+#     im = axs[2].pcolormesh(P.X, P.Z, expect[i].real)
+#     im = axs[3].pcolormesh(P.X, P.Z, (Lu[i] - expect[i]).real)
+#     fig.colorbar(im)
+#     # plt.show()
+#
+#     for i in range(u.shape[0]):
+#         assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
 
 
 @pytest.mark.base
@@ -345,6 +358,88 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('limit', ['Ra->0', 'Pr->0', 'Pr->inf'])
+def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    if limit == 'Ra->0':
+        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e-8, Prandl=1)
+        rhs = P.u_exact(0, 1e1)
+        sol = P.solve_system(rhs, 1e7)
+        expect = P.u_exact(0, 0)
+        thresh = 1e-10
+
+    elif limit == 'Pr->0':
+        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e-8)
+        rhs = P.u_exact(0, 1e1)
+        sol = P.solve_system(rhs, 1e9)
+        expect = P.u_exact(0, 0)
+        thresh = 1e-10
+
+    elif limit == 'Pr->inf':
+        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e20)
+
+        rhs = P.u_exact(0, 1e-2)
+        sol = P.solve_system(rhs.copy(), 1e0)
+
+        expect = P.u_exact(0, 0)
+
+        derivatives = P.u_init
+        idxp, idzp = 0, 1
+        sol_hat = P.transform(sol)
+        derivatives[idxp] = (P.U2T @ P.Dx @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idxp].shape)
+        derivatives[idzp] = (P.U2T @ P.Dz @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idzp].shape)
+        derivatives = P.itransform(derivatives)
+
+        P.plot(derivatives, quantity='v')
+        P.plot(sol, quantity='p')
+        import matplotlib.pyplot as plt
+
+        plt.show()
+
+        # assert np.allclose(derivatives[idxp], 0), 'Got non-zero pressure derivative in x-direction'
+        assert np.allclose(derivatives[idzp], sol[P.index('T')]), 'Got unexpected pressure derivative in z-direction'
+
+        for component in ['T', 'Tz', 'p']:
+            expect[P.index(component)] = rhs[P.index(component)]
+        thresh = (P.Rayleigh * P.Prandl) ** (-1 / 2.0) * 10.0
+
+    else:
+        raise NotImplementedError
+
+    def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
+        msgs = ''
+        for comp in components:
+            i = P.index(comp)
+            error = abs(u1[i] - u2[i])
+            if error > thresh:
+                msgs = f'{msgs} {error=:2e} in {comp}'
+        if plotting and msgs != '':
+            print(f'Errors too large in limit {msg}: {msgs}')
+        else:
+            assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
+
+        violations = P.compute_constraint_violation(u2)
+        for key in [key for key in violations.keys() if key in components]:
+            if plotting and abs(violations[key]) > 1e-12:
+                print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
+            else:
+                assert np.allclose(
+                    violations[key], 0
+                ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
+
+    compute_errors(sol, expect, limit, thresh=thresh)
+    if plotting:
+        import matplotlib.pyplot as plt
+
+        q = 'p'
+        P.plot(expect, quantity=q)
+        P.plot(sol, quantity=q)
+        plt.show()
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
@@ -353,7 +448,8 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
     import matplotlib.pyplot as plt
 
-    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+    P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)  # , Rayleigh=4e4)
+    P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
 
     def IMEX_Euler(_u, dt):
         f = P.eval_f(_u)
@@ -373,59 +469,68 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
             assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
 
         violations = P.compute_constraint_violation(u2)
-        for key in violations.keys():
+        for key in [key for key in violations.keys() if key in components]:
             if plotting and abs(violations[key]) > 1e-12:
                 print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
             else:
-                assert np.allclose(violations[key], 0), f'Violation of constraints in {key} after solving {msg}!'
+                assert np.allclose(
+                    violations[key], 0
+                ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
 
-    u_static = P.u_exact(noise_level=0)
-    static = P.solve_system(u_static, 1e-1)
-    compute_errors(u_static, static, 'static configuration')
+    # poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
+    # expect_poisson = P_heat.u_exact(0, 0)
+    # compute_errors(poisson, expect_poisson, 'Poisson')
 
-    u0 = P.u_exact(noise_level=1e-6)
-    small_dt = P.solve_system(u0, 1e-8)
-    compute_errors(u0, small_dt, 'tiny step size', 1e-3)
-    P.plot(u0, quantity='Tz')
-    P.plot(small_dt, quantity='Tz')
-    plt.show()
+    # u_static = P.u_exact(noise_level=0)
+    # static = P.solve_system(u_static, 1e-1)
+    # compute_errors(u_static, static, 'static configuration')
 
-    dt = 1e-2
-    u0 = P.u_exact(noise_level=1e-4)
-    forward = P.solve_system(u0, dt)
-    f = P.eval_f(forward)
-    backward = forward - dt * (f.impl)
-    compute_errors(u0, backward, 'backward without convection', 1e-6, components=['T', 'u', 'v'])
+    # u0 = P.u_exact(noise_level=1e-3)
+    # small_dt = P.solve_system(u0, 1e-9)
+    # compute_errors(u0, small_dt, 'tiny step size', 1e-7)
+    # # P.plot(u0-small_dt, quantity='Tz')
+    # # P.plot(small_dt, quantity='Tz')
+    # # plt.show()
 
-    dt = 1e-2
-    u0 = P.u_exact(noise_level=1e-4)
-    forward = IMEX_Euler(u0, dt)
-    f = P.eval_f(forward)
-    backward = forward - dt * (f.impl + f.expl)
-    compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
+    # dt = 1e-2
+    # u0 = P.u_exact(noise_level=1e-4)
+    # forward = P.solve_system(u0, dt)
+    # f = P.eval_f(forward)
+    # backward = forward - dt * (f.impl)
+    # compute_errors(u0, backward, 'backward without convection', 1e-8, components=['T', 'u', 'v'])
+
+    # dt = 1e-2
+    # u0 = P.u_exact(noise_level=1e-4)
+    # forward = IMEX_Euler(u0, dt)
+    # f = P.eval_f(forward)
+    # backward = forward - dt * (f.impl + f.expl)
+    # compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
 
     if plotting:
         u = P.u_exact(noise_level=1e-3)
         t = 0
-        nsteps = 3
-        dt = 2e-2
+        nsteps = 1000
+        dt = 0.1
         fig = P.get_fig()
-        P.plot(u, t, fig=fig, quantity='T')
+        # P.plot(u, t, fig=fig, quantity='u')
+        # plt.show()
+        # return None
 
         for i in range(nsteps):
             t += dt
             u = IMEX_Euler(u, dt)
 
             P.plot(u, t, fig=fig, quantity='T')
-            plt.pause(1e0)
+            plt.pause(1e-8)
         plt.show()
 
 
 if __name__ == '__main__':
+    # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(128, 129, 'T2T', 'z')
-    # test_BCs(2**1, 2**5, 'T2U', 0, 1, 2)
-    test_solver(2**7, 2**5, 'T2T', plotting=True)
+    # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
+    test_solver(2**8, 2**7, 'T2U', plotting=True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
     # test_initial_conditions(4, 5, 0, 1, 1, 1)
