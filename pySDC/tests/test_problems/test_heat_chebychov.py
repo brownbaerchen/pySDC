@@ -176,62 +176,10 @@ def test_SDC(plotting=False):
     assert np.allclose(uend[0], expect)
 
 
-@pytest.mark.base
-@pytest.mark.parametrize('nx', [4, 8])
-@pytest.mark.parametrize('nz', [4, 8])
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
-def test_heat2d(mode, nx, nz, plot=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2d
-
-    P = Heat2d(nx=nx, nz=nz, nu=1e-2, a=-1, b=2, bc_type='dirichlet', mode='T2U')
-
-    u0 = P.u_exact()
-
-    u0_hat = P.transform(u0)
-    assert np.allclose(u0, P.itransform(u0_hat))
-
-    dt = 3.0e-1
-    un = P.solve_system(u0, dt)
-
-    # un[1] = P._compute_derivative(un[0])
-    # u02 = un - dt * P.eval_f(un)
-    # err = u0 - u02
-    # print(np.max(abs(err)))
-
-    # solve something akin to a Poisson problem
-    dtP = 1e9
-    uP = P.solve_system(u0 * 0, dtP)
-    uP_expect = (P.b - P.a) / 2 * P.Z + (P.b + P.a) / 2.0
-
-    if plot:
-
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(1, 4, figsize=(12, 3))
-        args = {'vmin': P.a * 1.2, 'vmax': P.b * 1.2}
-        axs[0].pcolormesh(P.X, P.Z, u0[0], **args)
-        axs[1].pcolormesh(P.X, P.Z, un[0], **args)
-        # axs[0].pcolormesh(P.X, P.Z, u02[0], **args)
-
-        idx = nx // 3
-        axs[2].plot(P.Z[idx], u0[0][idx])
-        axs[2].plot(P.Z[idx], un[0][idx])
-        axs[2].set_title('z-direction')
-
-        idx = nz // 2
-        axs[3].plot(P.X[:, idx], u0[0][:, idx])
-        axs[3].plot(P.X[:, idx], un[0][:, idx])
-        axs[3].set_title('x-direction')
-        plt.show()
-
-    assert np.allclose(uP[0], uP_expect, atol=1e3 / dtP), 'Got unexpected solution of Poisson problem!'
-
-
 if __name__ == '__main__':
     # test_SDC(True)
     # test_heat1d_chebychov('T2U', False, plot=True)
     # test_heat2d('T2T', 2**4, 2**5, True)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(1, -2, 5, 1, 2, 'chebychov', 'chebychov', 2**6, 2**6)
+    test_heat2d_chebychov(1, 1, 5, 1, 2, 'chebychov', 'chebychov', 2**2, 2**1)
