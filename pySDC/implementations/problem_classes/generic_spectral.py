@@ -15,7 +15,8 @@ class GenericSpectralLinear(Problem):
         bases,
         components,
         comm=None,
-        preconditioning='D2T',
+        right_preconditioning='D2T',
+        left_preconditioner=True,
         solver_type='direct',
         solver_args=None,
         *args,
@@ -36,7 +37,7 @@ class GenericSpectralLinear(Problem):
 
         self.work_counters[solver_type] = WorkCounter()
 
-        self.setup_right_preconditioner(preconditioning)
+        self.setup_preconditioner(right_preconditioning, left_preconditioner)
 
     def __getattr__(self, name):
         return getattr(self.spectral, name)
@@ -82,10 +83,25 @@ class GenericSpectralLinear(Problem):
         '''
         self.M = self._setup_operator(LHS)
 
-    def setup_right_preconditioner(self, preconditioning='D2T'):
-        basis_conversion_matrix = self.spectral.get_basis_change_matrix(direction=preconditioning)
+    def setup_preconditioner(self, right_preconditioning='D2T', left_preconditioner=True):
+        Id = self.get_Id()
+        Pl_lhs = {comp: {comp: Id} for comp in self.components}
+        self.Pl = self._setup_operator(Pl_lhs)
+
+        if left_preconditioner:
+            # reverse Kronecker product
+            N = self.xp.prod(self.init[0][1:])
+            sp = self.spectral.sparse_lib
+
+            R = self.Pl.tolil() * 0
+            for j in range(self.ncomponents):
+                for i in range(N):
+                    R[i * self.ncomponents + j, j * N + i] = 1.0
+            self.Pl = R.tocsc()
+
+        basis_conversion_matrix = self.spectral.get_basis_change_matrix(direction=right_preconditioning)
         Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}
-        self.Pr = self._setup_operator(Pr_lhs)
+        self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
     def solve_system(self, rhs, dt, u0=None, **kwargs):
         """
@@ -104,10 +120,10 @@ class GenericSpectralLinear(Problem):
         rhs = self.spectral.itransform(rhs_hat)
 
         rhs = self.spectral.put_BCs_in_rhs(rhs) / dt
-        rhs_hat = self.spectral.transform(rhs).flatten()
+        rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
 
         A = self.M + dt * self.L
-        A = self.spectral.put_BCs_in_matrix(A) / dt @ self.Pr
+        A = self.Pl @ self.spectral.put_BCs_in_matrix(A) / dt @ self.Pr
 
         if self.solver_type == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)
