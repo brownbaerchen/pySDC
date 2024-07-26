@@ -79,11 +79,11 @@ class GenericSpectralLinear(Problem):
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs = self.spectral.itransform(rhs_hat)
 
-        rhs = self.spectral.put_BCs_in_rhs(rhs)
+        rhs = self.spectral.put_BCs_in_rhs(rhs) / dt
         rhs_hat = self.spectral.transform(rhs)
 
         A = self.M + dt * self.L
-        A = self.spectral.put_BCs_in_matrix(A)
+        A = self.spectral.put_BCs_in_matrix(A) / dt
 
         sol_hat = (self.spectral.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
