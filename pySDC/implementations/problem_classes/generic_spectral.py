@@ -1,4 +1,4 @@
-from pySDC.core.problem import Problem
+from pySDC.core.problem import Problem, WorkCounter
 from pySDC.helpers.spectral_helper import SpectralHelper
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
@@ -10,7 +10,7 @@ class GenericSpectralLinear(Problem):
 
     """
 
-    def __init__(self, bases, components, comm=None, *args, **kwargs):
+    def __init__(self, bases, components, comm=None, solver_type='direct', solver_args=None, *args, **kwargs):
         self.spectral = SpectralHelper(comm=comm)
 
         for base in bases:
@@ -20,6 +20,11 @@ class GenericSpectralLinear(Problem):
         self.spectral.setup_fft()
 
         super().__init__(init=self.spectral.init)
+
+        self.solver_type = solver_type
+        self.solver_args = {} if solver_args is None else solver_args
+
+        self.work_counters[solver_type] = WorkCounter()
 
     def __getattr__(self, name):
         return getattr(self.spectral, name)
@@ -65,7 +70,7 @@ class GenericSpectralLinear(Problem):
         '''
         self.M = self._setup_operator(LHS)
 
-    def solve_system(self, rhs, dt, *args, **kwargs):
+    def solve_system(self, rhs, dt, u0=None, **kwargs):
         """
         Solve (M + dt*L)u=rhs. This requires that you setup the operators before using the functions ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``. Note that the mass matrix need not be invertible, as long as (M + dt*L) is. This allows to solve some differential algebraic equations.
 
@@ -73,6 +78,8 @@ class GenericSpectralLinear(Problem):
 
         We use a tau method to enforce boundary conditions in Chebychov methods. This means we replace a line in the system matrix by the polynomials evaluated at a boundary and put the value we want there in the rhs at the respective position. Since we have to do that in spectral space along only the axis we want to apply the boundary condition to, we transform back to real space after applying the mass matrix, and then transform only along one axis, apply the boundary conditions and transform back. Then we transform along all dimensions again. If you desire speed, you may wish to overload this function with something less generic that avoids a few transformations.
         """
+        sp = self.spectral.sparse_lib
+
         sol = self.u_init
 
         rhs_hat = self.spectral.transform(rhs)
@@ -85,7 +92,23 @@ class GenericSpectralLinear(Problem):
         A = self.M + dt * self.L
         A = self.spectral.put_BCs_in_matrix(A) / dt
 
-        sol_hat = (self.spectral.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
+        if self.solver_type == 'direct':
+            sol_hat = sp.linalg.spsolve(A, rhs_hat.flatten())
+        elif self.solver_type == 'gmres':
+            sol_hat, _ = sp.linalg.gmres(
+                A,
+                rhs_hat.flatten(),
+                x0=u0,
+                **self.solver_args,
+                callback=self.work_counters[self.solver_type],
+                callback_type='legacy',
+            )
+        elif self.solver_type == 'cg':
+            sol_hat, _ = sp.linalg.cg(
+                A, rhs_hat.flatten(), x0=u0, **self.solver_args, callback=self.work_counters[self.solver_type]
+            )
+        else:
+            raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')
 
-        sol[:] = self.spectral.itransform(sol_hat)
+        sol[:] = self.spectral.itransform(sol_hat.reshape(rhs_hat.shape))
         return sol
