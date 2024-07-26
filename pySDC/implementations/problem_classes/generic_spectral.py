@@ -10,7 +10,17 @@ class GenericSpectralLinear(Problem):
 
     """
 
-    def __init__(self, bases, components, comm=None, solver_type='direct', solver_args=None, *args, **kwargs):
+    def __init__(
+        self,
+        bases,
+        components,
+        comm=None,
+        preconditioning='D2T',
+        solver_type='direct',
+        solver_args=None,
+        *args,
+        **kwargs,
+    ):
         self.spectral = SpectralHelper(comm=comm)
 
         for base in bases:
@@ -25,6 +35,8 @@ class GenericSpectralLinear(Problem):
         self.solver_args = {} if solver_args is None else solver_args
 
         self.work_counters[solver_type] = WorkCounter()
+
+        self.setup_right_preconditioner(preconditioning)
 
     def __getattr__(self, name):
         return getattr(self.spectral, name)
@@ -70,6 +82,11 @@ class GenericSpectralLinear(Problem):
         '''
         self.M = self._setup_operator(LHS)
 
+    def setup_right_preconditioner(self, preconditioning='D2T'):
+        basis_conversion_matrix = self.spectral.get_basis_change_matrix(direction=preconditioning)
+        Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}
+        self.Pr = self._setup_operator(Pr_lhs)
+
     def solve_system(self, rhs, dt, u0=None, **kwargs):
         """
         Solve (M + dt*L)u=rhs. This requires that you setup the operators before using the functions ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``. Note that the mass matrix need not be invertible, as long as (M + dt*L) is. This allows to solve some differential algebraic equations.
@@ -87,17 +104,17 @@ class GenericSpectralLinear(Problem):
         rhs = self.spectral.itransform(rhs_hat)
 
         rhs = self.spectral.put_BCs_in_rhs(rhs) / dt
-        rhs_hat = self.spectral.transform(rhs)
+        rhs_hat = self.spectral.transform(rhs).flatten()
 
         A = self.M + dt * self.L
-        A = self.spectral.put_BCs_in_matrix(A) / dt
+        A = self.spectral.put_BCs_in_matrix(A) / dt @ self.Pr
 
         if self.solver_type == 'direct':
-            sol_hat = sp.linalg.spsolve(A, rhs_hat.flatten())
+            sol_hat = sp.linalg.spsolve(A, rhs_hat)
         elif self.solver_type == 'gmres':
             sol_hat, _ = sp.linalg.gmres(
                 A,
-                rhs_hat.flatten(),
+                rhs_hat,
                 x0=u0,
                 **self.solver_args,
                 callback=self.work_counters[self.solver_type],
@@ -105,10 +122,11 @@ class GenericSpectralLinear(Problem):
             )
         elif self.solver_type == 'cg':
             sol_hat, _ = sp.linalg.cg(
-                A, rhs_hat.flatten(), x0=u0, **self.solver_args, callback=self.work_counters[self.solver_type]
+                A, rhs_hat, x0=u0, **self.solver_args, callback=self.work_counters[self.solver_type]
             )
         else:
             raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')
 
-        sol[:] = self.spectral.itransform(sol_hat.reshape(rhs_hat.shape))
+        sol_hat = self.Pr @ sol_hat
+        sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape))
         return sol
