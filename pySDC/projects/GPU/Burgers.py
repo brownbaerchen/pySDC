@@ -2,15 +2,16 @@ from mpi4py import MPI
 import numpy as np
 from pySDC.implementations.hooks.log_solution import LogToFile
 
-# class LogVorticity(LogToFile):
-
 
 def run_Burgers():
+    from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
     from pySDC.implementations.problem_classes.Burgers import Burgers2D
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
-    # from pySDC.implementations.
+    imex_1st_order.compute_residual = compute_residual_DAE
+
     from pySDC.implementations.hooks.live_plotting import PlotPostStep
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
@@ -25,27 +26,30 @@ def run_Burgers():
     LogGrid.file_name = f'Burgers-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
 
+    convergence_controllers = {Adaptivity: {'e_tol': 1e-2}}
+
     level_params = {}
     level_params['dt'] = 1e-2
+    # level_params['e_tol'] = 1e-3
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'MIN-SR-S'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
-        'nx': 2**8,
-        'nz': 2**8,
+        'nx': 2**7,
+        'nz': 2**7,
         'epsilon': 1e-1,
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 4
 
     controller_params = {}
-    controller_params['logger_level'] = 15
+    controller_params['logger_level'] = 15 if comm.rank == 0 else 40
     controller_params['hook_class'] = [LogToFile, LogGrid]
     controller_params['mssdc_jac'] = False
 
@@ -56,6 +60,7 @@ def run_Burgers():
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
+    description['convergence_controllers'] = convergence_controllers
 
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 

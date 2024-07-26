@@ -81,17 +81,27 @@ class GenericSpectralLinear(Problem):
         '''
         Setup mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
         '''
+        self.diff_index = list(LHS.keys())
+        self.diff_mask = [me in self.diff_index for me in self.components]
         self.M = self._setup_operator(LHS)
 
     def setup_preconditioner(self, right_preconditioning='D2T', left_preconditioner=True):
-        Id = self.get_Id()
+        """
+        Get left and right precondioners. A right preconditioner of D2T will result in Dirichlet recombination.
+
+        Args:
+            right_preconditioning (str): Basis conversion for right precondioner
+            left_preconditioner (bool): If True, it will interleave the variables and reverse the Kronecker product
+        """
+        sp = self.spectral.sparse_lib
+        N = self.xp.prod(self.init[0][1:])
+
+        Id = sp.eye(N)
         Pl_lhs = {comp: {comp: Id} for comp in self.components}
         self.Pl = self._setup_operator(Pl_lhs)
 
         if left_preconditioner:
             # reverse Kronecker product
-            N = self.xp.prod(self.init[0][1:])
-            sp = self.spectral.sparse_lib
 
             R = self.Pl.tolil() * 0
             for j in range(self.ncomponents):
@@ -103,7 +113,7 @@ class GenericSpectralLinear(Problem):
         Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}
         self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
-    def solve_system(self, rhs, dt, u0=None, **kwargs):
+    def solve_system(self, rhs, dt, u0=None, *args, **kwargs):
         """
         Solve (M + dt*L)u=rhs. This requires that you setup the operators before using the functions ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``. Note that the mass matrix need not be invertible, as long as (M + dt*L) is. This allows to solve some differential algebraic equations.
 
@@ -124,6 +134,14 @@ class GenericSpectralLinear(Problem):
 
         A = self.M + dt * self.L
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) / dt @ self.Pr
+
+        # print(rhs_hat.reshape(sol.shape))
+
+        # import matplotlib.pyplot as plt
+        # import numpy as np
+        # im = plt.imshow((A/abs(A)).real)
+        # plt.colorbar(im)
+        # plt.show()
 
         if self.solver_type == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)
@@ -146,3 +164,58 @@ class GenericSpectralLinear(Problem):
         sol_hat = self.Pr @ sol_hat
         sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape))
         return sol
+
+
+def compute_residual_DAE(self, stage=''):
+    """
+    Computation of the residual using the collocation matrix Q
+
+    Args:
+        stage (str): The current stage of the step the level belongs to
+    """
+
+    # get current level and problem description
+    L = self.level
+
+    # Check if we want to skip the residual computation to gain performance
+    # Keep in mind that skipping any residual computation is likely to give incorrect outputs of the residual!
+    if stage in self.params.skip_residual_computation:
+        L.status.residual = 0.0 if L.status.residual is None else L.status.residual
+        return None
+
+    # check if there are new values (e.g. from a sweep)
+    # assert L.status.updated
+
+    # compute the residual for each node
+
+    # build QF(u)
+    res_norm = []
+    res = self.integrate()
+    mask = L.prob.diff_mask
+    for m in range(self.coll.num_nodes):
+        res[m][mask] += L.u[0][mask] - L.u[m + 1][mask]
+        # add tau if associated
+        if L.tau[m] is not None:
+            res[m] += L.tau[m]
+        # use abs function from data type here
+        res_norm.append(abs(res[m]))
+
+    # find maximal residual over the nodes
+    if L.params.residual_type == 'full_abs':
+        L.status.residual = max(res_norm)
+    elif L.params.residual_type == 'last_abs':
+        L.status.residual = res_norm[-1]
+    elif L.params.residual_type == 'full_rel':
+        L.status.residual = max(res_norm) / abs(L.u[0])
+    elif L.params.residual_type == 'last_rel':
+        L.status.residual = res_norm[-1] / abs(L.u[0])
+    else:
+        raise ParameterError(
+            f'residual_type = {L.params.residual_type} not implemented, choose '
+            f'full_abs, last_abs, full_rel or last_rel instead'
+        )
+
+    # indicate that the residual has seen the new values
+    L.status.updated = False
+
+    return None

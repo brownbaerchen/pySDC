@@ -184,10 +184,10 @@ class Burgers2D(GenericSpectralLinear):
         # boundary conditions
         self.BCtop = 1
         self.BCbottom = -self.BCtop
-        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet')
-        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet')
-        self.add_BC(component='uz', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet')
-        self.add_BC(component='uz', equation='u', axis=1, v=0, x=1, kind='Dirichlet')
+        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='uz', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='uz', equation='u', axis=1, v=0, x=1, kind='Dirichlet', zero_line=True)
         self.setup_BCs()
 
     def u_exact(self, t=0, *args, noise_level=0, **kwargs):
@@ -216,12 +216,12 @@ class Burgers2D(GenericSpectralLinear):
 
         u_hat = self.transform(u, axes=(-1, -2))
         f_hat = self.u_init
-        f_hat[iu] = -self.epsilon * (
-            self.C @ (self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())
-        ).reshape(u_hat[iux].shape)
-        f_hat[iv] = -self.epsilon * (
-            self.C @ (self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())
-        ).reshape(u_hat[iux].shape)
+        f_hat[iu] = self.epsilon * (self.C @ (self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())).reshape(
+            u_hat[iux].shape
+        )
+        f_hat[iv] = self.epsilon * (self.C @ (self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())).reshape(
+            u_hat[iux].shape
+        )
         f.impl[...] = self.itransform(f_hat, axes=(-2, -1))
 
         f.expl[iu] = u[iu] * (u[iux] + u[ivz])
