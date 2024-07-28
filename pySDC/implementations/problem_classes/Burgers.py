@@ -59,8 +59,8 @@ class Burgers1D(GenericSpectralLinear):
                 (self.BCr + self.BCl) / 2 + (self.BCr - self.BCl) / 2 * self.x
             ) * self.f * np.pi * -np.sin(self.x * np.pi * self.f)
         elif t == np.inf and self.f == 0 and self.BCl == -self.BCr:
-            me[0] = (self.BCl * np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + self.BCr) / (
-                np.exp((self.BCl - self.BCr) / (2 * self.epsilon) * self.x) + 1
+            me[0] = (self.BCl * np.exp((self.BCr - self.BCl) / (2 * self.epsilon) * self.x) + self.BCr) / (
+                np.exp((self.BCr - self.BCl) / (2 * self.epsilon) * self.x) + 1
             )
         else:
             raise NotImplementedError
@@ -74,10 +74,10 @@ class Burgers1D(GenericSpectralLinear):
         u_hat = self.transform(u)
 
         Dx_u_hat = self.u_init
-        Dx_u_hat[iu] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
+        Dx_u_hat[iux] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
 
-        f.impl[iu] = -self.epsilon * self.itransform(Dx_u_hat)[iu]
-        f.expl[iu] = u[iu] * u[iux]
+        f.impl[iu] = self.epsilon * self.itransform(Dx_u_hat)[iux]
+        f.expl[iu] = -u[iu] * u[iux]
         return f
 
     def solve_system(self, rhs, factor, *args, **kwargs):
@@ -229,8 +229,8 @@ class Burgers2D(GenericSpectralLinear):
         )
         f.impl[...] = self.itransform(f_hat, axes=(-2, -1))
 
-        f.expl[iu] = u[iu] * u[iux] + u[iv] * u[iuz]
-        f.expl[iv] = u[iu] * u[ivx] + u[iv] * u[ivz]
+        f.expl[iu] = -(u[iu] * u[iux] + u[iv] * u[iuz])
+        f.expl[iv] = -(u[iu] * u[ivx] + u[iv] * u[ivz])
         return f
 
     def compute_vorticity(self, u):
