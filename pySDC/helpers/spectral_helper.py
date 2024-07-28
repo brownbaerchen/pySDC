@@ -58,7 +58,6 @@ class SpectralHelper1D:
 
 
 class ChebychovHelper(SpectralHelper1D):
-
     def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', **kwargs):
         super().__init__(*args, **kwargs)
         self.S = S
@@ -224,23 +223,24 @@ class ChebychovHelper(SpectralHelper1D):
             'fwd': {},
             'bck': {},
         }
+        xp = self.xp
 
         N = self.N
-        k = np.arange(N)
+        k = xp.arange(N)
         norm = self.get_norm()
 
         # forwards transform
-        self.fft_utils['fwd']['shuffle'] = np.append(np.arange((N + 1) // 2) * 2, -np.arange(N // 2) * 2 - 1 - N % 2)
-        self.fft_utils['fwd']['shift'] = 2 * np.exp(-1j * np.pi * k / (2 * N)) * norm
+        self.fft_utils['fwd']['shuffle'] = xp.append(xp.arange((N + 1) // 2) * 2, -xp.arange(N // 2) * 2 - 1 - N % 2)
+        self.fft_utils['fwd']['shift'] = 2 * xp.exp(-1j * np.pi * k / (2 * N)) * norm
 
         # backwards transform
-        mask = np.zeros(N, dtype=int)
-        mask[: N - N % 2 : 2] = np.arange(N // 2)
-        mask[1::2] = N - np.arange(N // 2) - 1
+        mask = xp.zeros(N, dtype=int)
+        mask[: N - N % 2 : 2] = xp.arange(N // 2)
+        mask[1::2] = N - xp.arange(N // 2) - 1
         mask[-1] = N // 2
         self.fft_utils['bck']['shuffle'] = mask
 
-        shift = np.exp(1j * np.pi * k / (2 * N))
+        shift = xp.exp(1j * np.pi * k / (2 * N))
         shift[0] /= 2
         self.fft_utils['bck']['shift'] = shift / norm
 
@@ -307,7 +307,7 @@ class ChebychovHelper(SpectralHelper1D):
         Returns:
             self.xp.ndarray: Row to put into a matrix
         """
-        n = np.arange(self.N) + 1
+        n = self.xp.arange(self.N) + 1
         me = self.xp.zeros_like(n).astype(float)
         me[2:] = ((-1) ** n[1:-1] + 1) / (1 - n[1:-1] ** 2)
         me[0] = 2.0
@@ -361,7 +361,6 @@ class ChebychovHelper(SpectralHelper1D):
 
 
 class FFTHelper(SpectralHelper1D):
-
     def __init__(self, *args, x0=0, L=2 * np.pi, **kwargs):
         self.x0 = x0
         self.L = L
@@ -398,9 +397,25 @@ class SpectralHelper:
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
     dtype = mesh
+    fft_backend = 'fftw'
+    fft_comm_backend = 'MPI'
 
-    def __init__(self, comm=None):
+    @classmethod
+    def setup_GPU(cls):
+        """switch to GPU modules"""
+        import cupy as cp
+        import cupyx.scipy.sparse as sparse_lib
+
+        cls.xp = cp
+        cls.sparse_lib = sparse_lib
+
+        cls.fft_backend = 'cupy'
+        cls.fft_comm_backend = 'NCCL'
+
+    def __init__(self, comm=None, useGPU=False):
         self.comm = comm
+        if useGPU:
+            self.setup_GPU()
 
         self.axes = []
         self.components = []
@@ -424,13 +439,14 @@ class SpectralHelper:
         return len(self.components)
 
     def add_axis(self, base, *args, **kwargs):
-
         if base.lower() in ['chebychov', 'chebychev', 'cheby']:
             self.axes.append(ChebychovHelper(*args, **kwargs, transform_type='fft'))
         elif base.lower() in ['fft', 'fourier']:
             self.axes.append(FFTHelper(*args, **kwargs))
         else:
             raise NotImplementedError(f'{base=!r} is not implemented!')
+        self.axes[-1].xp = self.xp
+        self.axes[-1].sparse_lib = self.sparse_lib
 
     def add_component(self, name):
         if type(name) in [list, tuple]:
@@ -578,8 +594,8 @@ class SpectralHelper:
                     axes=sorted(list(axes)),
                     dtype='D',
                     collapse=False,
-                    # backend=self.fft_backend,
-                    # comm_backend=self.fft_comm_backend,
+                    backend=self.fft_backend,
+                    comm_backend=self.fft_comm_backend,
                 )
                 if direction == 'forward':
                     self.fft_cache[key] = _fft.forward
@@ -636,7 +652,6 @@ class SpectralHelper:
         if len(axes) > 1:
             v = self._transform_dct(self._transform_dct(u, axes[1:]), (axes[0],))
         else:
-
             v = u.copy()
             axis = axes[0]
 

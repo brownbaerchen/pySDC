@@ -29,14 +29,13 @@ class CFLLimit(ConvergenceController):
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
 
 
-def run_RBC():
+def run_RBC(useGPU=False):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
     from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
 
-    from pySDC.implementations.hooks.live_plotting import PlotPostStep
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
     imex_1st_order.compute_residual = compute_residual_DAE
@@ -71,6 +70,7 @@ def run_RBC():
         'comm': comm,
         'nx': 2**9,
         'nz': 2**9,
+        'useGPU': useGPU,
     }
 
     step_params = {}
@@ -168,10 +168,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=bool)
     parser.add_argument('--plot', type=bool)
+    parser.add_argument('--useGPU', type=bool)
 
     args = parser.parse_args()
 
     if args.run:
-        run_RBC()
+        run_RBC(useGPU=args.useGPU)
     if MPI.COMM_WORLD.rank == 0 and args.plot:
         plot_RBC(MPI.COMM_WORLD.size)

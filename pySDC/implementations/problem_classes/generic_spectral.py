@@ -1,6 +1,6 @@
 from pySDC.core.problem import Problem, WorkCounter
 from pySDC.helpers.spectral_helper import SpectralHelper
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+import numpy as np
 
 
 class GenericSpectralLinear(Problem):
@@ -9,6 +9,24 @@ class GenericSpectralLinear(Problem):
     L may contain algebraic conditions, as long as (M + dt L) is invertible.
 
     """
+
+    @classmethod
+    def setup_GPU(cls):
+        """switch to GPU modules"""
+        import cupy as cp
+        from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh, imex_cupy_mesh
+        from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+
+        cls.xp = cp
+
+        cls.dtype_u = cupy_mesh
+
+        GPU_versions = {
+            mesh: cupy_mesh,
+            imex_mesh: imex_cupy_mesh,
+        }
+
+        cls.dtype_f = GPU_versions[cls.dtype_f]
 
     def __init__(
         self,
@@ -19,10 +37,14 @@ class GenericSpectralLinear(Problem):
         left_preconditioner=True,
         solver_type='direct',
         solver_args=None,
+        useGPU=False,
         *args,
         **kwargs,
     ):
-        self.spectral = SpectralHelper(comm=comm)
+        self.spectral = SpectralHelper(comm=comm, useGPU=useGPU)
+
+        if useGPU:
+            self.setup_GPU()
 
         for base in bases:
             self.spectral.add_axis(**base)
@@ -94,7 +116,7 @@ class GenericSpectralLinear(Problem):
             left_preconditioner (bool): If True, it will interleave the variables and reverse the Kronecker product
         """
         sp = self.spectral.sparse_lib
-        N = self.xp.prod(self.init[0][1:])
+        N = np.prod(self.init[0][1:])
 
         Id = sp.eye(N)
         Pl_lhs = {comp: {comp: Id} for comp in self.components}
