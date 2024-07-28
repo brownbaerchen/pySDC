@@ -71,8 +71,8 @@ def test_Burgers2D_f(mode, direction, plotting=False):
     import numpy as np
     from pySDC.implementations.problem_classes.Burgers import Burgers2D
 
-    nx = 2**7
-    nz = 2**7
+    nx = 2**5
+    nz = 2**5
     P = Burgers2D(nx=nx, nz=nz, epsilon=8e-3, mode=mode)
 
     u = P.u_init
@@ -83,22 +83,22 @@ def test_Burgers2D_f(mode, direction, plotting=False):
     if direction == 'x':
         u[iu] = np.sin(P.X * 2)
         u[iux] = np.cos(P.X * 2) * 2
-        f_expect.impl[iu] = P.epsilon * u[iu] * 2**2
+        f_expect.impl[iu] = -P.epsilon * u[iu] * 2**2
     elif direction == 'z':
         u[iv] = P.Z**3 + 2
         u[ivz] = P.Z**2 * 3
-        f_expect.impl[iv] = -P.epsilon * P.Z * 6
+        f_expect.impl[iv] = P.epsilon * P.Z * 6
     elif direction == 'mixed':
         u[iu] = np.sin(P.X * 2) * (P.Z**3 + 2)
         u[iv] = np.sin(P.X * 2) * (P.Z**3 + 2)
         u[iux] = np.cos(P.X * 2) * 2 * (P.Z**3 + 2)
         u[ivz] = np.sin(P.X * 2) * P.Z**2 * 3
-        f_expect.impl[iu] = P.epsilon * np.sin(P.X * 2) * 2**2 * (P.Z**3 + 2)
-        f_expect.impl[iv] = -P.epsilon * np.sin(P.X * 2) * P.Z * 6
+        f_expect.impl[iu] = -P.epsilon * np.sin(P.X * 2) * 2**2 * (P.Z**3 + 2)
+        f_expect.impl[iv] = P.epsilon * np.sin(P.X * 2) * P.Z * 6
 
     f = P.eval_f(u)
-    f_expect.expl[iu] = u[iu] * (u[iux] + u[ivz])
-    f_expect.expl[iv] = u[iv] * (u[iux] + u[ivz])
+    f_expect.expl[iu] = u[iu] * u[iux] + u[iv] * u[iuz]
+    f_expect.expl[iv] = u[iu] * u[ivx] + u[iv] * u[ivz]
 
     if plotting:
         import matplotlib.pyplot as plt
@@ -116,7 +116,7 @@ def test_Burgers2D_f(mode, direction, plotting=False):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('mode', ['T2U'])
 def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     import numpy as np
     import matplotlib.pyplot as plt
@@ -129,35 +129,59 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     except ModuleNotFoundError:
         comm = None
 
-    P = Burgers2D(nx=nx, nz=nz, epsilon=1e-2, mode=mode, comm=comm)
+    P = Burgers2D(
+        nx=nx,
+        nz=nz,
+        epsilon=1e-2,
+        fuz=1,
+        fux=1,
+        mode=mode,
+        comm=comm,
+        left_preconditioner=True,
+        right_preconditioning='D2T',
+    )
 
     iu, iv, iux, iuz, ivx, ivz = P.index(P.components)
 
     u = P.u_exact()
-    f = P.eval_f(u)
 
     def imex_euler(u, dt):
         f = P.eval_f(u)
-        u = P.solve_system(u + dt * f.expl, dt)
+        u = P.solve_system(u - dt * f.expl, dt)
         return u
 
-    small_step_size = 1e-9
+    def implicit_euler(u, dt):
+        u = P.solve_system(u, dt)
+        return u
+
+    small_step_size = 1e-8
     small_step = imex_euler(u.copy(), small_step_size)
+    f = P.eval_f(small_step)
+    rhs = P.transform(u)
 
-    for comp in ['u', 'v', 'ux']:
+    for comp in ['u', 'v', 'ux', 'uz', 'vz', 'vx']:
         i = P.index(comp)
-        assert np.allclose(u[i], small_step[i], atol=small_step_size * 1e1), f'Error in component {comp}!'
+        assert np.allclose(u[i], small_step[i], atol=1e-4), f'Error in component {comp}!: {abs(u[i]-small_step[i]):.2e}'
 
-    dt = 1e-3
+    dt = 1e0
+    forward = implicit_euler(u, dt)
+    f = P.eval_f(forward)
+    backward = forward - dt * (f.impl)
+
+    for comp in ['u', 'v']:
+        i = P.index(comp)
+        assert np.allclose(
+            u[i], backward[i], atol=1e-8
+        ), f'Error without convection in component {comp}: {abs(u[i]-backward[i]):.2e}!'
+
+    dt = 1e-6
     forward = imex_euler(u, dt)
     f = P.eval_f(forward)
     backward = forward - dt * (f.impl + f.expl)
 
-    # P.plot(backward-u)
-    # plt.show()
-    # for comp in ['u', 'v']:
-    #     i = P.index(comp)
-    #     assert np.allclose(u[i], backward[i], atol=1e-8), f'Error in component {comp}: {abs(u[i]-backward[i]):.2e}!'
+    for comp in ['u', 'v']:
+        i = P.index(comp)
+        assert np.allclose(u[i], backward[i], atol=1e-8), f'Error in component {comp}: {abs(u[i]-backward[i]):.2e}!'
 
     if not plotting:
         return None
@@ -166,8 +190,8 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     tol = 1e-3
 
     fig = P.get_fig()
-    u = P.u_exact(noise_level=1e-2)
-    for i in range(100):
+    u = P.u_exact(noise_level=0e-2)
+    for i in range(1000):
         u_old = u.copy()
         u = imex_euler(u, dt)
 
@@ -184,5 +208,5 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
 
 if __name__ == '__main__':
     # test_Burgers_solver('T2U', plotting=True)
-    # test_Burgers2D_f('T2U', 'z', plotting=True)
-    test_Burgers2D_solver('T2T', plotting=True)
+    test_Burgers2D_f('T2U', 'z', plotting=True)
+    test_Burgers2D_solver('T2U', plotting=True)

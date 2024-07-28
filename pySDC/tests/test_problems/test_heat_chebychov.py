@@ -9,7 +9,7 @@ def test_heat1d_chebychov(a, b, f, nvars=2**4):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychov
 
-    P = Heat1DChebychov(nvars=nvars, a=a, b=b, f=f, nu=1e-3)
+    P = Heat1DChebychov(nvars=nvars, a=a, b=b, f=f, nu=1e-3, left_preconditioner=False, right_preconditioning='T2T')
 
     u0 = P.u_exact(0)
     dt = 1e-1
@@ -37,7 +37,20 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
     if base_x == 'fft' and (b != a):
         return None
 
-    P = Heat2DChebychov(nx=nx, ny=ny, a=a, b=b, c=c, fx=fx, fy=fy, base_x=base_x, base_y=base_y, nu=1e-3)
+    P = Heat2DChebychov(
+        nx=nx,
+        ny=ny,
+        a=a,
+        b=b,
+        c=c,
+        fx=fx,
+        fy=fy,
+        base_x=base_x,
+        base_y=base_y,
+        nu=1e-3,
+        left_preconditioner=True,
+        right_preconditioning='D2T',
+    )
 
     u0 = P.u_exact(0)
     dt = 1e-1
@@ -178,8 +191,7 @@ def test_SDC(plotting=False):
 
 if __name__ == '__main__':
     # test_SDC(True)
-    # test_heat1d_chebychov('T2U', False, plot=True)
-    # test_heat2d('T2T', 2**4, 2**5, True)
+    # test_heat1d_chebychov(2, 3, 2, 2**5)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(1, 1, 5, 1, 2, 'chebychov', 'chebychov', 2**2, 2**1)
+    test_heat2d_chebychov(1, 1, -2, 1, 2, 'fft', 'chebychov', 2**0, 2**6)

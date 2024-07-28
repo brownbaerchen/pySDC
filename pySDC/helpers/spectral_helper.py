@@ -160,8 +160,10 @@ class ChebychovHelper(SpectralHelper1D):
     def get_basis_change_matrix(self, direction='backward'):
         if direction == 'forward':
             return self.get_conv(self.mode)
-        else:
+        elif direction == 'backward':
             return self.get_conv(self.mode[::-1])
+        else:
+            return self.get_conv(direction)
 
     def get_T2U_differentiation_matrix(self):
         '''
@@ -297,7 +299,7 @@ class ChebychovHelper(SpectralHelper1D):
         else:
             return super().get_BC(kind, **kwargs)
 
-    def get_integ_BC_row_T(self):
+    def get_integ_BC_row_T(self, **kwargs):
         """
         Get a row for generating integral BCs with T polynomials.
         It returns the values of the T polynomials at x.
@@ -311,7 +313,7 @@ class ChebychovHelper(SpectralHelper1D):
         me[0] = 2.0
         return me
 
-    def get_Dirichlet_BC_row_T(self, x):
+    def get_Dirichlet_BC_row_T(self, x, **kwargs):
         """
         Get a row for generating Dirichlet BCs at x with T polynomials.
         It returns the values of the T polynomials at x.
@@ -481,7 +483,7 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def add_BC(self, component, equation, axis, kind, v, **kwargs):
+    def add_BC(self, component, equation, axis, kind, v, zero_line=False, **kwargs):
         if equation in [me['equation'] for me in self.full_BCs]:
             raise Exception(f'There is already a boundary condition in equation for {equation}!')
 
@@ -496,7 +498,8 @@ class SpectralHelper:
             + [-1]
             + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
         )
-        self.BC_rhs_mask[*slices] = True
+        if zero_line:
+            self.BC_rhs_mask[*slices] = True
 
     def setup_BCs(self):
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
@@ -505,13 +508,13 @@ class SpectralHelper:
         self._BCs = BC.tolil()[self.BC_mask]
         self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
 
-    def put_BCs_in_matrix(self, A):
+    def put_BCs_in_matrix(self, A, rescale=1.0):
         A = A.tolil()
-        # A[self.BC_zero_index, :] = 0  # TODO: do I need sth like this?
-        A[self.BC_mask] = self._BCs
+        A[self.BC_zero_index, :] = 0  # TODO: Smells like tuna
+        A[self.BC_mask] = self._BCs * rescale
         return A.tocsc()
 
-    def put_BCs_in_rhs(self, rhs, istransformed=False):
+    def put_BCs_in_rhs(self, rhs, istransformed=False, rescale=1.0):
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
 
         ndim = len(self.axes)
@@ -531,7 +534,7 @@ class SpectralHelper:
             for bc in self.full_BCs:
                 if axis == bc['axis']:
                     _slice = [self.index(bc['equation'])] + slices
-                    _rhs_hat[*_slice] = bc['v']
+                    _rhs_hat[*_slice] = bc['v'] * rescale
 
             if istransformed:
                 rhs = _rhs_hat
@@ -553,8 +556,6 @@ class SpectralHelper:
     def get_grid(self):
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
-
-        return self.xp.meshgrid(*[me.get_1dgrid() for me in self.axes[::-1]])
 
     def get_fft(self, axes, direction):
         shape = self.global_shape[1:]
@@ -910,6 +911,6 @@ class SpectralHelper:
                 else:
                     C = C @ sp.kron(*mats)
         else:
-            raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
+            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
 
         return C

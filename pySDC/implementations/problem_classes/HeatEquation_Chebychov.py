@@ -12,20 +12,13 @@ class Heat1DChebychov(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(
-        self,
-        nvars=128,
-        a=0,
-        b=0,
-        f=1,
-        nu=1.0,
-    ):
+    def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': 'chebychov', 'N': nvars}]
         components = ['u', 'ux']
 
-        super().__init__(bases, components)
+        super().__init__(bases, components, **kwargs)
 
         self.x = self.get_grid()[0]
 
@@ -81,13 +74,13 @@ class Heat2DChebychov(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nx=128, ny=128, base_x='fft', base_y='chebychov', a=0, b=0, c=0, fx=1, fy=1, nu=1.0, comm=None):
+    def __init__(self, nx=128, ny=128, base_x='fft', base_y='chebychov', a=0, b=0, c=0, fx=1, fy=1, nu=1.0, **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
         components = ['u', 'ux', 'uy']
 
-        super().__init__(bases, components, comm)
+        super().__init__(bases, components, **kwargs)
 
         self.Y, self.X = self.get_grid()
 
@@ -117,13 +110,19 @@ class Heat2DChebychov(GenericSpectralLinear):
             y = self.Y[0, :]
             if self.base_y == 'fft':
                 self.add_BC(component='u', equation='u', axis=0, x=-1, v=beta * y - alpha + gamma, kind='Dirichlet')
-            self.add_BC(component='u', equation='ux', axis=0, x=1, v=beta * y + alpha + gamma, kind='Dirichlet')
+            self.add_BC(
+                component='u', equation='ux', axis=0, x=1, v=beta * y + alpha + gamma, kind='Dirichlet', zero_line=False
+            )
         else:
             assert a == b, f'Need periodic boundary conditions in x for {base_x} method!'
         if base_y == 'chebychov':
             x = self.X[:, 0]
-            self.add_BC(component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma, kind='Dirichlet')
-            self.add_BC(component='u', equation='uy', axis=1, x=1, v=alpha * x + beta + gamma, kind='Dirichlet')
+            self.add_BC(
+                component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma, kind='Dirichlet', zero_line=True
+            )
+            self.add_BC(
+                component='u', equation='uy', axis=1, x=1, v=alpha * x + beta + gamma, kind='Dirichlet', zero_line=True
+            )
         else:
             assert c == b, f'Need periodic boundary conditions in y for {base_y} method!'
         self.setup_BCs()
