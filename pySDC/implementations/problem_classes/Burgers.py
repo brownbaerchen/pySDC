@@ -10,13 +10,13 @@ class Burgers1D(GenericSpectralLinear):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U'):
+    def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': 'cheby', 'N': N, 'mode': mode}]
         components = ['u', 'ux']
 
-        super().__init__(bases=bases, components=components)
+        super().__init__(bases=bases, components=components, **kwargs)
 
         self.x = self.get_grid()[0]
 
@@ -143,7 +143,7 @@ class Burgers2D(GenericSpectralLinear):
     dtype_f = imex_mesh
     xp = np
 
-    def __init__(self, nx=64, nz=64, epsilon=0.1, mode='T2U', comm=None):
+    def __init__(self, nx=64, nz=64, epsilon=0.1, fux=2, fuz=1, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [
@@ -151,7 +151,7 @@ class Burgers2D(GenericSpectralLinear):
             {'base': 'cheby', 'N': nz, 'mode': mode},
         ]
         components = ['u', 'v', 'ux', 'uz', 'vx', 'vz']
-        super().__init__(bases=bases, components=components, comm=comm)
+        super().__init__(bases=bases, components=components, **kwargs)
 
         self.Z, self.X = self.get_grid()
 
@@ -184,10 +184,11 @@ class Burgers2D(GenericSpectralLinear):
         # boundary conditions
         self.BCtop = 1
         self.BCbottom = -self.BCtop
+        self.BCtopu = 0
         self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet', zero_line=True)
         self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='uz', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='uz', equation='u', axis=1, v=0, x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='u', equation='uz', axis=1, v=self.BCtopu, x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCtopu, x=-1, kind='Dirichlet', zero_line=True)
         self.setup_BCs()
 
     def u_exact(self, t=0, *args, noise_level=0, **kwargs):
@@ -195,8 +196,12 @@ class Burgers2D(GenericSpectralLinear):
 
         iu, iv, iux, iuz, ivx, ivz = self.index(self.components)
         if t == 0:
-            me[iu] = self.xp.cos(self.X * 2)
-            me[iux] = -self.xp.sin(self.X * 2) * 2
+            me[iu] = self.xp.cos(self.X * self.fux) * self.xp.sin(self.Z * np.pi * self.fuz) + self.BCtopu
+            me[iux] = -self.xp.sin(self.X * self.fux) * self.fux * self.xp.sin(self.Z * np.pi * self.fuz)
+            me[iuz] = self.xp.cos(self.X * self.fux) * self.xp.cos(self.Z * np.pi * self.fuz) * np.pi * self.fuz
+            # me[iu] = self.xp.cos(self.X * self.fux) * (self.Z+1)*(self.Z-1) + self.BCtopu
+            # me[iux] = -self.xp.sin(self.X * self.fux) * self.fux * (self.Z+1)*(self.Z-1)
+            # me[iuz] = self.xp.cos(self.X * self.fux) * 2 * self.Z
 
             me[iv] = (self.BCtop + self.BCbottom) / 2 + (self.BCtop - self.BCbottom) / 2 * self.Z
             me[ivz][:] = (self.BCtop - self.BCbottom) / 2
@@ -224,8 +229,8 @@ class Burgers2D(GenericSpectralLinear):
         )
         f.impl[...] = self.itransform(f_hat, axes=(-2, -1))
 
-        f.expl[iu] = u[iu] * (u[iux] + u[ivz])
-        f.expl[iv] = u[iv] * (u[iux] + u[ivz])
+        f.expl[iu] = u[iu] * u[iux] + u[iv] * u[iuz]
+        f.expl[iv] = u[iu] * u[ivx] + u[iv] * u[ivz]
         return f
 
     def compute_vorticity(self, u):
