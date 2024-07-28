@@ -219,7 +219,7 @@ class Burgers2D(GenericSpectralLinear):
         f = self.f_init
         iu, iv, iux, iuz, ivx, ivz = self.index(self.components)
 
-        u_hat = self.transform(u, axes=(-1, -2))
+        u_hat = self.transform(u)
         f_hat = self.u_init
         f_hat[iu] = self.epsilon * (self.C @ (self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())).reshape(
             u_hat[iux].shape
@@ -227,7 +227,7 @@ class Burgers2D(GenericSpectralLinear):
         f_hat[iv] = self.epsilon * (self.C @ (self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())).reshape(
             u_hat[iux].shape
         )
-        f.impl[...] = self.itransform(f_hat, axes=(-2, -1))
+        f.impl[...] = self.itransform(f_hat)
 
         f.expl[iu] = -(u[iu] * u[iux] + u[iv] * u[iuz])
         f.expl[iv] = -(u[iu] * u[ivx] + u[iv] * u[ivz])

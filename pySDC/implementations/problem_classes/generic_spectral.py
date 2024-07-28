@@ -125,6 +125,8 @@ class GenericSpectralLinear(Problem):
 
         sol = self.u_init
 
+        _rhs = rhs.copy()
+
         rhs_hat = self.spectral.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs = self.spectral.itransform(rhs_hat)
@@ -140,6 +142,7 @@ class GenericSpectralLinear(Problem):
         # import matplotlib.pyplot as plt
         # import numpy as np
         # im = plt.imshow((A/abs(A)).real)
+        # im = plt.imshow(np.log10(abs(A.toarray())).real)
         # plt.colorbar(im)
         # plt.show()
 
@@ -163,6 +166,20 @@ class GenericSpectralLinear(Problem):
 
         sol_hat = self.Pr @ sol_hat
         sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape))
+
+        # comp = 'Tz'
+        # lala = self.itransform(sol_hat.reshape(sol.shape), axes=(0,1))
+        # fig, axs = plt.subplots(1, 2)
+        # axs[0].plot(np.abs(self.transform(_rhs-lala.reshape(sol.shape), axes=(0,1))[self.index(comp)].T), label='diff')
+        # axs[0].plot(abs(sol_hat.reshape(sol.shape)[self.index(comp)].T), label='sol', ls='--')
+        # axs[0].plot(np.abs(self.transform(_rhs, axes=(0,1))[self.index(comp)].T), label='rhs', ls='-.')
+        # # axs[1].plot(np.abs(_rhs-lala.reshape(sol.shape))[self.index(comp)].T, label='diff')
+        # axs[1].plot(np.abs(sol[self.index(comp)].T), label='sol', ls='--')
+        # axs[1].plot(np.abs(_rhs)[self.index(comp)].T, label='rhs', ls='-.')
+        # axs[0].set_yscale('log')
+        # axs[0].legend()
+        # axs[1].legend()
+        # plt.show()
         return sol
 
 

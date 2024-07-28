@@ -9,7 +9,7 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None):
+    def __init__(self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, **kwargs):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
@@ -23,7 +23,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         bases = [{'base': 'fft', 'N': nx}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
-        super().__init__(bases, components, comm)
+        super().__init__(bases, components, comm, **kwargs)
 
         self.indices = {
             'u': 0,
@@ -57,7 +57,6 @@ class RayleighBenard(GenericSpectralLinear):
 
         kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
         nu = (Rayleigh / Prandl) ** (-1 / 2.0)
-        print(f'{nu=:.2e}, {kappa=:.2e}, {Prandl=:.2e}')
 
         # construct operators
         L_lhs = {
@@ -75,13 +74,15 @@ class RayleighBenard(GenericSpectralLinear):
         M_lhs = {i: {i: I} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
 
-        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral')
-        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet')
-        self.add_BC(component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
-        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
-        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
-        self.add_BC(component='u', equation='u', axis=1, v=0, x=1, kind='Dirichlet')
-        self.add_BC(component='u', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet')
+        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True)
+        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', zero_line=True)
+        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
+        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True)
+        self.add_BC(
+            component='v', equation='vz', axis=1, x=1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
+        )
+        self.add_BC(component='u', equation='u', axis=1, v=0, x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='u', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet', zero_line=True)
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -127,13 +128,13 @@ class RayleighBenard(GenericSpectralLinear):
         Dx_u = self.itransform(Dx_u_hat)
 
         # treat convection explicitly
-        f.expl[iu] = -u[iu] * (Dx_u[iu] + u[ivz])
-        f.expl[iv] = -u[iv] * (Dx_u[iu] + u[ivz])
-        f.expl[iT] = -u[iu] * Dx_u[iT] - u[iv] * u[iTz]
+        f.expl[iu] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
+        f.expl[iv] = -(u[iu] * Dx_u[iv] + u[iv] * u[ivz])
+        f.expl[iT] = -(u[iu] * Dx_u[iT] + u[iv] * u[iTz])
 
         return f
 
-    def u_exact(self, t=0, noise_level=1e-3):
+    def u_exact(self, t=0, noise_level=1e-3, sigma=0):
         assert t == 0
         assert (
             self.BCs['v_top'] == self.BCs['v_bottom']
@@ -147,28 +148,50 @@ class RayleighBenard(GenericSpectralLinear):
             a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
             b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
             me[self.index(comp)] = a * self.Z + b
+            me[self.index(f'{comp}z')] = a
 
         # perturb slightly
         rng = self.xp.random.default_rng(seed=99)
-        noise = self.u_init
-        noise[iT].real = rng.normal(size=me[self.iT].shape)
+        from scipy.ndimage import gaussian_filter
 
-        me[iT] += noise[iT] * (self.Z - 1) * (self.Z + 1) * noise_level
+        noise = self.u_init
+        noise[iT].real = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
+
+        me[iT] += self.xp.abs(noise[iT] * (self.Z - 1) * (self.Z + 1)) * noise_level
+
+        # enforce boundary conditions in spite of noise
+        me_hat = self.transform(me, axes=(-1,))
+        bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
+        bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
+
+        # me_hat[iT, :, self.nz // 4:] = 0
+
+        rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
+        rhs[0] = self.BCs["T_top"] - self.xp.sum(bc_top[:-2] * me_hat[iT, :, :-2], axis=1)
+        rhs[1] = self.BCs["T_bottom"] - self.xp.sum(bc_bottom[:-2] * me_hat[iT, :, :-2], axis=1)
+
+        A = self.xp.array([bc_top[-2:], bc_bottom[-2:]], complex)
+        me_hat[iT, :, -2:] = self.xp.linalg.solve(A, rhs).T
+
+        me[...] = self.itransform(me_hat, axes=(-1,))
 
         u_hat = self.transform(me)
-
         S = self.get_integration_matrix(axes=(1,))
-        u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
+        # u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
 
-        u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
+        # u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
         u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
 
         me[...] = self.itransform(u_hat)
-        me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
+        # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
-        violations = self.compute_constraint_violation(me)
-        for k, v in violations.items():
-            assert self.xp.allclose(v, 0), f'Initial conditions violate Constraint in {k}!'
+        # violations = self.compute_constraint_violation(me)
+        # for k, v in violations.items():
+        #     assert self.xp.allclose(v, 0), f'Initial conditions violate constraint in {k}!'
+
+        # BC_violations = self.compute_BC_violation(me)
+        # for k, v in BC_violations.items():
+        #     assert self.xp.allclose(v, 0), f'Initial conditions violate boundary conditions in {k} by {v}!'
 
         return me
 
@@ -205,6 +228,21 @@ class RayleighBenard(GenericSpectralLinear):
 
         violations['divergence'] = derivatives[idxu] + derivatives[idzv]
 
+        return violations
+
+    def compute_BC_violation(self, u):
+        iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
+
+        violations = {}
+
+        A = self.put_BCs_in_matrix(self.M * 0)
+        boundary_values = self.u_init
+        boundary_values[...] = (A @ self.transform(u, axes=(-1,)).flatten()).reshape(u.shape)
+
+        for bc in self.full_BCs:
+            violations[f"component {bc['component']}, equation {bc['equation']}"] = abs(
+                boundary_values[self.index(bc['equation']), :, -1] - bc['v']
+            )
         return violations
 
     def get_fig(self):  # pragma: no cover

@@ -8,7 +8,7 @@ def run_Burgers():
     from pySDC.implementations.problem_classes.Burgers import Burgers2D
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityPolynomialError
 
     imex_1st_order.compute_residual = compute_residual_DAE
 
@@ -26,22 +26,26 @@ def run_Burgers():
     LogGrid.file_name = f'Burgers-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
 
-    convergence_controllers = {Adaptivity: {'e_tol': 1e-2}}
+    convergence_controllers = {
+        # AdaptivityPolynomialError: {'e_tol': 1.7e0, 'abort_at_growing_residual': False, 'interpolate_between_restarts': False},
+        Adaptivity: {'e_tol': 1e-1},
+    }
 
     level_params = {}
     level_params['dt'] = 1e-2
+    # level_params['restol'] = 1e-5
     # level_params['e_tol'] = 1e-3
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 3
-    sweeper_params['QI'] = 'MIN-SR-S'
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
-        'nx': 2**7,
-        'nz': 2**7,
+        'nx': 2**8,
+        'nz': 2**8,
         'epsilon': 1e-1,
     }
 
@@ -49,7 +53,7 @@ def run_Burgers():
     step_params['maxiter'] = 4
 
     controller_params = {}
-    controller_params['logger_level'] = 15 if comm.rank == 0 else 40
+    controller_params['logger_level'] = 11 if comm.rank == 0 else 40
     controller_params['hook_class'] = [LogToFile, LogGrid]
     controller_params['mssdc_jac'] = False
 
@@ -67,7 +71,7 @@ def run_Burgers():
     t0 = 0.0
     Tend = 4
     P = controller.MS[0].levels[0].prob
-    uinit = P.u_exact(t0)
+    uinit = P.u_exact(t0, noise_level=0e-3)
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
@@ -115,6 +119,15 @@ def plot_Burgers(size):
 
 
 if __name__ == '__main__':
-    # run_Burgers()
-    if MPI.COMM_WORLD.rank == 0:
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--run', type=bool)
+    parser.add_argument('--plot', type=bool)
+
+    args = parser.parse_args()
+
+    if args.run:
+        run_Burgers()
+    if MPI.COMM_WORLD.rank == 0 and args.plot:
         plot_Burgers(MPI.COMM_WORLD.size)
