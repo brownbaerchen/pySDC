@@ -67,20 +67,20 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 3
-    sweeper_params['QI'] = 'LU'
-    sweeper_params['QE'] = 'PIC'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
+    sweeper_params['QE'] = 'EE'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6,
-        'nx': 2**8,
-        'nz': 2**8,
+        'nx': 2**9,
+        'nz': 2**9,
     }
 
     step_params = {}
-    step_params['maxiter'] = 9
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -165,7 +165,9 @@ def plot_RBC(size, quantitiy='T'):
             axs[1].set_xlabel('x')
             axs[1].set_ylabel('z')
         plt.pause(1e-9)
-        fig.savefig(f'simulation_plots/RBC{i:06d}.png', dpi=300, bbox_inches='tight')
+        path = f'simulation_plots/RBC{i:06d}.png'
+        fig.savefig(path, dpi=300, bbox_inches='tight')
+        print(f'Stored figure {path!r}')
         plt.close(fig)
         del fig
         del buffer
