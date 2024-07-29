@@ -108,7 +108,7 @@ def run_RBC(useGPU=False):
     return stats
 
 
-def plot_RBC(size, quantitiy='T'):
+def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
     import matplotlib.pyplot as plt
     from pySDC.implementations.hooks.log_solution import LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -122,7 +122,7 @@ def plot_RBC(size, quantitiy='T'):
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
 
-    for i in range(0, 400):
+    for i in range(start_idx, 999):
         fig = P.get_fig()
         cax = P.cax
         axs = fig.get_axes()
@@ -164,10 +164,11 @@ def plot_RBC(size, quantitiy='T'):
             axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
             axs[1].set_xlabel('x')
             axs[1].set_ylabel('z')
-        plt.pause(1e-9)
         path = f'simulation_plots/RBC{i:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
-        print(f'Stored figure {path!r}')
+        print(f'Stored figure {path!r}', flush=True)
+        if render:
+            plt.pause(1e-9)
         plt.close(fig)
         del fig
         del buffer
@@ -182,10 +183,12 @@ if __name__ == '__main__':
     parser.add_argument('--run', type=bool)
     parser.add_argument('--plot', type=bool)
     parser.add_argument('--useGPU', type=bool)
+    parser.add_argument('--render', type=bool)
+    parser.add_argument('--startIdx', type=int, default=0)
 
     args = parser.parse_args()
 
     if args.run:
         run_RBC(useGPU=args.useGPU)
     if MPI.COMM_WORLD.rank == 0 and args.plot:
-        plot_RBC(MPI.COMM_WORLD.size)
+        plot_RBC(MPI.COMM_WORLD.size, render=args.render, start_idx=args.startIdx)

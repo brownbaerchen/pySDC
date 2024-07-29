@@ -648,7 +648,7 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    test_eval_f(8, 8, 'T2T', 'x')
+    # test_eval_f(8, 8, 'T2T', 'x')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
     test_solver(2**7, 2**6, 'T2U', plotting=True)
     # test_solver_small_step_size(True)
