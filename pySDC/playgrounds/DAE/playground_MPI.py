@@ -1,8 +1,8 @@
 from mpi4py import MPI
 from pathlib import Path
 
-from pySDC.projects.DAE.sweepers.SemiImplicitDAEMPI import SemiImplicitDAEMPI
-from pySDC.projects.DAE.problems.DiscontinuousTestDAE import DiscontinuousTestDAE
+from pySDC.projects.DAE.sweepers.semiImplicitDAEMPI import SemiImplicitDAEMPI
+from pySDC.projects.DAE.problems.discontinuousTestDAE import DiscontinuousTestDAE
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 
 from pySDC.playgrounds.DAE.DiscontinuousTestDAE import plotSolution
@@ -12,7 +12,7 @@ from pySDC.implementations.hooks.log_solution import LogSolution
 
 def run():
     r"""
-    Routine to do a run using the semi-implicit SDC-DAE sweeper enabling parallelization across the nodes. The number of processes that is used to run this file is the number of collocation nodes used! When you run the script with the command 
+    Routine to do a run using the semi-implicit SDC-DAE sweeper enabling parallelization across the nodes. The number of processes that is used to run this file is the number of collocation nodes used! When you run the script with the command
 
     >>> mpiexec -n 3 python3 playground_MPI.py
 
@@ -72,7 +72,7 @@ def run():
 
     t0 = 1.0
     Tend = 3.0
-    
+
     uinit = P.u_exact(t0)
 
     # call main function to get things done...

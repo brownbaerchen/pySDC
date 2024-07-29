@@ -20,10 +20,10 @@ def get_sweeper(sweeper_name):
 
     Returns
     -------
-    pySDC.Sweeper.RungeKutta
+    pySDC.projects.DAE.sweepers.rungeKuttaDAE.RungeKuttaDAE
         The sweeper.
     """
-    import pySDC.projects.DAE.sweepers.RungeKuttaDAE as RK
+    import pySDC.projects.DAE.sweepers.rungeKuttaDAE as RK
 
     return eval(f'RK.{sweeper_name}')
 
@@ -34,9 +34,9 @@ def getTestSetup(problem, sweeper, hook_class):
 
     Parameters
     ----------
-    problem : pySDC.projects.DAE.misc.ptype_dae
+    problem : pySDC.projects.DAE.misc.problemDAE.ProblemDAE
         Problem class.
-    sweeper : pySDC.projects.DAE.sweepers.RungeKuttaDAE
+    sweeper : pySDC.projects.DAE.sweepers.rungeKuttaDAE.RungeKuttaDAE
         Sweeper passed to the controller.
     hook_class : list
         Hook classes to log statistics such as errors.
@@ -86,9 +86,9 @@ def testOrderAccuracySemiExplicitIndexOne(sweeper_name):
     part.
     """
 
-    from pySDC.projects.DAE.problems.DiscontinuousTestDAE import DiscontinuousTestDAE
+    from pySDC.projects.DAE.problems.discontinuousTestDAE import DiscontinuousTestDAE
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.projects.DAE.misc.HookClass_DAE import (
+    from pySDC.projects.DAE.misc.hooksDAE import (
         LogGlobalErrorPostStepDifferentialVariable,
         LogGlobalErrorPostStepAlgebraicVariable,
     )
@@ -153,10 +153,10 @@ def testOrderAccuracySemiExplicitIndexOne(sweeper_name):
 
     assert np.isclose(
         orderDiff, expectedOrderDiff[sweeper_name], atol=1e0
-    ), f"Expected order {expectedOrderDiff[sweeper_name]} in differential variable, got {orderDiff}"
+    ), f"SE index-1 case: Expected order {expectedOrderDiff[sweeper_name]} in differential variable for {sweeper_name}, got {orderDiff}"
     assert np.isclose(
         orderAlg, expectedOrderAlg[sweeper_name], atol=1e0
-    ), f"Expected order {expectedOrderAlg[sweeper_name]} in algebraic variable, got {orderAlg}"
+    ), f"SE index-1 case:  Expected order {expectedOrderAlg[sweeper_name]} in algebraic variable for {sweeper_name}, got {orderAlg}"
 
 
 @pytest.mark.base
@@ -171,9 +171,9 @@ def testOrderAccuracySemiExplicitIndexTwo(sweeper_name):
     Note that order reduction in the algebraic variable is expected.
     """
 
-    from pySDC.projects.DAE.problems.simple_DAE import simple_dae_1
+    from pySDC.projects.DAE.problems.simpleDAE import SimpleDAE
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.projects.DAE.misc.HookClass_DAE import (
+    from pySDC.projects.DAE.misc.hooksDAE import (
         LogGlobalErrorPostStepDifferentialVariable,
         LogGlobalErrorPostStepAlgebraicVariable,
     )
@@ -194,7 +194,7 @@ def testOrderAccuracySemiExplicitIndexTwo(sweeper_name):
     }
 
     hook_class = [LogGlobalErrorPostStepDifferentialVariable, LogGlobalErrorPostStepAlgebraicVariable]
-    description, controller_params = getTestSetup(simple_dae_1, get_sweeper(sweeper_name), hook_class)
+    description, controller_params = getTestSetup(SimpleDAE, get_sweeper(sweeper_name), hook_class)
 
     sweeper_params = {
         'quad_type': 'RADAU-RIGHT',
@@ -238,10 +238,10 @@ def testOrderAccuracySemiExplicitIndexTwo(sweeper_name):
 
     assert np.isclose(
         orderDiff, expectedOrderDiff[sweeper_name], atol=1e0
-    ), f"Expected order {expectedOrderDiff[sweeper_name]} in differential variable, got {orderDiff}"
+    ), f"SE index-2 case: Expected order {expectedOrderDiff[sweeper_name]} in differential variable for {sweeper_name}, got {orderDiff}"
     assert np.isclose(
         orderAlg, expectedOrderAlg[sweeper_name], atol=1e0
-    ), f"Expected order {expectedOrderAlg[sweeper_name]} in algebraic variable, got {orderAlg}"
+    ), f"SE index-2 case: Expected order {expectedOrderAlg[sweeper_name]} in algebraic variable for {sweeper_name}, got {orderAlg}"
 
 
 @pytest.mark.base
@@ -255,7 +255,7 @@ def testOrderAccuracyFullyImplicitIndexTwo(sweeper_name):
     Note that for index two problems order reduction is expected.
     """
 
-    from pySDC.projects.DAE.problems.problematicF import problematic_f
+    from pySDC.projects.DAE.problems.problematicF import ProblematicF
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.hooks.log_errors import LogGlobalErrorPostStep
 
@@ -269,7 +269,7 @@ def testOrderAccuracyFullyImplicitIndexTwo(sweeper_name):
     }
 
     hook_class = [LogGlobalErrorPostStep]
-    description, controller_params = getTestSetup(problematic_f, get_sweeper(sweeper_name), hook_class)
+    description, controller_params = getTestSetup(ProblematicF, get_sweeper(sweeper_name), hook_class)
 
     sweeper_params = {
         'quad_type': 'RADAU-RIGHT',
@@ -281,7 +281,7 @@ def testOrderAccuracyFullyImplicitIndexTwo(sweeper_name):
     level_params = description['level_params']
 
     t0, Tend = 0.0, 2.0
-    dt_list = np.logspace(-1.7, -1.0, num=7)
+    dt_list = dt_list = np.logspace(-2.5, -1.0, num=7)
 
     errors = np.zeros(len(dt_list))
     for i, dt in enumerate(dt_list):
@@ -302,4 +302,4 @@ def testOrderAccuracyFullyImplicitIndexTwo(sweeper_name):
 
     assert np.isclose(
         order, expectedOrder[sweeper_name], atol=1e0
-    ), f"Expected order {expectedOrder[sweeper_name]} in differential variable, got {order}"
+    ), f"FI index-2 case: Expected order {expectedOrder[sweeper_name]} in differential variable for {sweeper_name}, got {order}"
