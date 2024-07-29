@@ -186,9 +186,9 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[P.iT] = -y * (y_x + y_z)
     f_expect.impl[P.iT] = kappa * (y_xx + y_zz)
     f_expect.expl[P.iu] = -y * y_z - y * y_x
-    f_expect.impl[P.iu] = -y_x + nu * y_xx
+    f_expect.impl[P.iu] = -y_x + nu * (y_xx + y_zz)
     f_expect.expl[P.iv] = -y * (y_z + y_x)
-    f_expect.impl[P.iv] = -y_z + nu * y_zz + y
+    f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
 
     for comp in P.spectral.components:
         i = P.spectral.index(comp)
@@ -597,7 +597,10 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     # static = P.solve_system(u_static, 1e-0)
     # compute_errors(u_static, static, 'static configuration')
 
-    u0 = P.u_exact(noise_level=1e-3, sigma=0.0)
+    # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
+    _u0 = P.u_exact(noise_level=1e-3, sigma=0.0)
+    u0 = P.solve_system(_u0, 0.25)
+
     small_dt = P.solve_system(u0, 1e0)
     compute_errors(u0, small_dt, 'tiny step size', 1e-9)
     # P.plot(u0, quantity='p')
@@ -647,7 +650,7 @@ if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     test_eval_f(8, 8, 'T2T', 'x')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
-    # test_solver(2**7, 2**6, 'T2U', plotting=True)
+    test_solver(2**7, 2**6, 'T2U', plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

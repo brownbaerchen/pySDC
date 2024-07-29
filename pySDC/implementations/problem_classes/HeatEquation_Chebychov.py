@@ -44,7 +44,7 @@ class Heat1DChebychov(GenericSpectralLinear):
         f = self.f_init
         iu, iux = self.index(self.components)
 
-        me_hat = self.u_init
+        me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
         me_hat[iu] = (self.nu * self.U2T @ self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat)
@@ -131,14 +131,14 @@ class Heat2DChebychov(GenericSpectralLinear):
         f = self.f_init
         iu, iux, iuy = self.index(self.components)
 
-        me_hat = self.u_init
+        me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
         me_hat[iu] = self.nu * (
             self.U2T @ self.Dx @ me_hat[iux].flatten() + self.U2T @ self.Dy @ me_hat[iuy].flatten()
         ).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat)
 
-        f[self.index("u")] = me[iu]
+        f[self.index("u")] = me[iu].real
         return f
 
     def u_exact(self, t):

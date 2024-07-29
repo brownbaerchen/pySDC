@@ -86,24 +86,24 @@ class RayleighBenard(GenericSpectralLinear):
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
-        me_hat = self.u_init
+        me_hat = self.u_init_forward
 
         u_hat = self.transform(u)
         shape = u[0].shape
         Dz = self.U2T @ self.Dz
 
-        for comp in ['T', 'v']:
+        for comp in ['T', 'v', 'u']:
             i = self.index(comp)
             iD = self.index(f'{comp}z')
             me_hat[iD][:] = (Dz @ u_hat[i].flatten()).reshape(shape)
 
-        return self.itransform(me_hat)
+        return self.itransform(me_hat).real
 
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
 
         u_hat = self.transform(u)
-        f_hat = self.f_init
+        f_impl_hat = self.u_init_forward
 
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
@@ -116,20 +116,20 @@ class RayleighBenard(GenericSpectralLinear):
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
 
         # evaluate implicit terms
-        f_hat.impl[iT][:] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
-        f_hat.impl[iu][:] = (
+        f_impl_hat[iT][:] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
+        f_impl_hat[iu][:] = (
             -Dx @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iu].flatten() + Dz @ u_hat[iuz].flatten())
         ).reshape(shape)
-        f_hat.impl[iv][:] = (
+        f_impl_hat[iv][:] = (
             -Dz @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iv].flatten() + Dz @ u_hat[ivz].flatten())
         ).reshape(shape) + u_hat[iT]
 
-        f.impl[:] = self.itransform(f_hat.impl)
+        f.impl[:] = self.itransform(f_impl_hat).real
 
-        Dx_u_hat = self.u_init
+        Dx_u_hat = self.u_init_forward
         for i in [iu, iv, iT]:
             Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(shape)
-        Dx_u = self.itransform(Dx_u_hat)
+        Dx_u = self.itransform(Dx_u_hat).real
 
         # treat convection explicitly
         f.expl[iu][:] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
@@ -177,7 +177,7 @@ class RayleighBenard(GenericSpectralLinear):
         A = self.xp.array([bc_top[-2:], bc_bottom[-2:]], complex)
         me_hat[iT, :, -2:] = self.xp.linalg.solve(A, rhs).T
 
-        me[...] = self.itransform(me_hat, axes=(-1,))
+        me[...] = self.itransform(me_hat, axes=(-1,)).real
 
         u_hat = self.transform(me)
         S = self.get_integration_matrix(axes=(1,))
@@ -186,7 +186,7 @@ class RayleighBenard(GenericSpectralLinear):
         # u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
         u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
 
-        me[...] = self.itransform(u_hat)
+        me[...] = self.itransform(u_hat).real
         # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
         # violations = self.compute_constraint_violation(me)
@@ -205,16 +205,16 @@ class RayleighBenard(GenericSpectralLinear):
         Dx = self.U2T @ self.Dx
         iu = self.index('u')
 
-        vorticity_hat = self.u_init
+        vorticity_hat = self.u_init_forward
         vorticity_hat[0] = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.itransform(vorticity_hat)[0]
+        return self.itransform(vorticity_hat)[0].real
 
     def compute_constraint_violation(self, u):
 
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
         idxu, idxv, idzu, idzv, idzT = 0, 1, 2, 3, 4
 
-        derivatives_hat = self.u_init
+        derivatives_hat = self.u_init_forward
 
         u_hat = self.transform(u)
         derivatives_hat[idxu] = (self.U2T @ self.Dx @ u_hat[iu].flatten()).reshape(derivatives_hat[idxu].shape)
@@ -222,7 +222,7 @@ class RayleighBenard(GenericSpectralLinear):
         derivatives_hat[idzu] = (self.U2T @ self.Dz @ u_hat[iu].flatten()).reshape(derivatives_hat[idxu].shape)
         derivatives_hat[idzv] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(derivatives_hat[idxu].shape)
         derivatives_hat[idzT] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(derivatives_hat[idxu].shape)
-        derivatives = self.itransform(derivatives_hat)
+        derivatives = self.itransform(derivatives_hat).real
 
         violations = {}
 
@@ -240,7 +240,7 @@ class RayleighBenard(GenericSpectralLinear):
         violations = {}
 
         A = self.put_BCs_in_matrix(self.M * 0)
-        boundary_values = self.u_init
+        boundary_values = self.u_init_forward
         boundary_values[...] = (A @ self.transform(u, axes=(-1,)).flatten()).reshape(u.shape)
 
         for bc in self.full_BCs:

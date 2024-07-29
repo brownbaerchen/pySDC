@@ -52,7 +52,7 @@ class GenericSpectralLinear(Problem):
 
         self.spectral.setup_fft()
 
-        super().__init__(init=self.spectral.init)
+        super().__init__(init=self.init)
 
         self.solver_type = solver_type
         self.solver_args = {} if solver_args is None else solver_args
@@ -187,7 +187,7 @@ class GenericSpectralLinear(Problem):
             raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')
 
         sol_hat = self.Pr @ sol_hat
-        sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape))
+        sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape)).real
 
         # comp = 'Tz'
         # lala = self.itransform(sol_hat.reshape(sol.shape), axes=(0,1))

@@ -75,8 +75,8 @@ def run_RBC(useGPU=False):
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6,
-        'nx': 2**9,
-        'nz': 2**9,
+        'nx': 2**8,
+        'nz': 2**8,
     }
 
     step_params = {}

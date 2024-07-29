@@ -73,10 +73,10 @@ class Burgers1D(GenericSpectralLinear):
 
         u_hat = self.transform(u)
 
-        Dx_u_hat = self.u_init
+        Dx_u_hat = self.u_init_forward
         Dx_u_hat[iux] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
 
-        f.impl[iu] = self.epsilon * self.itransform(Dx_u_hat)[iux]
+        f.impl[iu] = self.epsilon * self.itransform(Dx_u_hat)[iux].real
         f.expl[iu] = -u[iu] * u[iux]
         return f
 
@@ -92,7 +92,7 @@ class Burgers1D(GenericSpectralLinear):
 
         sol_hat = (self.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
 
-        sol[:] = self.itransform(sol_hat)
+        sol[:] = self.itransform(sol_hat).real
         return sol
 
     def get_fig(self):  # pragma: no cover
@@ -220,27 +220,27 @@ class Burgers2D(GenericSpectralLinear):
         iu, iv, iux, iuz, ivx, ivz = self.index(self.components)
 
         u_hat = self.transform(u)
-        f_hat = self.u_init
+        f_hat = self.u_init_forward
         f_hat[iu] = self.epsilon * (self.C @ (self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())).reshape(
             u_hat[iux].shape
         )
         f_hat[iv] = self.epsilon * (self.C @ (self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())).reshape(
             u_hat[iux].shape
         )
-        f.impl[...] = self.itransform(f_hat)
+        f.impl[...] = self.itransform(f_hat).real
 
         f.expl[iu] = -(u[iu] * u[iux] + u[iv] * u[iuz])
         f.expl[iv] = -(u[iu] * u[ivx] + u[iv] * u[ivz])
         return f
 
     def compute_vorticity(self, u):
-        me = self.u_init
+        me = self.u_init_forward
 
         u_hat = self.transform(u)
         iu, iv = self.index(['u', 'v'])
 
         me[iu] = (self.C @ self.Dx @ u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.itransform(me)[iu]
+        return self.itransform(me)[iu].real
 
     def get_fig(self):  # pragma: no cover
         """

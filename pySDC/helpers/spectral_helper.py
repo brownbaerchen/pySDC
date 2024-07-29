@@ -431,6 +431,10 @@ class SpectralHelper:
         return self.dtype(self.init)
 
     @property
+    def u_init_forward(self):
+        return self.dtype(self.init_forward)
+
+    @property
     def ndim(self):
         return len(self.axes)
 
@@ -624,7 +628,12 @@ class SpectralHelper:
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice(False)
 
-        self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('complex128'))
+        self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('float'))
+        self.init_forward = (
+            np.empty(shape=self.global_shape)[:, *self.local_slice].shape,
+            self.comm,
+            np.dtype('complex128'),
+        )
 
         self.BC_mat = self.get_empty_operator_matrix()
         self.BC_mask = self.xp.zeros(
