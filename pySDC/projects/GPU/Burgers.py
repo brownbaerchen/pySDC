@@ -27,13 +27,17 @@ def run_Burgers():
     LogGrid.file_logger = LogToFile
 
     convergence_controllers = {
-        # AdaptivityPolynomialError: {'e_tol': 1.7e0, 'abort_at_growing_residual': False, 'interpolate_between_restarts': False},
-        Adaptivity: {'e_tol': 1e-1},
+        AdaptivityPolynomialError: {
+            'e_tol': 1.7e-3,
+            'abort_at_growing_residual': False,
+            'interpolate_between_restarts': False,
+        },
+        # Adaptivity: {'e_tol': 1e-1},
     }
 
     level_params = {}
     level_params['dt'] = 1e-2
-    # level_params['restol'] = 1e-5
+    level_params['restol'] = 1e-8
     # level_params['e_tol'] = 1e-3
 
     sweeper_params = {}
@@ -50,7 +54,7 @@ def run_Burgers():
     }
 
     step_params = {}
-    step_params['maxiter'] = 4
+    step_params['maxiter'] = 16
 
     controller_params = {}
     controller_params['logger_level'] = 11 if comm.rank == 0 else 40

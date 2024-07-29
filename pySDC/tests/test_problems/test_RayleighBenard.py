@@ -175,6 +175,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
         u[i][:] = y
     u[P.ivz] = y_z
     u[P.iTz] = y_z
+    u[P.index('uz')] = y_z
 
     f = P.eval_f(u)
 
@@ -184,7 +185,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect = P.f_init
     f_expect.expl[P.iT] = -y * (y_x + y_z)
     f_expect.impl[P.iT] = kappa * (y_xx + y_zz)
-    f_expect.expl[P.iu] = -y * (y_z + y_x)
+    f_expect.expl[P.iu] = -y * y_z - y * y_x
     f_expect.impl[P.iu] = -y_x + nu * y_xx
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -y_z + nu * y_zz + y
@@ -644,9 +645,9 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    # test_eval_f(128, 129, 'T2T', 'z')
+    test_eval_f(8, 8, 'T2T', 'x')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
-    test_solver(2**7, 2**6, 'T2U', plotting=True)
+    # test_solver(2**7, 2**6, 'T2U', plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

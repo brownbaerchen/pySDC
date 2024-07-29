@@ -23,9 +23,12 @@ class CFLLimit(ConvergenceController):
             max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / abs(u[iu][:-1, :]))])
             max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / abs(u[iv][:, :-1]))])
 
+        if hasattr(P, 'comm'):
+            max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
         dt_new = L.status.dt_new if L.status.dt_new else L.params.dt
         L.status.dt_new = min([dt_new, max_step_size])
         L.status.dt_new = max([min_step_size, L.status.dt_new])
+
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
 
 
@@ -34,6 +37,7 @@ def run_RBC(useGPU=False):
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
     from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
 
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -56,25 +60,27 @@ def run_RBC(useGPU=False):
     level_params['restol'] = 1e-6
 
     convergence_controllers = {
-        # Adaptivity: {'e_tol': 1e0}
-        CFLLimit: {}
+        # Adaptivity: {'e_tol': 1e0},
+        CFLLimit: {},
+        StopAtNan: {'thresh': 1e9},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
-    sweeper_params['QE'] = 'EE'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'LU'
+    sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
-        'nx': 2**9,
-        'nz': 2**9,
         'useGPU': useGPU,
+        'Rayleigh': 2e6,
+        'nx': 2**8,
+        'nz': 2**8,
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 9
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -95,7 +101,7 @@ def run_RBC(useGPU=False):
     t0 = 0.0
     Tend = 500
     P = controller.MS[0].levels[0].prob
-    uinit = P.u_exact(t0)
+    uinit = P.u_exact(t0, seed=comm.rank)
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
@@ -107,6 +113,7 @@ def plot_RBC(size, quantitiy='T'):
     from pySDC.implementations.hooks.log_solution import LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
     from mpl_toolkits.axes_grid1 import make_axes_locatable
+    import gc
 
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
@@ -115,11 +122,11 @@ def plot_RBC(size, quantitiy='T'):
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
 
-    fig = P.get_fig()
-    cax = P.cax
-    axs = fig.get_axes()
+    for i in range(0, 400):
+        fig = P.get_fig()
+        cax = P.cax
+        axs = fig.get_axes()
 
-    for i in range(400):
         buffer = {}
         vmin = {quantitiy: 0, 'vorticity': 0}
         vmax = {quantitiy: 0, 'vorticity': 0}
@@ -149,16 +156,20 @@ def plot_RBC(size, quantitiy='T'):
                 buffer[f'X-{rank}'],
                 buffer[f'Z-{rank}'],
                 buffer[f'u-{rank}']['u'][P.index(quantitiy)].real,
-                vmin=-vmax[quantitiy],
+                vmin=vmin[quantitiy],
                 vmax=vmax[quantitiy],
-                cmap='bwr',
+                cmap='plasma',
             )
             fig.colorbar(im, cax[0])
-            axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2e}')
+            axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
             axs[1].set_xlabel('x')
             axs[1].set_ylabel('z')
         plt.pause(1e-9)
         fig.savefig(f'simulation_plots/RBC{i:06d}.png', dpi=300, bbox_inches='tight')
+        plt.close(fig)
+        del fig
+        del buffer
+        gc.collect()
     plt.show()
 
 

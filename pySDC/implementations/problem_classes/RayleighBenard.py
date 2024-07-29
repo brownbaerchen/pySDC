@@ -13,7 +13,7 @@ class RayleighBenard(GenericSpectralLinear):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
-            'T_bottom': 2,
+            'T_bottom': 0.5,
             'v_top': 0,
             'v_bottom': 0,
             'p_integral': 0,
@@ -116,25 +116,29 @@ class RayleighBenard(GenericSpectralLinear):
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
 
         # evaluate implicit terms
-        f_hat.impl[iT] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
-        f_hat.impl[iu] = (-Dx @ u_hat[ip].flatten() + nu * Dxx @ u_hat[iu].flatten()).reshape(shape)
-        f_hat.impl[iv] = (-Dz @ u_hat[ip].flatten() + nu * Dz @ u_hat[ivz].flatten()).reshape(shape) + u_hat[iT]
+        f_hat.impl[iT][:] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
+        f_hat.impl[iu][:] = (
+            -Dx @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iu].flatten() + Dz @ u_hat[iuz].flatten())
+        ).reshape(shape)
+        f_hat.impl[iv][:] = (
+            -Dz @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iv].flatten() + Dz @ u_hat[ivz].flatten())
+        ).reshape(shape) + u_hat[iT]
 
         f.impl[:] = self.itransform(f_hat.impl)
 
         Dx_u_hat = self.u_init
-        for i in [iu, iT]:
+        for i in [iu, iv, iT]:
             Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(shape)
         Dx_u = self.itransform(Dx_u_hat)
 
         # treat convection explicitly
-        f.expl[iu] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
-        f.expl[iv] = -(u[iu] * Dx_u[iv] + u[iv] * u[ivz])
-        f.expl[iT] = -(u[iu] * Dx_u[iT] + u[iv] * u[iTz])
+        f.expl[iu][:] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
+        f.expl[iv][:] = -(u[iu] * Dx_u[iv] + u[iv] * u[ivz])
+        f.expl[iT][:] = -(u[iu] * Dx_u[iT] + u[iv] * u[iTz])
 
         return f
 
-    def u_exact(self, t=0, noise_level=1e-3, sigma=0):
+    def u_exact(self, t=0, noise_level=1e-3, sigma=0, seed=99):
         assert t == 0
         assert (
             self.BCs['v_top'] == self.BCs['v_bottom']
@@ -151,7 +155,7 @@ class RayleighBenard(GenericSpectralLinear):
             me[self.index(f'{comp}z')] = a
 
         # perturb slightly
-        rng = self.xp.random.default_rng(seed=99)
+        rng = self.xp.random.default_rng(seed=seed)
         from scipy.ndimage import gaussian_filter
 
         noise = self.u_init
