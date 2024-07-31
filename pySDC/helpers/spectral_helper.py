@@ -231,7 +231,7 @@ class ChebychovHelper(SpectralHelper1D):
         xp = self.xp
 
         N = self.N
-        k = xp.arange(N)
+        k = self.get_wavenumbers()
         norm = self.get_norm()
 
         # forwards transform

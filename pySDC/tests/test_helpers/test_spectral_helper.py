@@ -165,14 +165,16 @@ def test_matrix1D(N, base, type):
 def test_transform_dealias(
     bx,
     bz,
-    nx=2**1,
-    nz=2**2,
+    nx=2**2 + 1,
+    nz=2**2 + 1,
     padding=3 / 2,
     axes=(
         -2,
         -1,
     ),
 ):
+    assert nx % 2 == 1
+    assert nz % 2 == 1
     from mpi4py import MPI
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
@@ -192,12 +194,13 @@ def test_transform_dealias(
     helper_padded.add_axis(base=bz, N=shape_padded[1])
     helper_padded.setup_fft()
 
+    kz, kx = helper.get_wavenumbers()
+    kz_padded, kx_padded = helper_padded.get_wavenumbers()
+
+    Z, X = helper.get_grid()
     u = helper.u_init
     u[:] = xp.random.rand(*shape)
     u_hat = helper.transform(u)
-
-    kz, kx = helper.get_wavenumbers()
-    kz_padded, kx_padded = helper_padded.get_wavenumbers()
 
     u_hat_padded = helper_padded.u_init_forward
     mask = xp.ones(shape_padded, bool)
