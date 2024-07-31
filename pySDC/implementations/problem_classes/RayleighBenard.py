@@ -9,7 +9,9 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, **kwargs):
+    def __init__(
+        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, dealisasing=3 / 2, **kwargs
+    ):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
@@ -26,6 +28,8 @@ class RayleighBenard(GenericSpectralLinear):
         bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 8}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
         super().__init__(bases, components, comm, **kwargs)
+
+        self.padded_trf, self.padding_mask = self.get_padded_version(padding=dealisasing)
 
         self.indices = {
             'u': 0,
@@ -133,15 +137,14 @@ class RayleighBenard(GenericSpectralLinear):
         f.impl[:] = self.itransform(f_impl_hat).real
 
         Dx_u_hat = self.u_init_forward
+        Dx_u_hat_padded = self.padded_trf.u_init_forward
         for i in [iu, iv, iT]:
-            Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(shape)
+            buffer = self.xp.zeros(shape=np.prod(self.padded_trf.shape), dtype=complex)
+            buffer[self.padding_mask] = Dx @ u_hat[i].flatten()
+            Dx_u_hat_padded[i] = buffer.reshape(Dx_u_hat_padded[i].shape)
+
+        Dx_u = self.padded_trf.itransform(Dx_u_hat_padded)
         Dx_u = self.itransform(Dx_u_hat, padding=3 / 2.0).real
-        # _fft = self.get_fft(axes=(0,), direction='object', padding=3/2)
-        # from mpi4py_fft import newDistArray
-        # me = newDistArray(_fft, forward_output=True)
-        # print(u_hat.shape, u.shape, me.shape)
-        # print(Dx_u.shape)
-        # u_padded = self.itrans
 
         # treat convection explicitly
         f.expl[iu][:] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])

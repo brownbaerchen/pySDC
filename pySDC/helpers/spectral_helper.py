@@ -978,6 +978,16 @@ class SpectralHelper:
             mask_axis = self.xp.logical_and(mask_top, mask_bottom)
             mask = self.xp.logical_and(mask, mask_axis)
 
-        mask = mask.flatten()
+        padded.padding_mask = mask.flatten()
+        return padded
 
-        return padded, mask
+    def fill_padded(self, u_hat, u_hat_pad):
+        assert hasattr(self, 'padding_mask'), 'I don\'t seem to be a padded transform!'
+
+        buffer = self.xp.zeros(shape=np.prod(self.shape), dtype=complex)
+        buffer[self.padding_mask] = u_hat.flatten()
+        u_hat_pad[...] = buffer.reshape(u_hat_pad.shape)
+
+    def retrieve_padded(self, u_hat, u_hat_pad):
+        assert hasattr(self, 'padding_mask'), 'I don\'t seem to be a padded transform!'
+        u_hat[...] = (u_hat_pad.flatten()[self.padding_mask]).reshape(u_hat.shape)

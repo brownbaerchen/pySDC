@@ -188,24 +188,23 @@ def test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
-    helper_padded, mask = helper.get_zero_padded_version(padding=padding)
+    helper_padded = helper.get_zero_padded_version(padding=padding)
 
     u = helper.u_init
     u[:] = xp.random.rand(*shape)
     u_hat = helper.transform(u)
 
     u_hat_padded = helper_padded.u_init_forward
-    mask = mask.flatten()
     for i in range(helper.ncomponents):
-        buffer = xp.zeros(shape=(np.prod(helper_padded.shape),), dtype=complex)
-        buffer[mask] = u_hat[i].flatten()
-        u_hat_padded[i] = buffer.reshape(u_hat_padded[i].shape)
+        helper_padded.fill_padded(u_hat[i], u_hat_padded[i])
 
     u_padded = helper_padded.itransform(u_hat_padded)
     u = helper.itransform(u)
 
     u_2_padded_hat = helper_padded.transform(u_padded)
-    u_2_hat = u_2_padded_hat.flatten()[mask].reshape(u_hat.shape)
+    u_2_hat = helper.u_init_forward
+    for i in range(helper.ncomponents):
+        helper_padded.retrieve_padded(u_2_hat[i], u_2_padded_hat[i])
 
     assert xp.allclose(u_2_padded_hat.real, u_hat_padded.real)
     assert xp.allclose(u_2_padded_hat.imag, u_hat_padded.imag)
