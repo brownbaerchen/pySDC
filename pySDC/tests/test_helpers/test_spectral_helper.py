@@ -181,7 +181,6 @@ def test_transform_dealias(
 
     comm = MPI.COMM_WORLD
     shape = (nx, nz)
-    shape_padded = (int(nx * padding), int(nz * padding))
 
     helper = SpectralHelper(comm=comm)
     helper.add_axis(base=bx, N=nx)
@@ -189,31 +188,16 @@ def test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
-    helper_padded = SpectralHelper(comm=comm)
-    helper_padded.add_axis(base=bx, N=shape_padded[0])
-    helper_padded.add_axis(base=bz, N=shape_padded[1])
-    helper_padded.setup_fft()
+    helper_padded, mask = helper.get_zero_padded_version(padding=padding)
 
-    kz, kx = helper.get_wavenumbers()
-    kz_padded, kx_padded = helper_padded.get_wavenumbers()
-
-    Z, X = helper.get_grid()
     u = helper.u_init
     u[:] = xp.random.rand(*shape)
     u_hat = helper.transform(u)
 
     u_hat_padded = helper_padded.u_init_forward
-    mask = xp.ones(shape_padded, bool)
-    k_pad = helper_padded.get_wavenumbers()[::-1]
-    for axis in range(helper.ndim):
-        k = helper.axes[axis].get_wavenumbers()
-        mask_top = k_pad[axis] <= xp.max(k)
-        mask_bottom = k_pad[axis] >= xp.min(k)
-        mask_axis = xp.logical_and(mask_top, mask_bottom)
-        mask = xp.logical_and(mask, mask_axis)
     mask = mask.flatten()
     for i in range(helper.ncomponents):
-        buffer = xp.zeros(shape=(np.prod(helper_padded.init[0][1:]),), dtype=complex)
+        buffer = xp.zeros(shape=(np.prod(helper_padded.shape),), dtype=complex)
         buffer[mask] = u_hat[i].flatten()
         u_hat_padded[i] = buffer.reshape(u_hat_padded[i].shape)
 

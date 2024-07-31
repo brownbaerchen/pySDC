@@ -8,7 +8,7 @@ class SpectralHelper1D:
     sparse_lib = scipy.sparse
     xp = np
 
-    def __init__(self, N, x0=None, x1=None):
+    def __init__(self, N, x0=None, x1=None, **kwargs):
         self.N = N
         self.x0 = x0
         self.x1 = x1
@@ -438,6 +438,10 @@ class SpectralHelper:
         return self.dtype(self.init_forward)
 
     @property
+    def shape(self):
+        return self.init[0][1:]
+
+    @property
     def ndim(self):
         return len(self.axes)
 
@@ -446,9 +450,10 @@ class SpectralHelper:
         return len(self.components)
 
     def add_axis(self, base, *args, **kwargs):
-        if base.lower() in ['chebychov', 'chebychev', 'cheby']:
-            self.axes.append(ChebychovHelper(*args, **kwargs, transform_type='fft'))
-        elif base.lower() in ['fft', 'fourier']:
+        if base.lower() in ['chebychov', 'chebychev', 'cheby', 'chebychovhelper']:
+            kwargs['transform_type'] = kwargs.get('transform_type', 'fft')
+            self.axes.append(ChebychovHelper(*args, **kwargs))
+        elif base.lower() in ['fft', 'fourier', 'ffthelper']:
             self.axes.append(FFTHelper(*args, **kwargs))
         else:
             raise NotImplementedError(f'{base=!r} is not implemented!')
@@ -951,3 +956,28 @@ class SpectralHelper:
             raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
 
         return C
+
+    def get_zero_padded_version(self, padding=3 / 2):
+        padded = SpectralHelper(self.comm)
+        for base in self.axes:
+            params = {
+                **base.__dict__,
+                'N': int(padding * base.N),
+                'base': type(base).__name__,
+            }
+
+            padded.add_axis(**params)
+        padded.setup_fft()
+
+        mask = self.xp.ones(padded.shape, bool)
+        K_padded = padded.get_wavenumbers()[::-1]
+        for axis in range(self.ndim):
+            k = self.axes[axis].get_wavenumbers()
+            mask_top = K_padded[axis] <= self.xp.max(k)
+            mask_bottom = K_padded[axis] >= self.xp.min(k)
+            mask_axis = self.xp.logical_and(mask_top, mask_bottom)
+            mask = self.xp.logical_and(mask, mask_axis)
+
+        mask = mask.flatten()
+
+        return padded, mask
