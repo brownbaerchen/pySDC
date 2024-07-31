@@ -13,15 +13,17 @@ class RayleighBenard(GenericSpectralLinear):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
-            'T_bottom': 0.5,
+            'T_bottom': 2,
             'v_top': 0,
             'v_bottom': 0,
+            'u_top': 0,
+            'u_bottom': 0,
             'p_integral': 0,
             **BCs,
         }
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        bases = [{'base': 'fft', 'N': nx}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
+        bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 8}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
         super().__init__(bases, components, comm, **kwargs)
 
@@ -53,6 +55,8 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dx = Dx
         self.Dxx = Dxx
         self.Dz = Dz
+        Dz_special = Dz.copy().tolil()
+        # Dz_special[-2] = 0
         self.U2T = self.get_basis_change_matrix()
 
         kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
@@ -63,7 +67,7 @@ class RayleighBenard(GenericSpectralLinear):
             'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
             'uz': {'u': -Dz, 'uz': I},  # algebraic constraint for first derivative
             'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
-            'p': {'u': -Dx, 'vz': -I},  # divergence free constraint
+            'p': {'u': Dx, 'vz': I},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx, 'uz': -nu * Dz},
             'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -I},
             'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
@@ -77,12 +81,14 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True)
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', zero_line=True)
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
-        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True)
+        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True)
         self.add_BC(
-            component='v', equation='vz', axis=1, x=1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
+            component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
         )
-        self.add_BC(component='u', equation='u', axis=1, v=0, x=1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='u', equation='uz', axis=1, v=0, x=-1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(
+            component='u', equation='uz', axis=1, v=self.BCs['u_bottom'], x=-1, kind='Dirichlet', zero_line=True
+        )
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -129,12 +135,21 @@ class RayleighBenard(GenericSpectralLinear):
         Dx_u_hat = self.u_init_forward
         for i in [iu, iv, iT]:
             Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(shape)
-        Dx_u = self.itransform(Dx_u_hat).real
+        Dx_u = self.itransform(Dx_u_hat, padding=3 / 2.0).real
+        # _fft = self.get_fft(axes=(0,), direction='object', padding=3/2)
+        # from mpi4py_fft import newDistArray
+        # me = newDistArray(_fft, forward_output=True)
+        # print(u_hat.shape, u.shape, me.shape)
+        # print(Dx_u.shape)
+        # u_padded = self.itrans
 
         # treat convection explicitly
         f.expl[iu][:] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
         f.expl[iv][:] = -(u[iu] * Dx_u[iv] + u[iv] * u[ivz])
         f.expl[iT][:] = -(u[iu] * Dx_u[iT] + u[iv] * u[iTz])
+
+        fexpl_hat = self.transform(f.expl, padding=1.5)
+        f.expl[:] = self.itransform(fexpl_hat, padding=1.5)
 
         return f
 
@@ -148,7 +163,7 @@ class RayleighBenard(GenericSpectralLinear):
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
 
         # linear temperature gradient
-        for comp in ['T', 'v']:
+        for comp in ['T', 'v', 'u']:
             a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
             b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
             me[self.index(comp)] = a * self.Z + b
@@ -193,9 +208,9 @@ class RayleighBenard(GenericSpectralLinear):
         # for k, v in violations.items():
         #     assert self.xp.allclose(v, 0), f'Initial conditions violate constraint in {k}!'
 
-        # BC_violations = self.compute_BC_violation(me)
-        # for k, v in BC_violations.items():
-        #     assert self.xp.allclose(v, 0), f'Initial conditions violate boundary conditions in {k} by {v}!'
+        BC_violations = self.compute_BC_violation(me)
+        for k, v in BC_violations.items():
+            assert self.xp.allclose(v, 0), f'Initial conditions violate boundary conditions in {k} by {v}!'
 
         return me
 
@@ -261,7 +276,7 @@ class RayleighBenard(GenericSpectralLinear):
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((8, 5)))
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
         self.cax = []
         divider = make_axes_locatable(axs[0])
         self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
@@ -300,7 +315,7 @@ class RayleighBenard(GenericSpectralLinear):
             axs[i].set_title(label)
 
         if t is not None:
-            fig.suptitle(f't = {t:.2e}')
+            fig.suptitle(f't = {t:.2f}')
         axs[1].set_xlabel(r'$x$')
         axs[1].set_ylabel(r'$z$')
         fig.colorbar(imT, self.cax[0])

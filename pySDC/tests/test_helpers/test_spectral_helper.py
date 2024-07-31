@@ -159,6 +159,72 @@ def test_matrix1D(N, base, type):
     assert np.allclose(exact, du)
 
 
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+def test_transform_dealias(
+    bx,
+    bz,
+    nx=2**1,
+    nz=2**2,
+    padding=3 / 2,
+    axes=(
+        -2,
+        -1,
+    ),
+):
+    from mpi4py import MPI
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    comm = MPI.COMM_WORLD
+    shape = (nx, nz)
+    shape_padded = (int(nx * padding), int(nz * padding))
+
+    helper = SpectralHelper(comm=comm)
+    helper.add_axis(base=bx, N=nx)
+    helper.add_axis(base=bz, N=nz)
+    helper.setup_fft()
+    xp = helper.xp
+
+    helper_padded = SpectralHelper(comm=comm)
+    helper_padded.add_axis(base=bx, N=shape_padded[0])
+    helper_padded.add_axis(base=bz, N=shape_padded[1])
+    helper_padded.setup_fft()
+
+    u = helper.u_init
+    u[:] = xp.random.rand(*shape)
+    u_hat = helper.transform(u)
+
+    kz, kx = helper.get_wavenumbers()
+    kz_padded, kx_padded = helper_padded.get_wavenumbers()
+
+    u_hat_padded = helper_padded.u_init_forward
+    mask = xp.ones(shape_padded, bool)
+    k_pad = helper_padded.get_wavenumbers()[::-1]
+    for axis in range(helper.ndim):
+        k = helper.axes[axis].get_wavenumbers()
+        mask_top = k_pad[axis] <= xp.max(k)
+        mask_bottom = k_pad[axis] >= xp.min(k)
+        mask_axis = xp.logical_and(mask_top, mask_bottom)
+        mask = xp.logical_and(mask, mask_axis)
+    mask = mask.flatten()
+    for i in range(helper.ncomponents):
+        buffer = xp.zeros(shape=(np.prod(helper_padded.init[0][1:]),), dtype=complex)
+        buffer[mask] = u_hat[i].flatten()
+        u_hat_padded[i] = buffer.reshape(u_hat_padded[i].shape)
+
+    u_padded = helper_padded.itransform(u_hat_padded)
+    u = helper.itransform(u)
+
+    u_2_padded_hat = helper_padded.transform(u_padded)
+    u_2_hat = u_2_padded_hat.flatten()[mask].reshape(u_hat.shape)
+
+    assert xp.allclose(u_2_padded_hat.real, u_hat_padded.real)
+    assert xp.allclose(u_2_padded_hat.imag, u_hat_padded.imag)
+    assert xp.allclose(u_2_hat, u_hat)
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
@@ -388,7 +454,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     rhs_hat = helper.transform(rhs, axes=(-1, -2))
 
     # solve the system
-    sol_hat = helper.u_init
+    sol_hat = helper.u_init_forward
     sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
     sol = helper.itransform(sol_hat, axes=(-2, -1)).real
 
@@ -461,9 +527,10 @@ if __name__ == '__main__':
         # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(0, 8, 1, kind='Dirichlet')
+        # test_tau_method(0, 8, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
+        test_transform_dealias(bx='fft', bz='cheby')
     else:
         raise NotImplementedError
     print('done')

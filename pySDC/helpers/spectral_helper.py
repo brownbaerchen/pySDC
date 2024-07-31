@@ -8,8 +8,11 @@ class SpectralHelper1D:
     sparse_lib = scipy.sparse
     xp = np
 
-    def __init__(self, N):
+    def __init__(self, N, x0=None, x1=None):
         self.N = N
+        self.x0 = x0
+        self.x1 = x1
+        self.L = x1 - x0
 
     def get_Id(self):
         raise NotImplementedError
@@ -58,8 +61,10 @@ class SpectralHelper1D:
 
 
 class ChebychovHelper(SpectralHelper1D):
-    def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', x0=-1, x1=1, **kwargs):
+        assert x0 == -1
+        assert x1 == 1
+        super().__init__(*args, x0=x0, x1=x1, **kwargs)
         self.S = S
         self.d = d
         self.mode = mode
@@ -361,10 +366,8 @@ class ChebychovHelper(SpectralHelper1D):
 
 
 class FFTHelper(SpectralHelper1D):
-    def __init__(self, *args, x0=0, L=2 * np.pi, **kwargs):
-        self.x0 = x0
-        self.L = L
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, x0=0, x1=2 * np.pi, **kwargs):
+        super().__init__(*args, x0=x0, x1=x1, **kwargs)
 
     def get_1dgrid(self):
         dx = self.L / self.N
@@ -573,16 +576,22 @@ class SpectralHelper:
         else:
             return self.sparse_lib.bmat(M, format='lil')
 
+    def get_wavenumbers(self):
+        grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
+        return self.xp.meshgrid(*grids)
+
     def get_grid(self):
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
-    def get_fft(self, axes, direction):
+    def get_fft(self, axes, direction, padding=1):
         shape = self.global_shape[1:]
-        key = (axes, direction)
+        key = (axes, direction, padding)
 
         if key not in self.fft_cache.keys():
             if self.comm is None:
+                if padding != 1:
+                    raise NotImplementedError
                 if direction == 'forward':
                     self.fft_cache[key] = self.xp.fft.fftn
                 elif direction == 'backward':
@@ -600,6 +609,10 @@ class SpectralHelper:
                     collapse=False,
                     backend=self.fft_backend,
                     comm_backend=self.fft_comm_backend,
+                    padding=[
+                        padding,
+                    ]
+                    * self.ndim,
                 )
                 if direction == 'forward':
                     self.fft_cache[key] = _fft.forward
@@ -651,11 +664,11 @@ class SpectralHelper:
         else:
             return u.redistribute(axis)
 
-    def _transform_fft(self, u, axes):
-        fft = self.get_fft(axes, 'forward')
+    def _transform_fft(self, u, axes, padding=1):
+        fft = self.get_fft(axes, 'forward', padding)
         return fft(u, axes=axes)
 
-    def _transform_dct(self, u, axes):
+    def _transform_dct(self, u, axes, padding=1):
         result = u.copy()
 
         if len(axes) > 1:
@@ -668,7 +681,7 @@ class SpectralHelper:
             shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
             v = v[*shuffle]
 
-            fft = self.get_fft(axes, 'forward')
+            fft = self.get_fft(axes, 'forward', padding=padding)
             v = fft(v, axes=axes)
 
             expansion = [np.newaxis for _ in u.shape]
@@ -678,7 +691,7 @@ class SpectralHelper:
         result.real[...] = v.real
         return result
 
-    def transform(self, u, axes=None):
+    def transform(self, u, axes=None, padding=1):
         trfs = {
             ChebychovHelper: self._transform_dct,
             FFTHelper: self._transform_fft,
@@ -696,7 +709,7 @@ class SpectralHelper:
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
 
                 if len(axes_base) > 0:
-                    fft = self.get_fft(axes_base, 'object')
+                    fft = self.get_fft(axes_base, 'object', padding=padding)
                     if fft:
                         from mpi4py_fft import newDistArray
 
@@ -717,11 +730,11 @@ class SpectralHelper:
 
         return result
 
-    def _transform_ifft(self, u, axes):
-        ifft = self.get_fft(axes, 'backward')
+    def _transform_ifft(self, u, axes, padding=1):
+        ifft = self.get_fft(axes, 'backward', padding=padding)
         return ifft(u, axes=axes)
 
-    def _transform_idct(self, u, axes):
+    def _transform_idct(self, u, axes, padding=1):
         result = u.copy()
 
         v = u.copy().astype(complex)
@@ -736,7 +749,7 @@ class SpectralHelper:
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-            ifft = self.get_fft(axes, 'backward')
+            ifft = self.get_fft(axes, 'backward', padding=padding)
             v = ifft(v, axes=axes)
 
             shuffle = [slice(0, s, 1) for s in u.shape]
@@ -746,7 +759,7 @@ class SpectralHelper:
         result.real[...] = v.real
         return result
 
-    def itransform(self, u, axes=None):
+    def itransform(self, u, axes=None, padding=1.0):
         trfs = {
             FFTHelper: self._transform_ifft,
             ChebychovHelper: self._transform_idct,
@@ -764,7 +777,7 @@ class SpectralHelper:
                 axes_base = tuple(me for me in axes if type(self.axes[me]) == base)
 
                 if len(axes_base) > 0:
-                    fft = self.get_fft(axes_base, 'object')
+                    fft = self.get_fft(axes_base, 'object', padding=padding)
                     if fft:
                         from mpi4py_fft import newDistArray
 

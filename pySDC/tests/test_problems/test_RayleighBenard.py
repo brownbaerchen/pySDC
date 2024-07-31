@@ -537,7 +537,8 @@ def test_solver_small_step_size(plotting=False):
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-def test_solver(nx, nz, cheby_mode, plotting=False):
+@pytest.mark.parametrize('noise', [1e-3, 0])
+def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
     import matplotlib.pyplot as plt
@@ -549,14 +550,26 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     except ModuleNotFoundError:
         comm = None
 
+    BCs = None
+    if noise == 0:
+        BCs = {
+            'v_top': 3,
+            'v_bottom': 3,
+            'u_top': -4.5,
+            'u_bottom': 1.2,
+            'T_bottom': 0,
+            'T_top': -4,
+        }
+
     P = RayleighBenard(
         nx=nx,
         nz=nz,
         cheby_mode=cheby_mode,
         comm=comm,
         solver_type='direct',
-        left_preconditioner=True,
-        right_preconditioning='D2T',
+        left_preconditioner=False,
+        right_preconditioning='T2T',
+        BCs=BCs,
     )  # , Rayleigh=4e3)
 
     def IMEX_Euler(_u, dt):
@@ -598,18 +611,21 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     # compute_errors(u_static, static, 'static configuration')
 
     # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
-    _u0 = P.u_exact(noise_level=1e-3, sigma=0.0)
-    u0 = P.solve_system(_u0, 0.25)
+    if noise == 0:
+        u0 = P.u_exact(noise_level=noise)
+        # u0[P.index('v')] += np.sin(P.Z * np.pi)
+        # u0[P.index('u')] -= np.sin(P.X * np.pi)
+    else:
+        _u0 = P.u_exact(noise_level=noise, sigma=0.0)
+        u0 = P.solve_system(_u0, 0.25)
 
     small_dt = P.solve_system(u0, 1e0)
-    compute_errors(u0, small_dt, 'tiny step size', 1e-9)
-    # P.plot(u0, quantity='p')
-    # P.plot(small_dt, quantity='Tz')
+    compute_errors(u0, small_dt, 'tiny step size', 1e-9, components=['u', 'v', 'T', 'uz', 'vz', 'Tz'])
+    # P.plot(u0, quantity='u')
+    # P.plot(small_dt, quantity='u')
     # plt.show()
-    # return None
 
     dt = 1e-1
-    u0 = P.u_exact(noise_level=1e-4, sigma=0.0)
     forward = P.solve_system(u0, dt)
     f = P.eval_f(forward)
     backward = forward - dt * (f.impl)
@@ -619,12 +635,12 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
     # return None
 
     dt = 1e-1
-    u0 = P.u_exact(noise_level=1e-4)
     forward = IMEX_Euler(u0, dt)
     f = P.eval_f(forward)
     f_before = P.eval_f(u0)
     backward = forward - dt * (f.impl + f_before.expl)
     compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
+    # return None
 
     if plotting:
         u = P.u_exact(noise_level=1e-3, sigma=0)
@@ -639,6 +655,7 @@ def test_solver(nx, nz, cheby_mode, plotting=False):
         for i in range(nsteps):
             t += dt
             u = IMEX_Euler(u, dt)
+            # f = P.eval_f(u)
 
             P.plot(u, t, fig=fig, quantity='T')
             plt.pause(1e-8)
@@ -650,7 +667,7 @@ if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(8, 8, 'T2T', 'x')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
-    test_solver(2**7, 2**6, 'T2U', plotting=True)
+    test_solver(2**8, 2**6, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

@@ -151,7 +151,7 @@ class GenericSpectralLinear(Problem):
 
         rhs_hat = self.spectral.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
-        rhs = self.spectral.itransform(rhs_hat)
+        rhs = self.spectral.itransform(rhs_hat).real
 
         rhs = self.spectral.put_BCs_in_rhs(rhs) / dt
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
@@ -161,12 +161,31 @@ class GenericSpectralLinear(Problem):
 
         # print(rhs_hat.reshape(sol.shape))
 
+        import numpy as np
+
+        # T = A.toarray()
+        # for i in range(T.shape[0]):
+        #     for j in range(T.shape[0]):
+        #         if i == j:
+        #             continue
+        #         ratios = T[i,:][T[j,:]!=0] / T[j,:][T[j,:]!=0]
+        #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
+        #             print(i, j, ratios)
+        # for i in range(T.shape[0]):
+        #     for j in range(T.shape[0]):
+        #         if i == j:
+        #             continue
+        #         ratios = T[:,i][T[:,j]!=0] / T[:,j][T[:,j]!=0]
+        #         print(i, j, ratios)
+        #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
+        #             print(i, j, ratios)
         # import matplotlib.pyplot as plt
-        # import numpy as np
         # im = plt.imshow((A/abs(A)).real)
-        # im = plt.imshow(np.log10(abs(A.toarray())).real)
+        # # im = plt.imshow(np.log10(abs(A.toarray())).real)
+        # # im = plt.imshow(((A.toarray())).real)
         # plt.colorbar(im)
         # plt.show()
+        # print('p', rhs.reshape(sol.shape)[self.index('p')])
 
         if self.solver_type == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)

@@ -8,7 +8,7 @@ from pySDC.core.convergence_controller import ConvergenceController
 class CFLLimit(ConvergenceController):
     def get_new_step_size(self, controller, step, **kwargs):
         max_step_size = np.inf
-        min_step_size = 1e-3
+        min_step_size = 5e-2
 
         L = step.levels[0]
         P = step.levels[0].prob
@@ -34,15 +34,17 @@ class CFLLimit(ConvergenceController):
 
 def run_RBC(useGPU=False):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-    from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+    from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
     from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
     from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
 
+    # from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK54 as sweeper_class
+
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
-    imex_1st_order.compute_residual = compute_residual_DAE
+    sweeper_class.compute_residual = compute_residual_DAE
 
     comm = MPI.COMM_WORLD
     LogToFile.path = './data/'
@@ -51,6 +53,7 @@ def run_RBC(useGPU=False):
         't': L.time + L.dt,
         'u': L.uend.view(np.ndarray),
         'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
+        'divergence': np.log10(np.abs(L.prob.compute_constraint_violation(L.uend)['divergence'].view(np.ndarray))),
     }
     LogGrid.file_name = f'RBC-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
@@ -62,7 +65,7 @@ def run_RBC(useGPU=False):
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e0},
         CFLLimit: {},
-        StopAtNan: {'thresh': 1e9},
+        StopAtNan: {'thresh': 1e6},
     }
 
     sweeper_params = {}
@@ -76,7 +79,7 @@ def run_RBC(useGPU=False):
         'useGPU': useGPU,
         'Rayleigh': 2e6,
         'nx': 2**8,
-        'nz': 2**8,
+        'nz': 2**6,
     }
 
     step_params = {}
@@ -90,7 +93,7 @@ def run_RBC(useGPU=False):
     description = {}
     description['problem_class'] = RayleighBenard
     description['problem_params'] = problem_params
-    description['sweeper_class'] = imex_1st_order
+    description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -99,16 +102,21 @@ def run_RBC(useGPU=False):
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
     t0 = 0.0
-    Tend = 500
+    Tend = 50
     P = controller.MS[0].levels[0].prob
-    uinit = P.u_exact(t0, seed=comm.rank)
+
+    relaxation_steps = 0
+    u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
+    uinit = u0_noise
+    for _ in range(relaxation_steps):
+        uinit = P.solve_system(uinit, dt=0.25)
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
     return stats
 
 
-def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
+def plot_RBC(size, quantitiy='T', quantitiy2='divergence', render=True, start_idx=0):
     import matplotlib.pyplot as plt
     from pySDC.implementations.hooks.log_solution import LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -122,14 +130,16 @@ def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
 
+    cmaps = {'vorticity': 'bwr'}
+
     for i in range(start_idx, 999):
         fig = P.get_fig()
         cax = P.cax
         axs = fig.get_axes()
 
         buffer = {}
-        vmin = {quantitiy: 0, 'vorticity': 0}
-        vmax = {quantitiy: 0, 'vorticity': 0}
+        vmin = {quantitiy: np.inf, quantitiy2: np.inf}
+        vmax = {quantitiy: -np.inf, quantitiy2: -np.inf}
         for rank in range(size):
             LogToFile.file_name = f'RBC-{rank}'
             LogGrid.file_name = f'RBC-grid-{rank}'
@@ -137,8 +147,8 @@ def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
             buffer[f'u-{rank}'] = LogToFile.load(i)
             buffer[f'Z-{rank}'], buffer[f'X-{rank}'] = LogGrid.load()
 
-            vmin['vorticity'] = min([vmin['vorticity'], buffer[f'u-{rank}']['vorticity'].real.min()])
-            vmax['vorticity'] = max([vmax['vorticity'], abs(buffer[f'u-{rank}']['vorticity'].real).max()])
+            vmin[quantitiy2] = min([vmin[quantitiy2], buffer[f'u-{rank}'][quantitiy2].real.min()])
+            vmax[quantitiy2] = max([vmax[quantitiy2], buffer[f'u-{rank}'][quantitiy2].real.max()])
             vmin[quantitiy] = min([vmin[quantitiy], buffer[f'u-{rank}']['u'][P.index(quantitiy)].real.min()])
             vmax[quantitiy] = max([vmax[quantitiy], buffer[f'u-{rank}']['u'][P.index(quantitiy)].real.max()])
 
@@ -146,10 +156,10 @@ def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
             im = axs[1].pcolormesh(
                 buffer[f'X-{rank}'],
                 buffer[f'Z-{rank}'],
-                buffer[f'u-{rank}']['vorticity'].real,
-                vmin=-vmax['vorticity'],
-                vmax=vmax['vorticity'],
-                cmap='bwr',
+                buffer[f'u-{rank}'][quantitiy2].real,
+                vmin=-vmax[quantitiy2] if cmaps.get(quantitiy2, None) in ['bwr'] else vmin[quantitiy2],
+                vmax=vmax[quantitiy2],
+                cmap=cmaps.get(quantitiy2, None),
             )
             fig.colorbar(im, cax[1])
             im = axs[0].pcolormesh(
@@ -164,9 +174,12 @@ def plot_RBC(size, quantitiy='T', render=True, start_idx=0):
             axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
             axs[1].set_xlabel('x')
             axs[1].set_ylabel('z')
+            axs[0].set_aspect(1.0)
+            axs[1].set_aspect(1.0)
         path = f'simulation_plots/RBC{i:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
         print(f'Stored figure {path!r}', flush=True)
+        # plt.show()
         if render:
             plt.pause(1e-9)
         plt.close(fig)
