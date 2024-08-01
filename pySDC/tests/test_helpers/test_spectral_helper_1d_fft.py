@@ -3,11 +3,14 @@ import pytest
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [8, 64])
-def test_differentiation_matrix(N, plot=False):
+@pytest.mark.parametrize('x0', [0, 1])
+@pytest.mark.parametrize('x1', [None, 4])
+def test_differentiation_matrix(N, x0, x1, plot=False):
     import numpy as np
     from pySDC.helpers.spectral_helper import FFTHelper
 
-    helper = FFTHelper(N=N)
+    x1 = 2 * np.pi if x1 is None else x1
+    helper = FFTHelper(N=N, x0=x0, x1=x1)
 
     x = helper.get_1dgrid()
     D = helper.get_differentiation_matrix()
@@ -16,12 +19,13 @@ def test_differentiation_matrix(N, plot=False):
     expect = np.zeros_like(u)
 
     num_coef = N // 2
+    f = 2 * np.pi / helper.L
     coeffs = np.random.random((2, N))
     for i in range(num_coef):
-        u += coeffs[0, i] * np.sin(i * x)
-        u += coeffs[1, i] * np.cos(i * x)
-        expect += coeffs[0, i] * i * np.cos(i * x)
-        expect -= coeffs[1, i] * i * np.sin(i * x)
+        u += coeffs[0, i] * np.sin(i * x * f)
+        u += coeffs[1, i] * np.cos(i * x * f)
+        expect += coeffs[0, i] * i * np.cos(i * x * f) * f
+        expect -= coeffs[1, i] * i * np.sin(i * x * f) * f
 
     u_hat = np.fft.fft(u)
     Du_hat = D @ u_hat
@@ -87,4 +91,5 @@ def test_integration_matrix(N, plot=False):
 
 
 if __name__ == '__main__':
+    test_differentiation_matrix(64, 4, True)
     test_integration_matrix(8, True)

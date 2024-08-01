@@ -59,6 +59,9 @@ class SpectralHelper1D:
         F[:, mask] = 0
         return F.tocsc()
 
+    def get_1dgrid(self):
+        raise NotImplementedError
+
 
 class ChebychovHelper(SpectralHelper1D):
     def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', x0=-1, x1=1, **kwargs):
@@ -378,9 +381,10 @@ class FFTHelper(SpectralHelper1D):
 
     def get_differentiation_matrix(self, p=1):
         k = self.get_wavenumbers()
-        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
+        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k * 2 * np.pi / self.L), p)
 
     def get_integration_matrix(self, p=1):
+        assert self.L == 2 * np.pi, f'Integration matrix not implemented for L={self.L}'
         k = self.xp.array(self.get_wavenumbers(), dtype='complex128')
         k[0] = 1j * self.L
         return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
@@ -959,6 +963,7 @@ class SpectralHelper:
 
     def get_zero_padded_version(self, padding=3 / 2):
         padded = SpectralHelper(self.comm)
+        padded.add_component(self.components)
         for base in self.axes:
             params = {
                 **base.__dict__,
