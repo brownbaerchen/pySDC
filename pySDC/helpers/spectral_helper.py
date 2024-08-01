@@ -713,6 +713,8 @@ class SpectralHelper:
                 axes_base = tuple(sorted(me for me in axes if type(self.axes[me]) == base))
 
                 if len(axes_base) > 0:
+                    _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[-1])
+
                     fft = self.get_fft(axes_base, 'object')
                     if fft:
                         from mpi4py_fft import newDistArray
@@ -721,7 +723,6 @@ class SpectralHelper:
                     else:
                         _out = _in
 
-                    _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[-1])
                     _out[...] = trfs[base](_in, axes=axes_base)
 
                     if fft:
@@ -792,6 +793,8 @@ class SpectralHelper:
                 axes_base = tuple(sorted(me for me in axes if type(self.axes[me]) == base))
 
                 if len(axes_base) > 0:
+                    _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[0])
+
                     fft = self.get_fft(axes_base, 'object')
                     if fft:
                         from mpi4py_fft import newDistArray
@@ -800,7 +803,6 @@ class SpectralHelper:
                     else:
                         _out = _in
 
-                    _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[0])
                     if self.comm is not None:
                         _in /= np.prod([self.axes[i].N for i in axes_base])
                     _out[...] = trfs[base](_in, axes=axes_base)
@@ -971,9 +973,10 @@ class SpectralHelper:
         padded.add_component(self.components)
         for i in range(self.ndim):
             base = self.axes[i]
+            assert base.N % 2 == 1
             params = {
                 **base.__dict__,
-                'N': int(padding * base.N) if i == axis else base.N,
+                'N': int(np.ceil(padding * base.N)) if i == axis else base.N,
                 'base': type(base).__name__,
             }
 
@@ -987,9 +990,21 @@ class SpectralHelper:
             mask_bottom = K_pad[axis] >= self.xp.min(k)
             return self.xp.logical_and(mask_top, mask_bottom)
 
-        padded.padding_mask = get_mask(padded, axis).flatten()
+        padded.padding_mask_single = get_mask(padded, axis)
+        padding_mask = self.xp.zeros(padded.init[0], dtype=bool)
+        padding_mask[self.xp.stack([padded.padding_mask_single for _ in range(self.ncomponents)])] = 1
+        padded.padding_mask = padding_mask.flatten()
         padded.padding_axis = axis
+        padded.unpadded_init = self.init
         return padded
+
+    def get_padded(self, u_hat):
+        buffer = self.xp.zeros(np.prod(self.init[0]), dtype=complex)
+        buffer[self.padding_mask] = u_hat.flatten()
+        return buffer.reshape(self.init[0])
+
+    def get_unpadded(self, u_hat):
+        return (u_hat.flatten()[self.padding_mask]).reshape(self.unpadded_init[0])
 
     def fill_padded(self, u_hat, u_hat_pad):
         assert hasattr(self, 'padding_mask'), 'I don\'t seem to be a padded transform!'

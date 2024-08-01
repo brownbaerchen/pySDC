@@ -190,12 +190,12 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
 
-    print(f.expl[P.iT] / f_expect.expl[P.iT])
-    import matplotlib.pyplot as plt
+    # print(f.expl[P.iT] / f_expect.expl[P.iT])
+    # import matplotlib.pyplot as plt
 
-    Z, X = P.get_grid()
-    plt.pcolormesh(X, Z, f.expl[P.iT])
-    plt.show()
+    # Z, X = P.get_grid()
+    # plt.pcolormesh(X, Z, f.expl[P.iT])
+    # plt.show()
 
     for comp in P.spectral.components[::-1]:
         i = P.spectral.index(comp)

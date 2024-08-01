@@ -165,8 +165,8 @@ def test_matrix1D(N, base, type):
 def test_transform_dealias(
     bx,
     bz,
-    nx=2**2 + 1,
-    nz=2**2 + 1,
+    nx=2**1 + 1,
+    nz=2**1 + 1,
     padding=3 / 2,
     axes=(
         -2,
@@ -175,9 +175,6 @@ def test_transform_dealias(
     useMPI=False,
     **kwargs,
 ):
-    assert nx % 2 == 1
-    assert nz % 2 == 1
-    from mpi4py import MPI
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -196,23 +193,19 @@ def test_transform_dealias(
     xp = helper.xp
 
     shape = helper.shape
-    helper_padded = helper.get_zero_padded_version(padding=padding)
+    helper_padded = helper.get_zero_padded_version(axis=0, padding=padding)
 
     u = helper.u_init
     u[:] = xp.random.rand(*shape)
     u_hat = helper.transform(u)
 
-    u_hat_padded = helper_padded.u_init_forward
-    for i in range(helper.ncomponents):
-        helper_padded.fill_padded(u_hat[i], u_hat_padded[i])
+    u_hat_padded = helper_padded.get_padded(u_hat)
 
     u_padded = helper_padded.itransform(u_hat_padded)
     u = helper.itransform(u)
 
     u_2_padded_hat = helper_padded.transform(u_padded)
-    u_2_hat = helper.u_init_forward
-    for i in range(helper.ncomponents):
-        helper_padded.retrieve_padded(u_2_hat[i], u_2_padded_hat[i])
+    u_2_hat = helper_padded.get_unpadded(u_2_padded_hat)
 
     assert xp.allclose(u_2_padded_hat.real, u_hat_padded.real)
     assert xp.allclose(u_2_padded_hat.imag, u_hat_padded.imag)

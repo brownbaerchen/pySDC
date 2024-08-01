@@ -10,7 +10,7 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_f = imex_mesh
 
     def __init__(
-        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, dealiasing=4 / 2, **kwargs
+        self, Prandl=1, Rayleigh=2e6, nx=257, nz=65, cheby_mode='T2U', BCs=None, comm=None, dealiasing=4 / 2, **kwargs
     ):
         BCs = {} if BCs is None else BCs
         BCs = {
@@ -29,7 +29,7 @@ class RayleighBenard(GenericSpectralLinear):
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
         super().__init__(bases, components, comm, **kwargs)
 
-        self.padded_trf = self.get_zero_padded_version(padding=dealiasing)
+        self.padded_trf = self.get_zero_padded_version(axis=0, padding=dealiasing)
 
         self.indices = {
             'u': 0,
@@ -137,12 +137,12 @@ class RayleighBenard(GenericSpectralLinear):
         f.impl[:] = self.itransform(f_impl_hat).real
 
         # treat convection explicitly with dealiasing
-        u_hat_padded = self.padded_trf.u_init_forward
-        Dx_u_hat_padded = self.padded_trf.u_init_forward
+        Dx_u_hat = self.u_init_forward
         for i in [iu, iv, iT]:
-            self.padded_trf.fill_padded(Dx @ u_hat[i].flatten(), Dx_u_hat_padded[i])
-        for i in [iu, iv, iT, iuz, ivz, iTz]:
-            self.padded_trf.fill_padded(u_hat[i].flatten(), u_hat_padded[i])
+            Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(Dx_u_hat[i].shape)
+
+        Dx_u_hat_padded = self.padded_trf.get_padded(Dx_u_hat)
+        u_hat_padded = self.padded_trf.get_padded(u_hat)
 
         Dx_u_pad = self.padded_trf.itransform(Dx_u_hat_padded)
         u_pad = self.padded_trf.itransform(u_hat_padded)
@@ -154,9 +154,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         fexpl_hat_pad = self.padded_trf.transform(fexpl_pad)
 
-        fexpl_hat = self.u_init_forward
-        for i in [iu, iv, iT]:
-            self.padded_trf.retrieve_padded(fexpl_hat[i], fexpl_hat_pad[i])
+        fexpl_hat = self.padded_trf.get_unpadded(fexpl_hat_pad)
 
         f.expl[:] = self.itransform(fexpl_hat).real * self.dealiasing
 
