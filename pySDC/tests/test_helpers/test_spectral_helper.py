@@ -159,7 +159,7 @@ def test_matrix1D(N, base, type):
     assert np.allclose(exact, du)
 
 
-@pytest.mark.mpi4py
+@pytest.mark.base
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 def test_transform_dealias(
@@ -172,6 +172,8 @@ def test_transform_dealias(
         -2,
         -1,
     ),
+    useMPI=False,
+    **kwargs,
 ):
     assert nx % 2 == 1
     assert nz % 2 == 1
@@ -179,8 +181,13 @@ def test_transform_dealias(
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    comm = MPI.COMM_WORLD
-    shape = (nx, nz)
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+    else:
+        comm = None
 
     helper = SpectralHelper(comm=comm)
     helper.add_axis(base=bx, N=nx)
@@ -188,6 +195,7 @@ def test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
+    shape = helper.shape
     helper_padded = helper.get_zero_padded_version(padding=padding)
 
     u = helper.u_init
@@ -483,6 +491,13 @@ def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
     run_MPI_test(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
 
 
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('bx', ['cheby', 'fft'])
+@pytest.mark.parametrize('num_procs', [2])
+def test_dealias_MPI(bx, num_procs, nx=9, nz=7, **kwargs):
+    run_MPI_test(bx=bx, num_procs=num_procs, nx=nx, nz=nz, bz='cheby', test='dealias')
+
+
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
     str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
@@ -496,7 +511,7 @@ if __name__ == '__main__':
     parser.add_argument('--bz', type=str, help='Base in z direction')
     parser.add_argument('--bx', type=str, help='Base in x direction')
     parser.add_argument('--bc_val', type=int, help='Value of boundary condition')
-    parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau'])
+    parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau', 'dealias'])
     parser.add_argument('--variant', type=str, help='Chebychov mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
     args = parser.parse_args()
@@ -509,6 +524,8 @@ if __name__ == '__main__':
         test_integration_matrix2D(**vars(args))
     elif args.test == 'tau':
         test_tau_method2D(**vars(args))
+    elif args.test == 'dealias':
+        test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(3, 2, 'cheby', (-1, -2))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
