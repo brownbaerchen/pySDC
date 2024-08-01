@@ -134,8 +134,8 @@ def test_derivatives(nx, nz, direction, cheby_mode):
 @pytest.mark.base
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('nx', [4, 8])
-@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('nx', [5, 9])
+@pytest.mark.parametrize('nz', [5, 9])
 def test_eval_f(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -148,9 +148,9 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     nu = (P.Rayleigh / P.Prandl) ** (-1 / 2)
 
     if direction == 'x':
-        y = sin(X)
-        y_x = cos(X)
-        y_xx = -sin(X)
+        y = sin(X * np.pi)
+        y_x = cos(X * np.pi) * np.pi
+        y_xx = -sin(X * np.pi) * np.pi**2
         y_z = 0
         y_zz = 0
     elif direction == 'z':
@@ -160,11 +160,11 @@ def test_eval_f(nx, nz, cheby_mode, direction):
         y_z = 2 * Z
         y_zz = 2.0
     elif direction == 'mixed':
-        y = sin(X) * Z**2
-        y_x = cos(X) * Z**2
-        y_xx = -sin(X) * Z**2
-        y_z = sin(X) * 2 * Z
-        y_zz = sin(X) * 2
+        y = sin(X * np.pi) * Z**2
+        y_x = cos(X * np.pi) * np.pi * Z**2
+        y_xx = -sin(X * np.pi) * np.pi**2 * Z**2
+        y_z = sin(X * np.pi) * 2 * Z
+        y_zz = sin(X * np.pi) * 2
     else:
         raise NotImplementedError
 
@@ -190,7 +190,14 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
 
-    for comp in P.spectral.components:
+    print(f.expl[P.iT] / f_expect.expl[P.iT])
+    import matplotlib.pyplot as plt
+
+    Z, X = P.get_grid()
+    plt.pcolormesh(X, Z, f.expl[P.iT])
+    plt.show()
+
+    for comp in P.spectral.components[::-1]:
         i = P.spectral.index(comp)
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
@@ -665,9 +672,9 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    # test_eval_f(8, 8, 'T2T', 'x')
+    test_eval_f(65, 33, 'T2T', 'x')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
-    test_solver(2**8, 2**6, 'T2U', noise=1e-3, plotting=True)
+    # test_solver(2**8, 2**6, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(4, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

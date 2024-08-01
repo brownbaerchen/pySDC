@@ -10,7 +10,7 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_f = imex_mesh
 
     def __init__(
-        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, dealisasing=3 / 2, **kwargs
+        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, comm=None, dealiasing=4 / 2, **kwargs
     ):
         BCs = {} if BCs is None else BCs
         BCs = {
@@ -29,7 +29,7 @@ class RayleighBenard(GenericSpectralLinear):
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
         super().__init__(bases, components, comm, **kwargs)
 
-        self.padded_trf, self.padding_mask = self.get_padded_version(padding=dealisasing)
+        self.padded_trf = self.get_zero_padded_version(padding=dealiasing)
 
         self.indices = {
             'u': 0,
@@ -136,23 +136,29 @@ class RayleighBenard(GenericSpectralLinear):
 
         f.impl[:] = self.itransform(f_impl_hat).real
 
-        Dx_u_hat = self.u_init_forward
+        # treat convection explicitly with dealiasing
+        u_hat_padded = self.padded_trf.u_init_forward
         Dx_u_hat_padded = self.padded_trf.u_init_forward
         for i in [iu, iv, iT]:
-            buffer = self.xp.zeros(shape=np.prod(self.padded_trf.shape), dtype=complex)
-            buffer[self.padding_mask] = Dx @ u_hat[i].flatten()
-            Dx_u_hat_padded[i] = buffer.reshape(Dx_u_hat_padded[i].shape)
+            self.padded_trf.fill_padded(Dx @ u_hat[i].flatten(), Dx_u_hat_padded[i])
+        for i in [iu, iv, iT, iuz, ivz, iTz]:
+            self.padded_trf.fill_padded(u_hat[i].flatten(), u_hat_padded[i])
 
-        Dx_u = self.padded_trf.itransform(Dx_u_hat_padded)
-        Dx_u = self.itransform(Dx_u_hat, padding=3 / 2.0).real
+        Dx_u_pad = self.padded_trf.itransform(Dx_u_hat_padded)
+        u_pad = self.padded_trf.itransform(u_hat_padded)
 
-        # treat convection explicitly
-        f.expl[iu][:] = -(u[iu] * Dx_u[iu] + u[iv] * u[iuz])
-        f.expl[iv][:] = -(u[iu] * Dx_u[iv] + u[iv] * u[ivz])
-        f.expl[iT][:] = -(u[iu] * Dx_u[iT] + u[iv] * u[iTz])
+        fexpl_pad = self.padded_trf.u_init
+        fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * u_pad[iuz]).real
+        fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * u_pad[ivz]).real
+        fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * u_pad[iTz]).real
 
-        fexpl_hat = self.transform(f.expl, padding=1.5)
-        f.expl[:] = self.itransform(fexpl_hat, padding=1.5)
+        fexpl_hat_pad = self.padded_trf.transform(fexpl_pad)
+
+        fexpl_hat = self.u_init_forward
+        for i in [iu, iv, iT]:
+            self.padded_trf.retrieve_padded(fexpl_hat[i], fexpl_hat_pad[i])
+
+        f.expl[:] = self.itransform(fexpl_hat).real * self.dealiasing
 
         return f
 
