@@ -159,12 +159,72 @@ def test_matrix1D(N, base, type):
     assert np.allclose(exact, du)
 
 
+def test_transform_dealias(
+    axis=0,
+    nx=2**6,
+    nz=2**1,
+    padding=3 / 2,
+    axes=(-2,),
+    useMPI=True,
+    **kwargs,
+):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm)
+    helper.add_axis(base='fft', N=nx)
+    helper.add_axis(base='cheby', N=nz)
+    helper.setup_fft()
+    xp = helper.xp
+
+    # helper_padded = helper.get_zero_padded_version(axis=axis, padding=padding)
+
+    u_hat = helper.u_init_forward
+    Kz, Kx = helper.get_wavenumbers()
+    freq = [nx // 3, nx // 7, nx // 9]
+    for f in freq:
+        u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] = 1
+
+    # u_hat_pad = helper_padded.get_padded(u_hat)
+
+    # u_pad = helper_padded.itransform(u_hat_pad).real
+    u_pad = helper.itransform(u_hat, padding=[3 / 2, 3 / 2])
+    u = helper.itransform(u_hat).real
+
+    u2 = u**2
+    u2_pad = u_pad**2
+
+    u2_reg = helper.itransform(helper.transform(u2)).real
+    # u2_pad = helper.itransform(helper_padded.get_unpadded(helper_padded.transform(u2_pad))*padding).real
+    u2_pad = helper.itransform(helper.transform(u2_pad, padding=[3 / 2, 3 / 2])).real
+    print(u2_pad)
+
+    import matplotlib.pyplot as plt
+
+    Z, X = helper.get_grid()
+    plt.pcolormesh(X, Z, u2_reg[0])
+    plt.show()
+    assert xp.allclose(u2_reg, u2)
+    assert xp.allclose(u2_pad, u2)
+    assert xp.allclose(u2_pad, u2_reg)
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-def test_transform_dealias(
+@pytest.mark.parametrize('axis', [0, 1])
+def test_transform_dealias_back_and_forth(
     bx,
     bz,
+    axis,
     nx=2**1 + 1,
     nz=2**1 + 1,
     padding=3 / 2,
@@ -193,16 +253,15 @@ def test_transform_dealias(
     xp = helper.xp
 
     shape = helper.shape
-    helper_padded = helper.get_zero_padded_version(axis=0, padding=padding)
+    helper_padded = helper.get_zero_padded_version(axis=axis, padding=padding)
 
     u = helper.u_init
     u[:] = xp.random.rand(*shape)
-    u_hat = helper.transform(u)
 
+    u_hat = helper.transform(u)
     u_hat_padded = helper_padded.get_padded(u_hat)
 
     u_padded = helper_padded.itransform(u_hat_padded)
-    u = helper.itransform(u)
 
     u_2_padded_hat = helper_padded.transform(u_padded)
     u_2_hat = helper_padded.get_unpadded(u_2_padded_hat)
@@ -294,8 +353,8 @@ def run_MPI_test(num_procs, **kwargs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [2, 8])
-@pytest.mark.parametrize('nz', [2, 8])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('num_procs', [2, 1])
@@ -520,13 +579,13 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(3, 2, 'cheby', (-1, -2))
+        # test_transform(8, 3, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(0, 8, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        test_transform_dealias(bx='fft', bz='cheby')
+        test_transform_dealias(axis=0)
     else:
         raise NotImplementedError
     print('done')

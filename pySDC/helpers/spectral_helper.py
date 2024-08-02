@@ -49,6 +49,7 @@ class SpectralHelper1D:
         raise NotImplementedError(f'No boundary conditions of {kind=!r} implemented!')
 
     def get_filter_matrix(self, kmin=0, kmax=None):
+        raise NotImplementedError('This function is implemented incorrectly!')
         k = abs(self.get_wavenumbers())
 
         kmax = max(k) if kmax is None else kmax
@@ -377,14 +378,13 @@ class FFTHelper(SpectralHelper1D):
         return self.xp.arange(self.N) * dx + self.x0
 
     def get_wavenumbers(self):
-        return self.xp.fft.fftfreq(self.N, 1.0 / self.N)
+        return self.xp.fft.fftfreq(self.N, 1.0 / self.N) * 2 * np.pi / self.L
 
     def get_differentiation_matrix(self, p=1):
         k = self.get_wavenumbers()
-        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k * 2 * np.pi / self.L), p)
+        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
 
     def get_integration_matrix(self, p=1):
-        assert self.L == 2 * np.pi, f'Integration matrix not implemented for L={self.L}'
         k = self.xp.array(self.get_wavenumbers(), dtype='complex128')
         k[0] = 1j * self.L
         return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
@@ -593,13 +593,25 @@ class SpectralHelper:
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
-    def get_fft(self, axes=None, direction='object'):
+    def get_fft(self, axes=None, direction='object', padding=None, shape=None):
         axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
-        shape = self.global_shape[1:]
-        key = (axes, direction)
+        shape = self.global_shape[1:] if shape is None else shape
+        padding = (
+            [
+                1,
+            ]
+            * self.ndim
+            if padding is None
+            else padding
+        )
+        key = (axes, direction, tuple(padding), tuple(shape))
+        print(key)
+        # breakpoint()
 
         if key not in self.fft_cache.keys():
             if self.comm is None:
+                assert np.allclose(padding, 1), 'Zero padding is not implemented for non-MPI transforms'
+
                 if direction == 'forward':
                     self.fft_cache[key] = self.xp.fft.fftn
                 elif direction == 'backward':
@@ -617,6 +629,7 @@ class SpectralHelper:
                     collapse=False,
                     backend=self.fft_backend,
                     comm_backend=self.fft_comm_backend,
+                    padding=padding,
                 )
                 if direction == 'forward':
                     self.fft_cache[key] = _fft.forward
@@ -668,15 +681,15 @@ class SpectralHelper:
         else:
             return u.redistribute(axis)
 
-    def _transform_fft(self, u, axes):
-        fft = self.get_fft(axes, 'forward')
+    def _transform_fft(self, u, axes, padding=None):
+        fft = self.get_fft(axes, 'forward', padding=padding)
         return fft(u, axes=axes)
 
-    def _transform_dct(self, u, axes):
+    def _transform_dct(self, u, axes, padding=None):
         result = u.copy()
 
         if len(axes) > 1:
-            v = self._transform_dct(self._transform_dct(u, axes[1:]), (axes[0],))
+            v = self._transform_dct(self._transform_dct(u, axes[1:], padding=padding), (axes[0],), padding=padding)
         else:
             v = u.copy()
             axis = axes[0]
@@ -685,7 +698,7 @@ class SpectralHelper:
             shuffle[axis] = self.axes[axis].fft_utils['fwd']['shuffle']
             v = v[*shuffle]
 
-            fft = self.get_fft(axes, 'forward')
+            fft = self.get_fft(axes, 'forward', padding=padding)
             v = fft(v, axes=axes)
 
             expansion = [np.newaxis for _ in u.shape]
@@ -695,7 +708,7 @@ class SpectralHelper:
         result.real[...] = v.real
         return result
 
-    def transform(self, u, axes=None):
+    def transform(self, u, axes=None, padding=None):
         trfs = {
             ChebychovHelper: self._transform_dct,
             FFTHelper: self._transform_fft,
@@ -715,7 +728,7 @@ class SpectralHelper:
                 if len(axes_base) > 0:
                     _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[-1])
 
-                    fft = self.get_fft(axes_base, 'object')
+                    fft = self.get_fft(axes_base, 'object', padding=padding)
                     if fft:
                         from mpi4py_fft import newDistArray
 
@@ -732,24 +745,11 @@ class SpectralHelper:
 
         return result
 
-    def get_aligned(self, u, axis_in, axis_out, fft=None):
-        if self.comm is None:
-            return u
-
-        from mpi4py_fft import newDistArray
-
-        fft = self.get_fft() if fft is None else fft
-
-        _in = newDistArray(fft, False).redistribute(axis_in)
-        _in[...] = u
-
-        return _in.redistribute(axis_out)
-
-    def _transform_ifft(self, u, axes):
-        ifft = self.get_fft(axes, 'backward')
+    def _transform_ifft(self, u, axes, padding=None, shape=None):
+        ifft = self.get_fft(axes, 'backward', padding=padding, shape=shape)
         return ifft(u, axes=axes)
 
-    def _transform_idct(self, u, axes):
+    def _transform_idct(self, u, axes, padding=None, shape=None):
         result = u.copy()
 
         v = u.copy().astype(complex)
@@ -764,7 +764,7 @@ class SpectralHelper:
 
             v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
 
-            ifft = self.get_fft(axes, 'backward')
+            ifft = self.get_fft(axes, 'backward', padding=padding, shape=shape)
             v = ifft(v, axes=axes)
 
             shuffle = [slice(0, s, 1) for s in u.shape]
@@ -774,45 +774,138 @@ class SpectralHelper:
         result.real[...] = v.real
         return result
 
-    def itransform(self, u, axes=None):
+    # def itransform(self, u, axes=None, padding=None):
+    #     trfs = {
+    #         FFTHelper: self._transform_ifft,
+    #         ChebychovHelper: self._transform_idct,
+    #     }
+
+    #     axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
+    #     padding = [1,] * self.ndim if padding is None else padding
+
+    #     result = u.copy().astype(complex)
+    #     result = self.get_aligned
+    #     alignment = self.ndim - 1
+
+    #     for comp in self.components:
+    #         i = self.index(comp)
+
+    #         axes_base = []
+    #         for base in trfs.keys():
+    #             axes_base = tuple(sorted(me for me in axes if type(self.axes[me]) == base))
+
+    #             if len(axes_base) > 0:
+    #                 _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[0], padding=padding, forward=True)
+
+    #                 fft = self.get_fft(axes_base, 'object', padding=padding)
+    #                 if fft:
+    #                     from mpi4py_fft import newDistArray
+
+    #                     _out = newDistArray(fft, False)
+    #                 else:
+    #                     _out = _in
+
+    #                 _out = self.get_aligned(None, fill=False, axis_in=alignment, axis_out=self.ndim + axes_base[0], padding=padding, forward=False, fft=fft)
+    #                 if self.comm is not None:
+    #                     _in /= np.prod([self.axes[i].N for i in axes_base])
+    #                 _out[...] = trfs[base](_in, axes=axes_base, padding=padding)
+
+    #                 if fft:
+    #                     result[i] = _out.redistribute(-1)
+    #                 else:
+    #                     result[i] = _out
+
+    #     return result
+
+    def itransform_single_component(self, u, axes=None, padding=None):
         trfs = {
             FFTHelper: self._transform_ifft,
             ChebychovHelper: self._transform_idct,
         }
 
         axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
+        padding = (
+            [
+                1,
+            ]
+            * self.ndim
+            if padding is None
+            else padding
+        )
 
         result = u.copy().astype(complex)
         alignment = self.ndim - 1
 
+        axes_collapsed = [tuple(sorted(me for me in axes if type(self.axes[me]) == base)) for base in trfs.keys()]
+        bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
+        axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
+
+        for trf in range(len(axes_collapsed)):
+            _axes = axes_collapsed[trf]
+            base = bases[trf]
+            shape = None  # result.shape
+
+            if len(_axes) == 0:
+                continue
+
+            fft = self.get_fft(_axes, 'object', padding=padding, shape=shape)
+
+            _in = self.get_aligned(result, axis_in=alignment, axis_out=self.ndim + _axes[0], forward=True, fft=fft)
+            if self.comm is not None:
+                _in /= np.prod([self.axes[i].N for i in _axes])
+
+            alignment = self.ndim + _axes[0]
+
+            _out = trfs[base](_in, axes=_axes, padding=padding, shape=shape)
+
+            axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            fft_next_base = self.get_fft(axes_next_base, 'object', padding=padding, shape=shape)
+            alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[0]
+            forward = trf == len(axes_collapsed) - 1
+            result = self.get_aligned(_out, axis_in=self.ndim + _axes[-1], axis_out=alignment, fft=fft, forward=forward)
+
+        return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft)
+
+    def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, padding=None, fill=True):
+        if self.comm is None:
+            if fill:
+                return u
+            elif forward:
+                return self.u_init_forward
+            else:
+                return self.u_init
+
+        from mpi4py_fft import newDistArray
+
+        fft = self.get_fft(padding=padding) if fft is None else fft
+
+        _in = newDistArray(fft, forward).redistribute(axis_in)
+        if fill:
+            _in[...] = u
+
+        return _in.redistribute(axis_out)
+
+    def itransform(self, u, axes=None, padding=None):
+        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
+        padding = (
+            [
+                1,
+            ]
+            * self.ndim
+            if padding is None
+            else padding
+        )
+
+        alignment = self.ndim - 1
+        result = [
+            None,
+        ] * self.ncomponents
         for comp in self.components:
             i = self.index(comp)
 
-            axes_base = []
-            for base in trfs.keys():
-                axes_base = tuple(sorted(me for me in axes if type(self.axes[me]) == base))
+            result[i] = self.itransform_single_component(u[i], axes=axes, padding=padding)
 
-                if len(axes_base) > 0:
-                    _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[0])
-
-                    fft = self.get_fft(axes_base, 'object')
-                    if fft:
-                        from mpi4py_fft import newDistArray
-
-                        _out = newDistArray(fft, False)
-                    else:
-                        _out = _in
-
-                    if self.comm is not None:
-                        _in /= np.prod([self.axes[i].N for i in axes_base])
-                    _out[...] = trfs[base](_in, axes=axes_base)
-
-                    if fft:
-                        result[i] = _out.redistribute(-1)
-                    else:
-                        result[i] = _out
-
-        return result
+        return self.xp.array(result)
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
@@ -973,7 +1066,7 @@ class SpectralHelper:
         padded.add_component(self.components)
         for i in range(self.ndim):
             base = self.axes[i]
-            assert base.N % 2 == 1
+            # assert base.N % 2 == 1
             params = {
                 **base.__dict__,
                 'N': int(np.ceil(padding * base.N)) if i == axis else base.N,

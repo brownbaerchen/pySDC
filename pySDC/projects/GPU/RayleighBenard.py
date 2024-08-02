@@ -8,7 +8,7 @@ from pySDC.core.convergence_controller import ConvergenceController
 class CFLLimit(ConvergenceController):
     def get_new_step_size(self, controller, step, **kwargs):
         max_step_size = np.inf
-        min_step_size = 5e-2
+        min_step_size = 1e-3
 
         L = step.levels[0]
         P = step.levels[0].prob
@@ -70,20 +70,20 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
-    sweeper_params['QE'] = 'EE'
+    sweeper_params['num_nodes'] = 2
+    sweeper_params['QI'] = 'LU'
+    sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6,
-        'nx': 2**8 + 1,
-        'nz': 2**6 + 1,
+        'nx': 2**8,
+        'nz': 2**6,
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 99
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -116,7 +116,7 @@ def run_RBC(useGPU=False):
     return stats
 
 
-def plot_RBC(size, quantitiy='T', quantitiy2='divergence', render=True, start_idx=0):
+def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx=0):
     import matplotlib.pyplot as plt
     from pySDC.implementations.hooks.log_solution import LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
@@ -198,10 +198,11 @@ if __name__ == '__main__':
     parser.add_argument('--useGPU', type=bool)
     parser.add_argument('--render', type=bool)
     parser.add_argument('--startIdx', type=int, default=0)
+    parser.add_argument('--np', type=int, default=1)
 
     args = parser.parse_args()
 
     if args.run:
         run_RBC(useGPU=args.useGPU)
     if MPI.COMM_WORLD.rank == 0 and args.plot:
-        plot_RBC(MPI.COMM_WORLD.size, render=args.render, start_idx=args.startIdx)
+        plot_RBC(size=args.np, render=args.render, start_idx=args.startIdx)

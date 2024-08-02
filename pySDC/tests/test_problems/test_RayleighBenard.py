@@ -93,7 +93,7 @@ def compute_errors(u1, u2, msg, thresh=1e-10, components=None, raise_errors=True
 #     plt.show()
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 @pytest.mark.parametrize('nx', [4, 8])
@@ -131,11 +131,11 @@ def test_derivatives(nx, nz, direction, cheby_mode):
         assert np.allclose(derivatives[i], expect_z), f'Got unexpected z-derivative in component {comp}'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('nx', [5, 9])
-@pytest.mark.parametrize('nz', [5, 9])
+@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nz', [4, 8])
 def test_eval_f(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -190,11 +190,11 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
 
-    # print(f.expl[P.iT] / f_expect.expl[P.iT])
-    # import matplotlib.pyplot as plt
+    print(f.expl[P.iT] / f_expect.expl[P.iT])
+    import matplotlib.pyplot as plt
 
-    # Z, X = P.get_grid()
-    # plt.pcolormesh(X, Z, f.expl[P.iT])
+    Z, X = P.get_grid()
+    plt.pcolormesh(X, Z, f.expl[P.iT])
     # plt.show()
 
     for comp in P.spectral.components[::-1]:
@@ -203,7 +203,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [1, 4])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
@@ -276,7 +276,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
@@ -292,24 +292,24 @@ def test_vorticity(nx, nz, cheby_mode, direction):
     u = P.u_init
 
     if direction == 'x':
-        u[P.iv] = np.sin(P.X)
-        u[P.iu] = np.cos(P.X)
-        expect = np.cos(P.X)
+        u[P.iv] = np.sin(P.X * np.pi)
+        u[P.iu] = np.cos(P.X * np.pi)
+        expect = np.cos(P.X * np.pi) * np.pi
     elif direction == 'z':
         u[P.iv] = P.Z**2
         u[P.iu] = P.Z**3
         expect = 3 * P.Z**2
     elif direction == 'mixed':
-        u[P.iv] = np.sin(P.X) * P.Z**2
-        u[P.iu] = np.cos(P.X) * P.Z**3
-        expect = np.cos(P.X) * P.Z**2 + np.cos(P.X) * 3 * P.Z**2
+        u[P.iv] = np.sin(P.X * np.pi) * P.Z**2
+        u[P.iu] = np.cos(P.X * np.pi) * P.Z**3
+        expect = np.cos(P.X * np.pi) * np.pi * P.Z**2 + np.cos(P.X * np.pi) * 3 * P.Z**2
     else:
         raise NotImplementedError
 
     assert np.allclose(P.compute_vorticity(u), expect)
 
 
-# @pytest.mark.base
+# @pytest.mark.mpi4py
 # @pytest.mark.parametrize('nx', [32])
 # @pytest.mark.parametrize('nz', [32])
 # @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
@@ -376,7 +376,7 @@ def test_vorticity(nx, nz, cheby_mode, direction):
 #         assert np.allclose(Lu[i], expect[i]), f'Got unexpected result in component {P.index_to_name[i]}'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('T_top', [2])
@@ -413,7 +413,7 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
         ), f'Error in BCs in initial conditions of {P.index_to_name[i]}'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('limit', ['Ra->0', 'Pr->0', 'Pr->inf'])
 def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
     import numpy as np
@@ -452,7 +452,7 @@ def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
         P.plot(sol, quantity='p')
         import matplotlib.pyplot as plt
 
-        plt.show()
+        # plt.show()
 
         # assert np.allclose(derivatives[idxp], 0), 'Got non-zero pressure derivative in x-direction'
         assert np.allclose(derivatives[idzp], sol[P.index('T')]), 'Got unexpected pressure derivative in z-direction'
@@ -495,7 +495,7 @@ def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
         plt.show()
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 def test_solver_small_step_size(plotting=False):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -540,7 +540,7 @@ def test_solver_small_step_size(plotting=False):
         plt.show()
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [32])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
@@ -666,13 +666,13 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 
             P.plot(u, t, fig=fig, quantity='T')
             plt.pause(1e-8)
-        plt.show()
+        # plt.show()
 
 
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    test_eval_f(65, 33, 'T2T', 'x')
+    test_eval_f(16, 4, 'T2U', 'mixed')
     # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
     # test_solver(2**8, 2**6, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)

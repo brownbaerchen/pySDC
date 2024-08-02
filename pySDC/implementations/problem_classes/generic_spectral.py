@@ -41,6 +41,13 @@ class GenericSpectralLinear(Problem):
         *args,
         **kwargs,
     ):
+        if comm is None:
+            try:
+                from mpi4py import MPI
+
+                comm = MPI.COMM_WORLD
+            except ModuleNotFoundError:
+                pass
         self.spectral = SpectralHelper(comm=comm, useGPU=useGPU)
 
         if useGPU:
