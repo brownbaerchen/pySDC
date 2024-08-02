@@ -162,9 +162,9 @@ def test_matrix1D(N, base, type):
 def test_transform_dealias(
     axis=0,
     nx=2**6,
-    nz=2**1,
+    nz=2**2,
     padding=3 / 2,
-    axes=(-2,),
+    axes=(-2, -1),
     useMPI=True,
     **kwargs,
 ):
@@ -185,17 +185,12 @@ def test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
-    # helper_padded = helper.get_zero_padded_version(axis=axis, padding=padding)
-
     u_hat = helper.u_init_forward
     Kz, Kx = helper.get_wavenumbers()
     freq = [nx // 3, nx // 7, nx // 9]
     for f in freq:
         u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] = 1
 
-    # u_hat_pad = helper_padded.get_padded(u_hat)
-
-    # u_pad = helper_padded.itransform(u_hat_pad).real
     u_pad = helper.itransform(u_hat, padding=[3 / 2, 3 / 2])
     u = helper.itransform(u_hat).real
 
@@ -203,7 +198,6 @@ def test_transform_dealias(
     u2_pad = u_pad**2
 
     u2_reg = helper.itransform(helper.transform(u2)).real
-    # u2_pad = helper.itransform(helper_padded.get_unpadded(helper_padded.transform(u2_pad))*padding).real
     u2_pad = helper.itransform(helper.transform(u2_pad, padding=[3 / 2, 3 / 2])).real
     print(u2_pad)
 

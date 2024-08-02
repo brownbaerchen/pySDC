@@ -419,8 +419,9 @@ class SpectralHelper:
         cls.fft_backend = 'cupy'
         cls.fft_comm_backend = 'NCCL'
 
-    def __init__(self, comm=None, useGPU=False):
+    def __init__(self, comm=None, useGPU=False, debug=False):
         self.comm = comm
+        self.debug = debug
         if useGPU:
             self.setup_GPU()
 
@@ -605,8 +606,6 @@ class SpectralHelper:
             else padding
         )
         key = (axes, direction, tuple(padding), tuple(shape))
-        print(key)
-        # breakpoint()
 
         if key not in self.fft_cache.keys():
             if self.comm is None:
@@ -750,7 +749,11 @@ class SpectralHelper:
         return ifft(u, axes=axes)
 
     def _transform_idct(self, u, axes, padding=None, shape=None):
-        result = u.copy()
+        '''
+        This will only ever return real values!
+        '''
+        if self.debug:
+            assert self.xp.allclose(u.imag, 0), 'This function can only handle real input.'
 
         v = u.copy().astype(complex)
 
@@ -767,12 +770,17 @@ class SpectralHelper:
             ifft = self.get_fft(axes, 'backward', padding=padding, shape=shape)
             v = ifft(v, axes=axes)
 
-            shuffle = [slice(0, s, 1) for s in u.shape]
-            shuffle[axis] = self.axes[axis].fft_utils['bck']['shuffle']
+            shuffle = [slice(0, s, 1) for s in v.shape]
+            N = v.shape[axis]
+            xp = self.xp
+            mask = xp.zeros(N, dtype=int)
+            mask[: N - N % 2 : 2] = xp.arange(N // 2)
+            mask[1::2] = N - xp.arange(N // 2) - 1
+            mask[-1] = N // 2
+            shuffle[axis] = mask
             v = v[*shuffle]
 
-        result.real[...] = v.real
-        return result
+        return v.real
 
     # def itransform(self, u, axes=None, padding=None):
     #     trfs = {
@@ -784,7 +792,6 @@ class SpectralHelper:
     #     padding = [1,] * self.ndim if padding is None else padding
 
     #     result = u.copy().astype(complex)
-    #     result = self.get_aligned
     #     alignment = self.ndim - 1
 
     #     for comp in self.components:
@@ -839,11 +846,11 @@ class SpectralHelper:
         axes_collapsed = [tuple(sorted(me for me in axes if type(self.axes[me]) == base)) for base in trfs.keys()]
         bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
         axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
+        shape = list(self.global_shape[1:])
 
         for trf in range(len(axes_collapsed)):
             _axes = axes_collapsed[trf]
             base = bases[trf]
-            shape = None  # result.shape
 
             if len(_axes) == 0:
                 continue
@@ -858,15 +865,17 @@ class SpectralHelper:
 
             _out = trfs[base](_in, axes=_axes, padding=padding, shape=shape)
 
-            axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
-            fft_next_base = self.get_fft(axes_next_base, 'object', padding=padding, shape=shape)
-            alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[0]
-            forward = trf == len(axes_collapsed) - 1
-            result = self.get_aligned(_out, axis_in=self.ndim + _axes[-1], axis_out=alignment, fft=fft, forward=forward)
+            for _ax in _axes:
+                shape[_ax] = _out.shape[_ax]
 
+            axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[0]
+            result = self.get_aligned(_out, axis_in=self.ndim + _axes[-1], axis_out=alignment, fft=fft, forward=False)
+
+        fft = self.get_fft(axes=axes, padding=padding)
         return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft)
 
-    def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, padding=None, fill=True):
+    def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, fill=True, **kwargs):
         if self.comm is None:
             if fill:
                 return u
@@ -877,7 +886,7 @@ class SpectralHelper:
 
         from mpi4py_fft import newDistArray
 
-        fft = self.get_fft(padding=padding) if fft is None else fft
+        fft = self.get_fft(**kwargs) if fft is None else fft
 
         _in = newDistArray(fft, forward).redistribute(axis_in)
         if fill:
