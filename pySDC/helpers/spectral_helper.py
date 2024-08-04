@@ -601,7 +601,7 @@ class SpectralHelper:
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
-    def get_fft(self, axes=None, direction='object', padding=None, shape=None):
+    def get_fft(self, axes=None, direction='object', padding=None, shape=None, comm=None):
         axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
         shape = self.global_shape[1:] if shape is None else shape
         padding = (
@@ -628,7 +628,7 @@ class SpectralHelper:
                 from mpi4py_fft import PFFT, newDistArray
 
                 _fft = PFFT(
-                    comm=self.comm,
+                    comm=self.comm if comm is None else comm,
                     shape=shape,
                     axes=sorted(list(axes)),
                     dtype='D',
@@ -737,6 +737,10 @@ class SpectralHelper:
         bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
         axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
         shape = [max(u.shape[i], self.global_shape[1 + i]) for i in range(self.ndim)]
+
+        fft = self.get_fft(axes=axes, padding=padding, direction='object')
+        if fft is not None:
+            shape = list(fft.global_shape(False))
 
         for trf in range(len(axes_collapsed)):
             _axes = axes_collapsed[trf]

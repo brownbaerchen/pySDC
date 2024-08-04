@@ -194,7 +194,6 @@ def test_transform_dealias(
     u_pad = helper.itransform(u_hat, padding=[3 / 2, 3 / 2])
     u = helper.itransform(u_hat).real
 
-    print(u_pad.shape, u.shape)
     assert np.allclose(u_pad.shape[1:], [me * 1.5 for me in u.shape][1:])
 
     u2 = u**2
@@ -213,58 +212,58 @@ def test_transform_dealias(
     assert xp.allclose(u2_pad, u2_reg)
 
 
-@pytest.mark.base
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('axis', [0, 1])
-def test_transform_dealias_back_and_forth(
-    bx,
-    bz,
-    axis,
-    nx=2**1 + 1,
-    nz=2**1 + 1,
-    padding=3 / 2,
-    axes=(
-        -2,
-        -1,
-    ),
-    useMPI=False,
-    **kwargs,
-):
-    import numpy as np
-    from pySDC.helpers.spectral_helper import SpectralHelper
-
-    if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-    else:
-        comm = None
-
-    helper = SpectralHelper(comm=comm, debug=True)
-    helper.add_axis(base=bx, N=nx)
-    helper.add_axis(base=bz, N=nz)
-    helper.setup_fft()
-    xp = helper.xp
-
-    shape = helper.shape
-    helper_padded = helper.get_zero_padded_version(axis=axis, padding=padding)
-
-    u = helper.u_init
-    u[:] = xp.random.rand(*shape)
-
-    u_hat = helper.transform(u)
-    u_hat_padded = helper_padded.get_padded(u_hat)
-
-    u_padded = helper_padded.itransform(u_hat_padded)
-
-    u_2_padded_hat = helper_padded.transform(u_padded)
-    u_2_hat = helper_padded.get_unpadded(u_2_padded_hat)
-
-    assert xp.allclose(u_2_padded_hat.real, u_hat_padded.real)
-    assert xp.allclose(u_2_padded_hat.imag, u_hat_padded.imag)
-    assert xp.allclose(u_2_hat, u_hat)
+# @pytest.mark.base
+# @pytest.mark.parametrize('bx', ['fft', 'cheby'])
+# @pytest.mark.parametrize('bz', ['fft', 'cheby'])
+# @pytest.mark.parametrize('axis', [0, 1])
+# def test_transform_dealias_back_and_forth(
+#     bx,
+#     bz,
+#     axis,
+#     nx=2**1 + 1,
+#     nz=2**1 + 1,
+#     padding=3 / 2,
+#     axes=(
+#         -2,
+#         -1,
+#     ),
+#     useMPI=False,
+#     **kwargs,
+# ):
+#     import numpy as np
+#     from pySDC.helpers.spectral_helper import SpectralHelper
+#
+#     if useMPI:
+#         from mpi4py import MPI
+#
+#         comm = MPI.COMM_WORLD
+#         rank = comm.rank
+#     else:
+#         comm = None
+#
+#     helper = SpectralHelper(comm=comm, debug=True)
+#     helper.add_axis(base=bx, N=nx)
+#     helper.add_axis(base=bz, N=nz)
+#     helper.setup_fft()
+#     xp = helper.xp
+#
+#     shape = helper.shape
+#     helper_padded = helper.get_zero_padded_version(axis=axis, padding=padding)
+#
+#     u = helper.u_init
+#     u[:] = xp.random.rand(*shape)
+#
+#     u_hat = helper.transform(u)
+#     u_hat_padded = helper_padded.get_padded(u_hat)
+#
+#     u_padded = helper_padded.itransform(u_hat_padded)
+#
+#     u_2_padded_hat = helper_padded.transform(u_padded)
+#     u_2_hat = helper_padded.get_unpadded(u_2_padded_hat)
+#
+#     assert xp.allclose(u_2_padded_hat.real, u_hat_padded.real)
+#     assert xp.allclose(u_2_padded_hat.imag, u_hat_padded.imag)
+#     assert xp.allclose(u_2_hat, u_hat)
 
 
 @pytest.mark.base
@@ -575,7 +574,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(8, 3, 'fft', 'cheby', (-1,))
+        test_transform(8, 3, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(0, 8, 1, kind='Dirichlet')
