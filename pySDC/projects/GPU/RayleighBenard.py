@@ -70,9 +70,9 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 2
-    sweeper_params['QI'] = 'LU'
-    sweeper_params['QE'] = 'PIC'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
+    sweeper_params['QE'] = 'EE'
 
     problem_params = {
         'comm': comm,
@@ -83,7 +83,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 99
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

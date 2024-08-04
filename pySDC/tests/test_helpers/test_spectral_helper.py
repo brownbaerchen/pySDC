@@ -17,7 +17,7 @@ def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base='fft', N=nx)
     helper.add_axis(base='cheby', N=nz, mode=variant)
     helper.setup_fft()
@@ -62,7 +62,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, useMPI=False, **kwa
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base='cheby', N=nz, mode=variant)
     helper.setup_fft()
@@ -105,7 +105,7 @@ def test_identity_matrix2D(nx, nz, variant, bx, useMPI=False, **kwargs):
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base='cheby', N=nz, mode=variant)
     helper.setup_fft()
@@ -134,7 +134,7 @@ def test_matrix1D(N, base, type):
 
     coeffs = np.random.random(N)
 
-    helper = SpectralHelper()
+    helper = SpectralHelper(debug=True)
     helper.add_axis(base=base, N=N)
     helper.setup_fft()
 
@@ -179,7 +179,7 @@ def test_transform_dealias(
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base='fft', N=nx)
     helper.add_axis(base='cheby', N=nz)
     helper.setup_fft()
@@ -194,12 +194,14 @@ def test_transform_dealias(
     u_pad = helper.itransform(u_hat, padding=[3 / 2, 3 / 2])
     u = helper.itransform(u_hat).real
 
+    print(u_pad.shape, u.shape)
+    assert np.allclose(u_pad.shape[1:], [me * 1.5 for me in u.shape][1:])
+
     u2 = u**2
     u2_pad = u_pad**2
 
     u2_reg = helper.itransform(helper.transform(u2)).real
     u2_pad = helper.itransform(helper.transform(u2_pad, padding=[3 / 2, 3 / 2])).real
-    print(u2_pad)
 
     import matplotlib.pyplot as plt
 
@@ -240,7 +242,7 @@ def test_transform_dealias_back_and_forth(
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
@@ -283,7 +285,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
@@ -400,7 +402,7 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     import numpy as np
     import scipy.sparse as sp
 
-    helper = SpectralHelper()
+    helper = SpectralHelper(debug=True)
     helper.add_component('u')
     helper.add_axis(base='cheby', N=N)
     helper.setup_fft()
@@ -463,7 +465,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm)
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis('fft', N=nx)
     helper.add_axis('cheby', N=nz, mode=variant)
     helper.add_component(['u'])
