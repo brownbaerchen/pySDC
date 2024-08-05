@@ -65,7 +65,7 @@ class RayleighBenard(GenericSpectralLinear):
             'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
             'uz': {'u': -Dz, 'uz': I},  # algebraic constraint for first derivative
             'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
-            'p': {'u': Dx, 'vz': I},  # divergence free constraint
+            'p': {'u': Dx, 'v': Dz},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx, 'uz': -nu * Dz},
             'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -I},
             'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
