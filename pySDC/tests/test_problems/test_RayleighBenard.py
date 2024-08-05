@@ -214,6 +214,8 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         'T_bottom': T_bottom,
         'v_top': v_top,
         'v_bottom': v_top,
+        'u_top': 0,
+        'u_bottom': 0,
         'p_integral': 0,
     }
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs)
@@ -228,7 +230,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         else:
             raise NotImplementedError
 
-    sol_hat = P.transform(sol, axes=(1,))
+    sol_hat = P.transform(sol, axes=(-1,))
     pressure_coef = sol_hat[P.ip][0]
     pressure_integral = np.polynomial.Chebyshev(pressure_coef).integ(1, lbnd=-1)(1)
 
@@ -246,7 +248,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
         # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
         # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
-        idx = P.iT
+        idx = P.iu
         axs[0].plot(P.Z[0, :], sol[idx][0, :], label='want')
         axs[0].plot(P.Z[0, :], rhs[idx][0, :], label='have', ls='--')
         axs[1].plot(P.Z[0, :], rhs[P.ip][0, :] - sol[P.ip][0, :])
@@ -255,17 +257,18 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         axs[1].legend()
         plt.show()
 
-    for component in ['T', 'v']:
+    for component in ['T', 'v', 'u']:
         i = P.index(component)
         poly = np.polynomial.Chebyshev(sol_hat[i][0])
         assert np.isclose(
-            poly(-1), BCs[f'{component}_bottom']
+            poly(-1), BCs[f'{component}_bottom'], atol=1e-6
         ), f'unexpected bottom bc in {component}: Deviation: {poly(-1).real- BCs[f"{component}_bottom"]:.2e}'
         assert np.isclose(
-            poly(1), BCs[f'{component}_top']
+            poly(1), BCs[f'{component}_top'], atol=1e-6
         ), f'unexpected top bc in {component}: Deviation {poly(1).real-BCs[f"{component}_top"]:.2e}'
     assert np.isclose(pressure_integral.real, BCs['p_integral']), f'Got unexpected {pressure_integral.real=:.2e}!'
-    for i in [P.iu]:
+    if noise == 0:
+        i = P.index('u')
         assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
 
 

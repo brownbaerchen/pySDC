@@ -172,7 +172,15 @@ class RayleighBenard(GenericSpectralLinear):
         from scipy.ndimage import gaussian_filter
 
         noise = self.u_init
-        noise[iT].real = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
+        noise[iT] = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
+        padding = [
+            self.dealiasing,
+        ] * 2
+        # noise_pad = self.itransform(self.transform(noise), padding=padding)
+        # noise_dealias = self.itransform(self.transform(noise_pad, padding=padding))
+        # print(abs(noise-noise_dealias), noise_pad.shape, noise.shape)
+        # Kz, Kx = self.get_wavenumbers()
+        # noise[iT, Kz > 2] *=1e-2
 
         me[iT] += self.xp.abs(noise[iT] * (self.Z - 1) * (self.Z + 1)) * noise_level
 
