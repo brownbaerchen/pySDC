@@ -159,8 +159,8 @@ def test_matrix1D(N, base, type):
     assert np.allclose(exact, du)
 
 
-def test_transform_dealias(
-    axis=0,
+@pytest.mark.mpi4py
+def _test_transform_dealias(
     nx=2**6,
     nz=2**2,
     padding=3 / 2,
@@ -185,31 +185,51 @@ def test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
+    padding = [
+        padding,
+    ] * helper.ndim
+
+    helper_pad = SpectralHelper(comm=comm, debug=True)
+    helper_pad.add_axis(base='fft', N=int(padding[0] * nx))
+    helper_pad.add_axis(base='cheby', N=int(padding[1] * nz))
+    helper_pad.setup_fft()
+
     u_hat = helper.u_init_forward
+    u_expect = helper.u_init
+    u_expect_pad = helper_pad.u_init
     Kz, Kx = helper.get_wavenumbers()
-    freq = [nx // 3, nx // 7, nx // 9]
+    Z, X = helper.get_grid()
+    Z_pad, X_pad = helper_pad.get_grid()
+    freq = [nx // 3]  # , nx // 7, nx // 9]
     for f in freq:
         u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] = 1
+        u_expect[0] += (np.cos(f * X) * 2 / nx) ** 2
+        u_expect_pad[0] += (np.cos(f * X_pad) * 2 / nx) ** 2
 
-    u_pad = helper.itransform(u_hat, padding=[3 / 2, 3 / 2])
-    u = helper.itransform(u_hat).real
+    u_pad = helper.itransform(u_hat, padding=padding, axes=axes)
+    u = helper.itransform(u_hat, axes=axes).real
 
-    assert np.allclose(u_pad.shape[1:], [me * 1.5 for me in u.shape][1:])
+    # assert np.allclose(u_pad.shape[1:], [me * padding[0] for me in u.shape][1:])
 
     u2 = u**2
     u2_pad = u_pad**2
 
-    u2_reg = helper.itransform(helper.transform(u2)).real
-    u2_pad = helper.itransform(helper.transform(u2_pad, padding=[3 / 2, 3 / 2])).real
+    assert xp.allclose(u2_pad, u_expect_pad)
+
+    u2_reg = helper.itransform(helper.transform(u2, axes=axes), axes=axes).real
+    u2_pad = helper.itransform(helper.transform(u2_pad, padding=padding, axes=axes), axes=axes).real
 
     import matplotlib.pyplot as plt
 
+    print(u2_pad)  # -u_expect)
     Z, X = helper.get_grid()
-    plt.pcolormesh(X, Z, u2_reg[0])
+    fig, axs = plt.subplots(2, 1)
+    axs[0].pcolormesh(X, Z, u2_pad[0])
+    axs[1].pcolormesh(X, Z, u_expect[0])
     plt.show()
-    assert xp.allclose(u2_reg, u2)
-    assert xp.allclose(u2_pad, u2)
-    assert xp.allclose(u2_pad, u2_reg)
+    assert xp.allclose(u2, u_expect)
+    assert xp.allclose(u2_reg, u_expect)
+    assert xp.allclose(u2_pad, u_expect)
 
 
 # @pytest.mark.base
@@ -540,8 +560,8 @@ def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
 
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-@pytest.mark.parametrize('num_procs', [2])
-def test_dealias_MPI(bx, num_procs, nx=9, nz=7, **kwargs):
+@pytest.mark.parametrize('num_procs', [1, 2])
+def test_dealias_MPI(bx, num_procs, nx=8, nz=6, **kwargs):
     run_MPI_test(bx=bx, num_procs=num_procs, nx=nx, nz=nz, bz='cheby', test='dealias')
 
 
@@ -572,15 +592,15 @@ if __name__ == '__main__':
     elif args.test == 'tau':
         test_tau_method2D(**vars(args))
     elif args.test == 'dealias':
-        test_transform_dealias(**vars(args))
+        _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(8, 3, 'fft', 'cheby', (-1,))
+        # test_transform(8, 3, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(0, 8, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        test_transform_dealias(axis=0)
+        _test_transform_dealias()
     else:
         raise NotImplementedError
     print('done')

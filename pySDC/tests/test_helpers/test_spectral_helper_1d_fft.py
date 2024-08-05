@@ -4,7 +4,7 @@ import pytest
 @pytest.mark.base
 @pytest.mark.parametrize('N', [8, 64])
 @pytest.mark.parametrize('x0', [0, 1])
-@pytest.mark.parametrize('x1', [None, 4])
+@pytest.mark.parametrize('x1', [None, 4, 8])
 def test_differentiation_matrix(N, x0, x1, plot=False):
     import numpy as np
     from pySDC.helpers.spectral_helper import FFTHelper

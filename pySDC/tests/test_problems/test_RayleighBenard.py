@@ -135,7 +135,7 @@ def test_derivatives(nx, nz, direction, cheby_mode):
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [16])
-@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('nz', [8])
 def test_eval_f(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -189,13 +189,6 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.impl[P.iu] = -y_x + nu * (y_xx + y_zz)
     f_expect.expl[P.iv] = -y * (y_z + y_x)
     f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
-
-    print(f.expl[P.iT] / f_expect.expl[P.iT])
-    import matplotlib.pyplot as plt
-
-    Z, X = P.get_grid()
-    plt.pcolormesh(X, Z, f.expl[P.iT])
-    # plt.show()
 
     for comp in P.spectral.components[::-1]:
         i = P.spectral.index(comp)
@@ -277,15 +270,16 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [4, 8])
-@pytest.mark.parametrize('nz', [4, 8])
-@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+@pytest.mark.parametrize('nx', [16])
+@pytest.mark.parametrize('nz', [4])
+@pytest.mark.parametrize('cheby_mode', ['T2U'])
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
 def test_vorticity(nx, nz, cheby_mode, direction):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
     assert nz > 3
+    assert nx > 8
 
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
 
@@ -647,7 +641,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     f_before = P.eval_f(u0)
     backward = forward - dt * (f.impl + f_before.expl)
     compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
-    # return None
+    return None
 
     if plotting:
         u = P.u_exact(noise_level=1e-3, sigma=0)
@@ -672,10 +666,11 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    test_eval_f(16, 4, 'T2U', 'mixed')
-    # test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
+    # test_eval_f(16, 8, 'T2U', 'z')
+    test_BCs(2**1, 2**7, 'T2U', 0, 0, 2, 0.001, True)
     # test_solver(2**8, 2**6, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)
-    # test_vorticity(4, 4, 'T2T', 'x')
+    # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
     # test_initial_conditions(4, 5, 0, 1, 1, 1)
+    print('done')

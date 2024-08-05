@@ -26,7 +26,7 @@ class CFLLimit(ConvergenceController):
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
         dt_new = L.status.dt_new if L.status.dt_new else L.params.dt
-        L.status.dt_new = min([dt_new, max_step_size])
+        L.status.dt_new = min([dt_new, cfl * max_step_size])
         L.status.dt_new = max([min_step_size, L.status.dt_new])
 
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
@@ -40,7 +40,8 @@ def run_RBC(useGPU=False):
     from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
     from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
 
-    # from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK54 as sweeper_class
+    # from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK548L2SA as sweeper_class
+    # from pySDC.implementations.sweeper_classes.Runge_Kutta import IMEXEuler as sweeper_class
 
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
@@ -72,7 +73,8 @@ def run_RBC(useGPU=False):
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 1
     sweeper_params['QI'] = 'IE'
-    sweeper_params['QE'] = 'EE'
+    sweeper_params['QE'] = 'PIC'
+    # sweeper_params['initial_guess'] = 'zero'
 
     problem_params = {
         'comm': comm,
@@ -106,7 +108,7 @@ def run_RBC(useGPU=False):
     P = controller.MS[0].levels[0].prob
 
     relaxation_steps = 0
-    u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
+    u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3, sigma=0)
     uinit = u0_noise
     for _ in range(relaxation_steps):
         uinit = P.solve_system(uinit, dt=0.25)

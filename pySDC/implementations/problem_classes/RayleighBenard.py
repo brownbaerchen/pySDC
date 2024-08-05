@@ -13,7 +13,7 @@ class RayleighBenard(GenericSpectralLinear):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
-            'T_bottom': 1,
+            'T_bottom': 2,
             'v_top': 0,
             'v_bottom': 0,
             'u_top': 0,
@@ -55,8 +55,6 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dx = Dx
         self.Dxx = Dxx
         self.Dz = Dz
-        Dz_special = Dz.copy().tolil()
-        # Dz_special[-2] = 0
         self.U2T = self.get_basis_change_matrix()
 
         kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
@@ -82,6 +80,9 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', zero_line=True)
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
         self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True)
+        # self.add_BC(
+        #     component='vz', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=True
+        # )
         self.add_BC(
             component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
         )
@@ -140,13 +141,11 @@ class RayleighBenard(GenericSpectralLinear):
         padding = [self.dealiasing, self.dealiasing]
         Dx_u_pad = self.itransform(Dx_u_hat, padding=padding).real
         u_pad = self.itransform(u_hat, padding=padding).real
-        print(u_hat.shape, u_pad.shape)
 
         fexpl_pad = self.xp.zeros_like(u_pad)
         fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * u_pad[iuz])
         fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * u_pad[ivz])
         fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * u_pad[iTz])
-        print(fexpl_pad.shape, f.expl.shape, padding, self.dealiasing)
 
         f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
 
@@ -217,10 +216,10 @@ class RayleighBenard(GenericSpectralLinear):
         u_hat = self.transform(u)
         Dz = self.U2T @ self.Dz
         Dx = self.U2T @ self.Dx
-        iu = self.index('u')
+        iu, iv = self.index(['u', 'v'])
 
         vorticity_hat = self.u_init_forward
-        vorticity_hat[0] = (Dx * u_hat[self.iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.itransform(vorticity_hat)[0].real
 
     def compute_constraint_violation(self, u):

@@ -687,3 +687,11 @@ class ARK548L2SA(RungeKuttaIMEX):
     @classmethod
     def get_update_order(cls):
         return 5
+
+
+class IMEXEuler(RungeKuttaIMEX):
+
+    nodes = BackwardEuler.nodes
+    weights = BackwardEuler.weights
+    matrix = BackwardEuler.matrix
+    matrix_explicit = ForwardEuler.matrix

@@ -150,6 +150,9 @@ class GenericSpectralLinear(Problem):
 
         We use a tau method to enforce boundary conditions in Chebychov methods. This means we replace a line in the system matrix by the polynomials evaluated at a boundary and put the value we want there in the rhs at the respective position. Since we have to do that in spectral space along only the axis we want to apply the boundary condition to, we transform back to real space after applying the mass matrix, and then transform only along one axis, apply the boundary conditions and transform back. Then we transform along all dimensions again. If you desire speed, you may wish to overload this function with something less generic that avoids a few transformations.
         """
+        if dt == 0:
+            return rhs
+
         sp = self.spectral.sparse_lib
 
         sol = self.u_init
