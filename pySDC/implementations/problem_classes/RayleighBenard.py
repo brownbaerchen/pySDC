@@ -9,7 +9,9 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
 
-    def __init__(self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, dealiasing=3 / 2, **kwargs):
+    def __init__(
+        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, dealiasing=3 / 2, comm=None, **kwargs
+    ):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
@@ -21,11 +23,18 @@ class RayleighBenard(GenericSpectralLinear):
             'p_integral': 0,
             **BCs,
         }
+        if comm is None:
+            try:
+                from mpi4py import MPI
+
+                comm = MPI.COMM_WORLD
+            except ModuleNotFoundError:
+                pass
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 8}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
-        super().__init__(bases, components, **kwargs)
+        super().__init__(bases, components, comm=comm, **kwargs)
 
         self.indices = {
             'u': 0,
@@ -76,20 +85,23 @@ class RayleighBenard(GenericSpectralLinear):
         M_lhs = {i: {i: I} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
 
-        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True)
-        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', zero_line=True)
-        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
-        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True)
+        self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral')
+        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
+        # self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        self.add_BC(component='Tz', equation='Tz', axis=1, v=self.BCs['T_top'] - self.BCs['T_bottom'], kind='integral')
+        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_bottom'], kind='Dirichlet')
         # self.add_BC(
         #     component='vz', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=True
         # )
-        self.add_BC(
-            component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
-        )
-        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet', zero_line=True)
-        self.add_BC(
-            component='u', equation='uz', axis=1, v=self.BCs['u_bottom'], x=-1, kind='Dirichlet', zero_line=True
-        )
+        # self.add_BC(
+        #     component='v', equation='vz', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=False
+        # )
+        self.add_BC(component='vz', equation='vz', axis=1, v=self.BCs['v_top'] - self.BCs['v_bottom'], kind='integral')
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
+        # self.add_BC(
+        #     component='u', equation='uz', axis=1, v=self.BCs['u_bottom'], x=-1, kind='Dirichlet', zero_line=zero_line
+        # )
+        self.add_BC(component='uz', equation='uz', axis=1, v=self.BCs['u_top'] - self.BCs['u_bottom'], kind='integral')
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -106,7 +118,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         return self.itransform(me_hat).real
 
-    def eval_f(self, u, *args, **kwargs):
+    def eval_f(self, u, *args, compute_violations=True, **kwargs):
         f = self.f_init
 
         u_hat = self.transform(u)
@@ -130,6 +142,14 @@ class RayleighBenard(GenericSpectralLinear):
         f_impl_hat[iv][:] = (
             -Dz @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iv].flatten() + Dz @ u_hat[ivz].flatten())
         ).reshape(shape) + u_hat[iT]
+
+        if compute_violations:
+            f_impl_hat[iuz][:] = (Dz @ u_hat[iu].flatten()).reshape(shape) - u_hat[iuz]
+            f_impl_hat[ivz][:] = (Dz @ u_hat[iv].flatten()).reshape(shape) - u_hat[ivz]
+            f_impl_hat[iTz][:] = (Dz @ u_hat[iT].flatten()).reshape(shape) - u_hat[iTz]
+            f_impl_hat[ip][:] = (Dz @ u_hat[iv].flatten() + Dx @ u_hat[iu].flatten()).reshape(shape)
+
+        # f_impl_hat = (self.L @ u_hat.flatten()).reshape(u_hat.shape)
 
         f.impl[:] = self.itransform(f_impl_hat).real
 
@@ -189,7 +209,7 @@ class RayleighBenard(GenericSpectralLinear):
         bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
         bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
 
-        # me_hat[iT, :, self.nz // 4:] = 0
+        me_hat[iT, :, self.nz // 4 :] = 0
 
         rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
         rhs[0] = self.BCs["T_top"] - self.xp.sum(bc_top[:-2] * me_hat[iT, :, :-2], axis=1)

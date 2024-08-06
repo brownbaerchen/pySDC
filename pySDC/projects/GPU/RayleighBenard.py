@@ -60,19 +60,19 @@ def run_RBC(useGPU=False):
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.25
-    level_params['restol'] = 1e-6
+    level_params['dt'] = 0.1
+    level_params['restol'] = 1e-5
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e0},
-        CFLLimit: {},
+        # CFLLimit: {},
         StopAtNan: {'thresh': 1e6},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 2
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
@@ -80,12 +80,15 @@ def run_RBC(useGPU=False):
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6,
-        'nx': 2**8,
-        'nz': 2**6,
+        'nx': 2**8 + 1,
+        'nz': 2**6 + 1,
+        'cheby_mode': 'T2U',
+        'left_preconditioning': 'T2T',
+        'right_preconditioner': False,
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 4
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

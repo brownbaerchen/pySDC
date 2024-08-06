@@ -28,7 +28,7 @@ def test_heat1d_chebychov(a, b, f, nvars=2**4):
 @pytest.mark.parametrize('fy', [2, 1])
 @pytest.mark.parametrize('base_x', ['fft', 'chebychov'])
 @pytest.mark.parametrize('base_y', ['fft', 'chebychov'])
-def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
+def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5 + 1, ny=2**5 + 1):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DChebychov
 
@@ -48,8 +48,8 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
         base_x=base_x,
         base_y=base_y,
         nu=1e-3,
-        left_preconditioner=False,
-        right_preconditioning='T2T',
+        left_preconditioner=True,
+        right_preconditioning='D2T',
     )
 
     u0 = P.u_exact(0)
@@ -57,7 +57,7 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5, ny=2**5):
     u = P.solve_system(u0, dt)
     u02 = u - dt * P.eval_f(u)
 
-    tol = 1e-6 if (base_x == 'fft' or base_y == 'fft') else 1e-3
+    tol = 1e-9 if (base_x == 'fft' or base_y == 'fft') else 1e-3
 
     assert np.allclose(
         u, P.u_exact(dt), atol=tol
@@ -119,8 +119,8 @@ def test_SDC():
 
 
 if __name__ == '__main__':
-    test_SDC()
+    # test_SDC()
     # test_heat1d_chebychov(2, 3, 2, 2**5)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    # test_heat2d_chebychov(1, 1, -2, 1, 2, 'fft', 'chebychov', 2**0, 2**5)
+    test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5, 2**5)

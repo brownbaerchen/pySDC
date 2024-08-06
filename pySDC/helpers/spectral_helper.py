@@ -523,7 +523,7 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def add_BC(self, component, equation, axis, kind, v, zero_line=False, **kwargs):
+    def add_BC(self, component, equation, axis, kind, v, zero_line=True, **kwargs):
         if equation in [me['equation'] for me in self.full_BCs]:
             raise Exception(f'There is already a boundary condition in equation for {equation}!')
 

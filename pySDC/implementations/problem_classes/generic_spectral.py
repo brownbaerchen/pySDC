@@ -41,13 +41,6 @@ class GenericSpectralLinear(Problem):
         *args,
         **kwargs,
     ):
-        if comm is None:
-            try:
-                from mpi4py import MPI
-
-                comm = MPI.COMM_WORLD
-            except ModuleNotFoundError:
-                pass
         self.spectral = SpectralHelper(comm=comm, useGPU=useGPU)
 
         if useGPU:
@@ -163,11 +156,11 @@ class GenericSpectralLinear(Problem):
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs = self.spectral.itransform(rhs_hat).real
 
-        rhs = self.spectral.put_BCs_in_rhs(rhs) / dt
+        rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
 
         A = self.M + dt * self.L
-        A = self.Pl @ self.spectral.put_BCs_in_matrix(A) / dt @ self.Pr
+        A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
         # print(rhs_hat.reshape(sol.shape))
 
@@ -267,6 +260,7 @@ def compute_residual_DAE(self, stage=''):
             res[m] += L.tau[m]
         # use abs function from data type here
         res_norm.append(abs(res[m]))
+        # print(m, [abs(me) for me in res[m]], [abs(me) for me in L.u[0] - L.u[m + 1]])
 
     # find maximal residual over the nodes
     if L.params.residual_type == 'full_abs':
