@@ -8,7 +8,6 @@ class Burgers1D(GenericSpectralLinear):
 
     dtype_u = mesh
     dtype_f = imex_mesh
-    xp = np
 
     def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
