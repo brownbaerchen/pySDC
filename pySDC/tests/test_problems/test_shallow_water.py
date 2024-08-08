@@ -37,4 +37,4 @@ def test_SWE_linearized(plotting=False):
 
 
 if __name__ == '__main__':
-    test_SWE_linearized()
+    test_SWE_linearized(True)

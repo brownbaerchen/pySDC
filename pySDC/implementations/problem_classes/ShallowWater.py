@@ -73,11 +73,21 @@ class ShallowWaterLinearized(GenericSpectralLinear):
 
         gh = np.sqrt(self.H * self.g)
 
-        f = 4 * np.pi
+        amplitudes_x = [1, 2]
+        freq_x = [4 * np.pi, 5 * np.pi]
 
-        me[ih] = xp.sin(self.X * f + gh * t * f) + xp.sin(self.Y * f + gh * f * t) + self.H
-        me[iu] = -self.g / gh * xp.sin(self.X * f + gh * t * f)
-        me[iv] = -self.g / gh * xp.sin(self.Y * f + gh * t * f)
+        amplitudes_y = [0.1, 1.7]
+        freq_y = [3 * np.pi, 4 * np.pi]
+
+        for f, A in zip(freq_x, amplitudes_x):
+            me[ih] += A * xp.sin(self.X * f + gh * t * f)
+            me[iu] += -A * self.g / gh * xp.sin(self.X * f + gh * t * f)
+
+        for f, A in zip(freq_y, amplitudes_y):
+            me[ih] += A * xp.sin(self.Y * f + gh * f * t)
+            me[iv] += -A * self.g / gh * xp.sin(self.Y * f + gh * t * f)
+
+        me[ih] += self.H
 
         return me
 

@@ -123,4 +123,4 @@ if __name__ == '__main__':
     # test_heat1d_chebychov(2, 3, 2, 2**5)
     # test_AdvectionDiffusion(plot=True)
     # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5, 2**5)
+    test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)

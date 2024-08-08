@@ -21,7 +21,7 @@ class LogGrid(Hooks):
         self.file_logger()
 
         prob = step.levels[level_number].prob
-        grid = prob.Z, prob.X
+        grid = prob.get_grid()
 
         with open(self.get_path(), 'wb') as file:
             try:

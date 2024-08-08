@@ -75,8 +75,8 @@ class Heat2DChebychov(GenericSpectralLinear):
     dtype_f = mesh
 
     def __init__(self, nx=128, ny=128, base_x='fft', base_y='chebychov', a=0, b=0, c=0, fx=1, fy=1, nu=1.0, **kwargs):
-        assert nx % 2 == 1 or bx == 'fft'
-        assert nz % 2 == 1 or bz == 'fft'
+        assert nx % 2 == 1 or base_x == 'fft'
+        assert ny % 2 == 1 or base_y == 'fft'
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
