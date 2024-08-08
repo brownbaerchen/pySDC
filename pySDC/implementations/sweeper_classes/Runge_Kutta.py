@@ -687,3 +687,32 @@ class ARK548L2SA(RungeKuttaIMEX):
     @classmethod
     def get_update_order(cls):
         return 5
+
+
+class ARK324L2SAESDIRK(RungeKutta):
+    ButcherTableauClass = ButcherTableauEmbedded
+    generator = RK_SCHEMES["ARK324L2SAESDIRK"]()
+    nodes, weights, matrix = generator.genCoeffs(embedded=True)
+
+    @classmethod
+    def get_update_order(cls):
+        return 3
+
+
+class ARK324L2SA(RungeKuttaIMEX):
+    """
+    IMEX embedded Runge-Kutta method of orders 3 and 2 from https://doi.org/10.1016/S0168-9274(02)00138-1.
+    """
+
+    ButcherTableauClass = ButcherTableauEmbedded
+    ButcherTableauClass_explicit = ButcherTableauEmbedded
+
+    generator = RK_SCHEMES["ARK324L2SAESDIRK"]()
+    nodes, weights, matrix = generator.genCoeffs(embedded=True)
+
+    generator_explicit = RK_SCHEMES["ARK324L2SAERK"]()
+    _, _, matrix_explicit = generator_explicit.genCoeffs(embedded=True)
+
+    @classmethod
+    def get_update_order(cls):
+        return 3

@@ -773,6 +773,73 @@ def get_configs(mode, problem):
             ],
         }
 
+    elif mode == 'RK_comp_low_order':
+        """
+        Compare parallel adaptive SDC to Runge-Kutta
+        """
+        from pySDC.projects.Resilience.strategies import (
+            AdaptivityStrategy,
+            ERKStrategy,
+            ESDIRKStrategy,
+            ARKStrategy,
+            AdaptivityPolynomialError,
+        )
+
+        if problem.__name__ in ['run_Schroedinger', 'run_AC']:
+            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as parallel_sweeper
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import (
+                generic_implicit_MPI as parallel_sweeper,
+            )
+
+        newton_inexactness = False if problem.__name__ in ['run_vdp'] else True
+
+        desc = {}
+        desc['sweeper_params'] = {'num_nodes': 2, 'QI': 'IE', 'QE': "EE"}
+        desc['step_params'] = {'maxiter': 3}
+
+        desc_poly = {}
+        desc_poly['sweeper_params'] = {'num_nodes': 2}
+        desc_poly['sweeper_class'] = parallel_sweeper
+
+        ls = {
+            1: '-',
+            2: '--',
+            3: '-.',
+            4: ':',
+            5: ':',
+        }
+        if problem.__name__ in ['run_Schroedinger', 'run_AC']:
+            from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK324L2SA
+
+            configurations[-1] = {
+                'strategies': [ARKStrategy(useMPI=True)],
+                'custom_description': {'sweeper_class': ARK324L2SA},
+                'num_procs': 1,
+            }
+        else:
+            from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK324L2SAESDIRK
+
+            configurations[-1] = {
+                'strategies': [ESDIRKStrategy(useMPI=True)],
+                'custom_description': {'sweeper_class': ARK324L2SAESDIRK},
+                'num_procs': 1,
+            }
+
+        configurations[3] = {
+            'custom_description': desc_poly,
+            'strategies': [AdaptivityPolynomialError(useMPI=True, newton_inexactness=newton_inexactness)],
+            'num_procs': 1,
+            'num_procs_sweeper': 2,
+            'plotting_params': {'label': r'$\Delta t$-$k$-adaptivity $N$=1x2'},
+        }
+        configurations[2] = {
+            'strategies': [AdaptivityStrategy(useMPI=True)],
+            'custom_description': desc,
+            'num_procs': 3,
+            'plotting_params': {'label': r'$\Delta t$-adaptivity $N$=3x1'},
+        }
+
     elif mode == 'RK_comp':
         """
         Compare parallel adaptive SDC to Runge-Kutta
@@ -1586,12 +1653,12 @@ if __name__ == "__main__":
     record = comm_world.size > 1
     for mode in [
         # 'compare_strategies',
-        # 'RK_comp',
+        # 'RK_comp_low_order',
         # 'parallel_efficiency',
     ]:
         params = {
             'mode': mode,
-            'runs': 5,
+            'runs': 1,
             'plotting': comm_world.rank == 0,
         }
         params_single = {
@@ -1609,9 +1676,10 @@ if __name__ == "__main__":
     }
 
     for mode in [
-        'RK_comp',
-        'parallel_efficiency',
-        'compare_strategies',
+        # 'RK_comp',
+        # 'parallel_efficiency',
+        # 'compare_strategies',
+        'RK_comp_low_order',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()
