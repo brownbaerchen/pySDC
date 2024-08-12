@@ -10,13 +10,14 @@ class ShallowWaterLinearized(GenericSpectralLinear):
     def __init__(self, nx=2**6, ny=2**6, f=0, k=1, g=1, H=1e2, **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        bases = [{'base': 'fft', 'N': nx, 'x0': -1, 'x1': 1}, {'base': 'fft', 'N': ny, 'x0': -1, 'x1': 1}]
+        # bases = [{'base': 'fft', 'N': nx, 'x0': -1, 'x1': 1}, {'base': 'fft', 'N': ny, 'x0': -1, 'x1': 1}]
+        bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 2 * np.pi}, {'base': 'fft', 'N': ny, 'x0': 0, 'x1': 2 * np.pi}]
         components = ['h', 'u', 'v']
 
         super().__init__(bases, components, **kwargs)
 
-        Dx = self.get_differentiation_matrix(axes=(0,))
-        Dy = self.get_differentiation_matrix(axes=(1,))
+        Dx = self.get_differentiation_matrix(axes=(-2,))
+        Dy = self.get_differentiation_matrix(axes=(-1,))
         Id = self.get_Id()
         self.U2T = self.get_basis_change_matrix()
         self.Dx = Dx
@@ -72,22 +73,23 @@ class ShallowWaterLinearized(GenericSpectralLinear):
         me = self.u_init
 
         gh = np.sqrt(self.H * self.g)
+        Lx, Ly = (me.L for me in self.axes)
 
         amplitudes_x = [1, 2]
-        freq_x = [4 * np.pi, 5 * np.pi]
+        freq_x = [4 * np.pi / Lx, 6 * np.pi / Lx]
 
         amplitudes_y = [0.1, 1.7]
-        freq_y = [3 * np.pi, 4 * np.pi]
+        freq_y = [2 * np.pi / Ly, 4 * np.pi / Ly]
 
         for f, A in zip(freq_x, amplitudes_x):
-            me[ih] += A * xp.sin(self.X * f + gh * t * f)
-            me[iu] += -A * self.g / gh * xp.sin(self.X * f + gh * t * f)
+            wave = A * xp.sin((self.X - gh * t) * f)
+            me[ih] += wave
+            me[iu] += np.sqrt(self.g / self.H) * wave
 
         for f, A in zip(freq_y, amplitudes_y):
-            me[ih] += A * xp.sin(self.Y * f + gh * f * t)
-            me[iv] += -A * self.g / gh * xp.sin(self.Y * f + gh * t * f)
-
-        me[ih] += self.H
+            wave = A * xp.sin((self.Y - gh * t) * f)
+            me[ih] += wave
+            me[iv] += np.sqrt(self.g / self.H) * wave
 
         return me
 

@@ -166,6 +166,7 @@ def _test_transform_dealias(
     padding=3 / 2,
     axes=(-2, -1),
     useMPI=True,
+    axis=-2,
     **kwargs,
 ):
     import numpy as np
@@ -184,14 +185,19 @@ def _test_transform_dealias(
     helper.add_axis(base='cheby', N=nz)
     helper.setup_fft()
     xp = helper.xp
+    import scipy
 
-    padding = [
-        padding,
+    # padding = [
+    #     padding,
+    # ] * helper.ndim
+    _padding = [
+        1,
     ] * helper.ndim
+    _padding[axis] = padding
 
     helper_pad = SpectralHelper(comm=comm, debug=True)
-    helper_pad.add_axis(base='fft', N=int(padding[0] * nx))
-    helper_pad.add_axis(base='cheby', N=int(padding[1] * nz))
+    helper_pad.add_axis(base='fft', N=int(_padding[0] * nx))
+    helper_pad.add_axis(base='cheby', N=int(_padding[1] * nz))
     helper_pad.setup_fft()
 
     u_hat = helper.u_init_forward
@@ -206,18 +212,25 @@ def _test_transform_dealias(
         u_expect[0] += (np.cos(f * X) * 2 / nx) ** 2
         u_expect_pad[0] += (np.cos(f * X_pad) * 2 / nx) ** 2
 
-    u_pad = helper.itransform(u_hat, padding=padding, axes=axes)
+    u_pad = helper.itransform(u_hat, padding=_padding, axes=axes)
     u = helper.itransform(u_hat, axes=axes).real
 
-    # assert np.allclose(u_pad.shape[1:], [me * padding[0] for me in u.shape][1:])
+    # assert np.allclose(u_pad.shape[1:], [me * _padding[0] for me in u.shape][1:])
 
     u2 = u**2
     u2_pad = u_pad**2
 
     assert xp.allclose(u2_pad, u_expect_pad)
 
+    if axis == -2:
+        u2_hat_expect = scipy.signal.fftconvolve(u_hat, u_hat, axes=(-2,), mode='same')
+        assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
+        assert np.allclose(u2_hat_expect, helper.transform(u2))
+    else:
+        raise NotImplementedError
+
     u2_reg = helper.itransform(helper.transform(u2, axes=axes), axes=axes).real
-    u2_pad = helper.itransform(helper.transform(u2_pad, padding=padding, axes=axes), axes=axes).real
+    u2_pad = helper.itransform(helper.transform(u2_pad, padding=_padding, axes=axes), axes=axes).real
 
     import matplotlib.pyplot as plt
 
