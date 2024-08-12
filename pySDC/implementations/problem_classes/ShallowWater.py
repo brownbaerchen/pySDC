@@ -142,3 +142,66 @@ class ShallowWaterLinearized(GenericSpectralLinear):
         axs[-1].set_xlabel(r'$x$')
         axs[-1].set_ylabel(r'$y$')
         fig.colorbar(im, self.cax[0])
+
+
+class ShallowWaterPeriodic(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = imex_mesh
+
+    def __init__(self, nx=2**6, ny=2**6, f=0, k=1, g=1, H=1e2, nu=1e-2, **kwargs):
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        bases = [{'base': 'fft', 'N': nx, 'x0': -1, 'x1': 1}, {'base': 'fft', 'N': ny, 'x0': -1, 'x1': 1}]
+        components = ['h', 'u', 'v']
+
+        super().__init__(bases, components, **kwargs)
+
+        Dx = self.get_differentiation_matrix(axes=(-2,))
+        Dy = self.get_differentiation_matrix(axes=(-1,))
+        Dxx = self.get_differentiation_matrix(axes=(-2,), p=2)
+        Dyy = self.get_differentiation_matrix(axes=(-1,), p=2)
+        Id = self.get_Id()
+        self.U2T = self.get_basis_change_matrix()
+        self.Dx = self.U2T @ Dx
+        self.Dxx = self.U2T @ Dxx
+        self.Dy = self.U2T @ Dy
+        self.Dyy = self.U2T @ Dyy
+
+        L_lhs = {
+            'u': {'v': -f * Id, 'h': g * Dx, 'u': k * Id - nu * Dxx + nu * Dyy},
+            'v': {'u': f * Id, 'h': g * Dy, 'v': k * Id - nu * Dxx + nu * Dyy},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {comp: {comp: Id} for comp in ['h', 'u', 'v']}
+        self.setup_M(M_lhs)
+
+        self.setup_BCs()
+
+        self.Y, self.X = self.get_grid()
+
+    def eval_f(self, u, *args, **kwargs):
+        ih, iu, iv = self.index(self.components)
+        f = self.f_init
+
+        f_hat = self.u_init_forward
+
+        u_hat = self.transform(u)
+        f_hat[ih] = -self.H * (self.Dx @ u_hat[iu].flatten() + self.Dy @ u_hat[iv].flatten()).reshape(f[ih].shape)
+        f_hat[iu] = (
+            self.f * u_hat[iv]
+            - self.g * (self.Dx @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
+            - self.k * u_hat[iu]
+            + self.nu * ((self.Dxx + self.Dyy) @ u_hat[iu].flatten()).reshape(f_hat[iu].shape)
+        )
+        f_hat[iv] = (
+            -self.f * u_hat[iu]
+            - self.g * (self.Dy @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
+            - self.k * u_hat[iv]
+            + self.nu * ((self.Dxx + self.Dyy) @ u_hat[iv].flatten()).reshape(f_hat[iv].shape)
+        )
+
+        f.impl[:] = self.itransform(f_hat).real
+
+        # TODO: explicit f evaluation
+        return f
