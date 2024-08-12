@@ -274,6 +274,13 @@ def record_work_precision(
                 exponents = [0, 1, 2, 3, 5][::-1]
             else:
                 exponents = [-3, -2, -1, 0, 0.2, 0.8, 1][::-1]
+        if mode == 'RK_comp_low_order':
+            if problem.__name__ == 'run_Schroedinger':
+                exponents = [-1.5, -1, 0, 1, 2, 3][::-1]
+            if problem.__name__ == 'run_AC':
+                exponents = [-1, 0, 1, 2, 3][::-1]
+                if strategy.name == 'adaptivity-inter':
+                    exponents += [-2]
     elif param == 'dt':
         power = 2.0
         exponents = [-1, 0, 1, 2, 3][::-1]
@@ -1652,13 +1659,13 @@ if __name__ == "__main__":
 
     record = comm_world.size > 1
     for mode in [
-        # 'compare_strategies',
-        # 'RK_comp_low_order',
+        #'compare_strategies',
+        'RK_comp_low_order',
         # 'parallel_efficiency',
     ]:
         params = {
             'mode': mode,
-            'runs': 1,
+            'runs': 5,
             'plotting': comm_world.rank == 0,
         }
         params_single = {
@@ -1679,7 +1686,7 @@ if __name__ == "__main__":
         # 'RK_comp',
         # 'parallel_efficiency',
         # 'compare_strategies',
-        'RK_comp_low_order',
+        #'RK_comp_low_order',
     ]:
         all_problems(**all_params, mode=mode)
         comm_world.Barrier()

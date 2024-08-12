@@ -1872,7 +1872,6 @@ class AdaptivityPolynomialError(InexactBaseStrategy):
             e_tol = 6e-4
             level_params['dt'] = 0.1
             restol_rel = 1e-5
-            restol_min = 1e-12
             dt_min = 1e-7
             problem_params['newton_tol'] = 1e-14
         elif problem.__name__ == "run_piline":
