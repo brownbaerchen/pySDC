@@ -158,6 +158,7 @@ class GenericSpectralLinear(Problem):
 
         rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
+        # print(rhs_hat.reshape(rhs.shape)[self.index('Tz')])
 
         A = self.M + dt * self.L
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr

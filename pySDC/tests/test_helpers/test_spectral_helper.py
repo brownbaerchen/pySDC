@@ -161,8 +161,8 @@ def test_matrix1D(N, base, type):
 
 @pytest.mark.mpi4py
 def _test_transform_dealias(
-    nx=2**6,
-    nz=2**2,
+    nx=2**4 + 1,
+    nz=2**1,
     padding=3 / 2,
     axes=(-2, -1),
     useMPI=True,
@@ -185,15 +185,10 @@ def _test_transform_dealias(
     helper.add_axis(base='cheby', N=nz)
     helper.setup_fft()
     xp = helper.xp
-    import scipy
 
-    # padding = [
-    #     padding,
-    # ] * helper.ndim
     _padding = [
-        1,
+        padding,
     ] * helper.ndim
-    _padding[axis] = padding
 
     helper_pad = SpectralHelper(comm=comm, debug=True)
     helper_pad.add_axis(base='fft', N=int(_padding[0] * nx))
@@ -201,48 +196,39 @@ def _test_transform_dealias(
     helper_pad.setup_fft()
 
     u_hat = helper.u_init_forward
+    u2_hat_expect = helper.u_init_forward
     u_expect = helper.u_init
     u_expect_pad = helper_pad.u_init
     Kz, Kx = helper.get_wavenumbers()
     Z, X = helper.get_grid()
     Z_pad, X_pad = helper_pad.get_grid()
-    freq = [nx // 3]  # , nx // 7, nx // 9]
-    for f in freq:
-        u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] = 1
+
+    if axis == -2:
+        f = nx // 3
+        u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] += 1
+        u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 2 * f, Kz == 0)] += 1 / nx
+        u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 0, Kz == 0)] += 2 / nx
         u_expect[0] += (np.cos(f * X) * 2 / nx) ** 2
         u_expect_pad[0] += (np.cos(f * X_pad) * 2 / nx) ** 2
+    else:
+        raise NotImplementedError
 
     u_pad = helper.itransform(u_hat, padding=_padding, axes=axes)
     u = helper.itransform(u_hat, axes=axes).real
 
-    # assert np.allclose(u_pad.shape[1:], [me * _padding[0] for me in u.shape][1:])
+    assert np.allclose(u_pad.shape[1:], [np.ceil(me * _padding[0]) for me in u.shape][1:])
 
     u2 = u**2
     u2_pad = u_pad**2
 
     assert xp.allclose(u2_pad, u_expect_pad)
 
-    if axis == -2:
-        u2_hat_expect = scipy.signal.fftconvolve(u_hat, u_hat, axes=(-2,), mode='same')
-        assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
-        assert np.allclose(u2_hat_expect, helper.transform(u2))
-    else:
-        raise NotImplementedError
+    u2_expect = helper.itransform(u2_hat_expect, axes=(-2, -1)).real
+    assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
+    assert not np.allclose(u2_hat_expect, helper.transform(u2))
 
     u2_reg = helper.itransform(helper.transform(u2, axes=axes), axes=axes).real
     u2_pad = helper.itransform(helper.transform(u2_pad, padding=_padding, axes=axes), axes=axes).real
-
-    import matplotlib.pyplot as plt
-
-    print(u2_pad)  # -u_expect)
-    Z, X = helper.get_grid()
-    fig, axs = plt.subplots(2, 1)
-    axs[0].pcolormesh(X, Z, u2_pad[0])
-    axs[1].pcolormesh(X, Z, u_expect[0])
-    plt.show()
-    assert xp.allclose(u2, u_expect)
-    assert xp.allclose(u2_reg, u_expect)
-    assert xp.allclose(u2_pad, u_expect)
 
 
 # @pytest.mark.base

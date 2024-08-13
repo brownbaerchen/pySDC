@@ -631,14 +631,14 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     # # P.plot(small_dt, quantity='u')
     # # plt.show()
 
-    # dt = 1e-1
-    # forward = P.solve_system(u0, dt)
-    # f = P.eval_f(forward)
-    # backward = forward - dt * (f.impl)
-    # compute_errors(u0, backward, 'backward without convection', 1e-8, components=['T', 'u', 'v'])
-    # # P.plot(forward, quantity='vz')
-    # # plt.show()
-    # # return None
+    dt = 1e-1
+    forward = P.solve_system(u0, dt)
+    f = P.eval_f(forward)
+    backward = forward - dt * (f.impl)
+    compute_errors(u0, backward, 'backward without convection', 1e-8, components=['T', 'u', 'v'])
+    # P.plot(forward, quantity='vz')
+    # plt.show()
+    # return None
 
     # dt = 1e-1
     # forward = IMEX_Euler(u0, dt)
@@ -674,7 +674,6 @@ if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
     # test_BCs(2**0, 2**2+1, 'T2U', 0, 0, 2, 0.001, True)
-    raise
     test_solver(2**9, 2**7, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')

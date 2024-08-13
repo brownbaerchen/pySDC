@@ -83,8 +83,8 @@ def run_RBC(useGPU=False):
         'nx': 2**8 + 1,
         'nz': 2**6 + 1,
         'cheby_mode': 'T2U',
-        'left_preconditioning': 'T2T',
-        'right_preconditioner': False,
+        'left_preconditioner': False,
+        'right_preconditioning': 'T2T',
     }
 
     step_params = {}

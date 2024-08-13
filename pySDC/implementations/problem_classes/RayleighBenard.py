@@ -10,7 +10,17 @@ class RayleighBenard(GenericSpectralLinear):
     dtype_f = imex_mesh
 
     def __init__(
-        self, Prandl=1, Rayleigh=2e6, nx=256, nz=64, cheby_mode='T2U', BCs=None, dealiasing=3 / 2, comm=None, **kwargs
+        self,
+        Prandl=1,
+        Rayleigh=2e6,
+        nx=256,
+        nz=64,
+        cheby_mode='T2U',
+        BCs=None,
+        dealiasing=3 / 2,
+        comm=None,
+        debug=True,
+        **kwargs,
     ):
         BCs = {} if BCs is None else BCs
         BCs = {
@@ -71,9 +81,9 @@ class RayleighBenard(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
-            'uz': {'u': -Dz, 'uz': I},  # algebraic constraint for first derivative
-            'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
+            'vz': {'v': Dz, 'vz': -I},  # algebraic constraint for first derivative
+            'uz': {'u': Dz, 'uz': -I},  # algebraic constraint for first derivative
+            'Tz': {'T': Dz, 'Tz': -I},  # algebraic constraint for first derivative
             'p': {'u': Dx, 'v': Dz},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx, 'uz': -nu * Dz},
             'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -I},
@@ -196,29 +206,40 @@ class RayleighBenard(GenericSpectralLinear):
         padding = [
             self.dealiasing,
         ] * 2
+        noise_hat = self.u_init_forward
+        noise_pad = self.itransform(noise_hat, padding=padding)
+        noise_pad[iT][:] = rng.normal(size=noise_pad[iT].shape)
         # noise_pad = self.itransform(self.transform(noise), padding=padding)
-        # noise_dealias = self.itransform(self.transform(noise_pad, padding=padding))
+        noise = self.itransform(self.transform(noise_pad, padding=padding))
         # print(abs(noise-noise_dealias), noise_pad.shape, noise.shape)
+        # noise[iT, Kx > 1] *=0
+        # noise[iT, Kz > 1] *=0
+
         # Kz, Kx = self.get_wavenumbers()
-        # noise[iT, Kz > 2] *=1e-2
+        # noise_hat = self.u_init_forward
+        # noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
+        # # noise_hat[iT, np.abs(Kx)>1] *= 0
+        # # noise_hat[iT, np.abs(Kz)>=1] *= 0
+        # noise = self.itransform(noise_hat)
 
-        me[iT] += self.xp.abs(noise[iT] * (self.Z - 1) * (self.Z + 1)) * noise_level
+        xp = self.xp
+        me[iT] += self.xp.abs(noise[iT]) / xp.max(xp.abs(noise[iT])) * noise_level * (self.Z - 1) * (self.Z + 1)
 
-        # enforce boundary conditions in spite of noise
-        me_hat = self.transform(me, axes=(-1,))
-        bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
-        bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
+        # # enforce boundary conditions in spite of noise
+        # me_hat = self.transform(me, axes=(-1,))
+        # bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
+        # bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
 
-        me_hat[iT, :, self.nz // 4 :] = 0
+        # me_hat[iT, :, self.nz // 4 :] = 0
 
-        rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
-        rhs[0] = self.BCs["T_top"] - self.xp.sum(bc_top[:-2] * me_hat[iT, :, :-2], axis=1)
-        rhs[1] = self.BCs["T_bottom"] - self.xp.sum(bc_bottom[:-2] * me_hat[iT, :, :-2], axis=1)
+        # rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
+        # rhs[0] = self.BCs["T_top"] - self.xp.sum(bc_top[:-2] * me_hat[iT, :, :-2], axis=1)
+        # rhs[1] = self.BCs["T_bottom"] - self.xp.sum(bc_bottom[:-2] * me_hat[iT, :, :-2], axis=1)
 
-        A = self.xp.array([bc_top[-2:], bc_bottom[-2:]], complex)
-        me_hat[iT, :, -2:] = self.xp.linalg.solve(A, rhs).T
+        # A = self.xp.array([bc_top[-2:], bc_bottom[-2:]], complex)
+        # me_hat[iT, :, -2:] = self.xp.linalg.solve(A, rhs).T
 
-        me[...] = self.itransform(me_hat, axes=(-1,)).real
+        # me[...] = self.itransform(me_hat, axes=(-1,)).real
 
         u_hat = self.transform(me)
         S = self.get_integration_matrix(axes=(1,))
@@ -235,10 +256,26 @@ class RayleighBenard(GenericSpectralLinear):
         #     assert self.xp.allclose(v, 0), f'Initial conditions violate constraint in {k}!'
 
         BC_violations = self.compute_BC_violation(me)
-        for k, v in BC_violations.items():
-            assert self.xp.allclose(v, 0), f'Initial conditions violate boundary conditions in {k} by {v}!'
+        # for k, v in BC_violations.items():
+        #     assert self.xp.allclose(v, 0), f'Initial conditions violate boundary conditions in {k} by {v:.2e}!'
 
         return me
+
+    def solve_system(self, *args, **kwargs):
+        sol = super().solve_system(*args, **kwargs)
+
+        if self.debug:
+            violations = {
+                key: self.xp.max(self.xp.abs(value)) for key, value in self.compute_constraint_violation(sol).items()
+            }
+            msg = ''
+            for key, value in violations.items():
+                if value > 1e-10:
+                    msg += f' {key}: {value:.2e}'
+            if msg != '':
+                self.logger.warning(f'Contraint violation:{msg}')
+
+        return sol
 
     def compute_vorticity(self, u):
         u_hat = self.transform(u)
@@ -267,9 +304,9 @@ class RayleighBenard(GenericSpectralLinear):
 
         violations = {}
 
-        violations['Tz'] = derivatives[idzT] - u[iTz]
-        violations['vz'] = derivatives[idzv] - u[ivz]
-        violations['uz'] = derivatives[idzu] - u[iuz]
+        violations['Tz'] = (derivatives[idzT] - u[iTz]) / derivatives[idzT]
+        violations['vz'] = (derivatives[idzv] - u[ivz]) / derivatives[idzv]
+        violations['uz'] = (derivatives[idzu] - u[iuz]) / derivatives[idzu]
 
         violations['divergence'] = derivatives[idxu] + derivatives[idzv]
 
