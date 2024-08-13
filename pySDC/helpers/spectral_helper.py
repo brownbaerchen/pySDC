@@ -221,9 +221,10 @@ class ChebychovHelper(SpectralHelper1D):
         D[0, :] /= 2
         return self.sparse_lib.csr_matrix(self.xp.linalg.matrix_power(D, p))
 
-    def get_norm(self):
+    def get_norm(self, N=None):
         '''get normalization for converting Chebychev coefficients and DCT'''
-        norm = self.xp.ones(self.N) / self.N
+        N = self.N if N is None else N
+        norm = self.xp.ones(N) / N
         norm[0] /= 2
         return norm
 
@@ -237,6 +238,17 @@ class ChebychovHelper(SpectralHelper1D):
             mask[1::2] = N - xp.arange(N // 2) - 1
             mask[-1] = N // 2
             return mask
+
+    def get_fft_shift(self, forward, N):
+        k = self.get_wavenumbers()
+        norm = self.get_norm()
+        xp = self.xp
+        if forward:
+            return 2 * xp.exp(-1j * np.pi * k / (2 * N) + 0j * np.pi / 4) * norm
+        else:
+            shift = xp.exp(1j * np.pi * k / (2 * N))
+            shift[0] /= 2
+            return shift / norm
 
     def get_fft_utils(self):
         self.fft_utils = {
@@ -687,7 +699,7 @@ class SpectralHelper:
         fft = self.get_fft(axes, 'forward', **kwargs)
         return fft(u, axes=axes)
 
-    def _transform_dct(self, u, axes, **kwargs):
+    def _transform_dct(self, u, axes, padding=None, **kwargs):
         '''
         This will only ever return real values!
         '''
@@ -705,12 +717,34 @@ class SpectralHelper:
             shuffle[axis] = base.get_fft_shuffle(True, N=v.shape[axis])
             v = v[*shuffle]
 
-            fft = self.get_fft(axes, 'forward', **kwargs)
+            # fft = self.get_fft(axes, 'forward', padding=padding, **kwargs)
+            fft = self.get_fft(axes, 'forward', shape=v.shape)
             v = fft(v, axes=axes)
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, v.shape[axis], 1)
-            v *= self.axes[axis].fft_utils['fwd']['shift'][*expansion]
+
+            if padding is not None:
+                _N = v.shape[axis]
+                N = int(np.ceil(v.shape[axis] / padding[axis]))
+                _expansion = [slice(0, n) for n in v.shape]
+                _expansion[axis] = slice(0, N, 1)
+                v = v[*_expansion]
+
+                shift = base.fft_utils['fwd']['shift']
+                shift = base.get_fft_shift(True, _N)
+
+                # N = int(np.ceil(v.shape[axis] * padding[axis]))
+                # xp = self.xp
+                # k = xp.append(xp.arange(base.N//2), N-base.N//2+xp.arange(base.N//2))
+                # # k = xp.array([0, 1, 2, 3, 12, 13, 14, 15])
+                # # k = xp.array([0, 0, 2, 0, 10.175, 0, 14, 0])
+                # # print(base.get_norm())
+                # shift = 2 * xp.exp(-1j * np.pi * k / (2 * N)) * base.get_norm()
+            else:
+                shift = base.fft_utils['fwd']['shift']
+
+            v *= shift[*expansion]
 
         return v.real
 
@@ -833,7 +867,7 @@ class SpectralHelper:
         ifft = self.get_fft(axes, 'backward', **kwargs)
         return ifft(u, axes=axes)
 
-    def _transform_idct(self, u, axes, **kwargs):
+    def _transform_idct(self, u, axes, padding=None, **kwargs):
         '''
         This will only ever return real values!
         '''
@@ -851,18 +885,18 @@ class SpectralHelper:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
 
-            v *= self.axes[axis].fft_utils['bck']['shift'][*expansion]
+            if padding is not None:
+                N = int(np.ceil(v.shape[axis] * padding[axis]))
+                shift = base.get_fft_shift(False, N)
+            else:
+                shift = base.fft_utils['bck']['shift']
 
-            ifft = self.get_fft(axes, 'backward', **kwargs)
+            v *= shift[*expansion]
+
+            ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
             v = ifft(v, axes=axes)
 
             shuffle = [slice(0, s, 1) for s in v.shape]
-            # N = v.shape[axis]
-            # xp = self.xp
-            # mask = xp.zeros(N, dtype=int)
-            # mask[: N - N % 2 : 2] = xp.arange(N // 2)
-            # mask[1::2] = N - xp.arange(N // 2) - 1
-            # mask[-1] = N // 2
             shuffle[axis] = base.get_fft_shuffle(False, N=v.shape[axis])
             v = v[*shuffle]
 

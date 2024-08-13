@@ -273,7 +273,7 @@ class RayleighBenard(GenericSpectralLinear):
                 if value > 1e-10:
                     msg += f' {key}: {value:.2e}'
             if msg != '':
-                self.logger.warning(f'Contraint violation:{msg}')
+                self.logger.warning(f'Constraint violation:{msg}')
 
         return sol
 
