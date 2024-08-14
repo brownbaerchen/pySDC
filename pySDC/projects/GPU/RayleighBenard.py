@@ -8,7 +8,7 @@ from pySDC.core.convergence_controller import ConvergenceController
 class CFLLimit(ConvergenceController):
     def get_new_step_size(self, controller, step, **kwargs):
         max_step_size = np.inf
-        min_step_size = 1e-3
+        min_step_size = 1e-2
 
         L = step.levels[0]
         P = step.levels[0].prob
@@ -71,9 +71,9 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 2
-    sweeper_params['QI'] = 'LU'
-    sweeper_params['QE'] = 'PIC'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
+    sweeper_params['QE'] = 'EE'
     # sweeper_params['initial_guess'] = 'zero'
 
     problem_params = {
@@ -88,7 +88,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 4
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

@@ -233,20 +233,8 @@ def _test_transform_dealias(
 
     u2 = u**2
     u2_pad = u_pad**2
-    import matplotlib.pyplot as plt
-
-    plt.plot(u2[0, 0, :].real)
-    plt.plot(u_expect[0, 0, :].real, ls='--')
-    # plt.show()
-
-    # assert xp.allclose(u2, u_expect)
-    # assert xp.allclose(u2_pad, u_expect_pad)
 
     u2_expect = helper.itransform(u2_hat_expect, axes=axes).real
-    # print('no padding', helper.transform(u2))
-    # print('padding', helper.transform(u2_pad, padding=_padding).real)
-    # print('weird', helper_pad.transform(u2_pad))
-    # print('expect', u2_hat_expect.real)
     assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 

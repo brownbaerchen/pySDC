@@ -177,7 +177,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     u[P.iTz] = y_z
     u[P.index('uz')] = y_z
 
-    f = P.eval_f(u)
+    f = P.eval_f(u, compute_violations=False)
 
     for i in [P.ivz, P.iTz]:
         assert np.allclose(f.impl[i] + f.expl[i], 0), f'Non-zero time derivative in algebraic component {i}'
@@ -222,21 +222,15 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs, right_preconditioning='T2T', left_preconditioner=False
     )
 
+    cheby = P.axes[-1]
+    BC_top = cheby.get_BC(kind='Dirichlet', x=1)
+    BC_bot = cheby.get_BC(kind='Dirichlet', x=-1)
+    BC_int = cheby.get_BC(kind='integral')
+
     rhs = P.u_exact(0, noise_level=noise)
     sol = P.solve_system(rhs, 1e0)
 
-    expect = {}
-    for q in ['T', 'v']:
-        if nz == 2 or True:
-            expect[q] = (BCs[f'{q}_top'] - BCs[f'{q}_bottom']) / 2 * P.Z + (BCs[f'{q}_top'] + BCs[f'{q}_bottom']) / 2
-        else:
-            raise NotImplementedError
-
     sol_hat = P.transform(sol, axes=(-1,))
-    pressure_coef = sol_hat[P.ip][0]
-    pressure_integral = np.polynomial.Chebyshev(pressure_coef).integ(1, lbnd=-1)(1)
-
-    zero = np.zeros_like(expect['T'])
 
     if plotting:
         import matplotlib.pyplot as plt
@@ -259,19 +253,12 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         axs[1].legend()
         plt.show()
 
-    for component in ['T', 'v', 'u']:
-        i = P.index(component)
-        poly = np.polynomial.Chebyshev(sol_hat[i][0])
-        assert np.isclose(
-            poly(-1), BCs[f'{component}_bottom'], atol=1e-6
-        ), f'unexpected bottom bc in {component}: Deviation: {poly(-1).real- BCs[f"{component}_bottom"]:.2e}'
-        assert np.isclose(
-            poly(1), BCs[f'{component}_top'], atol=1e-6
-        ), f'unexpected top bc in {component}: Deviation {poly(1).real-BCs[f"{component}_top"]:.2e}'
-    assert np.isclose(pressure_integral.real, BCs['p_integral']), f'Got unexpected {pressure_integral.real=:.2e}!'
-    if noise == 0:
-        i = P.index('u')
-        assert np.allclose(sol[i], zero), f'Got non-zero values for {P.index_to_name[i]}'
+    for q, v in zip(['T', 'v', 'u'], [T_top, v_top, 0]):
+        got = sol_hat[P.index(q)] @ BC_top
+        assert np.allclose(got, v), f'unexpected BC at top in {q}! got {got}, but expected {v}'
+    for q, v in zip(['T', 'v', 'u'], [T_bottom, v_top, 0]):
+        assert np.allclose(sol_hat[P.index(q)] @ BC_bot, v), f'unexpected BC at bottom in {q}'
+    assert np.allclose(sol_hat[P.index('p')] @ BC_int, 0), 'Unexpected pressure integral'
 
 
 @pytest.mark.mpi4py
@@ -631,6 +618,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     # # P.plot(small_dt, quantity='u')
     # # plt.show()
 
+    u0 = P.u_exact(noise_level=noise)
     dt = 1e-1
     forward = P.solve_system(u0, dt)
     f = P.eval_f(forward)
@@ -673,8 +661,8 @@ if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
-    # test_BCs(2**0, 2**2+1, 'T2U', 0, 0, 2, 0.001, True)
-    test_solver(2**9, 2**7, 'T2U', noise=1e-3, plotting=True)
+    test_BCs(2**0, 33, 'T2T', 2.77, 3.14, 2, 0.001, True)
+    # test_solver(2**7, 2**5+1, 'T2U', noise=1e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

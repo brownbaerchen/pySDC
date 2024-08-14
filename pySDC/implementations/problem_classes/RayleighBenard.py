@@ -97,7 +97,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         self.add_BC(component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral')
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
-        # self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        # self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=False)
         self.add_BC(component='Tz', equation='Tz', axis=1, v=self.BCs['T_top'] - self.BCs['T_bottom'], kind='integral')
         self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_bottom'], kind='Dirichlet')
         # self.add_BC(
@@ -109,7 +109,7 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='vz', equation='vz', axis=1, v=self.BCs['v_top'] - self.BCs['v_bottom'], kind='integral')
         self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
         # self.add_BC(
-        #     component='u', equation='uz', axis=1, v=self.BCs['u_bottom'], x=-1, kind='Dirichlet', zero_line=zero_line
+        #     component='u', equation='uz', axis=1, v=self.BCs['u_bottom'], x=-1, kind='Dirichlet', zero_line=False
         # )
         self.add_BC(component='uz', equation='uz', axis=1, v=self.BCs['u_top'] - self.BCs['u_bottom'], kind='integral')
         self.setup_BCs()
@@ -128,7 +128,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         return self.itransform(me_hat).real
 
-    def eval_f(self, u, *args, compute_violations=True, **kwargs):
+    def eval_f(self, u, *args, compute_violations=False, **kwargs):
         f = self.f_init
 
         u_hat = self.transform(u)
@@ -140,6 +140,9 @@ class RayleighBenard(GenericSpectralLinear):
 
         shape = u[0].shape
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
+
+        # L = self.put_BCs_in_matrix(self.L)
+        # f_impl_hat = (-self.L @ u_hat.flatten()).reshape(u_hat.shape)
 
         kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
@@ -158,8 +161,6 @@ class RayleighBenard(GenericSpectralLinear):
             f_impl_hat[ivz][:] = (Dz @ u_hat[iv].flatten()).reshape(shape) - u_hat[ivz]
             f_impl_hat[iTz][:] = (Dz @ u_hat[iT].flatten()).reshape(shape) - u_hat[iTz]
             f_impl_hat[ip][:] = (Dz @ u_hat[iv].flatten() + Dx @ u_hat[iu].flatten()).reshape(shape)
-
-        # f_impl_hat = (self.L @ u_hat.flatten()).reshape(u_hat.shape)
 
         f.impl[:] = self.itransform(f_impl_hat).real
 
@@ -203,27 +204,16 @@ class RayleighBenard(GenericSpectralLinear):
 
         noise = self.u_init
         noise[iT] = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
-        padding = [
-            self.dealiasing,
-        ] * 2
-        noise_hat = self.u_init_forward
-        noise_pad = self.itransform(noise_hat, padding=padding)
-        noise_pad[iT][:] = rng.normal(size=noise_pad[iT].shape)
-        # noise_pad = self.itransform(self.transform(noise), padding=padding)
-        noise = self.itransform(self.transform(noise_pad, padding=padding))
-        # print(abs(noise-noise_dealias), noise_pad.shape, noise.shape)
-        # noise[iT, Kx > 1] *=0
-        # noise[iT, Kz > 1] *=0
 
-        # Kz, Kx = self.get_wavenumbers()
-        # noise_hat = self.u_init_forward
-        # noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
-        # # noise_hat[iT, np.abs(Kx)>1] *= 0
-        # # noise_hat[iT, np.abs(Kz)>=1] *= 0
-        # noise = self.itransform(noise_hat)
+        Kz, Kx = self.get_wavenumbers()
+        noise_hat = self.u_init_forward
+        noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
+        noise_hat[iT, np.abs(Kx) > self.nx // 8] *= 0
+        noise_hat[iT, np.abs(Kz) > self.nz // 8] *= 0
+        noise = self.itransform(noise_hat)
 
         xp = self.xp
-        me[iT] += self.xp.abs(noise[iT]) / xp.max(xp.abs(noise[iT])) * noise_level * (self.Z - 1) * (self.Z + 1)
+        me[iT] += self.xp.abs(noise[iT]) * noise_level * (self.Z - 1) * (self.Z + 1)
 
         # # enforce boundary conditions in spite of noise
         # me_hat = self.transform(me, axes=(-1,))
@@ -304,9 +294,9 @@ class RayleighBenard(GenericSpectralLinear):
 
         violations = {}
 
-        violations['Tz'] = (derivatives[idzT] - u[iTz]) / derivatives[idzT]
-        violations['vz'] = (derivatives[idzv] - u[ivz]) / derivatives[idzv]
-        violations['uz'] = (derivatives[idzu] - u[iuz]) / derivatives[idzu]
+        violations['Tz'] = derivatives[idzT] - u[iTz]  # / derivatives[idzT]
+        violations['vz'] = derivatives[idzv] - u[ivz]  # / derivatives[idzv]
+        violations['uz'] = derivatives[idzu] - u[iuz]  # / derivatives[idzu]
 
         violations['divergence'] = derivatives[idxu] + derivatives[idzv]
 
