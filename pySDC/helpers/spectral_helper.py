@@ -553,6 +553,19 @@ class SpectralHelper:
         self._BCs = BC.tolil()[self.BC_mask]
         self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
 
+    def check_BCs(self, u):
+        for axis in range(self.ndim):
+            BCs = [me for me in self.full_BCs if me["axis"] == axis]
+
+            if len(BCs) > 0:
+                u_hat = self.transform(u, axes=(axis - self.ndim,))
+                for BC in BCs:
+                    get = u_hat[self.index(BC['component'])] @ self.axes[axis].get_BC(**BC)
+                    want = BC['v']
+                    assert self.xp.allclose(
+                        get, want
+                    ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}'
+
     def put_BCs_in_matrix(self, A, rescale=1.0):
         A = A.tolil()
         A[self.BC_zero_index, :] = 0  # TODO: Smells like tuna

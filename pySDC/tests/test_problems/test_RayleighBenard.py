@@ -230,6 +230,7 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
     rhs = P.u_exact(0, noise_level=noise)
     sol = P.solve_system(rhs, 1e0)
 
+    P.check_BCs(sol)
     sol_hat = P.transform(sol, axes=(-1,))
 
     if plotting:
