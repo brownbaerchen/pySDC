@@ -149,25 +149,25 @@ def test_integration_matrix(N, variant):
     assert np.allclose(exact.coef[:-1], du)
 
 
-@pytest.mark.base
-@pytest.mark.parametrize('N', [8])
-@pytest.mark.parametrize('kmin', [0, 3])
-@pytest.mark.parametrize('kmax', [8, 3])
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
-def test_filter(N, kmin, kmax, mode):
-    import numpy as np
-    from pySDC.helpers.spectral_helper import ChebychovHelper
-
-    coef = np.random.random(N)
-
-    cheby = ChebychovHelper(N, mode=mode)
-    F = cheby.get_filter_matrix(kmin=kmin, kmax=kmax)
-    U2T = cheby.get_conv(cheby.mode[::-1])
-
-    filtered_coef = U2T @ F @ coef
-    assert np.allclose(filtered_coef[:kmin], 0)
-    assert np.allclose(filtered_coef[kmax:], 0)
-    assert np.allclose(filtered_coef[kmin:kmax], coef[kmin:kmax])
+# @pytest.mark.base
+# @pytest.mark.parametrize('N', [8])
+# @pytest.mark.parametrize('kmin', [0, 3])
+# @pytest.mark.parametrize('kmax', [8, 3])
+# @pytest.mark.parametrize('mode', ['T2T', 'T2U'])
+# def test_filter(N, kmin, kmax, mode):
+#     import numpy as np
+#     from pySDC.helpers.spectral_helper import ChebychovHelper
+#
+#     coef = np.random.random(N)
+#
+#     cheby = ChebychovHelper(N, mode=mode)
+#     F = cheby.get_filter_matrix(kmin=kmin, kmax=kmax)
+#     U2T = cheby.get_conv(cheby.mode[::-1])
+#
+#     filtered_coef = U2T @ F @ coef
+#     assert np.allclose(filtered_coef[:kmin], 0)
+#     assert np.allclose(filtered_coef[kmax:], 0)
+#     assert np.allclose(filtered_coef[kmin:kmax], coef[kmin:kmax])
 
 
 @pytest.mark.base

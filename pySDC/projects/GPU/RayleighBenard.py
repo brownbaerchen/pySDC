@@ -60,12 +60,12 @@ def run_RBC(useGPU=False):
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.1
+    level_params['dt'] = 0.25
     level_params['restol'] = 1e-5
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e0},
-        # CFLLimit: {},
+        CFLLimit: {},
         StopAtNan: {'thresh': 1e6},
     }
 

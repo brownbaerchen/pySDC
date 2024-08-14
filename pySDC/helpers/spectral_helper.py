@@ -257,20 +257,13 @@ class ChebychovHelper(SpectralHelper1D):
         }
         xp = self.xp
 
-        N = self.N
-        k = self.get_wavenumbers()
-        norm = self.get_norm()
-
         # forwards transform
-        self.fft_utils['fwd']['shuffle'] = self.get_fft_shuffle(True, N)
-        self.fft_utils['fwd']['shift'] = 2 * xp.exp(-1j * np.pi * k / (2 * N)) * norm
+        self.fft_utils['fwd']['shuffle'] = self.get_fft_shuffle(True, self.N)
+        self.fft_utils['fwd']['shift'] = self.get_fft_shift(True, self.N)
 
         # backwards transform
-        self.fft_utils['bck']['shuffle'] = self.get_fft_shuffle(False, N)
-
-        shift = xp.exp(1j * np.pi * k / (2 * N))
-        shift[0] /= 2
-        self.fft_utils['bck']['shift'] = shift / norm
+        self.fft_utils['bck']['shuffle'] = self.get_fft_shuffle(False, self.N)
+        self.fft_utils['bck']['shift'] = self.get_fft_shift(False, self.N)
 
         return self.fft_utils
 
@@ -717,30 +710,27 @@ class SpectralHelper:
             shuffle[axis] = base.get_fft_shuffle(True, N=v.shape[axis])
             v = v[*shuffle]
 
-            # fft = self.get_fft(axes, 'forward', padding=padding, **kwargs)
-            fft = self.get_fft(axes, 'forward', shape=v.shape)
+            if padding is not None:
+                shape = list(v.shape)
+                if self.comm:
+                    shape[0] = self.comm.allreduce(v.shape[0])
+                fft = self.get_fft(axes, 'forward', shape=shape)
+            else:
+                fft = self.get_fft(axes, 'forward', **kwargs)
+
             v = fft(v, axes=axes)
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, v.shape[axis], 1)
 
             if padding is not None:
-                _N = v.shape[axis]
-                N = int(np.ceil(v.shape[axis] / padding[axis]))
-                _expansion = [slice(0, n) for n in v.shape]
-                _expansion[axis] = slice(0, N, 1)
-                v = v[*_expansion]
+                shift = base.get_fft_shift(True, v.shape[axis])
 
-                shift = base.fft_utils['fwd']['shift']
-                shift = base.get_fft_shift(True, _N)
-
-                # N = int(np.ceil(v.shape[axis] * padding[axis]))
-                # xp = self.xp
-                # k = xp.append(xp.arange(base.N//2), N-base.N//2+xp.arange(base.N//2))
-                # # k = xp.array([0, 1, 2, 3, 12, 13, 14, 15])
-                # # k = xp.array([0, 0, 2, 0, 10.175, 0, 14, 0])
-                # # print(base.get_norm())
-                # shift = 2 * xp.exp(-1j * np.pi * k / (2 * N)) * base.get_norm()
+                if padding[axis] != 1:
+                    N = int(np.ceil(v.shape[axis] / padding[axis]))
+                    _expansion = [slice(0, n) for n in v.shape]
+                    _expansion[axis] = slice(0, N, 1)
+                    v = v[*_expansion]
             else:
                 shift = base.fft_utils['fwd']['shift']
 
