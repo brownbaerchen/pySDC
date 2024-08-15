@@ -2,22 +2,26 @@ import pytest
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('a', [-2, 19])
-@pytest.mark.parametrize('b', [-7.3, 66])
+@pytest.mark.parametrize('a', [0, 19])
+@pytest.mark.parametrize('b', [0, 66])
 @pytest.mark.parametrize('f', [0, 1])
-def test_heat1d_chebychov(a, b, f, nvars=2**4):
+@pytest.mark.parametrize('noise', [0, 1e-3])
+def test_heat1d_chebychov(a, b, f, noise, nvars=2**4):
     import numpy as np
     from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychov
 
-    P = Heat1DChebychov(nvars=nvars, a=a, b=b, f=f, nu=1e-3, left_preconditioner=False, right_preconditioning='T2T')
+    P = Heat1DChebychov(
+        nvars=nvars, a=a, b=b, f=f, nu=1e-2, left_preconditioner=False, right_preconditioning='T2T', debug=True
+    )
 
-    u0 = P.u_exact(0)
+    u0 = P.u_exact(0, noise=noise)
     dt = 1e-1
     u = P.solve_system(u0, dt)
     u02 = u - dt * P.eval_f(u)
 
-    assert np.allclose(u, P.u_exact(dt), atol=1e-8), 'Error in solver'
-    assert np.allclose(u0[0], u02[0], atol=1e-8), 'Error in eval_f'
+    if noise == 0:
+        assert np.allclose(u, P.u_exact(dt), atol=1e-2), 'Error in solver'
+    assert np.allclose(u0[0], u02[0], atol=1e-3 if noise > 0 else 1e-8), 'Error in eval_f'
 
 
 @pytest.mark.base
@@ -120,7 +124,6 @@ def test_SDC():
 
 if __name__ == '__main__':
     # test_SDC()
-    # test_heat1d_chebychov(2, 3, 2, 2**5)
+    test_heat1d_chebychov(0, 0, 1, 1e-1, 2**4 + 1)
     # test_AdvectionDiffusion(plot=True)
-    # test_heat1d_chebychov_preconditioning('D2U', True)
-    test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)
+    # test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)

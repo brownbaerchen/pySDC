@@ -15,7 +15,7 @@ class Heat1DChebychov(GenericSpectralLinear):
     def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        bases = [{'base': 'chebychov', 'N': nvars}]
+        bases = [{'base': 'chebychov', 'N': nvars, 'mode': 'T2U'}]
         components = ['u', 'ux']
 
         super().__init__(bases, components, **kwargs)
@@ -40,6 +40,13 @@ class Heat1DChebychov(GenericSpectralLinear):
         self.add_BC(component='u', equation='ux', axis=0, x=1, v=b, kind="Dirichlet", zero_line=True)
         self.setup_BCs()
 
+    def solve_system(self, *args, **kwargs):
+        sol = super().solve_system(*args, **kwargs)
+        return sol
+        sol_hat = self.transform(sol)
+        sol_hat[self.index('ux')][-1] = 0
+        return self.itransform(sol_hat)
+
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
         iu, iux = self.index(self.components)
@@ -52,7 +59,7 @@ class Heat1DChebychov(GenericSpectralLinear):
         f[self.index("u")] = me[iu]
         return f
 
-    def u_exact(self, t):
+    def u_exact(self, t, noise=0):
         xp = self.xp
         iu, iux = self.index(self.components)
         u = self.u_init
@@ -67,6 +74,18 @@ class Heat1DChebychov(GenericSpectralLinear):
             + (self.b - self.a) / 2
         )
 
+        if noise > 0:
+            assert t == 0
+            _noise = self.u_init
+            rng = self.xp.random.default_rng(seed=666)
+            _noise[iu] = rng.normal(size=u[iu].shape)
+            noise_hat = self.transform(_noise)
+            low_pass = self.get_filter_matrix(axis=0, kmax=self.nvars - 2)
+            noise_hat[iu] = (low_pass @ noise_hat[iu].flatten()).reshape(noise_hat[iu].shape)
+            _noise[:] = self.itransform(noise_hat)
+            u += _noise * noise * (self.x - 1) * (self.x + 1)
+
+        self.check_BCs(u)
         return u
 
 

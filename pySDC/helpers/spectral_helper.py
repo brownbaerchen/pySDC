@@ -49,7 +49,6 @@ class SpectralHelper1D:
         raise NotImplementedError(f'No boundary conditions of {kind=!r} implemented!')
 
     def get_filter_matrix(self, kmin=0, kmax=None):
-        raise NotImplementedError('This function is implemented incorrectly!')
         k = abs(self.get_wavenumbers())
 
         kmax = max(k) if kmax is None else kmax
@@ -564,7 +563,7 @@ class SpectralHelper:
                     want = BC['v']
                     assert self.xp.allclose(
                         get, want
-                    ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}'
+                    ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}! Got {get}, wanted {want}'
 
     def put_BCs_in_matrix(self, A, rescale=1.0):
         A = A.tolil()
@@ -999,6 +998,14 @@ class SpectralHelper:
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
+
+    def get_filter_matrix(self, axis, **kwargs):
+        if self.ndim == 1:
+            return self.axes[0].get_filter_matrix(**kwargs)
+
+        mats = [base.get_Id() for base in self.axes]
+        mats[axis] = self.axes[axis].get_filter_matrix(**kwargs)
+        return self.sparse_lib.kron(*mats)
 
     def get_differentiation_matrix(self, axes, **kwargs):
         """
