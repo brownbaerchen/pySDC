@@ -236,7 +236,7 @@ def test_norm(N):
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
 @pytest.mark.parametrize('mode', ['T2T', 'T2U', 'D2U'])
-@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('N', [3, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
 def test_tau_method(mode, bc, N, bc_val):
     '''
@@ -266,10 +266,6 @@ def test_tau_method(mode, bc, N, bc_val):
         A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
 
         sol_hat = np.linalg.solve(A, rhs)
-
-        print(A)
-        print(rhs)
-        print(sol_hat)
 
     elif mode == 'T2U':
         T2U = cheby.get_conv('T2U')
@@ -477,10 +473,10 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 if __name__ == '__main__':
     # test_transform(6, 1, 'fft')
-    # test_tau_method('T2T', -1.0, N=5, bc_val=3.0)
+    test_tau_method('T2U', -1.0, N=4, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
     # test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')
     # test_differentiation_matrix2D(2**7, 2**7, 'T2U', 'mixed')
     # test_integration_BC(6)
-    test_filter(12, 2, 5, 'T2U')
+    # test_filter(12, 2, 5, 'T2U')

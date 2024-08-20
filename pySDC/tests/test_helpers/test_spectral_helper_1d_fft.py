@@ -90,6 +90,30 @@ def test_integration_matrix(N, plot=False):
     assert np.allclose(expect, Du)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('N', [4, 32])
+@pytest.mark.parametrize('v', [0, 4.78])
+def test_tau_method(N, v):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import FFTHelper
+
+    helper = FFTHelper(N=N)
+
+    D = helper.get_differentiation_matrix()
+    bc_line = 0
+    BC = (helper.get_Id() * 0).tolil()
+    BC[bc_line, :] = helper.get_integ_BC_row()
+
+    A = D + BC
+    rhs = np.zeros(N)
+    rhs[bc_line] = v
+    u_hat = helper.sparse_lib.linalg.spsolve(A, rhs)
+
+    u = helper.itransform(u_hat)
+    assert np.allclose(u * helper.L, v)
+
+
 if __name__ == '__main__':
-    test_differentiation_matrix(64, 4, True)
-    test_integration_matrix(8, True)
+    # test_differentiation_matrix(64, 4, True)
+    # test_integration_matrix(8, True)
+    test_tau_method(6, 1)

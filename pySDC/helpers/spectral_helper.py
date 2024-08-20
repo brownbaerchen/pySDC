@@ -409,6 +409,17 @@ class FFTHelper(SpectralHelper1D):
     def itransform(self, u, axis=-1):
         return self.fft_lib.ifft(u, axis=axis)
 
+    def get_BC(self, kind, **kwargs):
+        if kind.lower() == 'integral':
+            return self.get_integ_BC_row(**kwargs)
+        else:
+            return super().get_BC(kind, **kwargs)
+
+    def get_integ_BC_row(self, **kwargs):
+        me = self.xp.zeros(self.N)
+        me[0] = self.L / self.N
+        return me
+
 
 class SpectralHelper:
     xp = np
@@ -442,6 +453,8 @@ class SpectralHelper:
         self.full_BCs = []
         self.BC_mat = None
         self.BCs = None
+        self.tau_terms_in_equation = {}
+        # self.boundary_bordering=boundary_bordering
 
         self.fft_cache = {}
 
@@ -506,11 +519,11 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_BC(self, axis, kind, **kwargs):
+    def get_BC(self, axis, kind, line=-1, **kwargs):
         base = self.axes[axis]
 
         BC = base.get_Id().tolil() * 0
-        BC[-1, :] = base.get_BC(kind=kind, **kwargs)
+        BC[line, :] = base.get_BC(kind=kind, **kwargs)
 
         ndim = len(self.axes)
         if ndim == 1:
@@ -527,19 +540,30 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def add_BC(self, component, equation, axis, kind, v, zero_line=True, **kwargs):
-        if equation in [me['equation'] for me in self.full_BCs]:
-            raise Exception(f'There is already a boundary condition in equation for {equation}!')
+    def add_BC(self, component, equation, axis, kind, v, zero_line=True, scale=1.0, line=-1, **kwargs):
+        self.tau_terms_in_equation[equation] = self.tau_terms_in_equation.get(equation, 0) + 1
+        line = line  # -self.tau_terms_in_equation[equation]
 
-        _BC = self.get_BC(axis=axis, kind=kind, **kwargs)
-        self.BC_mat[self.index(equation)][self.index(component)] = _BC
-        self.full_BCs += [{'component': component, 'equation': equation, 'axis': axis, 'kind': kind, 'v': v, **kwargs}]
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, **kwargs) * scale
+        self.BC_mat[self.index(equation)][self.index(component)] += _BC
+        self.full_BCs += [
+            {
+                'component': component,
+                'equation': equation,
+                'axis': axis,
+                'kind': kind,
+                'v': v * scale,
+                'zero_line': zero_line,
+                'line': line,
+                **kwargs,
+            }
+        ]
 
         shape = self.init[0][1:]
         slices = (
             [self.index(equation)]
             + [slice(0, self.init[0][i + 1]) for i in range(axis)]
-            + [-1]
+            + [line]
             + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
         )
         if zero_line:
@@ -569,7 +593,34 @@ class SpectralHelper:
         A = A.tolil()
         A[self.BC_zero_index, :] = 0  # TODO: Smells like tuna
         A[self.BC_mask] = self._BCs * rescale
+        # if not self.boundary_bordering:
+        #     A[:, self.BC_zero_index] = 0
+        #     for BC in self.full_BCs:
+        #         idx = self.components.index(BC['equation'])
+        #         A[idx * np.prod(self.shape), (idx+1) * np.prod(self.shape)-1] = 1
+        #         # A[(idx+1) * np.prod(self.shape)-2, (idx+1) * np.prod(self.shape)-1] = 1
         return A.tocsc()
+
+    # def padd_with_tau_terms(self, u_hat):
+    #     padded_shape = list(u_hat.shape)
+    #     for axis in range(self.ndim):
+    #         padded_shape[axis+1] += max([0] - [BC['line'] for BC in self.full_BCs if BC['axis'] == axis])
+    #     me = self.xp.zeros(shape=padded_shape, dtype=complex)
+
+    #     slices = [slice(0, me) for me in u_hat.shape]
+    #     print(slices, u_hat.shape)
+    #     me[*slices] = u_hat
+    #     return me
+
+    # def remove_tau_terms(self, u_hat):
+    #     if self.boundary_bordering:
+    #         return u_hat
+    #     else:
+    #         for BC in self.full_BCs:
+    #             slices = [slice(0, me.N) for me in self.axes]
+    #             slices[BC['axis']] = BC['line']
+    #             u_hat[*slices] = 0
+    #         return u_hat
 
     def put_BCs_in_rhs(self, rhs, istransformed=False, rescale=1.0):
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
@@ -582,16 +633,19 @@ class SpectralHelper:
             else:
                 _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
 
-            slices = (
-                [slice(0, self.init[0][i + 1]) for i in range(axis)]
-                + [-1]
-                + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-            )
-
             for bc in self.full_BCs:
+
+                slices = (
+                    [slice(0, self.init[0][i + 1]) for i in range(axis)]
+                    + [bc['line']]
+                    + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
+                )
                 if axis == bc['axis']:
                     _slice = [self.index(bc['equation'])] + slices
-                    _rhs_hat[*_slice] = bc['v'] * rescale
+                    if bc['zero_line']:
+                        _rhs_hat[*_slice] = bc['v'] * rescale
+                    else:
+                        _rhs_hat[*_slice] += bc['v'] * rescale
 
             if istransformed:
                 rhs = _rhs_hat

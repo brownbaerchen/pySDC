@@ -158,7 +158,9 @@ class GenericSpectralLinear(Problem):
 
         rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
-        # print(self.xp.sum(rhs_hat.reshape(rhs.shape)[self.index('p')]))
+        # rhs_hat[self.xp.abs(rhs_hat) < 1e-12] = 0
+        # print(self.itransform(rhs_hat.reshape(rhs.shape), axes=(-2,))[self.index('T')])
+        # breakpoint()
 
         A = self.M + dt * self.L
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
@@ -183,12 +185,14 @@ class GenericSpectralLinear(Problem):
         #         print(i, j, ratios)
         #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
         #             print(i, j, ratios)
-        # import matplotlib.pyplot as plt
-        # im = plt.imshow((A/abs(A)).real)
-        # # im = plt.imshow(np.log10(abs(A.toarray())).real)
-        # # im = plt.imshow(((A.toarray())).real)
-        # plt.colorbar(im)
-        # plt.show()
+        if A.shape[0] < 100:
+            import matplotlib.pyplot as plt
+
+            im = plt.imshow((A / abs(A)).real)
+            # im = plt.imshow(np.log10(abs(A.toarray())).real)
+            # im = plt.imshow(((A.toarray())).real)
+            plt.colorbar(im)
+            plt.show()
         # print('p', rhs.reshape(sol.shape)[self.index('p')])
 
         if self.solver_type == 'direct':
@@ -211,6 +215,9 @@ class GenericSpectralLinear(Problem):
 
         sol_hat = self.Pr @ sol_hat
         sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape)).real
+
+        if self.spectral.debug:
+            self.spectral.check_BCs(sol)
 
         # comp = 'Tz'
         # lala = self.itransform(sol_hat.reshape(sol.shape), axes=(0,1))

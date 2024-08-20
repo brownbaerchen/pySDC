@@ -452,10 +452,12 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     rhs_hat = helper.transform(rhs, axes=(-1,))
 
     sol_hat = sp.linalg.spsolve(A, rhs_hat.flatten())
-
-    x = helper.get_grid()
-    coef = np.append(np.zeros(N - 1), [1])
-    P = np.polynomial.Chebyshev(C @ coef)
+    # print(_sol_hat)
+    # sol_hat = helper.remove_tau_terms(_sol_hat)
+    # print(A.toarray())
+    # import matplotlib.pyplot as plt
+    # plt.imshow(A.real/np.abs(A))
+    # plt.show()
 
     sol_poly = np.polynomial.Chebyshev(sol_hat)
     d_sol_poly = sol_poly.deriv(1)
@@ -467,6 +469,8 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     else:
         assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
 
+    coef = np.append(np.zeros(N - 1), [1])
+    P = np.polynomial.Chebyshev(C @ coef)
     tau = (d_sol_poly(x) - sol_poly(x)) / P(x)
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
 
@@ -605,10 +609,10 @@ if __name__ == '__main__':
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        # test_tau_method(0, 8, 1, kind='Dirichlet')
+        test_tau_method(-1, 4, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias()
+        # _test_transform_dealias()
     else:
         raise NotImplementedError
     print('done')

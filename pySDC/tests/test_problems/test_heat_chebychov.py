@@ -124,6 +124,6 @@ def test_SDC():
 
 if __name__ == '__main__':
     # test_SDC()
-    test_heat1d_chebychov(0, 0, 1, 1e-1, 2**4 + 1)
+    test_heat1d_chebychov(0, 0, 1, 0e-1, 2**3)
     # test_AdvectionDiffusion(plot=True)
     # test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)

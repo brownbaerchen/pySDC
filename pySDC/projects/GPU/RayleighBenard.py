@@ -79,9 +79,9 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6,
+        'Rayleigh': 2e6 / 16,
         'nx': 2**8 + 1,
-        'nz': 2**6 + 1,
+        'nz': 2**6 + 0,
         'cheby_mode': 'T2U',
         'left_preconditioner': False,
         'right_preconditioning': 'T2T',
@@ -137,7 +137,7 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
 
     cmaps = {'vorticity': 'bwr'}
 
-    for i in range(start_idx, 999):
+    for i in range(start_idx, 9999):
         fig = P.get_fig()
         cax = P.cax
         axs = fig.get_axes()
