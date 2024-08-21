@@ -603,10 +603,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 
     u_static = P.u_exact(noise_level=0)
     static = P.solve_system(u_static, 1e-0)
-    compute_errors(u_static, static, 'static configuration')
-    # P.plot(u0, quantity='u')
-    P.plot(u_static, quantity='v')
-    plt.show()
+    compute_errors(u_static, static, 'static configuration', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
 
     # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
     if noise == 0:
@@ -668,7 +665,7 @@ if __name__ == '__main__':
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
     # test_BCs(2**1, 2**2+1, 'T2T', 2.77, 3.14, 2, 0.001, True)
-    test_solver(2**0, 2**2 + 1, 'T2U', noise=0e-3, plotting=True)
+    test_solver(2**8, 2**6 + 1, 'T2U', noise=0e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

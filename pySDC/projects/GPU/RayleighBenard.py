@@ -8,7 +8,7 @@ from pySDC.core.convergence_controller import ConvergenceController
 class CFLLimit(ConvergenceController):
     def get_new_step_size(self, controller, step, **kwargs):
         max_step_size = np.inf
-        min_step_size = 1e-2
+        min_step_size = 1e-3
 
         L = step.levels[0]
         P = step.levels[0].prob
@@ -79,9 +79,9 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 32,
-        'nx': 2**8 + 1,
-        'nz': 2**6 + 1,
+        'Rayleigh': 2e6 / 1,
+        'nx': 2**10 + 1,
+        'nz': 2**8 + 1,
         'cheby_mode': 'T2U',
         # 'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
@@ -130,6 +130,10 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
 
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+
     P = RayleighBenard()
 
     LogToFile.path = './data/'
@@ -137,7 +141,7 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
 
     cmaps = {'vorticity': 'bwr'}
 
-    for i in range(start_idx, 9999):
+    for i in range(start_idx + comm.rank, 9999, comm.size):
         fig = P.get_fig()
         cax = P.cax
         axs = fig.get_axes()
@@ -183,7 +187,7 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
             axs[1].set_aspect(1.0)
         path = f'simulation_plots/RBC{i:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
-        print(f'Stored figure {path!r}', flush=True)
+        print(f'{comm.rank} Stored figure {path!r}', flush=True)
         # plt.show()
         if render:
             plt.pause(1e-9)
@@ -209,5 +213,5 @@ if __name__ == '__main__':
 
     if args.run:
         run_RBC(useGPU=args.useGPU)
-    if MPI.COMM_WORLD.rank == 0 and args.plot:
+    if args.plot:
         plot_RBC(size=args.np, render=args.render, start_idx=args.startIdx)

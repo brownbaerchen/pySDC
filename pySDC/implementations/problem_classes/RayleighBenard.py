@@ -76,19 +76,8 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dz = Dz
         self.U2T = self.get_basis_change_matrix()
 
-        # print(Dx.toarray())
-        # print(Dz.toarray())
-        # import matplotlib.pyplot as plt
-        # # plt.imshow(Dx.toarray().imag)
-        # im = plt.imshow(Dz.toarray().real)
-        # plt.colorbar()
-        # plt.show()
-
         kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
         nu = (Rayleigh / Prandl) ** (-1 / 2.0)
-        # print(kappa)
-        # print((self.U2T @ I.toarray()).real)
-        # print((self.U2T @ Dz.toarray()).real)
 
         # construct operators
         L_lhs = {
@@ -112,24 +101,17 @@ class RayleighBenard(GenericSpectralLinear):
             axis=0,
             v=self.BCs['p_integral'],
             kind='integral',
-            zero_line=True,
-            scale=1e-0,
             line=0,
             pressure_gauge_FFT=True,
         )
         # self.add_BC(
-        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True, scale=1e-0
+        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral',
         # )
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
-        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
-        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=True)
-        self.add_BC(
-            component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=True, scale=1e-0
-        )
-        # self.add_BC(
-        #     component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', zero_line=False, scale=1e-8
-        # )
-        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
+        self.add_BC(component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', scale=1e-0)
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
         self.add_BC(
             component='u',
             equation='uz',
@@ -137,11 +119,7 @@ class RayleighBenard(GenericSpectralLinear):
             v=self.BCs['u_bottom'],
             x=-1,
             kind='Dirichlet',
-            zero_line=True,
         )
-        # self.add_BC(component='vz', equation='vz', axis=1, v=self.BCs['v_top'] - self.BCs['v_bottom'], kind='integral')
-        # self.add_BC(component='Tz', equation='Tz', axis=1, v=self.BCs['T_top'] - self.BCs['T_bottom'], kind='integral')
-        # self.add_BC(component='uz', equation='uz', axis=1, v=self.BCs['u_top'] - self.BCs['u_bottom'], kind='integral')
         self.setup_BCs()
 
     def compute_z_derivatives(self, u):
@@ -170,9 +148,6 @@ class RayleighBenard(GenericSpectralLinear):
 
         shape = u[0].shape
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
-
-        # L = self.put_BCs_in_matrix(self.L)
-        # f_impl_hat = (-self.L @ u_hat.flatten()).reshape(u_hat.shape)
 
         kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
@@ -209,9 +184,6 @@ class RayleighBenard(GenericSpectralLinear):
         fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * u_pad[iTz])
 
         f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
-        # print('implicit', f_impl_hat[iT])
-        # print('explicit', self.transform(fexpl_pad, padding=padding)[iT])
-        # breakpoint()
 
         return f
 
@@ -239,7 +211,7 @@ class RayleighBenard(GenericSpectralLinear):
         noise[iT] = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
 
         Kz, Kx = self.get_wavenumbers()
-        kzmax = self.nz - 3  # self.nz-7#self.nz // 8
+        kzmax = self.nz - 3
         kxmax = self.nx // 2
         noise_hat = self.u_init_forward
         noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
@@ -256,8 +228,6 @@ class RayleighBenard(GenericSpectralLinear):
         me_hat = self.transform(me, axes=(-1,))
         bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
         bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
-
-        # me_hat[iT, :, self.nz // 4 :] = 0
 
         if noise_level > 0:
             rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
