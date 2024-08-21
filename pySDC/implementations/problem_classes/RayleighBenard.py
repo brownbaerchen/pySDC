@@ -115,10 +115,11 @@ class RayleighBenard(GenericSpectralLinear):
             zero_line=True,
             scale=1e-0,
             line=0,
+            pressure_gauge_FFT=True,
         )
-        self.add_BC(
-            component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True, scale=1e-0
-        )
+        # self.add_BC(
+        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', zero_line=True, scale=1e-0
+        # )
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', zero_line=True)
         self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', zero_line=True)

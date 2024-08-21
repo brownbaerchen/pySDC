@@ -163,6 +163,7 @@ class GenericSpectralLinear(Problem):
         # breakpoint()
 
         A = self.M + dt * self.L
+        # A[2*self.nx*self.nz, 2*self.nx*self.nz] = 1
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
         # print(rhs_hat.reshape(sol.shape))
@@ -185,10 +186,12 @@ class GenericSpectralLinear(Problem):
         #         print(i, j, ratios)
         #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
         #             print(i, j, ratios)
-        if A.shape[0] < 100:
+        if A.shape[0] < 200:
             import matplotlib.pyplot as plt
 
-            im = plt.imshow((A / abs(A)).real)
+            # M = self.spectral.put_BCs_in_matrix(self.L)
+            M = A  # self.L
+            im = plt.imshow((M / abs(M)).real)
             # im = plt.imshow(np.log10(abs(A.toarray())).real)
             # im = plt.imshow(((A.toarray())).real)
             plt.colorbar(im)

@@ -79,12 +79,12 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 16,
+        'Rayleigh': 2e6 / 32,
         'nx': 2**8 + 1,
-        'nz': 2**6 + 0,
+        'nz': 2**6 + 1,
         'cheby_mode': 'T2U',
-        'left_preconditioner': False,
-        'right_preconditioning': 'T2T',
+        # 'left_preconditioner': False,
+        # 'right_preconditioning': 'T2T',
     }
 
     step_params = {}

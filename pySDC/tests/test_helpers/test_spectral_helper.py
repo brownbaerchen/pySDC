@@ -51,7 +51,8 @@ def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-def test_differentiation_matrix2D(nx, nz, variant, axes, bx, useMPI=False, **kwargs):
+@pytest.mark.parametrize('bz', ['cheby', 'fft'])
+def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -64,7 +65,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, useMPI=False, **kwa
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
-    helper.add_axis(base='cheby', N=nz, mode=variant)
+    helper.add_axis(base=bz, N=nz, mode=variant)
     helper.setup_fft()
 
     Z, X = helper.get_grid()
@@ -72,19 +73,37 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, useMPI=False, **kwa
     D = helper.get_differentiation_matrix(axes)
 
     u = helper.u_init
-    u[0, ...] = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
-    if axes == (-2,):
-        expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
-    elif axes == (-1,):
-        expect = np.sin(X) * Z * 2 + Z**2 * 3
-    elif axes in [(-2, -1), (-1, -2)]:
-        expect = np.cos(X) * 2 * Z
+
+    if bz == 'cheby':
+        u[0, ...] = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
+        if axes == (-2,):
+            expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
+        elif axes == (-1,):
+            expect = np.sin(X) * Z * 2 + Z**2 * 3
+        elif axes in [(-2, -1), (-1, -2)]:
+            expect = np.cos(X) * 2 * Z
+        else:
+            raise NotImplementedError
     else:
-        raise NotImplementedError
+        u[0, ...] = np.sin(X) * np.cos(2 * Z) + np.cos(2 * X) + np.sin(Z)
+        if axes == (-2,):
+            expect = np.cos(X) * np.cos(2 * Z) - 2 * np.sin(2 * X)
+        elif axes == (-1,):
+            expect = np.sin(X) * (-2) * np.sin(2 * Z) + np.cos(Z)
+        elif axes in [(-2, -1), (-1, -2)]:
+            expect = np.cos(X) * np.cos(2 * Z) + np.sin(X) * (-2) * np.sin(2 * Z) - 2 * np.sin(2 * X) + np.cos(Z)
+        else:
+            raise NotImplementedError
 
     u_hat = helper.transform(u, axes=(-2, -1))
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat, axes=(-1, -2))
+
+    # import matplotlib.pyplot as plt
+    # plt.imshow(D_u[0])
+    # # plt.imshow(expect)
+    # # plt.imshow(u[0])
+    # plt.show()
 
     assert np.allclose(D_u, expect, atol=1e-12)
 
@@ -607,9 +626,9 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
-        # test_differentiation_matrix2D(2**4, 2**4, 'T2U', bx='cheby', axes=(-2, -1))
+        test_differentiation_matrix2D(2**2, 2**2, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(-1, 4, 1, kind='Dirichlet')
+        # test_tau_method(-1, 4, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias()

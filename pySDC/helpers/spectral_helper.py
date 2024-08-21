@@ -519,7 +519,7 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_BC(self, axis, kind, line=-1, **kwargs):
+    def get_BC(self, axis, kind, line=-1, pressure_gauge_FFT=False, **kwargs):
         base = self.axes[axis]
 
         BC = base.get_Id().tolil() * 0
@@ -530,21 +530,31 @@ class SpectralHelper:
             return BC
         elif ndim == 2:
             axis2 = (axis + 1) % ndim
-            Id = self.get_local_slice_of_1D_matrix(
-                self.axes[axis2].get_basis_change_matrix() @ self.axes[axis2].get_Id(), axis=axis2
-            )
+
+            if pressure_gauge_FFT:
+                _Id = self.sparse_lib.diags(self.xp.append([1], self.xp.zeros(self.axes[axis2].N - 1)))
+            else:
+                _Id = self.axes[axis2].get_Id().tolil()
+
+            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_basis_change_matrix() @ _Id, axis=axis2)
             mats = [
                 None,
             ] * ndim
-            mats[axis] = BC
+            mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def add_BC(self, component, equation, axis, kind, v, zero_line=True, scale=1.0, line=-1, **kwargs):
+    #     def add_gauge(self, component, equation):
+    #         _BC = self.get_BC(axis=axis, kind=kind, line=line, **kwargs) * scale
+    #
+
+    def add_BC(
+        self, component, equation, axis, kind, v, zero_line=True, scale=1.0, line=-1, pressure_gauge_FFT=False, **kwargs
+    ):
         self.tau_terms_in_equation[equation] = self.tau_terms_in_equation.get(equation, 0) + 1
         line = line  # -self.tau_terms_in_equation[equation]
 
-        _BC = self.get_BC(axis=axis, kind=kind, line=line, **kwargs) * scale
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, pressure_gauge_FFT=pressure_gauge_FFT, **kwargs) * scale
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
         self.full_BCs += [
             {
@@ -559,15 +569,21 @@ class SpectralHelper:
             }
         ]
 
-        shape = self.init[0][1:]
-        slices = (
-            [self.index(equation)]
-            + [slice(0, self.init[0][i + 1]) for i in range(axis)]
-            + [line]
-            + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-        )
         if zero_line:
-            self.BC_rhs_mask[*slices] = True
+            if pressure_gauge_FFT:
+                slices = [self.index(equation)] + [
+                    line,
+                ] * self.ndim
+            else:
+                slices = (
+                    [self.index(equation)]
+                    + [slice(0, self.init[0][i + 1]) for i in range(axis)]
+                    + [line]
+                    + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
+                )
+            N = self.axes[axis].N
+            if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
+                self.BC_rhs_mask[*slices] = True
 
     def setup_BCs(self):
         BC = self.convert_operator_matrix_to_operator(self.BC_mat)
@@ -1052,6 +1068,17 @@ class SpectralHelper:
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
+
+    # def get_local_slice_of_2D_matrix(self, M, axis):
+    #     slices = [slice(0, me) for me in M.shape]
+    #     if axis == 0:
+    #         slices[axis] = slice(0, M.shape[0], self.local_slice[1])
+    #     elif axis == 1:
+    #         slices[axis] = self.local_slice[axis]
+    #     else:
+    #         raise NotImplementedError
+    #     print(slices, axis)
+    #     return M.tolil()[*slices]
 
     def get_filter_matrix(self, axis, **kwargs):
         if self.ndim == 1:
