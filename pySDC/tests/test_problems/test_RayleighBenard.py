@@ -544,17 +544,6 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     except ModuleNotFoundError:
         comm = None
 
-    BCs = None
-    if noise == 0:
-        BCs = {
-            'v_top': 3,
-            'v_bottom': 3,
-            'u_top': -4.5,
-            'u_bottom': 1.2,
-            'T_bottom': 0,
-            'T_top': -4,
-        }
-
     P = RayleighBenard(
         nx=nx,
         nz=nz,
@@ -563,14 +552,12 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
         solver_type='direct',
         left_preconditioner=False,
         right_preconditioning='T2T',
-        # BCs=BCs,
         # Rayleigh=1,
-    )  # , Rayleigh=4e3)
+    )
 
     def IMEX_Euler(_u, dt):
         f = P.eval_f(_u)
         un = P.solve_system(_u + dt * f.expl, dt)
-        # un = P.solve_system(_u, dt)
         return un
 
     def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
@@ -596,10 +583,10 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
                     violations[key], 0
                 ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
 
-    # # P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
-    # # poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
-    # # expect_poisson = P_heat.u_exact(0, 0)
-    # # compute_errors(poisson, expect_poisson, 'Poisson')
+    P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
+    poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
+    expect_poisson = P_heat.u_exact(0, 0)
+    compute_errors(poisson, expect_poisson, 'Poisson', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
 
     u_static = P.u_exact(noise_level=0)
     static = P.solve_system(u_static, 1e-0)
@@ -607,15 +594,14 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 
     # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
     if noise == 0:
-        u0 = P.u_exact(noise_level=noise)
-        # u0[P.index('v')] += np.sin(P.Z * np.pi)
-        # u0[P.index('u')] -= np.sin(P.X * np.pi)
+        u0 = P.u_exact()
     else:
-        _u0 = P.u_exact(noise_level=noise, sigma=0.0)
+        _u0 = P.u_exact(noise_level=noise)
         u0 = P.solve_system(_u0, 0.25)
 
     small_dt = P.solve_system(u0, 1e0)
     compute_errors(u0, small_dt, 'tiny step size', 1e-9, components=['u', 'v', 'T', 'uz', 'vz', 'Tz'])
+    return None
 
     u0 = P.u_exact(noise_level=noise)
     # print('T0', P.transform(u0)[P.iT])
@@ -664,8 +650,9 @@ if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
-    # test_BCs(2**1, 2**2+1, 'T2T', 2.77, 3.14, 2, 0.001, True)
-    test_solver(2**8, 2**6 + 1, 'T2U', noise=0e-3, plotting=True)
+    test_BCs(2**1, 2**2 + 1, 'T2T', 2.77, 3.14, 2, 0.001, True)
+    # test_solver(2**6, 2**4 + 0, 'T2U', noise=0e-3, plotting=True)
+    # test_solver(2**1, 2**1 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

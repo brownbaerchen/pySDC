@@ -137,15 +137,24 @@ class ChebychovHelper(SpectralHelper1D):
             return self.cache[name]
 
         N = N if N else self.N
+        sp = self.sparse_lib
+        xp = self.xp
 
         def get_forward_conv(name):
             if name == 'T2U':
-                mat = (self.sparse_lib.eye(N) - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2)) / 2.0
+                mat = (sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)) / 2.0
                 mat[:, 0] *= 2
             elif name == 'D2T':
-                mat = self.sparse_lib.eye(N) - self.sparse_lib.diags(self.xp.ones(N - 2), offsets=+2)
+                mat = sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)
             elif name == 'D2U':
                 mat = self.get_conv('D2T') @ self.get_conv('T2U')
+            # elif name[:3] == 'C2T':
+            #     l = int(name[3:])
+            #     if l == 0:
+            #         mat = (sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)) / 2.0 + sp.diags(xp.append([0.5], xp.zeros(N-1)))
+            #     else:
+            #         mat = sp.diags(xp.append([1, l/(l+1)], xp.ones(N-2) * l/(l+2))) \
+            #             - sp.diags(l / (l+xp.arange(N-2) + 2), offsets=+2)
             elif name[0] == name[-1]:
                 mat = self.sparse_lib.eye(self.N)
             else:
@@ -181,6 +190,15 @@ class ChebychovHelper(SpectralHelper1D):
             scipy.sparse: Sparse differentiation matrix
         '''
         return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1)
+
+    # def get_T2C_differentiation_matrix(self, p=1):
+    #     sp = self.sparse_lib
+    #     xp = self.xp
+    #     N = self.N
+    #     l = p
+    #     from scipy.special import factorial
+
+    #     return 2**(l-1) * factorial(l-1) * sp.diags(xp.arange(N - l) + l, offsets=l)
 
     def get_U2T_integration_matrix(self):
         # TODO: missing integration constant, use T2T instead!
@@ -246,7 +264,7 @@ class ChebychovHelper(SpectralHelper1D):
             return 2 * xp.exp(-1j * np.pi * k / (2 * N) + 0j * np.pi / 4) * norm
         else:
             shift = xp.exp(1j * np.pi * k / (2 * N))
-            shift[0] /= 2
+            shift[0] = 0.5
             return shift / norm
 
     def get_fft_utils(self):
@@ -954,18 +972,32 @@ class SpectralHelper:
             axis = axes[0]
             base = self.axes[axis]
 
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, u.shape[axis], 1)
-
             if padding is not None:
                 N = int(np.ceil(v.shape[axis] * padding[axis]))
                 shift = base.get_fft_shift(False, N)
             else:
                 shift = base.fft_utils['bck']['shift']
 
+            if padding[axis] != 1:
+                N_pad = int(np.ceil(v.shape[axis] * padding[axis]))
+                _pad = [[0, 0] for _ in v.shape]
+                _pad[axis] = [0, N_pad - base.N]
+                v = self.xp.pad(v, _pad, 'constant')
+
+                shift = self.xp.exp(1j * np.pi * self.xp.arange(N_pad) / (2 * N_pad)) * base.N
+
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, v.shape[axis], 1)
+
             v *= shift[*expansion]
 
-            ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
+            if padding[axis] != 1:
+                shape = list(v.shape)
+                if self.comm:
+                    shape[0] = self.comm.allreduce(v.shape[0])
+                ifft = self.get_fft(axes, 'backward', shape=shape)
+            else:
+                ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
             v = ifft(v, axes=axes)
 
             shuffle = [slice(0, s, 1) for s in v.shape]

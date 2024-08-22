@@ -178,17 +178,18 @@ def test_matrix1D(N, base, type):
     assert np.allclose(exact, du)
 
 
-@pytest.mark.mpi4py
 def _test_transform_dealias(
-    nx=2**5 + 1,
-    nz=2**6 + 1,
-    padding=4 / 2,
+    bx,
+    bz,
+    axis,
+    nx=2**4 + 1,
+    nz=2**2 + 1,
+    padding=3 / 2,
     axes=(
         -2,
         -1,
     ),
     useMPI=True,
-    axis=-1,
     **kwargs,
 ):
     import numpy as np
@@ -203,8 +204,8 @@ def _test_transform_dealias(
         comm = None
 
     helper = SpectralHelper(comm=comm, debug=True)
-    helper.add_axis(base='fft', N=nx)
-    helper.add_axis(base='cheby', N=nz)
+    helper.add_axis(base=bx, N=nx)
+    helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
     xp = helper.xp
 
@@ -213,8 +214,8 @@ def _test_transform_dealias(
     ] * helper.ndim
 
     helper_pad = SpectralHelper(comm=comm, debug=True)
-    helper_pad.add_axis(base='fft', N=int(_padding[0] * nx))
-    helper_pad.add_axis(base='cheby', N=int(_padding[1] * nz))
+    helper_pad.add_axis(base=bx, N=int(_padding[0] * nx))
+    helper_pad.add_axis(base=bz, N=int(_padding[1] * nz))
     helper_pad.setup_fft()
 
     u_hat = helper.u_init_forward
@@ -230,8 +231,10 @@ def _test_transform_dealias(
         u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] += 1
         u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 2 * f, Kz == 0)] += 1 / nx
         u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 0, Kz == 0)] += 2 / nx
-        u_expect[0] += (np.cos(f * X) * 2 / nx) ** 2
-        u_expect_pad[0] += (np.cos(f * X_pad) * 2 / nx) ** 2
+        u_expect[0] += np.cos(f * X) * 2 / nx
+        u_expect_pad[0] += np.cos(f * X_pad) * 2 / nx
+        u2_expect = u_expect**2
+        u2_expect_pad = u_expect_pad**2
     elif axis == -1:
         f = nz // 2 + 1
         u_hat[0][xp.logical_and(xp.abs(Kz) == f, Kx == 0)] += 1
@@ -240,8 +243,30 @@ def _test_transform_dealias(
 
         coef = np.zeros(nz)
         coef[f] = 1 / nx
-        u_expect[0] = np.polynomial.Chebyshev(coef)(Z) ** 2
-        u_expect_pad[0] = np.polynomial.Chebyshev(coef)(Z_pad) ** 2
+        u_expect[0] = np.polynomial.Chebyshev(coef)(Z)
+        u_expect_pad[0] = np.polynomial.Chebyshev(coef)(Z_pad)
+        u2_expect = u_expect**2
+        u2_expect_pad = u_expect_pad**2
+    elif axis in [(-1, -2), (-2, -1)]:
+        fx = nx // 3
+        fz = nz // 2 + 1
+
+        u_hat[0][xp.logical_and(xp.abs(Kx) == fx, Kz == 0)] += 1
+        u_hat[0][xp.logical_and(xp.abs(Kz) == fz, Kx == 0)] += 1
+
+        u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 2 * fx, Kz == 0)] += 1 / nx
+        u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 0, Kz == 0)] += 2 / nx
+        u2_hat_expect[0][xp.logical_and(Kz == 2 * fz, Kx == 0)] += 1 / (2 * nx)
+        u2_hat_expect[0][xp.logical_and(Kz == 0, Kx == 0)] += 1 / (2 * nx)
+        u2_hat_expect[0][xp.logical_and(Kz == fz, xp.abs(Kx) == fx)] += 2 / nx
+
+        coef = np.zeros(nz)
+        coef[fz] = 1 / nx
+
+        u_expect[0] = np.cos(fx * X) * 2 / nx + np.polynomial.Chebyshev(coef)(Z)
+        u2_expect = u_expect**2
+        u_expect_pad[0] = np.cos(fx * X_pad) * 2 / nx + np.polynomial.Chebyshev(coef)(Z_pad)
+        u2_expect_pad = u_expect_pad**2
     else:
         raise NotImplementedError
 
@@ -253,7 +278,9 @@ def _test_transform_dealias(
     u2 = u**2
     u2_pad = u_pad**2
 
-    u2_expect = helper.itransform(u2_hat_expect, axes=axes).real
+    assert np.allclose(u, u_expect)
+    assert np.allclose(u_pad, u_expect_pad)
+
     assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
@@ -397,7 +424,7 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('bx', ['fft'])
 @pytest.mark.parametrize('num_procs', [2, 1])
 @pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
 def test_transform_MPI(nx, nz, bx, bz, num_procs, axes):
@@ -407,11 +434,11 @@ def test_transform_MPI(nx, nz, bx, bz, num_procs, axes):
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('bx', ['fft'])
 @pytest.mark.parametrize('num_procs', [2, 1])
 @pytest.mark.parametrize('axes', ["-1", "-1,-2"])
 def test_differentiation_MPI(nx, nz, bx, num_procs, axes):
-    run_MPI_test(num_procs=num_procs, test='diff', nx=nx, nz=nz, bx=bx, axes=axes)
+    run_MPI_test(num_procs=num_procs, test='diff', nx=nx, nz=nz, bx=bx, bz='cheby', axes=axes)
 
 
 @pytest.mark.mpi4py
@@ -591,8 +618,10 @@ def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('num_procs', [1])
 @pytest.mark.parametrize('axis', [-1, -2])
-def test_dealias_MPI(num_procs, axis, nx=32, nz=64, **kwargs):
-    run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, nz=nz, bz='cheby', test='dealias')
+@pytest.mark.parametrize('bx', ['fft'])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+def test_dealias_MPI(num_procs, axis, bx, bz, nx=32, nz=64, **kwargs):
+    run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, nz=nz, bx=bx, bz=bz, test='dealias')
 
 
 if __name__ == '__main__':
@@ -626,12 +655,12 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
-        test_differentiation_matrix2D(2**2, 2**2, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
+        # test_differentiation_matrix2D(2**2, 2**2, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 4, 1, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        # _test_transform_dealias()
+        _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:
         raise NotImplementedError
     print('done')

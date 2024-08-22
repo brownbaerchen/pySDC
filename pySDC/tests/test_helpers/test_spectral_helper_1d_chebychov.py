@@ -114,6 +114,10 @@ def test_differentiation_matrix(N, variant):
         D = cheby.get_T2U_differentiation_matrix() @ cheby.get_conv('D2T')
         Q = cheby.get_conv('U2T')
         P = cheby.get_conv('T2D')
+    # elif variant == 'T2C':
+    #     D = cheby.get_T2C_differentiation_matrix()
+    #     P = cheby.get_conv('T2T')
+    #     Q = cheby.get_conv('T2C1')
     else:
         raise NotImplementedError
 
@@ -472,8 +476,9 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
 
 if __name__ == '__main__':
+    test_differentiation_matrix(4, 'T2U')
     # test_transform(6, 1, 'fft')
-    test_tau_method('T2U', -1.0, N=4, bc_val=3.0)
+    # test_tau_method('T2U', -1.0, N=4, bc_val=3.0)
     # test_tau_method2D('T2T', -1, nx=2**7, nz=2**6, bc_val=4.0, plotting=True)
     # test_integration_matrix(5, 'T2U')
     # test_integration_matrix2D(2**0, 2**2, 'T2U', 'z')

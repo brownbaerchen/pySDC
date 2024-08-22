@@ -6,14 +6,36 @@ from pySDC.core.convergence_controller import ConvergenceController
 
 
 class CFLLimit(ConvergenceController):
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Define default parameters here.
+
+        Default parameters are:
+         - control_order (int): The order relative to other convergence controllers
+         - dt_max (float): maximal step size
+         - dt_min (float): minimal step size
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): The params passed for this specific convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            (dict): The updated params dictionary
+        """
+        defaults = {
+            "control_order": -50,
+            "dt_max": np.inf,
+            "dt_min": 0,
+            "cfl": 0.4,
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
     def get_new_step_size(self, controller, step, **kwargs):
         max_step_size = np.inf
-        min_step_size = 1e-3
 
         L = step.levels[0]
         P = step.levels[0].prob
-
-        cfl = 0.4
 
         grid_spacing_x = P.X[1:, :] - P.X[:-1, :]
         grid_spacing_z = P.Z[:, :-1] - P.Z[:, 1:]
@@ -25,9 +47,10 @@ class CFLLimit(ConvergenceController):
 
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
-        dt_new = L.status.dt_new if L.status.dt_new else L.params.dt
-        L.status.dt_new = min([dt_new, cfl * max_step_size])
-        L.status.dt_new = max([min_step_size, L.status.dt_new])
+
+        dt_new = L.status.dt_new if L.status.dt_new else max([self.params.dt_max, L.params.dt])
+        L.status.dt_new = min([dt_new, self.params.cfl * max_step_size])
+        L.status.dt_new = max([self.params.dt_min, L.status.dt_new])
 
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
 
@@ -65,7 +88,7 @@ def run_RBC(useGPU=False):
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e0},
-        CFLLimit: {},
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-3, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},
     }
 
@@ -73,16 +96,17 @@ def run_RBC(useGPU=False):
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = 1
     sweeper_params['QI'] = 'IE'
-    sweeper_params['QE'] = 'EE'
+    sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6 / 1,
-        'nx': 2**10 + 1,
-        'nz': 2**8 + 1,
+        'nx': 2**8 + 1,
+        'nz': 2**6 + 1,
         'cheby_mode': 'T2U',
+        'dealiasing': 2.0,
         # 'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
     }
@@ -139,7 +163,7 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
 
-    cmaps = {'vorticity': 'bwr'}
+    cmaps = {'vorticity': 'bwr', 'p': 'bwr'}
 
     for i in range(start_idx + comm.rank, 9999, comm.size):
         fig = P.get_fig()
@@ -175,9 +199,11 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
                 buffer[f'X-{rank}'],
                 buffer[f'Z-{rank}'],
                 buffer[f'u-{rank}']['u'][P.index(quantitiy)].real,
+                # vmin=-vmax[quantitiy] if cmaps.get(quantitiy, None) in ['bwr', 'seismic'] else vmin[quantitiy],
                 vmin=vmin[quantitiy],
-                vmax=vmax[quantitiy],
-                cmap='plasma',
+                vmax=-vmin[quantitiy] if cmaps.get(quantitiy, None) in ['bwr', 'seismic'] else vmax[quantitiy],
+                # vmax=vmax[quantitiy],
+                cmap=cmaps.get(quantitiy, 'plasma'),
             )
             fig.colorbar(im, cax[0])
             axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
@@ -187,7 +213,7 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
             axs[1].set_aspect(1.0)
         path = f'simulation_plots/RBC{i:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
-        print(f'{comm.rank} Stored figure {path!r}', flush=True)
+        print(f'{comm.rank} Stored figure {path!r} at t={buffer[f"u-{rank}"]["t"]:.2f}', flush=True)
         # plt.show()
         if render:
             plt.pause(1e-9)

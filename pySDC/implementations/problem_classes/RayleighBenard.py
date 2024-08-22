@@ -105,12 +105,12 @@ class RayleighBenard(GenericSpectralLinear):
             pressure_gauge_FFT=True,
         )
         # self.add_BC(
-        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral',
+        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1
         # )
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
-        self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet')
+        self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-2)
         self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
-        self.add_BC(component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', scale=1e-0)
+        self.add_BC(component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-1)
         self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
         self.add_BC(
             component='u',
@@ -119,6 +119,7 @@ class RayleighBenard(GenericSpectralLinear):
             v=self.BCs['u_bottom'],
             x=-1,
             kind='Dirichlet',
+            line=-1,
         )
         self.setup_BCs()
 
@@ -210,54 +211,54 @@ class RayleighBenard(GenericSpectralLinear):
         noise = self.u_init
         noise[iT] = gaussian_filter(rng.normal(size=me[self.iT].shape), sigma=sigma)
 
-        Kz, Kx = self.get_wavenumbers()
-        kzmax = self.nz - 3
-        kxmax = self.nx // 2
-        noise_hat = self.u_init_forward
-        noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
-        noise_hat[iT, np.abs(Kx) > kxmax] *= 0
-        noise_hat[iT, Kz > kzmax] *= 0
-        noise = self.itransform(noise_hat)
-        # print('noise', self.transform(noise * (self.Z - 1) * (self.Z + 1), axes=(-1,))[iT])
+        # Kz, Kx = self.get_wavenumbers()
+        # kzmax = self.nz - 3
+        # kxmax = self.nx // 2
+        # noise_hat = self.u_init_forward
+        # noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
+        # noise_hat[iT, np.abs(Kx) > kxmax] *= 0
+        # noise_hat[iT, Kz > kzmax] *= 0
+        # noise = self.itransform(noise_hat)
+        # # print('noise', self.transform(noise * (self.Z - 1) * (self.Z + 1), axes=(-1,))[iT])
 
         xp = self.xp
         me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
         # print('full', self.transform(me)[iT])
 
-        # enforce boundary conditions in spite of noise
-        me_hat = self.transform(me, axes=(-1,))
-        bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
-        bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
+        # # enforce boundary conditions in spite of noise
+        # me_hat = self.transform(me, axes=(-1,))
+        # bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
+        # bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
 
-        if noise_level > 0:
-            rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
-            rhs[0] = (
-                self.BCs["T_top"]
-                - self.xp.sum(bc_top[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
-                - self.xp.sum(bc_top[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
-            )
-            rhs[1] = (
-                self.BCs["T_bottom"]
-                - self.xp.sum(bc_bottom[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
-                - self.xp.sum(bc_bottom[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
-            )
+        # if noise_level > 0:
+        #     rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
+        #     rhs[0] = (
+        #         self.BCs["T_top"]
+        #         - self.xp.sum(bc_top[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
+        #         - self.xp.sum(bc_top[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
+        #     )
+        #     rhs[1] = (
+        #         self.BCs["T_bottom"]
+        #         - self.xp.sum(bc_bottom[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
+        #         - self.xp.sum(bc_bottom[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
+        #     )
 
-            A = self.xp.array([bc_top[kzmax - 2 : kzmax], bc_bottom[kzmax - 2 : kzmax]], complex)
-            me_hat[iT, :, kzmax - 2 : kzmax] = self.xp.linalg.solve(A, rhs).T
-            # print('T', me_hat[iT])
-            # print('D', (self.spectral.get_basis_change_matrix(axes=(-1,), direction='T2D') @ me_hat[iT].flatten()).reshape(me_hat[iT].shape))
+        #     A = self.xp.array([bc_top[kzmax - 2 : kzmax], bc_bottom[kzmax - 2 : kzmax]], complex)
+        #     me_hat[iT, :, kzmax - 2 : kzmax] = self.xp.linalg.solve(A, rhs).T
+        #     # print('T', me_hat[iT])
+        #     # print('D', (self.spectral.get_basis_change_matrix(axes=(-1,), direction='T2D') @ me_hat[iT].flatten()).reshape(me_hat[iT].shape))
 
-            me[...] = self.itransform(me_hat, axes=(-1,)).real
+        #     me[...] = self.itransform(me_hat, axes=(-1,)).real
 
-        u_hat = self.transform(me)
-        S = self.get_integration_matrix(axes=(1,))
-        # u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
+        # u_hat = self.transform(me)
+        # S = self.get_integration_matrix(axes=(1,))
+        # # u_hat[ip] = (self.U2T @ S @ u_hat[iT].flatten()).reshape(u_hat[ip].shape)
 
-        u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
-        u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
+        # u_hat[iTz] = (self.U2T @ self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iTz].shape)
+        # u_hat[ivz] = (self.U2T @ self.Dz @ u_hat[iv].flatten()).reshape(u_hat[ivz].shape)
 
-        me[...] = self.itransform(u_hat).real
-        # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
+        # me[...] = self.itransform(u_hat).real
+        # # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
         violations = self.compute_constraint_violation(me)
         for k, v in violations.items():
