@@ -86,12 +86,17 @@ def run_RBC(useGPU=False):
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.125
-    level_params['restol'] = -1e-7
+    level_params['dt'] = 0.2
+    level_params['restol'] = 1e-5
 
     convergence_controllers = {
-        Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
-        # AdaptivityPolynomialError: {'e_tol': 1e-3, 'interpolate_between_restarts':False},
+        # Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
+        AdaptivityPolynomialError: {
+            'e_tol': 1e-3,
+            'interpolate_between_restarts': False,
+            'dt_max': level_params['dt'],
+            'dt_slope_max': 2,
+        },
         # CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},
     }
@@ -117,7 +122,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 5
+    step_params['maxiter'] = 16
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -139,7 +144,7 @@ def run_RBC(useGPU=False):
     Tend = 50
     P = controller.MS[0].levels[0].prob
 
-    relaxation_steps = 3
+    relaxation_steps = 30
     u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
     uinit = u0_noise
     for _ in range(relaxation_steps):
