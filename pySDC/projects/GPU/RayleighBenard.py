@@ -42,8 +42,10 @@ class CFLLimit(ConvergenceController):
 
         iu, iv = P.index(['u', 'v'])
         for u in step.levels[0].u:
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
+            # max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
+            # max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / abs(u[iu][:-1, :]))])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / abs(u[iv][:, :-1]))])
 
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
@@ -59,7 +61,7 @@ def run_RBC(useGPU=False):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+    from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityPolynomialError
     from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
     from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
 
@@ -84,19 +86,20 @@ def run_RBC(useGPU=False):
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.25
-    level_params['restol'] = 1e-5
+    level_params['dt'] = 0.125
+    level_params['restol'] = -1e-7
 
     convergence_controllers = {
-        # Adaptivity: {'e_tol': 1e0},
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
+        Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt']},
+        # AdaptivityPolynomialError: {'e_tol': 1e-3, 'interpolate_between_restarts':False},
+        # CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
@@ -114,7 +117,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 5
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -136,8 +139,8 @@ def run_RBC(useGPU=False):
     Tend = 50
     P = controller.MS[0].levels[0].prob
 
-    relaxation_steps = 0
-    u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3, sigma=0)
+    relaxation_steps = 3
+    u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
     uinit = u0_noise
     for _ in range(relaxation_steps):
         uinit = P.solve_system(uinit, dt=0.25)

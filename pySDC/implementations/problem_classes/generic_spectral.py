@@ -163,18 +163,17 @@ class GenericSpectralLinear(Problem):
         # A[2*self.nx*self.nz, 2*self.nx*self.nz] = 1
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
-        import numpy as np
+        # import numpy as np
+        # if A.shape[0] < 200:
+        #     import matplotlib.pyplot as plt
 
-        if A.shape[0] < 200:
-            import matplotlib.pyplot as plt
-
-            M = self.spectral.put_BCs_in_matrix(self.L.copy())
-            # M = A  # self.L
-            im = plt.imshow((M / abs(M)).real)
-            # im = plt.imshow(np.log10(abs(A.toarray())).real)
-            # im = plt.imshow(((A.toarray())).real)
-            plt.colorbar(im)
-            plt.show()
+        #     M = self.spectral.put_BCs_in_matrix(self.L.copy())
+        #     # M = A  # self.L
+        #     im = plt.imshow((M / abs(M)).real)
+        #     # im = plt.imshow(np.log10(abs(A.toarray())).real)
+        #     # im = plt.imshow(((A.toarray())).real)
+        #     plt.colorbar(im)
+        #     plt.show()
 
         if self.solver_type == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)
@@ -200,19 +199,6 @@ class GenericSpectralLinear(Problem):
         if self.spectral.debug:
             self.spectral.check_BCs(sol)
 
-        # comp = 'Tz'
-        # lala = self.itransform(sol_hat.reshape(sol.shape), axes=(0,1))
-        # fig, axs = plt.subplots(1, 2)
-        # axs[0].plot(np.abs(self.transform(_rhs-lala.reshape(sol.shape), axes=(0,1))[self.index(comp)].T), label='diff')
-        # axs[0].plot(abs(sol_hat.reshape(sol.shape)[self.index(comp)].T), label='sol', ls='--')
-        # axs[0].plot(np.abs(self.transform(_rhs, axes=(0,1))[self.index(comp)].T), label='rhs', ls='-.')
-        # # axs[1].plot(np.abs(_rhs-lala.reshape(sol.shape))[self.index(comp)].T, label='diff')
-        # axs[1].plot(np.abs(sol[self.index(comp)].T), label='sol', ls='--')
-        # axs[1].plot(np.abs(_rhs)[self.index(comp)].T, label='rhs', ls='-.')
-        # axs[0].set_yscale('log')
-        # axs[0].legend()
-        # axs[1].legend()
-        # plt.show()
         return sol
 
 
