@@ -102,7 +102,7 @@ class RayleighBenard(GenericSpectralLinear):
             v=self.BCs['p_integral'],
             kind='integral',
             line=0,
-            pressure_gauge_FFT=True,
+            scalar=True,
         )
         # self.add_BC(
         #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1

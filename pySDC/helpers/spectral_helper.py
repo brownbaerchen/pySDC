@@ -537,7 +537,7 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_BC(self, axis, kind, line=-1, pressure_gauge_FFT=False, **kwargs):
+    def get_BC(self, axis, kind, line=-1, scalar=False, **kwargs):
         base = self.axes[axis]
 
         BC = base.get_Id().tolil() * 0
@@ -549,7 +549,7 @@ class SpectralHelper:
         elif ndim == 2:
             axis2 = (axis + 1) % ndim
 
-            if pressure_gauge_FFT:
+            if scalar:
                 _Id = self.sparse_lib.diags(self.xp.append([1], self.xp.zeros(self.axes[axis2].N - 1)))
             else:
                 _Id = self.axes[axis2].get_Id().tolil()
@@ -566,11 +566,11 @@ class SpectralHelper:
     #         _BC = self.get_BC(axis=axis, kind=kind, line=line, **kwargs) * scale
     #
 
-    def add_BC(self, component, equation, axis, kind, v, scale=1.0, line=-1, pressure_gauge_FFT=False, **kwargs):
+    def add_BC(self, component, equation, axis, kind, v, scale=1.0, line=-1, scalar=False, **kwargs):
         self.tau_terms_in_equation[equation] = self.tau_terms_in_equation.get(equation, 0) + 1
         line = line  # -self.tau_terms_in_equation[equation]
 
-        _BC = self.get_BC(axis=axis, kind=kind, line=line, pressure_gauge_FFT=pressure_gauge_FFT, **kwargs) * scale
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
         self.full_BCs += [
             {
@@ -584,7 +584,7 @@ class SpectralHelper:
             }
         ]
 
-        if pressure_gauge_FFT:
+        if scalar:
             slices = [self.index(equation)] + [
                 line,
             ] * self.ndim
