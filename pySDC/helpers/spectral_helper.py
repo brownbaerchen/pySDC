@@ -64,12 +64,10 @@ class SpectralHelper1D:
 
 
 class ChebychovHelper(SpectralHelper1D):
-    def __init__(self, *args, S=1, d=1, mode='T2U', transform_type='fft', x0=-1, x1=1, **kwargs):
+    def __init__(self, *args, mode='T2U', transform_type='fft', x0=-1, x1=1, **kwargs):
         assert x0 == -1
         assert x1 == 1
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
-        self.S = S
-        self.d = d
         self.mode = mode
         self.transform_type = transform_type
 
@@ -471,8 +469,6 @@ class SpectralHelper:
         self.full_BCs = []
         self.BC_mat = None
         self.BCs = None
-        self.tau_terms_in_equation = {}
-        # self.boundary_bordering=boundary_bordering
 
         self.fft_cache = {}
 
@@ -562,14 +558,7 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    #     def add_gauge(self, component, equation):
-    #         _BC = self.get_BC(axis=axis, kind=kind, line=line, **kwargs) * scale
-    #
-
     def add_BC(self, component, equation, axis, kind, v, scale=1.0, line=-1, scalar=False, **kwargs):
-        self.tau_terms_in_equation[equation] = self.tau_terms_in_equation.get(equation, 0) + 1
-        line = line  # -self.tau_terms_in_equation[equation]
-
         _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
         self.full_BCs += [
