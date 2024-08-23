@@ -36,8 +36,8 @@ class Heat1DChebychov(GenericSpectralLinear):
         M_lhs = {'u': {'u': I}}
         self.setup_M(M_lhs)
 
-        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet", zero_line=True)
-        self.add_BC(component='u', equation='ux', axis=0, x=1, v=b, kind="Dirichlet", zero_line=True)
+        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet")
+        self.add_BC(component='u', equation='ux', axis=0, x=1, v=b, kind="Dirichlet")
         self.setup_BCs()
 
     def solve_system(self, *args, **kwargs):

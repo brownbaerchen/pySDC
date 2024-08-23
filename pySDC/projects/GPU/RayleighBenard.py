@@ -90,7 +90,7 @@ def run_RBC(useGPU=False):
     level_params['restol'] = -1e-7
 
     convergence_controllers = {
-        Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt']},
+        Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
         # AdaptivityPolynomialError: {'e_tol': 1e-3, 'interpolate_between_restarts':False},
         # CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},

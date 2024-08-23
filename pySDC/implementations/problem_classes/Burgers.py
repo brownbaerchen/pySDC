@@ -184,10 +184,10 @@ class Burgers2D(GenericSpectralLinear):
         self.BCtop = 1
         self.BCbottom = -self.BCtop
         self.BCtopu = 0
-        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='u', equation='uz', axis=1, v=self.BCtopu, x=1, kind='Dirichlet', zero_line=True)
-        self.add_BC(component='u', equation='u', axis=1, v=self.BCtopu, x=-1, kind='Dirichlet', zero_line=True)
+        self.add_BC(component='v', equation='v', axis=1, v=self.BCtop, x=1, kind='Dirichlet')
+        self.add_BC(component='v', equation='vz', axis=1, v=self.BCbottom, x=-1, kind='Dirichlet')
+        self.add_BC(component='u', equation='uz', axis=1, v=self.BCtopu, x=1, kind='Dirichlet')
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCtopu, x=-1, kind='Dirichlet')
         self.setup_BCs()
 
     def u_exact(self, t=0, *args, noise_level=0, **kwargs):
