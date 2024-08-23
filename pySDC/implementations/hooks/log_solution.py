@@ -102,10 +102,10 @@ class LogToFile(Hooks):
     logging_condition = lambda L: True
     process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.view(np.ndarray)}
     format_index = lambda index: f'{index:06d}'
+    counter = 0
 
     def __init__(self):
         super().__init__()
-        self.counter = 0
 
         if self.path is None:
             raise ValueError('Please set a path for logging as the class attribute `LogToFile.path`!')
@@ -118,20 +118,39 @@ class LogToFile(Hooks):
         if not os.path.isdir(self.path):
             os.mkdir(self.path)
 
-    def post_step(self, step, level_number):
+    def log_to_file(self, step, level_number, condition, process_solution=None):
         if level_number > 0:
             return None
 
         L = step.levels[level_number]
 
-        if type(self).logging_condition(L):
+        if condition:
             path = self.get_path(self.counter)
-            data = type(self).process_solution(L)
+
+            if process_solution:
+                data = process_solution(L)
+            else:
+                data = type(self).process_solution(L)
 
             with open(path, 'wb') as file:
                 pickle.dump(data, file)
+            self.logger.info(f'Stored file {path!r}')
 
-            self.counter += 1
+            type(self).counter += 1
+
+    def post_step(self, step, level_number):
+        L = step.levels[level_number]
+        self.log_to_file(step, level_number, type(self).logging_condition(L))
+
+    def pre_run(self, step, level_number):
+        L = step.levels[level_number]
+        if type(L.u[0]).__name__ in ['cupy_mesh']:
+            import cupy as cp
+
+            process_solution = lambda L: {'t': L.time, 'u': cp.asnumpy(L.u[0]).view(np.ndarray)}
+        else:
+            process_solution = lambda L: {'t': L.time, 'u': L.u[0].view(np.ndarray)}
+        self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod
     def get_path(cls, index):
@@ -142,3 +161,19 @@ class LogToFile(Hooks):
         path = cls.get_path(index)
         with open(path, 'rb') as file:
             return pickle.load(file)
+
+
+class LogToFileAfterXs(LogToFile):
+    r'''
+    Log to file after certain amount of time has passed instead of after every step
+    '''
+
+    time_increment = 0
+    t_next_log = 0
+
+    def post_step(self, step, level_number):
+        L = step.levels[level_number]
+
+        if L.time + L.dt >= self.t_next_log and not step.status.restart:
+            super().post_step(step, level_number)
+            self.t_next_log += self.time_increment

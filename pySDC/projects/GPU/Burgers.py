@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from pySDC.implementations.hooks.log_solution import LogToFile
+from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
 
 
 def run_Burgers():
@@ -16,15 +16,16 @@ def run_Burgers():
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
     comm = MPI.COMM_WORLD
-    LogToFile.path = './data/'
-    LogToFile.file_name = f'Burgers-{comm.rank}'
-    LogToFile.process_solution = lambda L: {
+    LogToFileAfterXs.path = './data/'
+    LogToFileAfterXs.file_name = f'Burgers-{comm.rank}'
+    LogToFileAfterXs.process_solution = lambda L: {
         't': L.time + L.dt,
         'u': L.uend.view(np.ndarray),
         'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
     }
+    LogToFileAfterXs.time_increment = 0.1
     LogGrid.file_name = f'Burgers-grid-{comm.rank}'
-    LogGrid.file_logger = LogToFile
+    LogGrid.file_logger = LogToFileAfterXs
 
     convergence_controllers = {
         AdaptivityPolynomialError: {
@@ -58,7 +59,7 @@ def run_Burgers():
 
     controller_params = {}
     controller_params['logger_level'] = 11 if comm.rank == 0 else 40
-    controller_params['hook_class'] = [LogToFile, LogGrid]
+    controller_params['hook_class'] = [LogToFileAfterXs, LogGrid]
     controller_params['mssdc_jac'] = False
 
     description = {}
@@ -84,12 +85,12 @@ def run_Burgers():
 
 def plot_Burgers(size):
     import matplotlib.pyplot as plt
-    from pySDC.implementations.hooks.log_solution import LogToFile
+    from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     LogToFile.path = './data/'
-    LogGrid.file_logger = LogToFile
+    LogGrid.file_logger = LogToFileAfterXs
 
     fig, ax = plt.subplots()
     divider = make_axes_locatable(ax)
@@ -100,10 +101,10 @@ def plot_Burgers(size):
         vmin = 0
         vmax = 0
         for rank in range(size):
-            LogToFile.file_name = f'Burgers-{rank}'
+            LogToFileAfterXs.file_name = f'Burgers-{rank}'
             LogGrid.file_name = f'Burgers-grid-{rank}'
 
-            buffer[f'u-{rank}'] = LogToFile.load(i)
+            buffer[f'u-{rank}'] = LogToFileAfterXs.load(i)
             buffer[f'Z-{rank}'], buffer[f'X-{rank}'] = LogGrid.load()
 
             vmin = min([vmin, buffer[f'u-{rank}']['vorticity'].real.min()])

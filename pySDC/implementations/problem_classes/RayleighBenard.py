@@ -19,7 +19,7 @@ class RayleighBenard(GenericSpectralLinear):
         BCs=None,
         dealiasing=3 / 2,
         comm=None,
-        debug=True,
+        debug=False,
         **kwargs,
     ):
         BCs = {} if BCs is None else BCs

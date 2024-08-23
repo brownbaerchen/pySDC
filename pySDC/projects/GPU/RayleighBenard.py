@@ -1,6 +1,6 @@
 from mpi4py import MPI
 import numpy as np
-from pySDC.implementations.hooks.log_solution import LogToFile
+from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFile
 
 from pySDC.core.convergence_controller import ConvergenceController
 
@@ -42,8 +42,8 @@ class CFLLimit(ConvergenceController):
 
         iu, iv = P.index(['u', 'v'])
         for u in step.levels[0].u:
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / abs(u[iu][:-1, :]))])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / abs(u[iv][:, :-1]))])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
 
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
@@ -79,6 +79,7 @@ def run_RBC(useGPU=False):
         'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
         'divergence': np.log10(np.abs(L.prob.compute_constraint_violation(L.uend)['divergence'].view(np.ndarray))),
     }
+    LogToFile.time_increment = 1e-1
     LogGrid.file_name = f'RBC-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
 
@@ -102,11 +103,12 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 1,
-        'nx': 2**8 + 1,
-        'nz': 2**6 + 1,
+        'Rayleigh': 2e6 / 16,
+        'nx': 2**8 + 0,
+        'nz': 2**6 + 0,
         'cheby_mode': 'T2U',
-        'dealiasing': 2.0,
+        'dealiasing': 4 / 2,
+        # 'debug':True,
         # 'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
     }
@@ -147,7 +149,7 @@ def run_RBC(useGPU=False):
 
 def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx=0):
     import matplotlib.pyplot as plt
-    from pySDC.implementations.hooks.log_solution import LogToFile
+    from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFile
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     import gc

@@ -552,6 +552,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
         solver_type='direct',
         left_preconditioner=False,
         right_preconditioning='T2T',
+        Rayleigh=2e6 / 8,
         # Rayleigh=1,
     )
 
@@ -601,7 +602,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 
     small_dt = P.solve_system(u0, 1e0)
     compute_errors(u0, small_dt, 'tiny step size', 1e-9, components=['u', 'v', 'T', 'uz', 'vz', 'Tz'])
-    return None
+    # return None
 
     u0 = P.u_exact(noise_level=noise)
     # print('T0', P.transform(u0)[P.iT])
@@ -650,8 +651,8 @@ if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
-    test_BCs(2**1, 2**2 + 1, 'T2T', 2.77, 3.14, 2, 0.001, True)
-    # test_solver(2**6, 2**4 + 0, 'T2U', noise=0e-3, plotting=True)
+    # test_BCs(2**1, 2**2 + 1, 'T2T', 2.77, 3.14, 2, 0.001, True)
+    test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver(2**1, 2**1 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
