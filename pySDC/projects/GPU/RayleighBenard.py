@@ -89,7 +89,7 @@ def run_RBC(useGPU=False):
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e0},
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-3, 'cfl': 0.8},
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},
     }
 

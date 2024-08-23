@@ -604,11 +604,13 @@ class SpectralHelper:
                 self.BC_rhs_mask[*slices] = True
 
     def setup_BCs(self):
-        BC = self.convert_operator_matrix_to_operator(self.BC_mat)
-
-        self.BC_mask = BC != 0
-        self._BCs = BC.tolil()[self.BC_mask]
+        sp = self.sparse_lib
+        self.BCs = self.convert_operator_matrix_to_operator(self.BC_mat)
         self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
+
+        diags = self.xp.ones(self.BCs.shape[0])
+        diags[self.BC_zero_index] = 0
+        self.BC_line_zero_matrix = sp.diags(diags)
 
     def check_BCs(self, u):
         for axis in range(self.ndim):
@@ -624,16 +626,7 @@ class SpectralHelper:
                     ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}! Got {get}, wanted {want}'
 
     def put_BCs_in_matrix(self, A, rescale=1.0):
-        A = A.tolil()
-        A[self.BC_zero_index, :] = 0  # TODO: Smells like tuna
-        A[self.BC_mask] = self._BCs * rescale
-        # if not self.boundary_bordering:
-        #     A[:, self.BC_zero_index] = 0
-        #     for BC in self.full_BCs:
-        #         idx = self.components.index(BC['equation'])
-        #         A[idx * np.prod(self.shape), (idx+1) * np.prod(self.shape)-1] = 1
-        #         # A[(idx+1) * np.prod(self.shape)-2, (idx+1) * np.prod(self.shape)-1] = 1
-        return A.tocsc()
+        return self.BC_line_zero_matrix @ A + self.BCs * rescale
 
     # def padd_with_tau_terms(self, u_hat):
     #     padded_shape = list(u_hat.shape)
@@ -973,29 +966,31 @@ class SpectralHelper:
             base = self.axes[axis]
 
             if padding is not None:
-                N = int(np.ceil(v.shape[axis] * padding[axis]))
-                shift = base.get_fft_shift(False, N)
+                if padding[axis] != 1:
+                    N_pad = int(np.ceil(v.shape[axis] * padding[axis]))
+                    _pad = [[0, 0] for _ in v.shape]
+                    _pad[axis] = [0, N_pad - base.N]
+                    v = self.xp.pad(v, _pad, 'constant')
+
+                    shift = self.xp.exp(1j * np.pi * self.xp.arange(N_pad) / (2 * N_pad)) * base.N
+                else:
+                    shift = base.fft_utils['bck']['shift']
             else:
                 shift = base.fft_utils['bck']['shift']
-
-            if padding[axis] != 1:
-                N_pad = int(np.ceil(v.shape[axis] * padding[axis]))
-                _pad = [[0, 0] for _ in v.shape]
-                _pad[axis] = [0, N_pad - base.N]
-                v = self.xp.pad(v, _pad, 'constant')
-
-                shift = self.xp.exp(1j * np.pi * self.xp.arange(N_pad) / (2 * N_pad)) * base.N
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, v.shape[axis], 1)
 
             v *= shift[*expansion]
 
-            if padding[axis] != 1:
-                shape = list(v.shape)
-                if self.comm:
-                    shape[0] = self.comm.allreduce(v.shape[0])
-                ifft = self.get_fft(axes, 'backward', shape=shape)
+            if padding is not None:
+                if padding[axis] != 1:
+                    shape = list(v.shape)
+                    if self.comm:
+                        shape[0] = self.comm.allreduce(v.shape[0])
+                    ifft = self.get_fft(axes, 'backward', shape=shape)
+                else:
+                    ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
             else:
                 ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
             v = ifft(v, axes=axes)

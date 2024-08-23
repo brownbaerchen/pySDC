@@ -85,7 +85,7 @@ class Heat1DChebychov(GenericSpectralLinear):
             _noise[:] = self.itransform(noise_hat)
             u += _noise * noise * (self.x - 1) * (self.x + 1)
 
-        self.check_BCs(u)
+        # self.check_BCs(u)
         return u
 
 

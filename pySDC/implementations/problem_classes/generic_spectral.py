@@ -158,34 +158,13 @@ class GenericSpectralLinear(Problem):
 
         rhs = self.spectral.put_BCs_in_rhs(rhs)
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
-        # rhs_hat[self.xp.abs(rhs_hat) < 1e-12] = 0
-        # print(self.itransform(rhs_hat.reshape(rhs.shape), axes=(-2,))[self.index('T')])
-        # breakpoint()
 
         A = self.M + dt * self.L
         # A[2*self.nx*self.nz, 2*self.nx*self.nz] = 1
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
-        # print(rhs_hat.reshape(sol.shape))
-
         import numpy as np
 
-        # T = A.toarray()
-        # for i in range(T.shape[0]):
-        #     for j in range(T.shape[0]):
-        #         if i == j:
-        #             continue
-        #         ratios = T[i,:][T[j,:]!=0] / T[j,:][T[j,:]!=0]
-        #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
-        #             print(i, j, ratios)
-        # for i in range(T.shape[0]):
-        #     for j in range(T.shape[0]):
-        #         if i == j:
-        #             continue
-        #         ratios = T[:,i][T[:,j]!=0] / T[:,j][T[:,j]!=0]
-        #         print(i, j, ratios)
-        #         if np.allclose(ratios, ratios[0]) and ratios[0] != 0:
-        #             print(i, j, ratios)
         if A.shape[0] < 200:
             import matplotlib.pyplot as plt
 
@@ -196,7 +175,6 @@ class GenericSpectralLinear(Problem):
             # im = plt.imshow(((A.toarray())).real)
             plt.colorbar(im)
             plt.show()
-        # print('p', rhs.reshape(sol.shape)[self.index('p')])
 
         if self.solver_type == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)

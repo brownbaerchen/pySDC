@@ -657,10 +657,10 @@ if __name__ == '__main__':
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**2, 2**2, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        # test_tau_method(-1, 4, 1, kind='Dirichlet')
+        test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', (-1, -2))
+        # _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:
         raise NotImplementedError
     print('done')
