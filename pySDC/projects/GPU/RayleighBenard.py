@@ -120,7 +120,7 @@ def run_RBC(useGPU=False):
         'nx': 2**8 + 0,
         'nz': 2**6 + 0,
         'cheby_mode': 'T2U',
-        'dealiasing': 4 / 2,
+        'dealiasing': 3 / 2,
         # 'debug':True,
         # 'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
