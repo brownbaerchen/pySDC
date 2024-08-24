@@ -5,8 +5,6 @@ from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.mesh import mesh
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 
-from pySDC.helpers.problem_helper import ChebychovHelper, FFTHelper
-
 
 class Heat1DChebychov(GenericSpectralLinear):
     dtype_u = mesh
@@ -85,7 +83,7 @@ class Heat1DChebychov(GenericSpectralLinear):
             _noise[:] = self.itransform(noise_hat)
             u += _noise * noise * (self.x - 1) * (self.x + 1)
 
-        # self.check_BCs(u)
+        self.check_BCs(u)
         return u
 
 
