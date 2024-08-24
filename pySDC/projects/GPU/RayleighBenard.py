@@ -37,15 +37,17 @@ class CFLLimit(ConvergenceController):
         L = step.levels[0]
         P = step.levels[0].prob
 
-        grid_spacing_x = P.X[1:, :] - P.X[:-1, :]
-        grid_spacing_z = P.Z[:, :-1] - P.Z[:, 1:]
+        # grid_spacing_x = P.X[1:, :] - P.X[:-1, :]
+        # grid_spacing_z = P.Z[:, :-1] - P.Z[:, 1:]
+        grid_spacing_x = P.X[1, 0] - P.X[0, 0]
+        grid_spacing_z = P.xp.append(P.Z[0, :-1] - P.Z[0, 1:], P.Z[0, -1] - P.axes[1].x0)
 
         iu, iv = P.index(['u', 'v'])
         for u in step.levels[0].u:
             # max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
             # max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / abs(u[iu][:-1, :]))])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / abs(u[iv][:, :-1]))])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu]))])
+            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv]))])
 
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
@@ -91,20 +93,20 @@ def run_RBC(useGPU=False):
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
-        AdaptivityPolynomialError: {
-            'e_tol': 1e-3,
-            'interpolate_between_restarts': False,
-            'dt_max': level_params['dt'],
-            'dt_slope_max': 2,
-        },
-        # CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-4, 'cfl': 0.8},
+        # AdaptivityPolynomialError: {
+        #     'e_tol': 1e-3,
+        #     'interpolate_between_restarts': False,
+        #     'dt_max': level_params['dt'],
+        #     'dt_slope_max': 2,
+        # },
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.2},
         StopAtNan: {'thresh': 1e6},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 3
-    sweeper_params['QI'] = 'LU'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
@@ -122,7 +124,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 16
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -144,7 +146,7 @@ def run_RBC(useGPU=False):
     Tend = 50
     P = controller.MS[0].levels[0].prob
 
-    relaxation_steps = 30
+    relaxation_steps = 0
     u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
     uinit = u0_noise
     for _ in range(relaxation_steps):

@@ -189,6 +189,8 @@ class ChebychovHelper(SpectralHelper1D):
         '''
         return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1)
 
+    # def get_NCC_matrix(self):
+
     # def get_T2C_differentiation_matrix(self, p=1):
     #     sp = self.sparse_lib
     #     xp = self.xp
