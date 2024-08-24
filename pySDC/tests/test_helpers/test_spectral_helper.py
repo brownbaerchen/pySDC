@@ -91,19 +91,13 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useMPI=False, *
         elif axes == (-1,):
             expect = np.sin(X) * (-2) * np.sin(2 * Z) + np.cos(Z)
         elif axes in [(-2, -1), (-1, -2)]:
-            expect = np.cos(X) * np.cos(2 * Z) + np.sin(X) * (-2) * np.sin(2 * Z) - 2 * np.sin(2 * X) + np.cos(Z)
+            expect = -2 * np.cos(X) * np.sin(2 * Z)
         else:
             raise NotImplementedError
 
     u_hat = helper.transform(u, axes=(-2, -1))
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
-    D_u = helper.itransform(D_u_hat, axes=(-1, -2))
-
-    # import matplotlib.pyplot as plt
-    # plt.imshow(D_u[0])
-    # # plt.imshow(expect)
-    # # plt.imshow(u[0])
-    # plt.show()
+    D_u = helper.itransform(D_u_hat, axes=(-1, -2)).real
 
     assert np.allclose(D_u, expect, atol=1e-12)
 
@@ -655,7 +649,7 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
-        # test_differentiation_matrix2D(2**2, 2**2, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
+        test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)

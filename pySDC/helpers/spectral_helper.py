@@ -1089,8 +1089,7 @@ class SpectralHelper:
             sparse differentiation matrix
         """
         sp = self.sparse_lib
-        D = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
-        ndim = len(self.axes)
+        ndim = self.ndim
 
         if ndim == 1:
             D = self.axes[0].get_differentiation_matrix(**kwargs)
@@ -1109,7 +1108,7 @@ class SpectralHelper:
                 mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
 
                 if axis == axes[0]:
-                    D += sp.kron(*mats)
+                    D = sp.kron(*mats)
                 else:
                     D = D @ sp.kron(*mats)
         else:
