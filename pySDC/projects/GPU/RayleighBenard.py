@@ -43,7 +43,10 @@ class CFLLimit(ConvergenceController):
         grid_spacing_z = P.xp.append(P.Z[0, :-1] - P.Z[0, 1:], P.Z[0, -1] - P.axes[1].x0)
 
         iu, iv = P.index(['u', 'v'])
-        for u in step.levels[0].u:
+        L.sweep.compute_end_point()
+        if step.levels[0].uend is not None:
+            u = step.levels[0].uend
+            # for u in step.levels[0].u:
             # max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
             # max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
             max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu]))])
@@ -105,8 +108,8 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
@@ -124,7 +127,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 4
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
