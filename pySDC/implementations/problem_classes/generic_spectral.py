@@ -150,8 +150,6 @@ class GenericSpectralLinear(Problem):
 
         sol = self.u_init
 
-        _rhs = rhs.copy()
-
         rhs_hat = self.spectral.transform(rhs)
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs = self.spectral.itransform(rhs_hat).real

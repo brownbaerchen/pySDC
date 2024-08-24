@@ -202,14 +202,15 @@ class ChebychovHelper(SpectralHelper1D):
 
     def get_U2T_integration_matrix(self):
         # TODO: missing integration constant, use T2T instead!
-        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1).tolil()
+        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1)
         return S
 
     def get_T2T_integration_matrix(self, lbnd=0):
         # TODO: this is a bit fishy
-        S = (self.get_U2T_integration_matrix() @ self.get_conv('T2U')).tolil()
+        S = self.get_U2T_integration_matrix() @ self.get_conv('T2U')
         n = self.xp.arange(self.N)
         if lbnd == 0:
+            S = S.tolil()
             S[0, 1::2] = (
                 (n / (2 * (self.xp.arange(self.N) + 1)))[1::2]
                 * (-1) ** (self.xp.arange(self.N // 2))
@@ -550,7 +551,7 @@ class SpectralHelper:
             if scalar:
                 _Id = self.sparse_lib.diags(self.xp.append([1], self.xp.zeros(self.axes[axis2].N - 1)))
             else:
-                _Id = self.axes[axis2].get_Id().tolil()
+                _Id = self.axes[axis2].get_Id()
 
             Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_basis_change_matrix() @ _Id, axis=axis2)
             mats = [
@@ -652,7 +653,7 @@ class SpectralHelper:
         if len(self.components) == 1:
             return M[0][0]
         else:
-            return self.sparse_lib.bmat(M, format='lil')
+            return self.sparse_lib.bmat(M, format='csc')
 
     def get_wavenumbers(self):
         grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
@@ -1059,17 +1060,6 @@ class SpectralHelper:
     def get_local_slice_of_1D_matrix(self, M, axis):
         return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
 
-    # def get_local_slice_of_2D_matrix(self, M, axis):
-    #     slices = [slice(0, me) for me in M.shape]
-    #     if axis == 0:
-    #         slices[axis] = slice(0, M.shape[0], self.local_slice[1])
-    #     elif axis == 1:
-    #         slices[axis] = self.local_slice[axis]
-    #     else:
-    #         raise NotImplementedError
-    #     print(slices, axis)
-    #     return M.tolil()[*slices]
-
     def get_filter_matrix(self, axis, **kwargs):
         if self.ndim == 1:
             return self.axes[0].get_filter_matrix(**kwargs)
@@ -1127,7 +1117,6 @@ class SpectralHelper:
             sparse integration matrix
         """
         sp = self.sparse_lib
-        S = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
@@ -1147,7 +1136,7 @@ class SpectralHelper:
                 mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
 
                 if axis == axes[0]:
-                    S += sp.kron(*mats)
+                    S = sp.kron(*mats)
                 else:
                     S = S @ sp.kron(*mats)
         else:
@@ -1164,7 +1153,7 @@ class SpectralHelper:
         """
         sp = self.sparse_lib
         ndim = self.ndim
-        I = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil()
+        I = sp.eye(np.prod(self.init[0][1:]), dtype=complex)
 
         if ndim == 1:
             I = self.axes[0].get_Id()
@@ -1200,7 +1189,6 @@ class SpectralHelper:
         axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
 
         sp = self.sparse_lib
-        C = sp.eye(np.prod(self.init[0][1:]), dtype=complex).tolil() * 0
         ndim = len(self.axes)
 
         if ndim == 1:
@@ -1220,7 +1208,7 @@ class SpectralHelper:
                 mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
 
                 if axis == axes[0]:
-                    C += sp.kron(*mats)
+                    C = sp.kron(*mats)
                 else:
                     C = C @ sp.kron(*mats)
         else:
