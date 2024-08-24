@@ -193,7 +193,6 @@ def _test_transform_dealias(
         from mpi4py import MPI
 
         comm = MPI.COMM_WORLD
-        rank = comm.rank
     else:
         comm = None
 
@@ -227,8 +226,8 @@ def _test_transform_dealias(
         u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 0, Kz == 0)] += 2 / nx
         u_expect[0] += np.cos(f * X) * 2 / nx
         u_expect_pad[0] += np.cos(f * X_pad) * 2 / nx
-        u2_expect = u_expect**2
-        u2_expect_pad = u_expect_pad**2
+        # u2_expect = u_expect**2
+        # u2_expect_pad = u_expect_pad**2
     elif axis == -1:
         f = nz // 2 + 1
         u_hat[0][xp.logical_and(xp.abs(Kz) == f, Kx == 0)] += 1
@@ -239,8 +238,8 @@ def _test_transform_dealias(
         coef[f] = 1 / nx
         u_expect[0] = np.polynomial.Chebyshev(coef)(Z)
         u_expect_pad[0] = np.polynomial.Chebyshev(coef)(Z_pad)
-        u2_expect = u_expect**2
-        u2_expect_pad = u_expect_pad**2
+        # u2_expect = u_expect**2
+        # u2_expect_pad = u_expect_pad**2
     elif axis in [(-1, -2), (-2, -1)]:
         fx = nx // 3
         fz = nz // 2 + 1
@@ -258,16 +257,18 @@ def _test_transform_dealias(
         coef[fz] = 1 / nx
 
         u_expect[0] = np.cos(fx * X) * 2 / nx + np.polynomial.Chebyshev(coef)(Z)
-        u2_expect = u_expect**2
+        # u2_expect = u_expect**2
         u_expect_pad[0] = np.cos(fx * X_pad) * 2 / nx + np.polynomial.Chebyshev(coef)(Z_pad)
-        u2_expect_pad = u_expect_pad**2
+        # u2_expect_pad = u_expect_pad**2
     else:
         raise NotImplementedError
+
+    assert bx == 'fft' and bz == 'cheby', 'This test is not implemented for the bases you are looking for'
 
     u_pad = helper.itransform(u_hat, padding=_padding, axes=axes)
     u = helper.itransform(u_hat, axes=axes).real
 
-    # assert np.allclose(u_pad.shape[1:], [np.ceil(me * _padding[0]) for me in u.shape][1:])
+    assert not np.allclose(u_pad.shape, u.shape)
 
     u2 = u**2
     u2_pad = u_pad**2
@@ -613,7 +614,7 @@ def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
 @pytest.mark.parametrize('num_procs', [1])
 @pytest.mark.parametrize('axis', [-1, -2])
 @pytest.mark.parametrize('bx', ['fft'])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('bz', ['cheby'])
 def test_dealias_MPI(num_procs, axis, bx, bz, nx=32, nz=64, **kwargs):
     run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, nz=nz, bx=bx, bz=bz, test='dealias')
 
@@ -649,12 +650,12 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(8, 3, 'fft', 'cheby', (-1,))
-        test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
+        # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
-        test_tau_method(-1, 8, 99, kind='Dirichlet')
+        # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**2, 2**2, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        # _test_transform_dealias('fft', 'cheby', (-1, -2))
+        _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:
         raise NotImplementedError
     print('done')
