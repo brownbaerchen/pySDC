@@ -102,14 +102,14 @@ def run_RBC(useGPU=False):
         #     'dt_max': level_params['dt'],
         #     'dt_slope_max': 2,
         # },
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.2},
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.5},
         StopAtNan: {'thresh': 1e6},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 3
-    sweeper_params['QI'] = 'LU'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
     # sweeper_params['initial_guess'] = 'zero'
 
@@ -127,7 +127,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 4
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

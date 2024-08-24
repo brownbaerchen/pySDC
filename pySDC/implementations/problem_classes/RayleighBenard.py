@@ -56,14 +56,6 @@ class RayleighBenard(GenericSpectralLinear):
         }
         self.index_to_name = {v: k for k, v, in self.indices.items()}
 
-        # prepare indexes for the different components. Do this by hand so that the editor can autocomplete...
-        self.iu = self.indices['u']  # velocity in x-direction
-        self.iv = self.indices['v']  # velocity in z-direction
-        self.ivz = self.indices['vz']  # derivative of v wrt z
-        self.iT = self.indices['T']  # temperature
-        self.iTz = self.indices['Tz']  # derivative of temperature wrt z
-        self.ip = self.indices['p']  # pressure
-
         self.Z, self.X = self.get_grid()
 
         # construct 2D matrices
@@ -208,13 +200,13 @@ class RayleighBenard(GenericSpectralLinear):
         rng = self.xp.random.default_rng(seed=seed)
 
         noise = self.u_init
-        noise[iT] = rng.normal(size=me[self.iT].shape)
+        noise[iT] = rng.normal(size=me[iT].shape)
 
         Kz, Kx = self.get_wavenumbers()
         kzmax = self.nz - 3 if kzmax is None else kzmax
         kxmax = self.nx // 2 if kxmax is None else kxmax
         noise_hat = self.u_init_forward
-        noise_hat[:] = rng.normal(size=noise_hat[self.iT].shape)
+        noise_hat[:] = rng.normal(size=noise_hat[iT].shape)
         noise_hat[iT, np.abs(Kx) > kxmax] *= 0
         noise_hat[iT, Kz > kzmax] *= 0
         noise = self.itransform(noise_hat)

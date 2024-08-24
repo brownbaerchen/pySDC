@@ -95,12 +95,12 @@ pyflakes = [
 #flake8-black = ["+*"]
 flake8-bugbear = ["+*", '-B023', '-B028']
 flake8-comprehensions = ["+*", '-C408', '-C417']
-target-version = ["py311"]
 
 [tool.black]
 line-length = 120
 skip-string-normalization = true
 exclude = '''playgrounds/'''
+target-version = ["py311"]
 
 [tool.coverage.run]
 omit = ['*/pySDC/tests/*', '*/data/*', '*/pySDC/playgrounds/*', '*/pySDC/projects/deprecated/*', '*/pySDC/projects/*/tests/*']

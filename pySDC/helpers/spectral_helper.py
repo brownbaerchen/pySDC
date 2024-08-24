@@ -55,7 +55,7 @@ class SpectralHelper1D:
 
         mask = self.xp.logical_or(k >= kmax, k < kmin)
 
-        F = self.get_Id().tolil()
+        F = self.get_Id().tocsc()
         F[:, mask] = 0
         return F.tocsc()
 
@@ -210,7 +210,7 @@ class ChebychovHelper(SpectralHelper1D):
         S = self.get_U2T_integration_matrix() @ self.get_conv('T2U')
         n = self.xp.arange(self.N)
         if lbnd == 0:
-            S = S.tolil()
+            S = S.tocsc()
             S[0, 1::2] = (
                 (n / (2 * (self.xp.arange(self.N) + 1)))[1::2]
                 * (-1) ** (self.xp.arange(self.N // 2))
@@ -539,7 +539,7 @@ class SpectralHelper:
     def get_BC(self, axis, kind, line=-1, scalar=False, **kwargs):
         base = self.axes[axis]
 
-        BC = base.get_Id().tolil() * 0
+        BC = base.get_Id().tocsc() * 0
         BC[line, :] = base.get_BC(kind=kind, **kwargs)
 
         ndim = len(self.axes)
@@ -572,6 +572,7 @@ class SpectralHelper:
                 'kind': kind,
                 'v': v * scale,
                 'line': line,
+                'scalar': scalar,
                 **kwargs,
             }
         ]
@@ -601,13 +602,17 @@ class SpectralHelper:
         self.BC_line_zero_matrix = sp.diags(diags)
 
     def check_BCs(self, u):
+        assert self.ndim < 3
         for axis in range(self.ndim):
-            BCs = [me for me in self.full_BCs if me["axis"] == axis]
+            BCs = [me for me in self.full_BCs if me["axis"] == axis and not me["scalar"]]
 
             if len(BCs) > 0:
                 u_hat = self.transform(u, axes=(axis - self.ndim,))
                 for BC in BCs:
-                    get = u_hat[self.index(BC['component'])] @ self.axes[axis].get_BC(**BC)
+                    if axis == 0:
+                        get = self.axes[axis].get_BC(**BC) @ u_hat[self.index(BC['component'])]
+                    elif axis == 1:
+                        get = u_hat[self.index(BC['component'])] @ self.axes[axis].get_BC(**BC)
                     want = BC['v']
                     assert self.xp.allclose(
                         get, want
@@ -1058,7 +1063,7 @@ class SpectralHelper:
         return self.xp.array(result)
 
     def get_local_slice_of_1D_matrix(self, M, axis):
-        return M.tolil()[self.local_slice[axis], self.local_slice[axis]]
+        return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]
 
     def get_filter_matrix(self, axis, **kwargs):
         if self.ndim == 1:

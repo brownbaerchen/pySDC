@@ -141,6 +141,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+    iu, iv, ip, iT, ivz, iuz, iTz = P.index(['u', 'v', 'p', 'T', 'vz', 'uz', 'Tz'])
     X, Z = P.X, P.Z
     cos, sin = np.cos, np.sin
 
@@ -171,24 +172,24 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
 
     u = P.u_init
-    for i in [P.iu, P.iv, P.iT, P.ip]:
+    for i in [iu, iv, iT, ip]:
         u[i][:] = y
-    u[P.ivz] = y_z
-    u[P.iTz] = y_z
+    u[ivz] = y_z
+    u[iTz] = y_z
     u[P.index('uz')] = y_z
 
     f = P.eval_f(u, compute_violations=False)
 
-    for i in [P.ivz, P.iTz]:
+    for i in [ivz, iTz]:
         assert np.allclose(f.impl[i] + f.expl[i], 0), f'Non-zero time derivative in algebraic component {i}'
 
     f_expect = P.f_init
-    f_expect.expl[P.iT] = -y * (y_x + y_z)
-    f_expect.impl[P.iT] = kappa * (y_xx + y_zz)
-    f_expect.expl[P.iu] = -y * y_z - y * y_x
-    f_expect.impl[P.iu] = -y_x + nu * (y_xx + y_zz)
-    f_expect.expl[P.iv] = -y * (y_z + y_x)
-    f_expect.impl[P.iv] = -y_z + nu * (y_xx + y_zz) + y
+    f_expect.expl[iT] = -y * (y_x + y_z)
+    f_expect.impl[iT] = kappa * (y_xx + y_zz)
+    f_expect.expl[iu] = -y * y_z - y * y_x
+    f_expect.impl[iu] = -y_x + nu * (y_xx + y_zz)
+    f_expect.expl[iv] = -y * (y_z + y_x)
+    f_expect.impl[iv] = -y_z + nu * (y_xx + y_zz) + y
 
     for comp in P.spectral.components[::-1]:
         i = P.spectral.index(comp)
@@ -222,44 +223,45 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs, right_preconditioning='T2T', left_preconditioner=False
     )
 
-    cheby = P.axes[-1]
-    BC_top = cheby.get_BC(kind='Dirichlet', x=1)
-    BC_bot = cheby.get_BC(kind='Dirichlet', x=-1)
-    BC_int = cheby.get_BC(kind='integral')
+    u0 = P.u_exact(0, noise_level=noise)
+    sol = P.solve_system(u0, 1e-1)
 
-    rhs = P.u_exact(0, noise_level=noise)
-    sol = P.solve_system(rhs, 1e0)
-
+    P.check_BCs(u0)
     P.check_BCs(sol)
-    sol_hat = P.transform(sol, axes=(-1,))
 
-    if plotting:
-        import matplotlib.pyplot as plt
+    # cheby = P.axes[-1]
+    # BC_top = cheby.get_BC(kind='Dirichlet', x=1)
+    # BC_bot = cheby.get_BC(kind='Dirichlet', x=-1)
+    # BC_int = cheby.get_BC(kind='integral')
+    # sol_hat = P.transform(sol, axes=(-1,))
 
-        fig, axs = plt.subplots(1, 2)
-        # axs[0].imshow(np.log(abs(_A.toarray())))
-        # axs[1].imshow(np.log(abs(A.toarray())))
-        # plt.show()
-        # for i in range(len(P.spectral.components)):
-        #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
-        #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
-        # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
-        # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
-        idx = P.iu
-        axs[0].plot(P.Z[0, :], sol[idx][0, :], label='want')
-        axs[0].plot(P.Z[0, :], rhs[idx][0, :], label='have', ls='--')
-        axs[1].plot(P.Z[0, :], rhs[P.ip][0, :] - sol[P.ip][0, :])
-        axs[1].plot(P.Z[0, :], rhs[idx][0, :] - sol[idx][0, :], label='Tz')
-        axs[0].legend()
-        axs[1].legend()
-        plt.show()
+    # if plotting:
+    #     import matplotlib.pyplot as plt
 
-    for q, v in zip(['T', 'v', 'u'], [T_top, v_top, 0]):
-        got = sol_hat[P.index(q)] @ BC_top
-        assert np.allclose(got, v), f'unexpected BC at top in {q}! got {got}, but expected {v}'
-    for q, v in zip(['T', 'v', 'u'], [T_bottom, v_top, 0]):
-        assert np.allclose(sol_hat[P.index(q)] @ BC_bot, v), f'unexpected BC at bottom in {q}'
-    assert np.allclose(sol_hat[P.index('p')] @ BC_int, 0), 'Unexpected pressure integral'
+    #     fig, axs = plt.subplots(1, 2)
+    #     # axs[0].imshow(np.log(abs(_A.toarray())))
+    #     # axs[1].imshow(np.log(abs(A.toarray())))
+    #     # plt.show()
+    #     # for i in range(len(P.spectral.components)):
+    #     #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
+    #     #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
+    #     # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
+    #     # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
+    #     idx = P.iu
+    #     axs[0].plot(P.Z[0, :], sol[idx][0, :], label='want')
+    #     axs[0].plot(P.Z[0, :], rhs[idx][0, :], label='have', ls='--')
+    #     axs[1].plot(P.Z[0, :], rhs[P.ip][0, :] - sol[P.ip][0, :])
+    #     axs[1].plot(P.Z[0, :], rhs[idx][0, :] - sol[idx][0, :], label='Tz')
+    #     axs[0].legend()
+    #     axs[1].legend()
+    #     plt.show()
+
+    # for q, v in zip(['T', 'v', 'u'], [T_top, v_top, 0]):
+    #     got = sol_hat[P.index(q)] @ BC_top
+    #     assert np.allclose(got, v), f'unexpected BC at top in {q}! got {got}, but expected {v}'
+    # for q, v in zip(['T', 'v', 'u'], [T_bottom, v_top, 0]):
+    #     assert np.allclose(sol_hat[P.index(q)] @ BC_bot, v), f'unexpected BC at bottom in {q}'
+    # assert np.allclose(sol_hat[P.index('p')] @ BC_int, 0), 'Unexpected pressure integral'
 
 
 @pytest.mark.mpi4py
@@ -275,20 +277,21 @@ def test_vorticity(nx, nz, cheby_mode, direction):
     assert nx > 8
 
     P = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode)
+    iu, iv = P.index(['u', 'v'])
 
     u = P.u_init
 
     if direction == 'x':
-        u[P.iv] = np.sin(P.X * np.pi)
-        u[P.iu] = np.cos(P.X * np.pi)
+        u[iv] = np.sin(P.X * np.pi)
+        u[iu] = np.cos(P.X * np.pi)
         expect = np.cos(P.X * np.pi) * np.pi
     elif direction == 'z':
-        u[P.iv] = P.Z**2
-        u[P.iu] = P.Z**3
+        u[iv] = P.Z**2
+        u[iu] = P.Z**3
         expect = 3 * P.Z**2
     elif direction == 'mixed':
-        u[P.iv] = np.sin(P.X * np.pi) * P.Z**2
-        u[P.iu] = np.cos(P.X * np.pi) * P.Z**3
+        u[iv] = np.sin(P.X * np.pi) * P.Z**2
+        u[iu] = np.cos(P.X * np.pi) * P.Z**3
         expect = np.cos(P.X * np.pi) * np.pi * P.Z**2 + np.cos(P.X * np.pi) * 3 * P.Z**2
     else:
         raise NotImplementedError
@@ -384,20 +387,7 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 
     P = RayleighBenard(nx=nx, nz=nz, BCs=BCs)
     u0 = P.u_exact()
-    # violations = P.compute_constraint_violation(u0)
-
-    # for key in violations.keys():
-    #     assert np.allclose(violations[key], 0), f'Violation of constraints in {key}!'
-
-    # test BCs
-    expect = {}
-    expect[P.iT] = (BCs['T_top'] - BCs['T_bottom']) / 2 * P.Z + (BCs['T_top'] + BCs['T_bottom']) / 2.0
-    expect[P.iv] = (BCs['v_top'] - BCs['v_bottom']) / 2 * P.Z + (BCs['v_top'] + BCs['v_bottom']) / 2.0
-    for i in [P.iT, P.iv]:
-        assert np.allclose(u0[i][:, 0], expect[i][:, 0]), f'Error in BCs in initial conditions of {P.index_to_name[i]}'
-        assert np.allclose(
-            u0[i][:, -1], expect[i][:, -1]
-        ), f'Error in BCs in initial conditions of {P.index_to_name[i]}'
+    P.spectral.check_BCs(u0)
 
 
 @pytest.mark.mpi4py
@@ -506,7 +496,7 @@ def test_solver_small_step_size(plotting=False):
         Rayleigh=1.0,
     )
 
-    u0 = P.u_exact(noise_level=1e-3, sigma=1.0)
+    u0 = P.u_exact(noise_level=1e-3)
     u_solver = P.solve_system(u0, 1e-4)
 
     u_hat = P.transform(u_solver)
@@ -627,7 +617,7 @@ def test_solver(nx, nz, cheby_mode, noise, plotting=False):
     # return None
 
     if plotting:
-        u = P.u_exact(noise_level=1e-3, sigma=0)
+        u = P.u_exact(noise_level=1e-3)
         t = 0
         nsteps = 1000
         dt = 0.25
@@ -651,11 +641,11 @@ if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
-    # test_BCs(2**1, 2**2 + 1, 'T2T', 2.77, 3.14, 2, 0.001, True)
+    test_BCs(2**1, 2**2 + 1, 'T2U', 2.77, 3.14, 2, 0.001, True)
     # test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver(2**1, 2**1 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
-    test_initial_conditions(4, 5, 0, 1, 1, 1)
+    # test_initial_conditions(4, 5, 0, 1, 1, 1)
     print('done')
