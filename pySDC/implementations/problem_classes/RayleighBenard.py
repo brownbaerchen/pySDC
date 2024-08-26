@@ -62,7 +62,7 @@ class RayleighBenard(GenericSpectralLinear):
         Dx = self.get_differentiation_matrix(axes=(0,))
         Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
         Dz = self.get_differentiation_matrix(axes=(1,))
-        I = self.get_Id()
+        Id = self.get_Id()
         self.Dx = Dx
         self.Dxx = Dxx
         self.Dz = Dz
@@ -73,18 +73,18 @@ class RayleighBenard(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'vz': {'v': -Dz, 'vz': I},  # algebraic constraint for first derivative
-            'uz': {'u': -Dz, 'uz': I},  # algebraic constraint for first derivative
-            'Tz': {'T': -Dz, 'Tz': I},  # algebraic constraint for first derivative
-            'p': {'u': Dx, 'vz': I},  # divergence free constraint
+            'vz': {'v': -Dz, 'vz': Id},  # algebraic constraint for first derivative
+            'uz': {'u': -Dz, 'uz': Id},  # algebraic constraint for first derivative
+            'Tz': {'T': -Dz, 'Tz': Id},  # algebraic constraint for first derivative
+            'p': {'u': Dx, 'vz': Id},  # divergence free constraint
             'u': {'p': Dx, 'u': -nu * Dxx, 'uz': -nu * Dz},
-            'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -I},
+            'v': {'p': Dz, 'v': -nu * Dxx, 'vz': -nu * Dz, 'T': -Id},
             'T': {'T': -kappa * Dxx, 'Tz': -kappa * Dz},
         }
         self.setup_L(L_lhs)
 
         # mass matrix
-        M_lhs = {i: {i: I} for i in ['u', 'v', 'T']}
+        M_lhs = {i: {i: Id} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
 
         self.add_BC(
@@ -97,7 +97,7 @@ class RayleighBenard(GenericSpectralLinear):
             scalar=True,
         )
         # self.add_BC(
-        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1
+        #     component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1, scalar=True
         # )
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-1)

@@ -198,8 +198,8 @@ def test_eval_f(nx, nz, cheby_mode, direction):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [1, 4])
-@pytest.mark.parametrize('nz', [33])
+@pytest.mark.parametrize('nx', [1, 2**7])
+@pytest.mark.parametrize('nz', [2**5])
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('T_top', [2])
 @pytest.mark.parametrize('T_bottom', [3.14, -9])
@@ -223,45 +223,10 @@ def test_BCs(nx, nz, cheby_mode, T_top, T_bottom, v_top, noise, plotting=False):
         nx=nx, nz=nz, cheby_mode=cheby_mode, BCs=BCs, right_preconditioning='T2T', left_preconditioner=False
     )
 
-    u0 = P.u_exact(0, noise_level=noise)
-    sol = P.solve_system(u0, 1e-1)
+    u = P.u_exact(0, noise_level=noise, kzmax=None, kxmax=None)
+    u = P.solve_system(u, 1e0)
 
-    P.check_BCs(u0)
-    P.check_BCs(sol)
-
-    # cheby = P.axes[-1]
-    # BC_top = cheby.get_BC(kind='Dirichlet', x=1)
-    # BC_bot = cheby.get_BC(kind='Dirichlet', x=-1)
-    # BC_int = cheby.get_BC(kind='integral')
-    # sol_hat = P.transform(sol, axes=(-1,))
-
-    # if plotting:
-    #     import matplotlib.pyplot as plt
-
-    #     fig, axs = plt.subplots(1, 2)
-    #     # axs[0].imshow(np.log(abs(_A.toarray())))
-    #     # axs[1].imshow(np.log(abs(A.toarray())))
-    #     # plt.show()
-    #     # for i in range(len(P.spectral.components)):
-    #     #     axs[0].plot(P.Z[0, :], sol[i, 0, :].real, label=f'{P.index_to_name[i]}')
-    #     #     axs[1].plot(P.X[:, 0], sol[i, :, 0].real, label=f'{P.index_to_name[i]}')
-    #     # axs[0].plot(P.Z[0, :], expect['v'][0, :], '--')
-    #     # axs[0].plot(P.Z[0, :], expect['T'][0, :], '--')
-    #     idx = P.iu
-    #     axs[0].plot(P.Z[0, :], sol[idx][0, :], label='want')
-    #     axs[0].plot(P.Z[0, :], rhs[idx][0, :], label='have', ls='--')
-    #     axs[1].plot(P.Z[0, :], rhs[P.ip][0, :] - sol[P.ip][0, :])
-    #     axs[1].plot(P.Z[0, :], rhs[idx][0, :] - sol[idx][0, :], label='Tz')
-    #     axs[0].legend()
-    #     axs[1].legend()
-    #     plt.show()
-
-    # for q, v in zip(['T', 'v', 'u'], [T_top, v_top, 0]):
-    #     got = sol_hat[P.index(q)] @ BC_top
-    #     assert np.allclose(got, v), f'unexpected BC at top in {q}! got {got}, but expected {v}'
-    # for q, v in zip(['T', 'v', 'u'], [T_bottom, v_top, 0]):
-    #     assert np.allclose(sol_hat[P.index(q)] @ BC_bot, v), f'unexpected BC at bottom in {q}'
-    # assert np.allclose(sol_hat[P.index('p')] @ BC_int, 0), 'Unexpected pressure integral'
+    P.check_BCs(u)
 
 
 @pytest.mark.mpi4py
@@ -486,8 +451,8 @@ def test_solver_small_step_size(plotting=False):
         comm = None
 
     P = RayleighBenard(
-        nx=2**1,
-        nz=2**2,
+        nx=2**4,
+        nz=2**6,
         cheby_mode='T2U',
         comm=comm,
         solver_type='direct',
@@ -496,7 +461,7 @@ def test_solver_small_step_size(plotting=False):
         Rayleigh=1.0,
     )
 
-    u0 = P.u_exact(noise_level=1e-3)
+    u0 = P.u_exact(noise_level=1e-3, kzmax=4, kxmax=4)
     u_solver = P.solve_system(u0, 1e-4)
 
     u_hat = P.transform(u_solver)
@@ -641,7 +606,7 @@ if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
     # test_eval_f(16, 8, 'T2U', 'z')
-    test_BCs(2**1, 2**2 + 1, 'T2U', 2.77, 3.14, 2, 0.001, True)
+    test_BCs(2**8, 2**6 + 0, 'T2U', 2.77, 3.14, 2, 0.001, True)
     # test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver(2**1, 2**1 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver_small_step_size(True)
