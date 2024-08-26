@@ -273,7 +273,6 @@ class ChebychovHelper(SpectralHelper1D):
             'fwd': {},
             'bck': {},
         }
-        xp = self.xp
 
         # forwards transform
         self.fft_utils['fwd']['shuffle'] = self.get_fft_shuffle(True, self.N)
@@ -294,14 +293,14 @@ class ChebychovHelper(SpectralHelper1D):
             shuffle = [slice(0, s, 1) for s in u.shape]
             shuffle[axis] = self.fft_utils['fwd']['shuffle']
 
-            v = u[*shuffle]
+            v = u[(*shuffle,)]
 
             V = self.fft_lib.fft(v, axis=axis, **kwargs)
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
 
-            V *= self.fft_utils['fwd']['shift'][*expansion]
+            V *= self.fft_utils['fwd']['shift'][(*expansion,)]
 
             result.real[...] = V.real[...]
             return result
@@ -319,11 +318,11 @@ class ChebychovHelper(SpectralHelper1D):
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
 
-            v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][*expansion], axis=axis)
+            v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][(*expansion,)], axis=axis)
 
             shuffle = [slice(0, s, 1) for s in u.shape]
             shuffle[axis] = self.fft_utils['bck']['shuffle']
-            V = v[*shuffle]
+            V = v[(*shuffle,)]
 
             result.real[...] = V.real[...]
             return result
@@ -590,7 +589,7 @@ class SpectralHelper:
             )
         N = self.axes[axis].N
         if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
-            self.BC_rhs_mask[*slices] = True
+            self.BC_rhs_mask[(*slices,)] = True
 
     def setup_BCs(self):
         sp = self.sparse_lib
@@ -641,7 +640,7 @@ class SpectralHelper:
                 )
                 if axis == bc['axis']:
                     _slice = [self.index(bc['equation'])] + slices
-                    _rhs_hat[*_slice] = bc['v'] * rescale
+                    _rhs_hat[(*_slice,)] = bc['v'] * rescale
 
             if istransformed:
                 rhs = _rhs_hat
@@ -692,7 +691,7 @@ class SpectralHelper:
                 elif direction == 'object':
                     self.fft_cache[key] = None
             else:
-                from mpi4py_fft import PFFT, newDistArray
+                from mpi4py_fft import PFFT
 
                 _fft = PFFT(
                     comm=self.comm if comm is None else comm,
@@ -718,7 +717,6 @@ class SpectralHelper:
         if len(self.components) == 0:
             self.add_component('u')
 
-        shape = [me.N for me in self.axes]
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
         self.local_slice = [slice(0, me.N) for me in self.axes]
 
@@ -727,9 +725,23 @@ class SpectralHelper:
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice(False)
 
-        self.init = (np.empty(shape=self.global_shape)[:, *self.local_slice].shape, self.comm, np.dtype('float'))
+        self.init = (
+            np.empty(shape=self.global_shape)[
+                (
+                    ...,
+                    *self.local_slice,
+                )
+            ].shape,
+            self.comm,
+            np.dtype('float'),
+        )
         self.init_forward = (
-            np.empty(shape=self.global_shape)[:, *self.local_slice].shape,
+            np.empty(shape=self.global_shape)[
+                (
+                    ...,
+                    *self.local_slice,
+                )
+            ].shape,
             self.comm,
             np.dtype('complex128'),
         )
@@ -770,7 +782,7 @@ class SpectralHelper:
 
             shuffle = [slice(0, s, 1) for s in u.shape]
             shuffle[axis] = base.get_fft_shuffle(True, N=v.shape[axis])
-            v = v[*shuffle]
+            v = v[(*shuffle,)]
 
             if padding is not None:
                 shape = list(v.shape)
@@ -792,11 +804,11 @@ class SpectralHelper:
                     N = int(np.ceil(v.shape[axis] / padding[axis]))
                     _expansion = [slice(0, n) for n in v.shape]
                     _expansion[axis] = slice(0, N, 1)
-                    v = v[*_expansion]
+                    v = v[(*_expansion,)]
             else:
                 shift = base.fft_utils['fwd']['shift']
 
-            v *= shift[*expansion]
+            v *= shift[(*expansion,)]
 
         return v.real
 
@@ -867,7 +879,6 @@ class SpectralHelper:
             else padding
         )
 
-        alignment = self.ndim - 1
         result = [
             None,
         ] * self.ncomponents
@@ -877,43 +888,6 @@ class SpectralHelper:
             result[i] = self.transform_single_component(u[i], axes=axes, padding=padding)
 
         return self.xp.array(result)
-
-    # def transform(self, u, axes=None, padding=None):
-    #     trfs = {
-    #         ChebychovHelper: self._transform_dct,
-    #         FFTHelper: self._transform_fft,
-    #     }
-
-    #     axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
-
-    #     result = u.copy().astype(complex)
-    #     alignment = self.ndim - 1
-
-    #     for comp in self.components:
-    #         i = self.index(comp)
-
-    #         for base in trfs.keys():
-    #             axes_base = tuple(sorted(me for me in axes if type(self.axes[me]) == base))
-
-    #             if len(axes_base) > 0:
-    #                 _in = self.get_aligned(result[i], axis_in=alignment, axis_out=self.ndim + axes_base[-1])
-
-    #                 fft = self.get_fft(axes_base, 'object', padding=padding)
-    #                 if fft:
-    #                     from mpi4py_fft import newDistArray
-
-    #                     _out = newDistArray(fft, True)
-    #                 else:
-    #                     _out = _in
-
-    #                 _out[...] = trfs[base](_in, axes=axes_base)
-
-    #                 if fft:
-    #                     result[i] = _out.redistribute(-1) * np.prod([self.axes[i].N for i in axes_base])
-    #                 else:
-    #                     result[i] = _out
-
-    #     return result
 
     def _transform_ifft(self, u, axes, **kwargs):
         ifft = self.get_fft(axes, 'backward', **kwargs)
@@ -950,7 +924,7 @@ class SpectralHelper:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, v.shape[axis], 1)
 
-            v *= shift[*expansion]
+            v *= shift[(*expansion,)]
 
             if padding is not None:
                 if padding[axis] != 1:
@@ -966,7 +940,7 @@ class SpectralHelper:
 
             shuffle = [slice(0, s, 1) for s in v.shape]
             shuffle[axis] = base.get_fft_shuffle(False, N=v.shape[axis])
-            v = v[*shuffle]
+            v = v[(*shuffle,)]
 
         return v.real
 
@@ -1051,7 +1025,6 @@ class SpectralHelper:
             else padding
         )
 
-        alignment = self.ndim - 1
         result = [
             None,
         ] * self.ncomponents

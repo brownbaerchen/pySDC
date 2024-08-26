@@ -39,29 +39,29 @@ class ShallowWaterLinearized(GenericSpectralLinear):
 
         self.Y, self.X = self.get_grid()
 
-    def eval_f(self, u, *args, **kwargs):
-        ih, iu, iv = self.index(self.components)
-        f = self.f_init
+    # def eval_f(self, u, *args, **kwargs):
+    #     ih, iu, iv = self.index(self.components)
+    #     f = self.f_init
 
-        f_hat = self.u_init_forward
+    #     f_hat = self.u_init_forward
 
-        u_hat = self.transform(u)
-        f_hat[ih] = -self.H * (self.U2T @ (self.Dx @ u_hat[iu].flatten() + self.Dy @ u_hat[iv].flatten())).reshape(
-            f[ih].shape
-        )
-        f_hat[iu] = (
-            self.f * u_hat[iv]
-            - self.g * (self.U2T @ self.Dx @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
-            - self.k * u_hat[iu]
-        )
-        f_hat[iv] = (
-            -self.f * u_hat[iu]
-            - self.g * (self.U2T @ self.Dy @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
-            - self.k * u_hat[iv]
-        )
+    #     u_hat = self.transform(u)
+    #     f_hat[ih] = -self.H * (self.U2T @ (self.Dx @ u_hat[iu].flatten() + self.Dy @ u_hat[iv].flatten())).reshape(
+    #         f[ih].shape
+    #     )
+    #     f_hat[iu] = (
+    #         self.f * u_hat[iv]
+    #         - self.g * (self.U2T @ self.Dx @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
+    #         - self.k * u_hat[iu]
+    #     )
+    #     f_hat[iv] = (
+    #         -self.f * u_hat[iu]
+    #         - self.g * (self.U2T @ self.Dy @ u_hat[ih].flatten()).reshape(f_hat[iu].shape)
+    #         - self.k * u_hat[iv]
+    #     )
 
-        f[:] = self.itransform(f_hat).real
-        return f
+    #     f[:] = self.itransform(f_hat).real
+    #     return f
 
     def u_exact(self, t=0):
 

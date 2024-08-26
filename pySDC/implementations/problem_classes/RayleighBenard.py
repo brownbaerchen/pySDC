@@ -211,7 +211,6 @@ class RayleighBenard(GenericSpectralLinear):
         noise_hat[iT, Kz > kzmax] *= 0
         noise = self.itransform(noise_hat)
 
-        xp = self.xp
         me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
 
         # enforce boundary conditions in spite of noise
@@ -390,9 +389,6 @@ class RayleighBenard(GenericSpectralLinear):
         """
         fig = self.get_fig() if fig is None else fig
         axs = fig.axes
-
-        vmin = u.min()
-        vmax = u.max()
 
         imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
         imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
