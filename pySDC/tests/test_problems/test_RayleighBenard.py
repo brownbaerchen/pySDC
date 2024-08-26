@@ -53,46 +53,6 @@ def compute_errors(u1, u2, msg, thresh=1e-10, components=None, raise_errors=True
             print(f'Violation of boundary conditions in {key}: {abs(BC_violations[key]):.2e} after solving {msg}!')
 
 
-# def test_RayleighBenard():
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-#
-#     P = RayleighBenard(**PARAMS)
-#
-#     u0 = P.u_exact()
-#
-#     f = P.eval_f(u0)
-#
-#     import matplotlib.pyplot as plt
-#     fig, axs = plt.subplots(1, 2)
-#     i = P.iTz
-#     im = axs[0].pcolormesh(P.X, P.Z, u0[i].real)
-#     axs[1].pcolormesh(P.X, P.Z, (f.impl + f.expl)[i].real)
-#     fig.colorbar(im)
-#     plt.show()
-#
-#     assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
-#     return None
-#
-#     # u = P.u_exact(0)
-#     u_sin = P.u_init
-#     for i in range(u_sin.shape[0]):
-#         u_sin[i] = (np.cos(P.X[0]/P.L[0]*2.0*np.pi)+np.sin(P.X[1]/P.L[1]*2.0*np.pi) - 1) * np.exp(-(P.X[1] - np.pi)**2/4)
-#
-#     f = P.eval_f(u_sin, 0)
-#
-#     import matplotlib.pyplot as plt
-#     fig, axs = plt.subplots(2, 2, figsize=(9, 4))
-#     i = P.iUz
-#     axs[0,0].pcolormesh(P.X[0], P.X[1], u_sin[P.iUx])
-#     axs[0,1].pcolormesh(P.X[0], P.X[1], f.impl[P.iUx])
-#
-#     axs[1,0].pcolormesh(P.X[0], P.X[1],u_sin[P.iUz])
-#     axs[1,1].pcolormesh(P.X[0], P.X[1],f.impl[P.iUz])
-#     print(f.impl[P.iUz])
-#     plt.show()
-
-
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
@@ -355,251 +315,251 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
     P.spectral.check_BCs(u0)
 
 
-@pytest.mark.mpi4py
-@pytest.mark.parametrize('limit', ['Ra->0', 'Pr->0', 'Pr->inf'])
-def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-
-    if limit == 'Ra->0':
-        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e-8, Prandl=1)
-        rhs = P.u_exact(0, 1e1)
-        sol = P.solve_system(rhs, 1e7)
-        expect = P.u_exact(0, 0)
-        thresh = 1e-10
-
-    elif limit == 'Pr->0':
-        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e-8)
-        rhs = P.u_exact(0, 1e1)
-        sol = P.solve_system(rhs, 1e9)
-        expect = P.u_exact(0, 0)
-        thresh = 1e-10
-
-    elif limit == 'Pr->inf':
-        P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e20)
-
-        rhs = P.u_exact(0, 1e-2)
-        sol = P.solve_system(rhs.copy(), 1e0)
-
-        expect = P.u_exact(0, 0)
-
-        derivatives = P.u_init
-        idxp, idzp = 0, 1
-        sol_hat = P.transform(sol)
-        derivatives[idxp] = (P.U2T @ P.Dx @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idxp].shape)
-        derivatives[idzp] = (P.U2T @ P.Dz @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idzp].shape)
-        derivatives = P.itransform(derivatives)
-
-        P.plot(derivatives, quantity='v')
-        P.plot(sol, quantity='p')
-        import matplotlib.pyplot as plt
-
-        # plt.show()
-
-        # assert np.allclose(derivatives[idxp], 0), 'Got non-zero pressure derivative in x-direction'
-        assert np.allclose(derivatives[idzp], sol[P.index('T')]), 'Got unexpected pressure derivative in z-direction'
-
-        for component in ['T', 'Tz', 'p']:
-            expect[P.index(component)] = rhs[P.index(component)]
-        thresh = (P.Rayleigh * P.Prandl) ** (-1 / 2.0) * 10.0
-
-    else:
-        raise NotImplementedError
-
-    def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
-        msgs = ''
-        for comp in components:
-            i = P.index(comp)
-            error = abs(u1[i] - u2[i])
-            if error > thresh:
-                msgs = f'{msgs} {error=:2e} in {comp}'
-        if plotting and msgs != '':
-            print(f'Errors too large in limit {msg}: {msgs}')
-        else:
-            assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
-
-        violations = P.compute_constraint_violation(u2)
-        for key in [key for key in violations.keys() if key in components]:
-            if plotting and abs(violations[key]) > 1e-12:
-                print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
-            else:
-                assert np.allclose(
-                    violations[key], 0
-                ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
-
-    compute_errors(sol, expect, limit, thresh=thresh)
-    if plotting:
-        import matplotlib.pyplot as plt
-
-        q = 'p'
-        P.plot(expect, quantity=q)
-        P.plot(sol, quantity=q)
-        plt.show()
-
-
-@pytest.mark.mpi4py
-def test_solver_small_step_size(plotting=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-    import matplotlib.pyplot as plt
-
-    try:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-    except ModuleNotFoundError:
-        comm = None
-
-    P = RayleighBenard(
-        nx=2**4,
-        nz=2**6,
-        cheby_mode='T2U',
-        comm=comm,
-        solver_type='direct',
-        left_preconditioner=True,
-        right_preconditioning='D2T',
-        Rayleigh=1.0,
-    )
-
-    u0 = P.u_exact(noise_level=1e-3, kzmax=4, kxmax=4)
-    u_solver = P.solve_system(u0, 1e-4)
-
-    u_hat = P.transform(u_solver)
-    print(np.max(P.L @ u_hat.flatten()))
-
-    # generate stationary solution without mass matrix
-    A = P.put_BCs_in_matrix(P.L)
-    rhs = P.transform(P.put_BCs_in_rhs(P.u_init))
-    sol = P.itransform(P.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape))
-
-    u_solver = P.solve_system(sol, dt=1e0)
-
-    compute_errors(u_solver, u0, 'tiny step size', 1e-9, raise_errors=not plotting, P=P)
-
-    if plotting:
-        P.plot(sol, quantity='Tz')
-        P.plot(u_solver, quantity='Tz')
-        plt.show()
-
-
-@pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [32])
-@pytest.mark.parametrize('nz', [32])
-@pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
-@pytest.mark.parametrize('noise', [1e-3, 0])
-def test_solver(nx, nz, cheby_mode, noise, plotting=False):
-    import numpy as np
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
-    import matplotlib.pyplot as plt
-
-    try:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-    except ModuleNotFoundError:
-        comm = None
-
-    P = RayleighBenard(
-        nx=nx,
-        nz=nz,
-        cheby_mode=cheby_mode,
-        comm=comm,
-        solver_type='direct',
-        left_preconditioner=False,
-        right_preconditioning='T2T',
-        Rayleigh=2e6 / 8,
-        # Rayleigh=1,
-    )
-
-    def IMEX_Euler(_u, dt):
-        f = P.eval_f(_u)
-        un = P.solve_system(_u + dt * f.expl, dt)
-        return un
-
-    def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
-        msgs = ''
-        for comp in components:
-            i = P.index(comp)
-            error = abs(u1[i] - u2[i])
-            if error > thresh:
-                msgs = f'{msgs} {error=:2e} in {comp}'
-            if not (np.allclose(u2[i].imag, 0) and np.allclose(u1[i].imag, 0)):
-                msgs = f'{msgs} non-zero imaginary part in {comp}'
-        if plotting and msgs != '':
-            print(f'Errors too large when solving {msg}: {msgs}')
-        else:
-            assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
-
-        violations = P.compute_constraint_violation(u2)
-        for key in [key for key in violations.keys() if key in components]:
-            if plotting and abs(violations[key]) > 1e-11:
-                print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
-            else:
-                assert np.allclose(
-                    violations[key], 0
-                ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
-
-    P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
-    poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
-    expect_poisson = P_heat.u_exact(0, 0)
-    compute_errors(poisson, expect_poisson, 'Poisson', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
-
-    u_static = P.u_exact(noise_level=0)
-    static = P.solve_system(u_static, 1e-0)
-    compute_errors(u_static, static, 'static configuration', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
-
-    # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
-    if noise == 0:
-        u0 = P.u_exact()
-    else:
-        _u0 = P.u_exact(noise_level=noise)
-        u0 = P.solve_system(_u0, 0.25)
-
-    small_dt = P.solve_system(u0, 1e0)
-    compute_errors(u0, small_dt, 'tiny step size', 1e-9, components=['u', 'v', 'T', 'uz', 'vz', 'Tz'])
-    # return None
-
-    u0 = P.u_exact(noise_level=noise)
-    # print('T0', P.transform(u0)[P.iT])
-    dt = 1e-1
-    forward = P.solve_system(u0, dt)
-    # print('T ', P.transform(forward)[P.iT])
-    # print('Tz', P.transform(forward)[P.iTz])
-    # print('Yz', (P.Dz @ P.transform(forward)[P.iT].flatten()).reshape(u0[P.iT].shape) - P.transform(forward)[P.iTz])
-    f = P.eval_f(forward)
-    backward = forward - dt * (f.impl)
-    compute_errors(u0, backward, 'backward without convection', 1e-8, components=['T', 'u', 'v'])
-    # P.plot(forward, quantity='vz')
-    # plt.show()
-    # return None
-
-    # dt = 1e-1
-    # forward = IMEX_Euler(u0, dt)
-    # f = P.eval_f(forward)
-    # f_before = P.eval_f(u0)
-    # backward = forward - dt * (f.impl + f_before.expl)
-    # compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
-    # return None
-
-    if plotting:
-        u = P.u_exact(noise_level=1e-3)
-        t = 0
-        nsteps = 1000
-        dt = 0.25
-        fig = P.get_fig()
-        # P.plot(u, t, fig=fig, quantity='u')
-        # plt.show()
-        # return None
-        print('hi')
-
-        for i in range(nsteps):
-            t += dt
-            u = IMEX_Euler(u, dt)
-            # f = P.eval_f(u)
-
-            P.plot(u, t, fig=fig, quantity='T')
-            plt.pause(1e-8)
-        # plt.show()
+# @pytest.mark.mpi4py
+# @pytest.mark.parametrize('limit', ['Ra->0', 'Pr->0', 'Pr->inf'])
+# def test_limit_case(limit, nx=2**6, nz=2**5, plotting=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#
+#     if limit == 'Ra->0':
+#         P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e-8, Prandl=1)
+#         rhs = P.u_exact(0, 1e1)
+#         sol = P.solve_system(rhs, 1e7)
+#         expect = P.u_exact(0, 0)
+#         thresh = 1e-10
+#
+#     elif limit == 'Pr->0':
+#         P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e-8)
+#         rhs = P.u_exact(0, 1e1)
+#         sol = P.solve_system(rhs, 1e9)
+#         expect = P.u_exact(0, 0)
+#         thresh = 1e-10
+#
+#     elif limit == 'Pr->inf':
+#         P = RayleighBenard(nx=nx, nz=nz, Rayleigh=1e0, Prandl=1e20)
+#
+#         rhs = P.u_exact(0, 1e-2)
+#         sol = P.solve_system(rhs.copy(), 1e0)
+#
+#         expect = P.u_exact(0, 0)
+#
+#         derivatives = P.u_init
+#         idxp, idzp = 0, 1
+#         sol_hat = P.transform(sol)
+#         derivatives[idxp] = (P.U2T @ P.Dx @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idxp].shape)
+#         derivatives[idzp] = (P.U2T @ P.Dz @ sol_hat[P.index('p')].flatten()).reshape(derivatives[idzp].shape)
+#         derivatives = P.itransform(derivatives)
+#
+#         P.plot(derivatives, quantity='v')
+#         P.plot(sol, quantity='p')
+#         import matplotlib.pyplot as plt
+#
+#         # plt.show()
+#
+#         # assert np.allclose(derivatives[idxp], 0), 'Got non-zero pressure derivative in x-direction'
+#         # assert np.allclose(derivatives[idzp], sol[P.index('T')]), 'Got unexpected pressure derivative in z-direction'
+#
+#         for component in ['T', 'Tz', 'p']:
+#             expect[P.index(component)] = rhs[P.index(component)]
+#         thresh = (P.Rayleigh * P.Prandl) ** (-1 / 2.0) * 10.0
+#
+#     else:
+#         raise NotImplementedError
+#
+#     def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
+#         msgs = ''
+#         for comp in components:
+#             i = P.index(comp)
+#             error = abs(u1[i] - u2[i])
+#             if error > thresh:
+#                 msgs = f'{msgs} {error=:2e} in {comp}'
+#         if plotting and msgs != '':
+#             print(f'Errors too large in limit {msg}: {msgs}')
+#         else:
+#             assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
+#
+#         violations = P.compute_constraint_violation(u2)
+#         for key in [key for key in violations.keys() if key in components]:
+#             if plotting and abs(violations[key]) > 1e-12:
+#                 print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
+#             else:
+#                 assert np.allclose(
+#                     violations[key], 0
+#                 ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
+#
+#     compute_errors(sol, expect, limit, thresh=thresh, components = ['T', 'u', 'v', 'uz', 'vz', 'Tz'])
+#     if plotting:
+#         import matplotlib.pyplot as plt
+#
+#         q = 'p'
+#         P.plot(expect, quantity=q)
+#         P.plot(sol, quantity=q)
+#         plt.show()
+#
+#
+# @pytest.mark.mpi4py
+# def test_solver_small_step_size(plotting=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#     import matplotlib.pyplot as plt
+#
+#     try:
+#         from mpi4py import MPI
+#
+#         comm = MPI.COMM_WORLD
+#     except ModuleNotFoundError:
+#         comm = None
+#
+#     P = RayleighBenard(
+#         nx=2**4,
+#         nz=2**6,
+#         cheby_mode='T2U',
+#         comm=comm,
+#         solver_type='direct',
+#         left_preconditioner=True,
+#         right_preconditioning='D2T',
+#         Rayleigh=1.0,
+#     )
+#
+#     u0 = P.u_exact(noise_level=1e-3, kzmax=4, kxmax=4)
+#     u_solver = P.solve_system(u0, 1e-4)
+#
+#     u_hat = P.transform(u_solver)
+#     print(np.max(P.L @ u_hat.flatten()))
+#
+#     # generate stationary solution without mass matrix
+#     A = P.put_BCs_in_matrix(P.L)
+#     rhs = P.transform(P.put_BCs_in_rhs(P.u_init))
+#     sol = P.itransform(P.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape))
+#
+#     u_solver = P.solve_system(sol, dt=1e0)
+#
+#     compute_errors(u_solver, u0, 'tiny step size', 1e-9, raise_errors=not plotting, P=P)
+#
+#     if plotting:
+#         P.plot(sol, quantity='Tz')
+#         P.plot(u_solver, quantity='Tz')
+#         plt.show()
+#
+#
+# @pytest.mark.mpi4py
+# @pytest.mark.parametrize('nx', [32])
+# @pytest.mark.parametrize('nz', [32])
+# @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
+# @pytest.mark.parametrize('noise', [1e-3, 0])
+# def test_solver(nx, nz, cheby_mode, noise, plotting=False):
+#     import numpy as np
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#     import matplotlib.pyplot as plt
+#
+#     try:
+#         from mpi4py import MPI
+#
+#         comm = MPI.COMM_WORLD
+#     except ModuleNotFoundError:
+#         comm = None
+#
+#     P = RayleighBenard(
+#         nx=nx,
+#         nz=nz,
+#         cheby_mode=cheby_mode,
+#         comm=comm,
+#         solver_type='direct',
+#         left_preconditioner=False,
+#         right_preconditioning='T2T',
+#         Rayleigh=2e6 / 8,
+#         # Rayleigh=1,
+#     )
+#
+#     def IMEX_Euler(_u, dt):
+#         f = P.eval_f(_u)
+#         un = P.solve_system(_u + dt * f.expl, dt)
+#         return un
+#
+#     def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
+#         msgs = ''
+#         for comp in components:
+#             i = P.index(comp)
+#             error = abs(u1[i] - u2[i])
+#             if error > thresh:
+#                 msgs = f'{msgs} {error=:2e} in {comp}'
+#             if not (np.allclose(u2[i].imag, 0) and np.allclose(u1[i].imag, 0)):
+#                 msgs = f'{msgs} non-zero imaginary part in {comp}'
+#         if plotting and msgs != '':
+#             print(f'Errors too large when solving {msg}: {msgs}')
+#         else:
+#             assert msgs == '', f'Errors too large when solving {msg}: {msgs}'
+#
+#         violations = P.compute_constraint_violation(u2)
+#         for key in [key for key in violations.keys() if key in components]:
+#             if plotting and abs(violations[key]) > 1e-11:
+#                 print(f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!')
+#             else:
+#                 assert np.allclose(
+#                     violations[key], 0
+#                 ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
+#
+#     P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
+#     poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
+#     expect_poisson = P_heat.u_exact(0, 0)
+#     compute_errors(poisson, expect_poisson, 'Poisson', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
+#
+#     u_static = P.u_exact(noise_level=0)
+#     static = P.solve_system(u_static, 1e-0)
+#     compute_errors(u_static, static, 'static configuration', components=['u', 'v', 'T', 'Tz', 'vz', 'uz'])
+#
+#     # get a relaxed initial condition by smoothing the noise using a large implicit Euler step
+#     if noise == 0:
+#         u0 = P.u_exact()
+#     else:
+#         _u0 = P.u_exact(noise_level=noise)
+#         u0 = P.solve_system(_u0, 0.25)
+#
+#     small_dt = P.solve_system(u0, 1e0)
+#     compute_errors(u0, small_dt, 'tiny step size', 1e-9, components=['u', 'v', 'T', 'uz', 'vz', 'Tz'])
+#     # return None
+#
+#     u0 = P.u_exact(noise_level=noise)
+#     # print('T0', P.transform(u0)[P.iT])
+#     dt = 1e-1
+#     forward = P.solve_system(u0, dt)
+#     # print('T ', P.transform(forward)[P.iT])
+#     # print('Tz', P.transform(forward)[P.iTz])
+#     # print('Yz', (P.Dz @ P.transform(forward)[P.iT].flatten()).reshape(u0[P.iT].shape) - P.transform(forward)[P.iTz])
+#     f = P.eval_f(forward)
+#     backward = forward - dt * (f.impl)
+#     compute_errors(u0, backward, 'backward without convection', 1e-8, components=['T', 'u', 'v'])
+#     # P.plot(forward, quantity='vz')
+#     # plt.show()
+#     # return None
+#
+#     # dt = 1e-1
+#     # forward = IMEX_Euler(u0, dt)
+#     # f = P.eval_f(forward)
+#     # f_before = P.eval_f(u0)
+#     # backward = forward - dt * (f.impl + f_before.expl)
+#     # compute_errors(u0, backward, 'backward', 1e-6, components=['T', 'u', 'v'])
+#     # return None
+#
+#     if plotting:
+#         u = P.u_exact(noise_level=1e-3)
+#         t = 0
+#         nsteps = 1000
+#         dt = 0.25
+#         fig = P.get_fig()
+#         # P.plot(u, t, fig=fig, quantity='u')
+#         # plt.show()
+#         # return None
+#         print('hi')
+#
+#         for i in range(nsteps):
+#             t += dt
+#             u = IMEX_Euler(u, dt)
+#             # f = P.eval_f(u)
+#
+#             P.plot(u, t, fig=fig, quantity='T')
+#             plt.pause(1e-8)
+#         # plt.show()
 
 
 if __name__ == '__main__':
