@@ -12,7 +12,6 @@ def run_SWE():
 
     generic_implicit.compute_residual = compute_residual_DAE
 
-    from pySDC.implementations.hooks.live_plotting import PlotPostStep
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
     comm = MPI.COMM_WORLD
@@ -95,8 +94,6 @@ def plot_SWE(size, quantitiy='h', render=True, start_idx=0):
 
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
-
-    cmaps = {'vorticity': 'bwr'}
 
     for i in range(start_idx, 999):
         fig = P.get_fig()

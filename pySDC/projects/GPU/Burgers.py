@@ -12,7 +12,6 @@ def run_Burgers():
 
     imex_1st_order.compute_residual = compute_residual_DAE
 
-    from pySDC.implementations.hooks.live_plotting import PlotPostStep
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
 
     comm = MPI.COMM_WORLD
@@ -89,7 +88,7 @@ def plot_Burgers(size):
     from pySDC.projects.GPU.hooks.LogGrid import LogGrid
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-    LogToFile.path = './data/'
+    LogToFileAfterXs.path = './data/'
     LogGrid.file_logger = LogToFileAfterXs
 
     fig, ax = plt.subplots()

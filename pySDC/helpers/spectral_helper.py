@@ -696,7 +696,7 @@ class SpectralHelper:
                 _fft = PFFT(
                     comm=self.comm if comm is None else comm,
                     shape=shape,
-                    axes=sorted(list(axes)),
+                    axes=sorted(axes),
                     dtype='D',
                     collapse=False,
                     backend=self.fft_backend,
