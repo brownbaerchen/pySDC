@@ -48,28 +48,6 @@ class mesh(np.ndarray):
             raise NotImplementedError(type(init))
         return obj
 
-    @property
-    def xp(self):
-        '''
-        Use this to infer what numerical library to use with this data.
-        '''
-        return np
-
-    @property
-    def comm(self):
-        """
-        Getter for the communicator
-        """
-        return self._comm
-
-    def __array_finalize__(self, obj):
-        """
-        Finalizing the datatype. Without this, new datatypes do not 'inherit' the communicator.
-        """
-        if obj is None:
-            return
-        self._comm = getattr(obj, '_comm', None)
-
     def __array_ufunc__(self, ufunc, method, *inputs, out=None, **kwargs):
         """
         Overriding default ufunc, cf. https://numpy.org/doc/stable/user/basics.subclassing.html#array-ufunc-for-ufuncs
