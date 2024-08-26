@@ -80,12 +80,25 @@ def run_RBC(useGPU=False):
     comm = MPI.COMM_WORLD
     LogToFile.path = './data/'
     LogToFile.file_name = f'RBC-{comm.rank}'
-    LogToFile.process_solution = lambda L: {
-        't': L.time + L.dt,
-        'u': L.uend.view(np.ndarray),
-        'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
-        'divergence': np.log10(np.abs(L.prob.compute_constraint_violation(L.uend)['divergence'].view(np.ndarray))),
-    }
+
+    if useGPU:
+        LogToFile.process_solution = lambda L: {
+            't': L.time + L.dt,
+            'u': L.uend.get().view(np.ndarray),
+            'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
+            'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence']))
+            .get()
+            .view(np.ndarray),
+        }
+    else:
+        LogToFile.process_solution = lambda L: {
+            't': L.time + L.dt,
+            'u': L.uend.view(np.ndarray),
+            'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
+            'divergence': L.uend.xp.log10(
+                L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence'])
+            ).view(np.ndarray),
+        }
     LogToFile.time_increment = 1e-1
     LogGrid.file_name = f'RBC-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
@@ -122,7 +135,7 @@ def run_RBC(useGPU=False):
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
-        # 'left_preconditioner': False,
+        'left_preconditioner': not useGPU,
         # 'right_preconditioning': 'T2T',
     }
 

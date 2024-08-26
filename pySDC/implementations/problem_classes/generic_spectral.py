@@ -114,7 +114,7 @@ class GenericSpectralLinear(Problem):
 
     def setup_preconditioner(self, right_preconditioning='D2T', left_preconditioner=True):
         """
-        Get left and right precondioners. A right preconditioner of D2T will result in Dirichlet recombination.
+        Get left and right precondioners. A right preconditioner of D2T will result in Dirichlet recombination. 10/10 would recommend!
 
         Args:
             right_preconditioning (str): Basis conversion for right precondioner
@@ -129,8 +129,9 @@ class GenericSpectralLinear(Problem):
 
         if left_preconditioner:
             # reverse Kronecker product
+            # TODO this is way to slow on GPUs. Need to find a better way!
 
-            R = self.Pl.tolil() * 0
+            R = self.Pl.tocsc() * 0
             for j in range(self.ncomponents):
                 for i in range(N):
                     R[i * self.ncomponents + j, j * N + i] = 1.0

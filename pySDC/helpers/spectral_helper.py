@@ -6,13 +6,30 @@ from pySDC.implementations.datatype_classes.mesh import mesh
 class SpectralHelper1D:
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
+    linalg = scipy.sparse.linalg
     xp = np
 
-    def __init__(self, N, x0=None, x1=None, **kwargs):
+    def __init__(self, N, x0=None, x1=None, useGPU=False, **kwargs):
         self.N = N
         self.x0 = x0
         self.x1 = x1
         self.L = x1 - x0
+        self.useGPU = useGPU
+
+        if useGPU:
+            self.setup_GPU()
+
+    @classmethod
+    def setup_GPU(cls):
+        """switch to GPU modules"""
+        import cupy as cp
+        import cupyx.scipy.sparse as sparse_lib
+        import cupyx.scipy.sparse.linalg as linalg
+        from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
+
+        cls.xp = cp
+        cls.sparse_lib = sparse_lib
+        cls.linalg = linalg
 
     def get_Id(self):
         raise NotImplementedError
@@ -164,7 +181,12 @@ class ChebychovHelper(SpectralHelper1D):
         except NotImplementedError as E:
             try:
                 fwd = get_forward_conv(name[::-1])
-                mat = self.sparse_lib.linalg.inv(fwd.tocsc())
+                import scipy.sparse as sp
+
+                if self.sparse_lib == sp:
+                    mat = self.sparse_lib.linalg.inv(fwd.tocsc())
+                else:
+                    mat = self.sparse_lib.csr_matrix(sp.linalg.inv(fwd.tocsc().get()))
             except NotImplementedError:
                 raise E
 
@@ -411,12 +433,18 @@ class FFTHelper(SpectralHelper1D):
 
     def get_differentiation_matrix(self, p=1):
         k = self.get_wavenumbers()
-        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
+        import scipy.sparse as sp
+
+        if self.sparse_lib == sp:
+            return self.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
+        else:
+            D = self.sparse_lib.diags(1j * k).get()
+            return self.sparse_lib.csr_matrix(sp.linalg.matrix_power(D, p))
 
     def get_integration_matrix(self, p=1):
         k = self.xp.array(self.get_wavenumbers(), dtype='complex128')
         k[0] = 1j * self.L
-        return self.sparse_lib.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
+        return self.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
     def get_Id(self):
         return self.sparse_lib.eye(self.N)
@@ -443,6 +471,7 @@ class SpectralHelper:
     xp = np
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
+    linalg = scipy.sparse.linalg
     dtype = mesh
     fft_backend = 'fftw'
     fft_comm_backend = 'MPI'
@@ -452,16 +481,23 @@ class SpectralHelper:
         """switch to GPU modules"""
         import cupy as cp
         import cupyx.scipy.sparse as sparse_lib
+        import cupyx.scipy.sparse.linalg as linalg
+        from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
 
         cls.xp = cp
         cls.sparse_lib = sparse_lib
+        cls.linalg = linalg
 
         cls.fft_backend = 'cupy'
         cls.fft_comm_backend = 'NCCL'
 
+        cls.dtype = cupy_mesh
+
     def __init__(self, comm=None, useGPU=False, debug=False):
         self.comm = comm
         self.debug = debug
+        self.useGPU = useGPU
+
         if useGPU:
             self.setup_GPU()
 
@@ -495,6 +531,8 @@ class SpectralHelper:
         return len(self.components)
 
     def add_axis(self, base, *args, **kwargs):
+        kwargs['useGPU'] = self.useGPU
+
         if base.lower() in ['chebychov', 'chebychev', 'cheby', 'chebychovhelper']:
             kwargs['transform_type'] = kwargs.get('transform_type', 'fft')
             self.axes.append(ChebychovHelper(*args, **kwargs))
@@ -632,7 +670,6 @@ class SpectralHelper:
                 _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
 
             for bc in self.full_BCs:
-
                 slices = (
                     [slice(0, self.init[0][i + 1]) for i in range(axis)]
                     + [bc['line']]
@@ -713,7 +750,6 @@ class SpectralHelper:
         return self.fft_cache[key]
 
     def setup_fft(self):
-
         if len(self.components) == 0:
             self.add_component('u')
 
@@ -887,7 +923,7 @@ class SpectralHelper:
 
             result[i] = self.transform_single_component(u[i], axes=axes, padding=padding)
 
-        return self.xp.array(result)
+        return self.xp.stack(result)
 
     def _transform_ifft(self, u, axes, **kwargs):
         ifft = self.get_fft(axes, 'backward', **kwargs)
@@ -1033,7 +1069,7 @@ class SpectralHelper:
 
             result[i] = self.itransform_single_component(u[i], axes=axes, padding=padding)
 
-        return self.xp.array(result)
+        return self.xp.stack(result)
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]

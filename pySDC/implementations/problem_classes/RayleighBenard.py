@@ -5,7 +5,6 @@ from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
 
 class RayleighBenard(GenericSpectralLinear):
-
     dtype_u = mesh
     dtype_f = imex_mesh
 
@@ -200,13 +199,13 @@ class RayleighBenard(GenericSpectralLinear):
         rng = self.xp.random.default_rng(seed=seed)
 
         noise = self.u_init
-        noise[iT] = rng.normal(size=me[iT].shape)
+        noise[iT] = rng.random(size=me[iT].shape)
 
         Kz, Kx = self.get_wavenumbers()
         kzmax = self.nz - 3 if kzmax is None else kzmax
         kxmax = self.nx // 2 if kxmax is None else kxmax
         noise_hat = self.u_init_forward
-        noise_hat[:] = rng.normal(size=noise_hat[iT].shape)
+        noise_hat[:] = rng.random(size=noise_hat[iT].shape)
         noise_hat[iT, np.abs(Kx) > kxmax] *= 0
         noise_hat[iT, Kz > kzmax] *= 0
         noise = self.itransform(noise_hat)
@@ -300,7 +299,6 @@ class RayleighBenard(GenericSpectralLinear):
         return self.itransform(vorticity_hat)[0].real
 
     def compute_constraint_violation(self, u):
-
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
         idxu, idxv, idzu, idzv, idzT = 0, 1, 2, 3, 4
 
