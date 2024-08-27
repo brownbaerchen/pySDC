@@ -179,20 +179,20 @@ class GenericSpectralLinear(Problem):
         #     plt.colorbar(im)
         #     plt.show()
 
-        if self.solver_type == 'direct':
+        if self.solver_type.lower() == 'direct':
             sol_hat = sp.linalg.spsolve(A, rhs_hat)
-        elif self.solver_type == 'gmres':
+        elif self.solver_type.lower() == 'gmres':
             sol_hat, _ = sp.linalg.gmres(
                 A,
                 rhs_hat,
-                x0=u0,
+                x0=u0.flatten(),
                 **self.solver_args,
                 callback=self.work_counters[self.solver_type],
                 callback_type='legacy',
             )
-        elif self.solver_type == 'cg':
+        elif self.solver_type.lower() == 'cg':
             sol_hat, _ = sp.linalg.cg(
-                A, rhs_hat, x0=u0, **self.solver_args, callback=self.work_counters[self.solver_type]
+                A, rhs_hat, x0=u0.flatten(), **self.solver_args, callback=self.work_counters[self.solver_type]
             )
         else:
             raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')

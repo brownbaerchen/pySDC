@@ -135,7 +135,7 @@ def run_RBC(useGPU=False):
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
-        'left_preconditioner': not useGPU,
+        'left_preconditioner': False,  # not useGPU,
         # 'right_preconditioning': 'T2T',
     }
 
