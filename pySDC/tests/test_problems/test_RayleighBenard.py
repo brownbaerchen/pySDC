@@ -661,7 +661,7 @@ def test_resolution_refinement(nz):
     assert P.check_refinement_needed(u_hat) == (nz <= 4)
 
     while P.check_refinement_needed(u_hat):
-        u = P.refine_resolution(u_hat)
+        u, P = P.refine_resolution(u_hat)
         u_hat = solve(P)
 
         assert u.shape[2] <= 6

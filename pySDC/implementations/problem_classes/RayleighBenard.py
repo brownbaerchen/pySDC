@@ -4,6 +4,7 @@ from mpi4py import MPI
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 from pySDC.core.convergence_controller import ConvergenceController
+from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
 
 class RayleighBenard(GenericSpectralLinear):
@@ -390,8 +391,13 @@ class RayleighBenard(GenericSpectralLinear):
             nx_new = u.shape[1]
 
         new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
-        self.__init__(**new_params)
-        return u
+        P_new = type(self)(**new_params)
+
+        me = P_new.u_init
+        me[...] = u[...]
+
+        self.logger.debug(f'Refined spatial resolution by {factor} to nx={P_new.nx} and nz={P_new.nz}')
+        return me, P_new
 
     def get_fig(self):  # pragma: no cover
         """
@@ -501,3 +507,55 @@ class CFLLimit(ConvergenceController):
         L.status.dt_new = max([self.params.dt_min, L.status.dt_new])
 
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
+
+
+class SpaceAdaptivity(ConvergenceController):
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Define default parameters here.
+
+        Default parameters are:
+         - control_order (int): The order relative to other convergence controllers
+         - dt_max (float): maximal step size
+         - dt_min (float): minimal step size
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): The params passed for this specific convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            (dict): The updated params dictionary
+        """
+        defaults = {
+            "control_order": 100,
+            "nx_max": np.inf,
+            "nx_min": 0,
+            "nz_max": np.inf,
+            "nz_min": 0,
+            "factor": 3 / 2,
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
+    def determine_restart(self, controller, S, *args, **kwargs):
+        L = S.levels[0]
+        P = L.prob
+
+        if not CheckConvergence.check_convergence(S):
+            return None
+
+        L.sweep.compute_end_point()
+        u_hat = P.transform(L.uend)
+
+        refinement_needed = P.check_refinement_needed(u_hat)
+
+        if P.comm:
+            refinement_needed = P.comm.allreduce(refinement_needed, op=MPI.BOR)
+
+        if refinement_needed:
+            for i in [0]:  # range(len(L.u)):
+                L.u[i], P_new = P.refine_resolution(P.transform(L.u[i]))
+            L.__dict__['_Level__prob'] = P_new
+            L.status.dt_new = L.params.dt
+            S.status.restart = True
+            self.log(f"Restarting with refined resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)

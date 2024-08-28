@@ -200,11 +200,11 @@ class GenericSpectralLinear(Problem):
         else:
             raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')
 
-        sol_hat = self.Pr @ sol_hat
+        sol_hat = (self.Pr @ sol_hat).reshape(sol.shape)
         if skip_itransform:
             return sol_hat
 
-        sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape)).real
+        sol[:] = self.spectral.itransform(sol_hat).real
 
         if self.spectral.debug:
             self.spectral.check_BCs(sol)

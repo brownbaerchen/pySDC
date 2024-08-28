@@ -4,7 +4,7 @@ from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFi
 
 
 def run_RBC(useGPU=False):
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit, SpaceAdaptivity
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityPolynomialError
@@ -26,6 +26,8 @@ def run_RBC(useGPU=False):
         LogToFile.process_solution = lambda L: {
             't': L.time + L.dt,
             'u': L.uend.get().view(np.ndarray),
+            'X': L.prob.X.get().view(np.ndarray),
+            'Z': L.prob.Z.get().view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
             'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence']))
             .get()
@@ -35,6 +37,8 @@ def run_RBC(useGPU=False):
         LogToFile.process_solution = lambda L: {
             't': L.time + L.dt,
             'u': L.uend.view(np.ndarray),
+            'X': L.prob.X.view(np.ndarray),
+            'Z': L.prob.Z.view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
             'divergence': L.uend.xp.log10(
                 L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence'])
@@ -46,7 +50,7 @@ def run_RBC(useGPU=False):
 
     level_params = {}
     level_params['dt'] = 0.2
-    level_params['restol'] = -1e-5
+    level_params['restol'] = 1e-7
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
@@ -54,16 +58,17 @@ def run_RBC(useGPU=False):
         #     'e_tol': 1e-3,
         #     'interpolate_between_restarts': False,
         #     'dt_max': level_params['dt'],
-        #     'dt_slope_max': 2,
+        #     # 'dt_slope_max': 2,
         # },
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.5},
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.4},
         StopAtNan: {'thresh': 1e6},
+        SpaceAdaptivity: {'nx_max': 2**10, 'nz_max': 2**8},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
@@ -72,6 +77,8 @@ def run_RBC(useGPU=False):
         'Rayleigh': 2e6 / 16,
         'nx': 2**8 + 0,
         'nz': 2**6 + 0,
+        'nx_max': 2**10 + 0,
+        'nz_max': 2**8 + 0,
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
@@ -80,7 +87,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 9
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
