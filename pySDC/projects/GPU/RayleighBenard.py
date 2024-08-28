@@ -2,68 +2,9 @@ from mpi4py import MPI
 import numpy as np
 from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFile
 
-from pySDC.core.convergence_controller import ConvergenceController
-
-
-class CFLLimit(ConvergenceController):
-    def setup(self, controller, params, description, **kwargs):
-        """
-        Define default parameters here.
-
-        Default parameters are:
-         - control_order (int): The order relative to other convergence controllers
-         - dt_max (float): maximal step size
-         - dt_min (float): minimal step size
-
-        Args:
-            controller (pySDC.Controller): The controller
-            params (dict): The params passed for this specific convergence controller
-            description (dict): The description object used to instantiate the controller
-
-        Returns:
-            (dict): The updated params dictionary
-        """
-        defaults = {
-            "control_order": -50,
-            "dt_max": np.inf,
-            "dt_min": 0,
-            "cfl": 0.4,
-        }
-        return {**defaults, **super().setup(controller, params, description, **kwargs)}
-
-    def get_new_step_size(self, controller, step, **kwargs):
-        max_step_size = np.inf
-
-        L = step.levels[0]
-        P = step.levels[0].prob
-
-        # grid_spacing_x = P.X[1:, :] - P.X[:-1, :]
-        # grid_spacing_z = P.Z[:, :-1] - P.Z[:, 1:]
-        grid_spacing_x = P.X[1, 0] - P.X[0, 0]
-        grid_spacing_z = P.xp.append(P.Z[0, :-1] - P.Z[0, 1:], P.Z[0, -1] - P.axes[1].x0)
-
-        iu, iv = P.index(['u', 'v'])
-        L.sweep.compute_end_point()
-        if step.levels[0].uend is not None:
-            u = step.levels[0].uend
-            # for u in step.levels[0].u:
-            # max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu][1:, :] + u[iu][:-1, :]) * 2)])
-            # max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv][:, 1:] + u[iv][:, :-1]) * 2)])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_x / P.xp.abs(u[iu]))])
-            max_step_size = min([max_step_size, P.xp.min(grid_spacing_z / P.xp.abs(u[iv]))])
-
-        if hasattr(P, 'comm'):
-            max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
-
-        dt_new = L.status.dt_new if L.status.dt_new else max([self.params.dt_max, L.params.dt])
-        L.status.dt_new = min([dt_new, self.params.cfl * max_step_size])
-        L.status.dt_new = max([self.params.dt_min, L.status.dt_new])
-
-        self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
-
 
 def run_RBC(useGPU=False):
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityPolynomialError
@@ -105,7 +46,7 @@ def run_RBC(useGPU=False):
 
     level_params = {}
     level_params['dt'] = 0.2
-    level_params['restol'] = 1e-5
+    level_params['restol'] = -1e-5
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
@@ -124,7 +65,6 @@ def run_RBC(useGPU=False):
     sweeper_params['num_nodes'] = 1
     sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
-    # sweeper_params['initial_guess'] = 'zero'
 
     problem_params = {
         'comm': comm,
@@ -135,7 +75,7 @@ def run_RBC(useGPU=False):
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
-        'left_preconditioner': False,  # not useGPU,
+        'left_preconditioner': not useGPU,
         # 'right_preconditioning': 'T2T',
     }
 

@@ -131,7 +131,10 @@ class GenericSpectralLinear(Problem):
             # reverse Kronecker product
             # TODO this is way to slow on GPUs. Need to find a better way!
 
-            R = self.Pl.tocsc() * 0
+            if self.spectral.useGPU:
+                raise NotImplementedError
+
+            R = self.Pl.tolil() * 0
             for j in range(self.ncomponents):
                 for i in range(N):
                     R[i * self.ncomponents + j, j * N + i] = 1.0
@@ -217,9 +220,9 @@ class GenericSpectralLinear(Problem):
         f = self.f_init
 
         if 'imex' in self.dtype_f.__name__.lower():
-            f.impl[:] = self.eval_L(u)
+            f.impl[:] = -self.eval_L(u)
         else:
-            f[:] = self.eval_L(u)
+            f[:] = -self.eval_L(u)
 
         return f
 

@@ -96,7 +96,8 @@ def test_derivatives(nx, nz, direction, cheby_mode):
 @pytest.mark.parametrize('cheby_mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [16])
 @pytest.mark.parametrize('nz', [8])
-def test_eval_f(nx, nz, cheby_mode, direction):
+@pytest.mark.parametrize('compute_violations', [True, False])
+def test_eval_f(nx, nz, cheby_mode, direction, compute_violations):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
@@ -136,11 +137,11 @@ def test_eval_f(nx, nz, cheby_mode, direction):
         u[i][:] = y
     u[ivz] = y_z
     u[iTz] = y_z
-    u[P.index('uz')] = y_z
+    u[iuz] = y_z
 
-    f = P.eval_f(u, compute_violations=False)
+    f = P.eval_f(u, compute_violations=compute_violations)
 
-    for i in [ivz, iTz]:
+    for i in [ivz, iTz, iuz]:
         assert np.allclose(f.impl[i] + f.expl[i], 0), f'Non-zero time derivative in algebraic component {i}'
 
     f_expect = P.f_init
@@ -151,7 +152,7 @@ def test_eval_f(nx, nz, cheby_mode, direction):
     f_expect.expl[iv] = -y * (y_z + y_x)
     f_expect.impl[iv] = -y_z + nu * (y_xx + y_zz) + y
 
-    for comp in P.spectral.components[::-1]:
+    for comp in ['u', 'v', 'T']:
         i = P.spectral.index(comp)
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
@@ -449,7 +450,7 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 # @pytest.mark.parametrize('noise', [1e-3, 0])
 # def test_solver(nx, nz, cheby_mode, noise, plotting=False):
 #     import numpy as np
-#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
 #     import matplotlib.pyplot as plt
 #
 #     try:
@@ -464,11 +465,9 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 #         nz=nz,
 #         cheby_mode=cheby_mode,
 #         comm=comm,
-#         solver_type='direct',
-#         left_preconditioner=False,
-#         right_preconditioning='T2T',
-#         Rayleigh=2e6 / 8,
-#         # Rayleigh=1,
+#         # left_preconditioner=False,
+#         # right_preconditioning='T2T',
+#         Rayleigh=2e6 / 16,
 #     )
 #
 #     def IMEX_Euler(_u, dt):
@@ -476,7 +475,7 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 #         un = P.solve_system(_u + dt * f.expl, dt)
 #         return un
 #
-#     def compute_errors(u1, u2, msg, thresh=1e-10, components=P.components):
+#     def compute_errors(u1, u2, msg, thresh=1e-10, components=['u', 'v', 'T']):
 #         msgs = ''
 #         for comp in components:
 #             i = P.index(comp)
@@ -498,6 +497,29 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 #                 assert np.allclose(
 #                     violations[key], 0
 #                 ), f'Violation of constraints in {key}: {abs(violations[key]):.2e} after solving {msg}!'
+#
+#
+#     dt = 1e-3
+#     u0 = P.solve_system(P.u_exact(noise_level=noise), dt=1000)
+#
+#
+#     f0 = P.eval_f(u0)
+#     P.plot(u0)
+#     import matplotlib.pyplot as plt
+#     # plt.show()
+#     dt = 0.4 * CFLLimit.compute_max_step_size(P, u0)
+#
+#     un_no_convection = P.solve_system(u0, dt)
+#     u02_no_convection = un_no_convection - dt * P.eval_f(un_no_convection).impl
+#     compute_errors(u0, u02_no_convection, 'without convection')
+#
+#     un = P.solve_system(u0 + dt * f0.expl, dt)
+#     fn = P.eval_f(un, compute_violations=True)
+#     violations = [abs(f0.impl[P.index(i)]) for i in ['uz', 'vz', 'Tz']]
+#     print(violations)
+#     u02 = un - dt * fn.impl - dt * f0.expl
+#     compute_errors(u0, u02, 'with convection')
+#     return None
 #
 #     P_heat = RayleighBenard(nx=nx, nz=nz, cheby_mode=cheby_mode, Rayleigh=1e-8)
 #     poisson = P_heat.solve_system(P_heat.u_exact(0, 1e1), 1e7)
@@ -562,13 +584,60 @@ def test_initial_conditions(nx, nz, T_top, T_bottom, v_top, v_bottom):
 #         # plt.show()
 
 
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nx', [1, 8])
+@pytest.mark.parametrize('component', ['u', 'T'])
+def test_Possion_problems(nx, component):
+    """
+    When forgetting about convection and the time-dependent part, you get Poisson problems in u and T that are easy to solve. We check that we get the exact solution in a simple test here.
+    """
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    BCs = {
+        'u_top': 0,
+        'u_bottom': 0,
+        'v_top': 0,
+        'v_bottom': 0,
+        'T_top': 0,
+        'T_bottom': 0,
+    }
+    P = RayleighBenard(nx=nx, nz=6, BCs=BCs, cheby_mode='T2T', Rayleigh=1.0)
+    rhs = P.u_init
+
+    idx = P.index(f'{component}')
+    idx_z = P.index(f'{component}z')
+
+    A = P.put_BCs_in_matrix(-P.L)
+    rhs = P.put_BCs_in_rhs(rhs)
+    rhs[idx][0, 2] = 6
+    rhs[idx][0, 0] = 6
+    u = P.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape).real
+
+    u_exact = P.u_init
+    u_exact[idx][0, 4] = 1 / 8
+    u_exact[idx][0, 2] = 1 / 2
+    u_exact[idx][0, 0] = -5 / 8
+    u_exact[idx_z][0, 3] = 1
+    u_exact[idx_z][0, 1] = 3
+
+    if component == 'T':
+        ip = P.index('p')
+        u_exact[ip][0, 5] = 1 / (16 * 5)
+        u_exact[ip][0, 3] = 5 / (16 * 5)
+        u_exact[ip][0, 1] = -70 / (16 * 5)
+
+    assert np.allclose(u_exact, u)
+
+
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
-    # test_eval_f(16, 8, 'T2U', 'z')
-    test_BCs(2**8, 2**6 + 0, 'T2U', 2.77, 3.14, 2, 0.001, True)
+    # test_eval_f(1, 8, 'T2T', 'z', True)
+    # test_BCs(2**8, 2**6 + 0, 'T2U', 2.77, 3.14, 2, 0.001, True)
     # test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
-    # test_solver(2**1, 2**1 + 0, 'T2U', noise=0e-3, plotting=True)
+    # test_solver(2**8, 2**6 + 0, 'T2U', noise=1e3, plotting=True)
+    test_1D_Possion_problems('T')
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

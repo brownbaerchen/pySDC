@@ -1,7 +1,9 @@
 import numpy as np
+from mpi4py import MPI
 
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.core.convergence_controller import ConvergenceController
 
 
 class RayleighBenard(GenericSpectralLinear):
@@ -102,10 +104,10 @@ class RayleighBenard(GenericSpectralLinear):
         self.add_BC(component='T', equation='Tz', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-1)
         self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
         self.add_BC(component='v', equation='vz', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-1)
-        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
+        self.add_BC(component='u', equation='uz', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet')
         self.add_BC(
             component='u',
-            equation='uz',
+            equation='u',
             axis=1,
             v=self.BCs['u_bottom'],
             x=-1,
@@ -141,23 +143,27 @@ class RayleighBenard(GenericSpectralLinear):
         shape = u[0].shape
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
 
-        kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
-        nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
-
-        # evaluate implicit terms
-        f_impl_hat[iT][:] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
-        f_impl_hat[iu][:] = (
-            -Dx @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iu].flatten() + Dz @ u_hat[iuz].flatten())
-        ).reshape(shape)
-        f_impl_hat[iv][:] = (
-            -Dz @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iv].flatten() + Dz @ u_hat[ivz].flatten())
-        ).reshape(shape) + u_hat[iT]
-
         if compute_violations:
-            f_impl_hat[iuz][:] = (Dz @ u_hat[iu].flatten()).reshape(shape) - u_hat[iuz]
-            f_impl_hat[ivz][:] = (Dz @ u_hat[iv].flatten()).reshape(shape) - u_hat[ivz]
-            f_impl_hat[iTz][:] = (Dz @ u_hat[iT].flatten()).reshape(shape) - u_hat[iTz]
-            f_impl_hat[ip][:] = (Dz @ u_hat[iv].flatten() + Dx @ u_hat[iu].flatten()).reshape(shape)
+            f_impl_hat[...] = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
+
+            # if compute_violations:
+            #     f_impl_hat[iuz][:] = (Dz @ u_hat[iu].flatten()).reshape(shape) - u_hat[iuz]
+            #     f_impl_hat[ivz][:] = (Dz @ u_hat[iv].flatten()).reshape(shape) - u_hat[ivz]
+            #     f_impl_hat[iTz][:] = (Dz @ u_hat[iT].flatten()).reshape(shape) - u_hat[iTz]
+            #     f_impl_hat[ip][:] = (Dz @ u_hat[iv].flatten() + Dx @ u_hat[iu].flatten()).reshape(shape)
+        else:
+
+            kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
+            nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
+
+            # evaluate implicit terms
+            f_impl_hat[iT][:] = kappa * (Dxx @ u_hat[iT].flatten() + Dz @ u_hat[iTz].flatten()).reshape(shape)
+            f_impl_hat[iu][:] = (
+                -Dx @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iu].flatten() + Dz @ u_hat[iuz].flatten())
+            ).reshape(shape)
+            f_impl_hat[iv][:] = (
+                -Dz @ u_hat[ip].flatten() + nu * (Dxx @ u_hat[iv].flatten() + Dz @ u_hat[ivz].flatten())
+            ).reshape(shape) + u_hat[iT]
 
         f.impl[:] = self.itransform(f_impl_hat).real
 
@@ -401,3 +407,58 @@ class RayleighBenard(GenericSpectralLinear):
         axs[1].set_ylabel(r'$z$')
         fig.colorbar(imT, self.cax[0])
         fig.colorbar(imV, self.cax[1])
+
+
+class CFLLimit(ConvergenceController):
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Define default parameters here.
+
+        Default parameters are:
+         - control_order (int): The order relative to other convergence controllers
+         - dt_max (float): maximal step size
+         - dt_min (float): minimal step size
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): The params passed for this specific convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            (dict): The updated params dictionary
+        """
+        defaults = {
+            "control_order": -50,
+            "dt_max": np.inf,
+            "dt_min": 0,
+            "cfl": 0.4,
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
+    @staticmethod
+    def compute_max_step_size(P, u):
+        grid_spacing_x = P.X[1, 0] - P.X[0, 0]
+        grid_spacing_z = P.xp.append(P.Z[0, :-1] - P.Z[0, 1:], P.Z[0, -1] - P.axes[1].x0)
+
+        iu, iv = P.index(['u', 'v'])
+
+        max_step_size_x = P.xp.min(grid_spacing_x / P.xp.abs(u[iu]))
+        max_step_size_z = P.xp.min(grid_spacing_z / P.xp.abs(u[iv]))
+        max_step_size = min([max_step_size_x, max_step_size_z])
+
+        if hasattr(P, 'comm'):
+            max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
+        return max_step_size
+
+    def get_new_step_size(self, controller, step, **kwargs):
+        L = step.levels[0]
+        P = step.levels[0].prob
+
+        L.sweep.compute_end_point()
+        max_step_size = self.compute_max_step_size(P, L.uend)
+
+        dt_new = L.status.dt_new if L.status.dt_new else max([self.params.dt_max, L.params.dt])
+        L.status.dt_new = min([dt_new, self.params.cfl * max_step_size])
+        L.status.dt_new = max([self.params.dt_min, L.status.dt_new])
+
+        self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
