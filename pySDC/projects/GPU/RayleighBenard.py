@@ -106,7 +106,7 @@ def run_RBC(useGPU=False):
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
     t0 = 0.0
-    Tend = 50
+    Tend = 1
     P = controller.MS[0].levels[0].prob
 
     relaxation_steps = 0
