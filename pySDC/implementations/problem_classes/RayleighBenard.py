@@ -496,6 +496,9 @@ class CFLLimit(ConvergenceController):
         return max_step_size
 
     def get_new_step_size(self, controller, step, **kwargs):
+        if not CheckConvergence.check_convergence(step):
+            return None
+
         L = step.levels[0]
         P = step.levels[0].prob
 
@@ -534,6 +537,7 @@ class SpaceAdaptivity(ConvergenceController):
             "nz_max": np.inf,
             "nz_min": 0,
             "factor": 3 / 2,
+            "refinement_tol": 1e-8,
         }
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
@@ -547,14 +551,14 @@ class SpaceAdaptivity(ConvergenceController):
         L.sweep.compute_end_point()
         u_hat = P.transform(L.uend)
 
-        refinement_needed = P.check_refinement_needed(u_hat)
+        refinement_needed = P.check_refinement_needed(u_hat, tol=self.params.refinement_tol)
 
         if P.comm:
             refinement_needed = P.comm.allreduce(refinement_needed, op=MPI.BOR)
 
         if refinement_needed:
             for i in [0]:  # range(len(L.u)):
-                L.u[i], P_new = P.refine_resolution(P.transform(L.u[i]))
+                L.u[i], P_new = P.refine_resolution(P.transform(L.u[i]), factor=self.params.factor)
             L.__dict__['_Level__prob'] = P_new
             L.status.dt_new = L.params.dt
             S.status.restart = True

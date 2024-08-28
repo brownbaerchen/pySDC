@@ -162,8 +162,8 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
 
         for rank in range(size):
             im = axs[1].pcolormesh(
-                buffer[f'X-{rank}'],
-                buffer[f'Z-{rank}'],
+                buffer[f'u-{rank}']['X'],
+                buffer[f'u-{rank}']['Z'],
                 buffer[f'u-{rank}'][quantitiy2].real,
                 vmin=-vmax[quantitiy2] if cmaps.get(quantitiy2, None) in ['bwr'] else vmin[quantitiy2],
                 vmax=vmax[quantitiy2],
@@ -171,8 +171,8 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
             )
             fig.colorbar(im, cax[1])
             im = axs[0].pcolormesh(
-                buffer[f'X-{rank}'],
-                buffer[f'Z-{rank}'],
+                buffer[f'u-{rank}']['X'],
+                buffer[f'u-{rank}']['Z'],
                 buffer[f'u-{rank}']['u'][P.index(quantitiy)].real,
                 # vmin=-vmax[quantitiy] if cmaps.get(quantitiy, None) in ['bwr', 'seismic'] else vmin[quantitiy],
                 vmin=vmin[quantitiy],
