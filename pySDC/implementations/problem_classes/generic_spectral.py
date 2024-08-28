@@ -53,7 +53,7 @@ class GenericSpectralLinear(Problem):
 
         self.spectral.setup_fft()
 
-        super().__init__(init=self.init)
+        super().__init__(init=self.spectral.init)
 
         self.solver_type = solver_type
         self.solver_args = {} if solver_args is None else solver_args
@@ -79,10 +79,10 @@ class GenericSpectralLinear(Problem):
         Returns:
             sparse linear operator
         """
-        operator = self.get_empty_operator_matrix()
+        operator = self.spectral.get_empty_operator_matrix()
         for line, equation in LHS.items():
-            self.add_equation_lhs(operator, line, equation)
-        return self.convert_operator_matrix_to_operator(operator)
+            self.spectral.add_equation_lhs(operator, line, equation)
+        return self.spectral.convert_operator_matrix_to_operator(operator)
 
     def setup_L(self, LHS):
         """
@@ -144,7 +144,7 @@ class GenericSpectralLinear(Problem):
         Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}
         self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
-    def solve_system(self, rhs, dt, u0=None, *args, **kwargs):
+    def solve_system(self, rhs, dt, u0=None, *args, skip_itransform=False, **kwargs):
         """
         Solve (M + dt*L)u=rhs. This requires that you setup the operators before using the functions ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``. Note that the mass matrix need not be invertible, as long as (M + dt*L) is. This allows to solve some differential algebraic equations.
 
@@ -201,6 +201,9 @@ class GenericSpectralLinear(Problem):
             raise NotImplementedError(f'Solver {self.solver_type:!} not implemented in {type(self).__name__}!')
 
         sol_hat = self.Pr @ sol_hat
+        if skip_itransform:
+            return sol_hat
+
         sol[:] = self.spectral.itransform(sol_hat.reshape(sol.shape)).real
 
         if self.spectral.debug:

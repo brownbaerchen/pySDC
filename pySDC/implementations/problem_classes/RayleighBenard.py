@@ -41,7 +41,19 @@ class RayleighBenard(GenericSpectralLinear):
                 comm = MPI.COMM_WORLD
             except ModuleNotFoundError:
                 pass
-        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister(
+            'Prandl',
+            'Rayleigh',
+            'nx',
+            'nz',
+            'cheby_mode',
+            'BCs',
+            'dealiasing',
+            'comm',
+            'debug',
+            localVars=locals(),
+            readOnly=True,
+        )
 
         bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 8}, {'base': 'chebychov', 'N': nz, 'mode': cheby_mode}]
         components = ['u', 'v', 'vz', 'T', 'Tz', 'p', 'uz']
@@ -353,6 +365,33 @@ class RayleighBenard(GenericSpectralLinear):
         if not np.allclose(u_hat[self.index('p')] @ BC_int, self.BCs['p_integral']):
             violations['p_integral'] = xp.max(xp.abs(u_hat[self.index('p')] @ BC_int - self.BCs['p_integral']))
         return violations
+
+    def check_refinement_needed(self, u_hat, tol=1e-7):
+        """
+        The derivative is an approximation to the derivative of the exact solution, which may not be the derivative of the numerical solution if the resolution is too low. We check if the derivative has energy in the highest mode, which is an indication of this.
+        """
+        need_more = False
+
+        for i in self.index(['uz', 'vz', 'Tz']):
+            need_more = need_more or not self.xp.allclose(u_hat[i][:, -1], 0, atol=tol)
+
+        return need_more
+
+    def refine_resolution(self, u_hat, factor=3 / 2):
+        padding = [
+            factor,
+        ] * 2
+        u = self.itransform(u_hat, padding=padding).real
+
+        nz_new = u.shape[2]
+        if self.comm:
+            nx_new = self.comm.allreduce(u.shape[1], op=MPI.SUM)
+        else:
+            nx_new = u.shape[1]
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
+        self.__init__(**new_params)
+        return u
 
     def get_fig(self):  # pragma: no cover
         """

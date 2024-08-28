@@ -630,6 +630,44 @@ def test_Possion_problems(nx, component):
     assert np.allclose(u_exact, u)
 
 
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nz', [4, 6])
+def test_resolution_refinement(nz):
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    BCs = {
+        'u_top': 0,
+        'u_bottom': 0,
+        'v_top': 0,
+        'v_bottom': 0,
+        'T_top': 0,
+        'T_bottom': 0,
+    }
+    P = RayleighBenard(nx=1, nz=nz, BCs=BCs, Rayleigh=1)
+
+    component = 'u'
+    idx = P.index(f'{component}')
+
+    def solve(prob):
+        A = prob.put_BCs_in_matrix(-prob.L)
+
+        rhs = prob.u_init
+        rhs = prob.put_BCs_in_rhs(rhs)
+        rhs[idx][0, 2] = 6
+        rhs[idx][0, 0] = 6
+        return prob.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape).real
+
+    u_hat = solve(P)
+    assert P.check_refinement_needed(u_hat) == (nz <= 4)
+
+    while P.check_refinement_needed(u_hat):
+        u = P.refine_resolution(u_hat)
+        u_hat = solve(P)
+
+        assert u.shape[2] <= 6
+        assert u.shape[2] > 4
+
+
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
@@ -637,7 +675,7 @@ if __name__ == '__main__':
     # test_BCs(2**8, 2**6 + 0, 'T2U', 2.77, 3.14, 2, 0.001, True)
     # test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver(2**8, 2**6 + 0, 'T2U', noise=1e3, plotting=True)
-    test_1D_Possion_problems('T')
+    test_resolution_refinement(4)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')
