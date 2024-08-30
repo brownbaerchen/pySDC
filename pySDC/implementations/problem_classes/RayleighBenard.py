@@ -367,11 +367,14 @@ class RayleighBenard(GenericSpectralLinear):
             violations['p_integral'] = xp.max(xp.abs(u_hat[self.index('p')] @ BC_int - self.BCs['p_integral']))
         return violations
 
-    def check_refinement_needed(self, u_hat, tol=1e-7):
+    def check_refinement_needed(self, u_hat, tol=1e-7, nx_max=np.inf, nz_max=np.inf):
         """
         The derivative is an approximation to the derivative of the exact solution, which may not be the derivative of the numerical solution if the resolution is too low. We check if the derivative has energy in the highest mode, which is an indication of this.
         """
         need_more = False
+
+        if self.nx >= nx_max or self.nz >= nz_max:
+            return False
 
         for i in self.index(['uz', 'vz', 'Tz']):
             need_more = need_more or not self.xp.allclose(u_hat[i][:, -1], 0, atol=tol)
@@ -631,7 +634,7 @@ class SpaceAdaptivity(ConvergenceController):
             "nz_min": 0,
             "factor": 3 / 2,
             "refinement_tol": 1e-8,
-            "derefinement_tol": 1e-8,
+            "derefinement_tol": 1e-11,
         }
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
@@ -645,7 +648,9 @@ class SpaceAdaptivity(ConvergenceController):
         L.sweep.compute_end_point()
         u_hat = P.transform(L.uend)
 
-        if P.check_refinement_needed(u_hat, tol=self.params.refinement_tol):
+        if P.check_refinement_needed(
+            u_hat, tol=self.params.refinement_tol, nx_max=self.params.nx_max, nz_max=self.params.nz_max
+        ):
             # u_hat, P_new = P.refine_resolution(P.transform(L.u[0]), add_modes=self.params.refine_modes)
             # L.u[0] = P_new.u_init
             # L.u[0][:] = P_new.itransform(u_hat).real
