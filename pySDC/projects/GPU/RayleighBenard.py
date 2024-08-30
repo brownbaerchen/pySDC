@@ -62,7 +62,7 @@ def run_RBC(useGPU=False):
         # },
         CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.4},
         StopAtNan: {'thresh': 1e6},
-        SpaceAdaptivity: {'nx_max': 2**10, 'nz_max': 2**8},
+        SpaceAdaptivity: {'nx_max': 2**10, 'nz_max': 2**8, 'factor': 2},
     }
 
     sweeper_params = {}
@@ -79,6 +79,8 @@ def run_RBC(useGPU=False):
         'nz': 2**6 + 0,
         'nx_max': 2**10 + 0,
         'nz_max': 2**8 + 0,
+        'nx_min': 2 * comm.size,
+        'nz_min': comm.size,
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
@@ -87,7 +89,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 9
+    step_params['maxiter'] = 5
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -106,7 +108,7 @@ def run_RBC(useGPU=False):
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
     t0 = 0.0
-    Tend = 1
+    Tend = 50
     P = controller.MS[0].levels[0].prob
 
     relaxation_steps = 0

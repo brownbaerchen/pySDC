@@ -632,7 +632,8 @@ def test_Possion_problems(nx, component):
 
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nz', [4, 6])
-def test_resolution_refinement(nz):
+@pytest.mark.parametrize('nx', [1, 4, 5])
+def test_resolution_derefinement(nz, nx):
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
 
     BCs = {
@@ -643,7 +644,48 @@ def test_resolution_refinement(nz):
         'T_top': 0,
         'T_bottom': 0,
     }
-    P = RayleighBenard(nx=1, nz=nz, BCs=BCs, Rayleigh=1)
+    P = RayleighBenard(nx=nx, nz=nz, BCs=BCs, Rayleigh=1)
+
+    remove_modes = 1
+
+    component = 'u'
+    idx = P.index(f'{component}')
+
+    def solve(prob):
+        A = prob.put_BCs_in_matrix(-prob.L)
+
+        rhs = prob.u_init
+        rhs = prob.put_BCs_in_rhs(rhs)
+        rhs[idx][0, 2] = 6
+        rhs[idx][0, 0] = 6
+        return prob.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape).real
+
+    u_hat = solve(P)
+    assert P.check_derefinement_ok(u_hat, remove_modes=1) == (nz > 4)
+
+    while P.check_derefinement_ok(u_hat, remove_modes=1):
+        u_hat, P = P.derefine_resolution(u_hat, remove_modes=1)
+        u_hat = solve(P)
+
+        assert u_hat.shape[2] < 6
+        assert u_hat.shape[2] >= 4
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nz', [4, 6])
+@pytest.mark.parametrize('nx', [1, 4, 5])
+def test_resolution_refinement(nz, nx):
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    BCs = {
+        'u_top': 0,
+        'u_bottom': 0,
+        'v_top': 0,
+        'v_bottom': 0,
+        'T_top': 0,
+        'T_bottom': 0,
+    }
+    P = RayleighBenard(nx=nx, nz=nz, BCs=BCs, Rayleigh=1)
 
     component = 'u'
     idx = P.index(f'{component}')
@@ -661,11 +703,44 @@ def test_resolution_refinement(nz):
     assert P.check_refinement_needed(u_hat) == (nz <= 4)
 
     while P.check_refinement_needed(u_hat):
-        u, P = P.refine_resolution(u_hat)
+        _u_hat, P = P.refine_resolution(u_hat)
         u_hat = solve(P)
 
-        assert u.shape[2] <= 6
-        assert u.shape[2] > 4
+        assert u_hat.shape[2] <= 6
+        assert u_hat.shape[2] > 4
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nz', [4, 5])
+def test_refinement_2D(nz):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    P = RayleighBenard(nx=2 * nz, nz=nz)
+
+    u_hat = P.u_init_forward
+    u_hat[...] = np.random.random(u_hat.shape)
+    # u_hat[0][:] = np.arange(nz)
+
+    u_refined, P_refined = P.refine_resolution2(u_hat, factor=2)
+    u_hat_refined = P_refined.transform(u_refined)
+    print(u_hat[0])
+    print(u_hat_refined[0].real)
+
+    u_pad = P.itransform(u_hat, padding=[2, 2]).real
+    print(P_refined.transform(u_pad)[0].real)
+    u_refined = P_refined.itransform(u_hat_refined)
+    # print(u_pad[0])
+    # print(u_refined[0])
+
+    assert np.allclose(u_pad, u_refined)
+
+    # u_hat_derefined, P_derefined = P_refined.derefine_resolution(u_hat_refined, remove_modes=nz)
+    u_hat_derefined, P_derefined = P_refined.derefine_resolution2(u_refined, factor=2)
+    print(u_hat_derefined[0])
+
+    assert np.allclose(u_hat, u_hat_derefined)
+    # print(u_hat, u_hat_
 
 
 if __name__ == '__main__':
@@ -675,7 +750,9 @@ if __name__ == '__main__':
     # test_BCs(2**8, 2**6 + 0, 'T2U', 2.77, 3.14, 2, 0.001, True)
     # test_solver(2**7, 2**5 + 0, 'T2U', noise=0e-3, plotting=True)
     # test_solver(2**8, 2**6 + 0, 'T2U', noise=1e3, plotting=True)
-    test_resolution_refinement(4)
+    # test_resolution_derefinement(6, 3)
+    # test_resolution_refinement(4, 4)
+    test_refinement_2D(2)
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

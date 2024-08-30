@@ -71,6 +71,7 @@ class RayleighBenard(GenericSpectralLinear):
         self.index_to_name = {v: k for k, v, in self.indices.items()}
 
         self.Z, self.X = self.get_grid()
+        self.Kz, self.Kx = self.get_wavenumbers()
 
         # construct 2D matrices
         Dx = self.get_differentiation_matrix(axes=(0,))
@@ -227,7 +228,7 @@ class RayleighBenard(GenericSpectralLinear):
         noise_hat[:] = rng.random(size=noise_hat[iT].shape)
         noise_hat[iT, np.abs(Kx) > kxmax] *= 0
         noise_hat[iT, Kz > kzmax] *= 0
-        noise = self.itransform(noise_hat)
+        noise = self.itransform(noise_hat).real
 
         me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
 
@@ -376,9 +377,32 @@ class RayleighBenard(GenericSpectralLinear):
         for i in self.index(['uz', 'vz', 'Tz']):
             need_more = need_more or not self.xp.allclose(u_hat[i][:, -1], 0, atol=tol)
 
+        if self.comm:
+            need_more = self.comm.allreduce(need_more, op=MPI.BOR)
+
         return need_more
 
-    def refine_resolution(self, u_hat, factor=3 / 2):
+    def refine_resolution(self, u_hat, add_modes=2):
+        xp = self.xp
+        nz_new = self.nz + add_modes
+        nx_new = self.nx + add_modes * self.nx // self.nz
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
+        P_new = type(self)(**new_params)
+
+        kx = xp.fft.fftfreq(nx_new, 1 / nx_new)[P_new.local_slice[0]]
+        mask_x = xp.abs(kx) <= self.nx // 2
+        if self.nx % 2 == 0:
+            mask_x = xp.logical_and(mask_x, kx != self.nx // 2)
+        slices = [slice(0, u_hat.shape[0]), mask_x, slice(0, self.nz)]
+
+        me = P_new.u_init_forward
+        me[(*slices,)] = u_hat[...] * nx_new / self.nx
+        self.logger.debug(f'Refined spatial resolution by {add_modes} to nx={P_new.nx} and nz={P_new.nz}')
+
+        return me, P_new
+
+    def refine_resolution2(self, u_hat, factor=3 / 2):
         padding = [
             factor,
         ] * 2
@@ -395,8 +419,80 @@ class RayleighBenard(GenericSpectralLinear):
 
         me = P_new.u_init
         me[...] = u[...]
-
         self.logger.debug(f'Refined spatial resolution by {factor} to nx={P_new.nx} and nz={P_new.nz}')
+
+        return me, P_new
+
+    def check_derefinement_ok(self, u_hat, factor=3 / 2, tol=1e-7, nx_min=0, nz_min=0):
+        xp = self.xp
+
+        nx_new = int(np.ceil(self.nx / factor))
+        nz_new = int(np.ceil(self.nz / factor))
+
+        if nx_new < nx_min or nz_new < nz_min:
+            return False
+
+        kx = xp.fft.fftfreq(self.nx, 1 / self.nx)[self.local_slice[0]]
+        mask_x = xp.abs(kx) > nx_new // 2
+        if not nx_new % 2:
+            mask_x = xp.logical_and(mask_x, kx == -nx_new // 2)
+
+        slices = [slice(0, u_hat.shape[0]), mask_x, slice(0, u_hat.shape[2])]
+        less_is_fine_x = xp.allclose(u_hat[(*slices,)], 0, atol=tol)
+
+        slices = [slice(0, u_hat.shape[0]), slice(0, u_hat.shape[1]), slice(nz_new, u_hat.shape[2])]
+        less_is_fine_z = xp.allclose(u_hat[(*slices,)], 0, atol=tol)
+
+        less_is_fine = less_is_fine_x and less_is_fine_z
+
+        if self.comm:
+            less_is_fine = self.comm.allreduce(less_is_fine, op=MPI.BAND)
+        return less_is_fine
+
+    def derefine_resolution2(self, u, factor=3 / 2):
+        padding = [
+            factor,
+        ] * 2
+
+        nx_new = int(np.ceil(self.nx / factor))
+        nz_new = int(np.ceil(self.nz / factor))
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
+        P_new = type(self)(**new_params)
+
+        shape = (nx_new, nz_new)
+        u_hat = P_new.transform(u, padding=padding).real
+
+        me = P_new.u_init_forward
+        me[...] = u_hat[...]
+        self.logger.debug(f'Derefined spatial resolution by {factor} to nx={P_new.nx} and nz={P_new.nz}')
+
+        return me, P_new
+
+    def derefine_resolution(self, u_hat, remove_modes=4):
+
+        min_res = 1
+        if self.comm:
+            min_res = self.comm.size
+
+        xp = self.xp
+
+        nz_new = max([min_res, int(self.nz - remove_modes)])
+        nx_new = max([min_res, int(self.nx - remove_modes * self.nx // self.nz)])
+
+        kx = xp.fft.fftfreq(self.nx, 1 / self.nx)
+        mask_x = xp.abs(kx) <= nx_new // 2
+        if nx_new % 2 == 0:
+            mask_x = xp.logical_and(mask_x, kx != nx_new // 2)
+        slices = [slice(0, u_hat.shape[0]), mask_x, slice(0, nz_new)]
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
+        P_new = type(self)(**new_params)
+
+        me = P_new.u_init_forward
+        me[...] = u_hat[(*slices,)] * nx_new / self.nx
+
+        self.logger.debug(f'Derefined spatial resolution by {remove_modes} modes to nx={P_new.nx} and nz={P_new.nz}')
         return me, P_new
 
     def get_fig(self):  # pragma: no cover
@@ -538,6 +634,7 @@ class SpaceAdaptivity(ConvergenceController):
             "nz_min": 0,
             "factor": 3 / 2,
             "refinement_tol": 1e-8,
+            "derefinement_tol": 1e-8,
         }
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
@@ -551,15 +648,29 @@ class SpaceAdaptivity(ConvergenceController):
         L.sweep.compute_end_point()
         u_hat = P.transform(L.uend)
 
-        refinement_needed = P.check_refinement_needed(u_hat, tol=self.params.refinement_tol)
-
-        if P.comm:
-            refinement_needed = P.comm.allreduce(refinement_needed, op=MPI.BOR)
-
-        if refinement_needed:
-            for i in [0]:  # range(len(L.u)):
-                L.u[i], P_new = P.refine_resolution(P.transform(L.u[i]), factor=self.params.factor)
+        if P.check_refinement_needed(u_hat, tol=self.params.refinement_tol):
+            # u_hat, P_new = P.refine_resolution(P.transform(L.u[0]), add_modes=self.params.refine_modes)
+            # L.u[0] = P_new.u_init
+            # L.u[0][:] = P_new.itransform(u_hat).real
+            L.u[0], P_new = P.refine_resolution2(P.transform(L.u[0]), factor=self.params.factor)
             L.__dict__['_Level__prob'] = P_new
             L.status.dt_new = L.params.dt
             S.status.restart = True
             self.log(f"Restarting with refined resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)
+        elif (
+            P.check_derefinement_ok(
+                u_hat,
+                tol=self.params.derefinement_tol,
+                factor=self.params.factor,
+                nx_min=self.params.nx_min,
+                nz_min=self.params.nz_min,
+            )
+            and not S.status.restart
+        ):
+            for i in range(len(L.u)):
+                # L.u[i], P_new = P.derefine_resolution(P.transform(L.u[i]), remove_modes=self.params.derefine_modes)
+                u_hat, P_new = P.derefine_resolution2(L.u[i], factor=self.params.factor)
+                L.u[i] = P_new.u_init
+                L.u[i][:] = P_new.itransform(u_hat).real
+            L.__dict__['_Level__prob'] = P_new
+            self.log(f"Derefining resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)
