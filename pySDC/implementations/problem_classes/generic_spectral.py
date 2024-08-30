@@ -132,13 +132,15 @@ class GenericSpectralLinear(Problem):
             # TODO this is way to slow on GPUs. Need to find a better way!
 
             if self.spectral.useGPU:
-                raise NotImplementedError
+                R = self.Pl.get().tolil() * 0
+            else:
+                R = self.Pl.tolil() * 0
 
-            R = self.Pl.tolil() * 0
             for j in range(self.ncomponents):
                 for i in range(N):
                     R[i * self.ncomponents + j, j * N + i] = 1.0
-            self.Pl = R.tocsc()
+
+            self.Pl = self.spectral.sparse_lib.csc_matrix(R)
 
         basis_conversion_matrix = self.spectral.get_basis_change_matrix(direction=right_preconditioning)
         Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}

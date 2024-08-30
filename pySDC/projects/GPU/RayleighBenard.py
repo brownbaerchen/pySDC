@@ -62,7 +62,7 @@ def run_RBC(useGPU=False):
         # },
         CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.4},
         StopAtNan: {'thresh': 1e6},
-        SpaceAdaptivity: {'nx_max': 2**10, 'nz_max': 2**8, 'factor': 2},
+        SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2},
     }
 
     sweeper_params = {}
@@ -74,22 +74,18 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 16,
-        'nx': 2**8 + 0,
-        'nz': 2**6 + 0,
-        'nx_max': 2**10 + 0,
-        'nz_max': 2**8 + 0,
-        'nx_min': 2 * comm.size,
-        'nz_min': comm.size,
+        'Rayleigh': 2e6 / 4,
+        'nx': max([2 * comm.size, 2**8]),
+        'nz': max([comm.size, 2**6]),
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
-        'left_preconditioner': not useGPU,
+        # 'left_preconditioner': not useGPU,
         # 'right_preconditioning': 'T2T',
     }
 
     step_params = {}
-    step_params['maxiter'] = 5
+    step_params['maxiter'] = 9
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

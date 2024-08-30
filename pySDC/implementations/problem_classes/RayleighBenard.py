@@ -166,7 +166,6 @@ class RayleighBenard(GenericSpectralLinear):
             #     f_impl_hat[iTz][:] = (Dz @ u_hat[iT].flatten()).reshape(shape) - u_hat[iTz]
             #     f_impl_hat[ip][:] = (Dz @ u_hat[iv].flatten() + Dx @ u_hat[iu].flatten()).reshape(shape)
         else:
-
             kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
             nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
 
@@ -414,7 +413,7 @@ class RayleighBenard(GenericSpectralLinear):
         else:
             nx_new = u.shape[1]
 
-        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new, 'useGPU': self.useGPU}
         P_new = type(self)(**new_params)
 
         me = P_new.u_init
@@ -460,7 +459,6 @@ class RayleighBenard(GenericSpectralLinear):
         new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
         P_new = type(self)(**new_params)
 
-        shape = (nx_new, nz_new)
         u_hat = P_new.transform(u, padding=padding).real
 
         me = P_new.u_init_forward
@@ -470,7 +468,6 @@ class RayleighBenard(GenericSpectralLinear):
         return me, P_new
 
     def derefine_resolution(self, u_hat, remove_modes=4):
-
         min_res = 1
         if self.comm:
             min_res = self.comm.size
