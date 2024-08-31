@@ -6,11 +6,16 @@ import pytest
 @pytest.mark.parametrize('b', [0, 66])
 @pytest.mark.parametrize('f', [0, 1])
 @pytest.mark.parametrize('noise', [0, 1e-3])
-def test_heat1d_chebychov(a, b, f, noise, nvars=2**4):
+@pytest.mark.parametrize('use_ultraspherical', [True, False])
+def test_heat1d_chebychov(a, b, f, noise, use_ultraspherical, nvars=2**4):
     import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychov
 
-    P = Heat1DChebychov(
+    if use_ultraspherical:
+        from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DUltraspherical as problem_class
+    else:
+        from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat1DChebychov as problem_class
+
+    P = problem_class(
         nvars=nvars, a=a, b=b, f=f, nu=1e-2, left_preconditioner=False, right_preconditioning='T2T', debug=True
     )
 
@@ -124,6 +129,6 @@ def test_SDC():
 
 if __name__ == '__main__':
     # test_SDC()
-    test_heat1d_chebychov(0, 0, 1, 0e-1, 2**4)
+    test_heat1d_chebychov(1, 0, 1, 0e-1, True, 2**6)
     # test_AdvectionDiffusion(plot=True)
     # test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)

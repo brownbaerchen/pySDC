@@ -725,7 +725,7 @@ class SpectralHelper:
                     want = BC['v']
                     assert self.xp.allclose(
                         get, want
-                    ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}! Got {get}, wanted {want}'
+                    ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}, line {BC["line"]}! Got {get}, wanted {want}'
 
     def put_BCs_in_matrix(self, A, rescale=1.0):
         return self.BC_line_zero_matrix @ A + self.BCs * rescale
@@ -923,6 +923,7 @@ class SpectralHelper:
     def transform_single_component(self, u, axes=None, padding=None):
         trfs = {
             ChebychovHelper: self._transform_dct,
+            Ultraspherical: self._transform_dct,
             FFTHelper: self._transform_fft,
         }
 
@@ -1056,6 +1057,7 @@ class SpectralHelper:
         trfs = {
             FFTHelper: self._transform_ifft,
             ChebychovHelper: self._transform_idct,
+            Ultraspherical: self._transform_idct,
         }
 
         axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
@@ -1260,7 +1262,7 @@ class SpectralHelper:
 
         return I
 
-    def get_basis_change_matrix(self, axes=None, direction='backward'):
+    def get_basis_change_matrix(self, axes=None, **kwargs):
         """
         Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
         the original basis afterwards.
@@ -1278,11 +1280,11 @@ class SpectralHelper:
         ndim = len(self.axes)
 
         if ndim == 1:
-            C = self.axes[0].get_basis_change_matrix(direction=direction)
+            C = self.axes[0].get_basis_change_matrix(**kwargs)
         elif ndim == 2:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
-                C1D = self.axes[axis].get_basis_change_matrix(direction=direction)
+                C1D = self.axes[axis].get_basis_change_matrix(**kwargs)
 
                 if len(axes) > 1:
                     I1D = sp.eye(self.axes[axis2].N)

@@ -38,13 +38,6 @@ class Heat1DChebychov(GenericSpectralLinear):
         self.add_BC(component='u', equation='ux', axis=0, x=1, v=b, kind="Dirichlet")
         self.setup_BCs()
 
-    def solve_system(self, *args, **kwargs):
-        sol = super().solve_system(*args, **kwargs)
-        return sol
-        sol_hat = self.transform(sol)
-        sol_hat[self.index('ux')][-1] = 0
-        return self.itransform(sol_hat)
-
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
         iu, iux = self.index(self.components)
@@ -84,6 +77,75 @@ class Heat1DChebychov(GenericSpectralLinear):
             u += _noise * noise * (self.x - 1) * (self.x + 1)
 
         self.check_BCs(u)
+        return u
+
+
+class Heat1DUltraspherical(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = mesh
+
+    def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, **kwargs):
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        bases = [{'base': 'ultraspherical', 'N': nvars}]
+        components = ['u']
+
+        GenericSpectralLinear.__init__(self, bases, components, **kwargs)
+
+        self.x = self.get_grid()[0]
+
+        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
+        I = self.get_Id()
+        self.Dxx = Dxx
+        self.S2 = self.get_basis_change_matrix(p=2)
+
+        L_lhs = {
+            'u': {'u': -nu * Dxx},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {'u': {'u': I}}
+        self.setup_M(M_lhs)
+
+        self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet", line=-1)
+        self.add_BC(component='u', equation='u', axis=0, x=1, v=b, kind="Dirichlet", line=-2)
+        self.setup_BCs()
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+        iu = self.index('u')
+
+        me_hat = self.u_init_forward
+        me_hat[:] = self.transform(u)
+        me_hat[iu] = (self.nu * self.S2 @ self.Dxx @ me_hat[iu].flatten()).reshape(me_hat[iu].shape)
+        me = self.itransform(me_hat).real
+
+        f[self.index("u")] = me[iu]
+        return f
+
+    def u_exact(self, t, noise=0):
+        xp = self.xp
+        iu = self.index('u')
+        u = self.u_init
+
+        u[iu] = (
+            xp.sin(self.f * np.pi * self.x) * xp.exp(-self.nu * (self.f * np.pi) ** 2 * t)
+            + (self.b - self.a) / 2 * self.x
+            + (self.b + self.a) / 2
+        )
+
+        if noise > 0:
+            assert t == 0
+            _noise = self.u_init
+            rng = self.xp.random.default_rng(seed=666)
+            _noise[iu] = rng.normal(size=u[iu].shape)
+            noise_hat = self.transform(_noise)
+            low_pass = self.get_filter_matrix(axis=0, kmax=self.nvars - 2)
+            noise_hat[iu] = (low_pass @ noise_hat[iu].flatten()).reshape(noise_hat[iu].shape)
+            _noise[:] = self.itransform(noise_hat)
+            u += _noise * noise * (self.x - 1) * (self.x + 1)
+
+        # self.check_BCs(u)
         return u
 
 
