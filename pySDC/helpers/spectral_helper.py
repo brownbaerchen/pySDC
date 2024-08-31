@@ -211,17 +211,6 @@ class ChebychovHelper(SpectralHelper1D):
         '''
         return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1)
 
-    # def get_NCC_matrix(self):
-
-    # def get_T2C_differentiation_matrix(self, p=1):
-    #     sp = self.sparse_lib
-    #     xp = self.xp
-    #     N = self.N
-    #     l = p
-    #     from scipy.special import factorial
-
-    #     return 2**(l-1) * factorial(l-1) * sp.diags(xp.arange(N - l) + l, offsets=l)
-
     def get_U2T_integration_matrix(self):
         # TODO: missing integration constant, use T2T instead!
         S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1)
@@ -418,6 +407,84 @@ class ChebychovHelper(SpectralHelper1D):
     #         return n
     #     else:
     #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
+
+
+class Ultraspherical(ChebychovHelper):
+    """
+    This implementation follows https://arxiv.org/abs/2006.08756
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.derivative_base = 0
+
+    def get_differentiation_matrix(self, p=1):
+        sp = self.sparse_lib
+        xp = self.xp
+        N = self.N
+        l = p
+        from scipy.special import factorial
+
+        self.derivative_base = max([p, self.derivative_base])
+        return 2 ** (l - 1) * factorial(l - 1) * sp.diags(xp.arange(N - l) + l, offsets=l)
+
+    def get_S(self, lmbda):
+        """
+        Get matrix for bumping the derivative base by one
+
+        Args:
+            lmbda (int): Ingoing derivative base
+
+        Returns:
+            sparse matrix: Conversion from derivative base lmbda to lmbda + 1
+        """
+        N = self.N
+
+        if lmbda == 0:
+            sp = scipy.sparse
+            mat = ((sp.eye(N) - sp.diags(np.ones(N - 2), offsets=+2)) / 2.0).tolil()
+            mat[:, 0] *= 2
+        else:
+            sp = self.sparse_lib
+            xp = self.xp
+            mat = sp.diags(lmbda / (lmbda + xp.arange(N))) - sp.diags(
+                lmbda / (lmbda + 2 + xp.arange(N - 2)), offsets=+2
+            )
+
+        return self.sparse_lib.csr_matrix(mat)
+
+    def get_conv(self, p_out, p_in=0):
+        """
+        Get a conversion matrix from derivative base `p_in` to `p_out`.
+
+        Args:
+            p_out (int): Resulting derivative base
+            p_in (int): Ingoing derivative base
+        """
+        mat_fwd = self.sparse_lib.eye(self.N)
+        for i in range(min([p_in, p_out]), max([p_in, p_out])):
+            mat_fwd = self.get_S(i) @ mat_fwd
+
+        if p_out > p_in:
+            return mat_fwd
+
+        else:
+            import scipy.sparse as sp
+
+            if self.useGPU:
+                mat_fwd = mat_fwd.get()
+
+            mat_bck = sp.linalg.inv(mat_fwd.tocsc())
+
+            return self.sparse_lib.csr_matrix(mat_bck)
+
+    def get_basis_change_matrix(self, p, direction='backward'):
+        if direction == 'forward':
+            return self.get_conv(p_out=self.derivative_base, p_in=p)
+        elif direction == 'backward':
+            return self.get_conv(p_in=p, p_out=0)
+        else:
+            return self.get_conv(direction)
 
 
 class FFTHelper(SpectralHelper1D):
