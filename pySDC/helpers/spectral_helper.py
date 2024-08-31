@@ -478,13 +478,16 @@ class Ultraspherical(ChebychovHelper):
 
             return self.sparse_lib.csr_matrix(mat_bck)
 
-    def get_basis_change_matrix(self, p, direction='backward'):
+    def get_basis_change_matrix(self, p=0, direction='backward'):
         if direction == 'forward':
             return self.get_conv(p_out=self.derivative_base, p_in=p)
         elif direction == 'backward':
             return self.get_conv(p_in=p, p_out=0)
         else:
             return self.get_conv(direction)
+
+    def get_Id(self):
+        return self.get_basis_change_matrix(p=0, direction='forward')
 
 
 class FFTHelper(SpectralHelper1D):
@@ -605,6 +608,8 @@ class SpectralHelper:
             self.axes.append(ChebychovHelper(*args, **kwargs))
         elif base.lower() in ['fft', 'fourier', 'ffthelper']:
             self.axes.append(FFTHelper(*args, **kwargs))
+        elif base.lower() in ['ultraspherical', 'gegenbauer']:
+            self.axes.append(Ultraspherical(*args, **kwargs))
         else:
             raise NotImplementedError(f'{base=!r} is not implemented!')
         self.axes[-1].xp = self.xp
