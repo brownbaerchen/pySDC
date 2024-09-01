@@ -609,10 +609,9 @@ def test_Possion_problems(nx, component):
     idx_z = P.index(f'{component}z')
 
     A = P.put_BCs_in_matrix(-P.L)
-    rhs = P.put_BCs_in_rhs(rhs)
     rhs[idx][0, 2] = 6
     rhs[idx][0, 0] = 6
-    u = P.sparse_lib.linalg.spsolve(A, rhs.flatten()).reshape(rhs.shape).real
+    u = P.sparse_lib.linalg.spsolve(A, P.M @ rhs.flatten()).reshape(rhs.shape).real
 
     u_exact = P.u_init
     u_exact[idx][0, 4] = 1 / 8

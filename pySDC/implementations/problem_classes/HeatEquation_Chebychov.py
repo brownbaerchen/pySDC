@@ -96,15 +96,17 @@ class Heat1DUltraspherical(GenericSpectralLinear):
 
         Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
         I = self.get_Id()
-        self.Dxx = Dxx
-        self.S2 = self.get_basis_change_matrix(p=2)
+        S2 = self.get_basis_change_matrix(p=2)
+        self.Dxx = S2 @ Dxx
+
+        U2 = self.get_basis_change_matrix(p=0, direction='forward')
 
         L_lhs = {
             'u': {'u': -nu * Dxx},
         }
         self.setup_L(L_lhs)
 
-        M_lhs = {'u': {'u': I}}
+        M_lhs = {'u': {'u': U2 @ I}}
         self.setup_M(M_lhs)
 
         self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet", line=-1)
@@ -117,10 +119,10 @@ class Heat1DUltraspherical(GenericSpectralLinear):
 
         me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
-        me_hat[iu] = (self.nu * self.S2 @ self.Dxx @ me_hat[iu].flatten()).reshape(me_hat[iu].shape)
+        me_hat[iu] = (self.nu * self.Dxx @ me_hat[iu].flatten()).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat).real
 
-        f[self.index("u")] = me[iu]
+        f[iu][...] = me[iu]
         return f
 
     def u_exact(self, t, noise=0):

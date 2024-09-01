@@ -62,20 +62,20 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         self.Kz, self.Kx = self.get_wavenumbers()
 
         # construct 2D matrices
+        Dzz = self.get_differentiation_matrix(axes=(1,), p=2)
+        Dz = self.get_differentiation_matrix(axes=(1,))
         Dx = self.get_differentiation_matrix(axes=(0,))
         Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
-        Dz = self.get_differentiation_matrix(axes=(1,))
-        Dzz = self.get_differentiation_matrix(axes=(1,), p=2)
         Id = self.get_Id()
 
-        S1 = self.get_basis_change_matrix(p=1)
-        S2 = self.get_basis_change_matrix(p=2)
+        S1 = self.get_basis_change_matrix(p=1, direction='backward')
+        S2 = self.get_basis_change_matrix(p=2, direction='backward')
 
         U1 = self.get_basis_change_matrix(p=1, direction='forward')
-        U2 = self.get_basis_change_matrix(p=2, direction='forward')
+        U2 = self.get_basis_change_matrix(p=0, direction='forward')
 
-        self.Dx = S2 @ Dx
-        self.Dxx = S2 @ Dxx
+        self.Dx = Dx
+        self.Dxx = Dxx
         self.Dz = S1 @ Dz
         self.Dzz = S2 @ Dzz
 
@@ -84,23 +84,25 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'p': {'u': Dx, 'v': Dz},  # divergence free constraint
+            'p': {'u': U2 @ Dx, 'v': U1 @ Dz},  # divergence free constraint
             'u': {'p': U2 @ Dx, 'u': -nu * (U2 @ Dxx + Dzz)},
             'v': {'p': U1 @ Dz, 'v': -nu * (U2 @ Dxx + Dzz), 'T': -U2 @ Id},
             'T': {'T': -kappa * (U2 @ Dxx + Dzz)},
         }
         self.setup_L(L_lhs)
 
-        # mass matrix
-        M_lhs = {i: {i: Id} for i in ['u', 'v', 'T']}
+        # mass matrix  TODO: use different base in different equations!
+        M_lhs = {i: {i: U2 @ Id} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
+
+        self.base_change = self._setup_operator({comp: {comp: S2} for comp in self.spectral.components})
 
         self.add_BC(
             component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1, scalar=True
         )
-        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
+        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', line=-1)
         self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-2)
-        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
+        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', line=-1)
         self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2)
         self.remove_BC(
             component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2, scalar=True
@@ -135,12 +137,7 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
 
         # evaluate implicit terms
-        f_impl_hat[iT][:] = (kappa * (Dxx + Dzz) @ u_hat[iT].flatten()).reshape(shape)
-        f_impl_hat[iu][:] = (-Dx @ u_hat[ip].flatten() + nu * (Dxx + Dzz) @ u_hat[iu].flatten()).reshape(shape)
-        f_impl_hat[iv][:] = (-Dz @ u_hat[ip].flatten() + nu * (Dxx + Dzz) @ u_hat[iv].flatten()).reshape(shape) + u_hat[
-            iT
-        ]
-
+        f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
         f.impl[:] = self.itransform(f_impl_hat).real
 
         # treat convection explicitly with dealiasing
@@ -236,6 +233,60 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         vorticity_hat = self.u_init_forward
         vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.itransform(vorticity_hat)[0].real
+
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
+        self.cax = []
+        divider = make_axes_locatable(axs[0])
+        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
+        divider2 = make_axes_locatable(axs[1])
+        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+        return self.fig
+
+    def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        axs = fig.axes
+
+        imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
+        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
+
+        for i, label in zip([0, 1], [rf'${quantity}$', 'vorticity']):
+            axs[i].set_aspect(1)
+            axs[i].set_title(label)
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2f}')
+        axs[1].set_xlabel(r'$x$')
+        axs[1].set_ylabel(r'$z$')
+        fig.colorbar(imT, self.cax[0])
+        fig.colorbar(imV, self.cax[1])
 
 
 class RayleighBenard(GenericSpectralLinear):

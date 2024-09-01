@@ -42,7 +42,7 @@ def test_poisson_problem(N, deg):
     Dxx = helper.get_differentiation_matrix(p=2)
     BC_l = helper.get_Dirichlet_BC_row_T(x=-1)
     BC_r = helper.get_Dirichlet_BC_row_T(x=1)
-    P = helper.get_Id()
+    P = helper.get_basis_change_matrix(direction='forward', p=0)
 
     A = Dxx.tolil()
     A[-1, :] = BC_l

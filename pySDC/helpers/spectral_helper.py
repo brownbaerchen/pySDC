@@ -487,7 +487,9 @@ class Ultraspherical(ChebychovHelper):
             return self.get_conv(direction)
 
     def get_Id(self):
-        return self.get_basis_change_matrix(p=0, direction='forward')
+        return self.sparse_lib.eye(self.N)
+
+    # return self.get_basis_change_matrix(p=0, direction='forward')
 
 
 class FFTHelper(SpectralHelper1D):
@@ -711,6 +713,11 @@ class SpectralHelper:
                 0,
             ] * self.ndim
             slices[axis + 1] = line
+            if self.comm:
+                if self.comm.rank == 0:
+                    self.BC_rhs_mask[(*slices,)] = True
+            else:
+                self.BC_rhs_mask[(*slices,)] = True
         else:
             slices = (
                 [self.index(equation)]
@@ -718,9 +725,9 @@ class SpectralHelper:
                 + [line]
                 + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
             )
-        N = self.axes[axis].N
-        if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
-            self.BC_rhs_mask[(*slices,)] = True
+            N = self.axes[axis].N
+            if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
+                self.BC_rhs_mask[(*slices,)] = True
 
     def setup_BCs(self):
         sp = self.sparse_lib

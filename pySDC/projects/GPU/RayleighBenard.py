@@ -64,7 +64,7 @@ def run_RBC(useGPU=False):
         #     # 'dt_max': level_params['dt'],
         #     # 'dt_slope_max': 2,
         # },
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.4},
+        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.2},
         StopAtNan: {'thresh': 1e6},
         # SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2, 'nx_max': 2**10,},
     }
@@ -83,7 +83,7 @@ def run_RBC(useGPU=False):
         'nz': max([comm.size, 2**6]),
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
-        # 'debug':True,
+        'debug': True,
         'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
     }
@@ -129,13 +129,13 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     import gc
 
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardUltraspherical
 
     from mpi4py import MPI
 
     comm = MPI.COMM_WORLD
 
-    P = RayleighBenard()
+    P = RayleighBenardUltraspherical()
 
     LogToFile.path = './data/'
     LogGrid.file_logger = LogToFile
