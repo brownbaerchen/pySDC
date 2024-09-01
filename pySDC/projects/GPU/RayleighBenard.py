@@ -4,7 +4,11 @@ from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFi
 
 
 def run_RBC(useGPU=False):
-    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit, SpaceAdaptivity
+    from pySDC.implementations.problem_classes.RayleighBenard import (
+        RayleighBenardUltraspherical,
+        CFLLimit,
+        SpaceAdaptivity,
+    )
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity, AdaptivityPolynomialError
@@ -29,9 +33,9 @@ def run_RBC(useGPU=False):
             'X': L.prob.X.get().view(np.ndarray),
             'Z': L.prob.Z.get().view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
-            'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence']))
-            .get()
-            .view(np.ndarray),
+            # 'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence']))
+            # .get()
+            # .view(np.ndarray),
         }
     else:
         LogToFile.process_solution = lambda L: {
@@ -40,29 +44,29 @@ def run_RBC(useGPU=False):
             'X': L.prob.X.view(np.ndarray),
             'Z': L.prob.Z.view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
-            'divergence': L.uend.xp.log10(
-                L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence'])
-            ).view(np.ndarray),
+            # 'divergence': L.uend.xp.log10(
+            #     L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence'])
+            # ).view(np.ndarray),
         }
     LogToFile.time_increment = 1e-1
     LogGrid.file_name = f'RBC-grid-{comm.rank}'
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.2
-    level_params['restol'] = 1e-7
+    level_params['dt'] = 0.5
+    level_params['restol'] = -1e-7
 
     convergence_controllers = {
-        # Adaptivity: {'e_tol': 1e-5, 'dt_max': level_params['dt'], 'max_restarts': 33},
+        # Adaptivity: {'e_tol': 1e-3, 'dt_max': level_params['dt']},
         # AdaptivityPolynomialError: {
         #     'e_tol': 1e-3,
         #     'interpolate_between_restarts': False,
-        #     'dt_max': level_params['dt'],
+        #     # 'dt_max': level_params['dt'],
         #     # 'dt_slope_max': 2,
         # },
         CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.4},
         StopAtNan: {'thresh': 1e6},
-        SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2},
+        # SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2, 'nx_max': 2**10,},
     }
 
     sweeper_params = {}
@@ -74,18 +78,18 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 4,
+        'Rayleigh': 2e6 / 16,
         'nx': max([2 * comm.size, 2**8]),
         'nz': max([comm.size, 2**6]),
         'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
         # 'debug':True,
-        # 'left_preconditioner': not useGPU,
+        'left_preconditioner': False,
         # 'right_preconditioning': 'T2T',
     }
 
     step_params = {}
-    step_params['maxiter'] = 9
+    step_params['maxiter'] = 5
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -93,7 +97,7 @@ def run_RBC(useGPU=False):
     controller_params['mssdc_jac'] = False
 
     description = {}
-    description['problem_class'] = RayleighBenard
+    description['problem_class'] = RayleighBenardUltraspherical
     description['problem_params'] = problem_params
     description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params

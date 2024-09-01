@@ -670,6 +670,26 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
+    def remove_BC(self, component, equation, axis, kind, scale=1.0, line=-1, scalar=False, **kwargs):
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
+        self.BC_mat[self.index(equation)][self.index(component)] -= _BC
+
+        if scalar:
+            slices = [self.index(equation)] + [
+                0,
+            ] * self.ndim
+            slices[axis + 1] = line
+        else:
+            slices = (
+                [self.index(equation)]
+                + [slice(0, self.init[0][i + 1]) for i in range(axis)]
+                + [line]
+                + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
+            )
+        N = self.axes[axis].N
+        if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
+            self.BC_rhs_mask[(*slices,)] = False
+
     def add_BC(self, component, equation, axis, kind, v, scale=1.0, line=-1, scalar=False, **kwargs):
         _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
@@ -688,8 +708,9 @@ class SpectralHelper:
 
         if scalar:
             slices = [self.index(equation)] + [
-                line,
+                0,
             ] * self.ndim
+            slices[axis + 1] = line
         else:
             slices = (
                 [self.index(equation)]

@@ -26,7 +26,14 @@ def test_heat1d_chebychov(a, b, f, noise, use_ultraspherical, nvars=2**4):
 
     if noise == 0:
         assert np.allclose(u, P.u_exact(dt), atol=1e-2), 'Error in solver'
-    assert np.allclose(u0[0], u02[0], atol=1e-3 if noise > 0 else 1e-8), 'Error in eval_f'
+
+    if noise > 0 and use_ultraspherical:
+        tol = 1e-5
+    elif noise > 0:
+        tol = 1e-4
+    else:
+        tol = 1e-8
+    assert np.allclose(u0[0], u02[0], atol=tol), 'Error in eval_f'
 
 
 @pytest.mark.base
@@ -35,18 +42,25 @@ def test_heat1d_chebychov(a, b, f, noise, use_ultraspherical, nvars=2**4):
 @pytest.mark.parametrize('c', [0, 3.1415])
 @pytest.mark.parametrize('fx', [2, 1])
 @pytest.mark.parametrize('fy', [2, 1])
-@pytest.mark.parametrize('base_x', ['fft', 'chebychov'])
-@pytest.mark.parametrize('base_y', ['fft', 'chebychov'])
+@pytest.mark.parametrize('base_x', ['fft', 'chebychov', 'ultraspherical'])
+@pytest.mark.parametrize('base_y', ['fft', 'chebychov', 'ultraspherical'])
 def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5 + 1, ny=2**5 + 1):
     import numpy as np
-    from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DChebychov
+
+    if base_x == 'ultraspherical' or base_y == 'ultraspherical':
+        from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DUltraspherical as problem_class
+    else:
+        from pySDC.implementations.problem_classes.HeatEquation_Chebychov import Heat2DChebychov as problem_class
+
+    if base_x == 'chebychov' and base_y == 'ultraspherical' or base_y == 'chebychov' and base_x == 'ultraspherical':
+        return None
 
     if base_y == 'fft' and (b != c):
         return None
     if base_x == 'fft' and (b != a):
         return None
 
-    P = Heat2DChebychov(
+    P = problem_class(
         nx=nx,
         ny=ny,
         a=a,
@@ -68,6 +82,8 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5 + 1, ny=2**5 
 
     tol = 1e-9 if (base_x == 'fft' or base_y == 'fft') else 1e-3
 
+    print(u)
+    print(P.u_exact(dt))
     assert np.allclose(
         u, P.u_exact(dt), atol=tol
     ), f'Error in solver larger than expected, got {abs((u - P.u_exact(dt))):.2e}'
@@ -129,6 +145,6 @@ def test_SDC():
 
 if __name__ == '__main__':
     # test_SDC()
-    test_heat1d_chebychov(1, 0, 1, 0e-1, True, 2**6)
+    # test_heat1d_chebychov(1, 0, 1, 0e-1, True, 2**6)
     # test_AdvectionDiffusion(plot=True)
-    # test_heat2d_chebychov(0, 0, 0, 1, 2, 'chebychov', 'chebychov', 2**5 + 1, 2**5 + 1)
+    test_heat2d_chebychov(0, 0, 0, 2, 2, 'ultraspherical', 'fft', 2**1, 2**3)

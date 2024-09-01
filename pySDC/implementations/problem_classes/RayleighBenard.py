@@ -7,6 +7,237 @@ from pySDC.core.convergence_controller import ConvergenceController
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
 
+class RayleighBenardUltraspherical(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = imex_mesh
+
+    def __init__(
+        self,
+        Prandl=1,
+        Rayleigh=2e6,
+        nx=256,
+        nz=64,
+        BCs=None,
+        dealiasing=3 / 2,
+        comm=None,
+        debug=False,
+        **kwargs,
+    ):
+        BCs = {} if BCs is None else BCs
+        BCs = {
+            'T_top': 0,
+            'T_bottom': 2,
+            'v_top': 0,
+            'v_bottom': 0,
+            'u_top': 0,
+            'u_bottom': 0,
+            'p_integral': 0,
+            **BCs,
+        }
+        if comm is None:
+            try:
+                from mpi4py import MPI
+
+                comm = MPI.COMM_WORLD
+            except ModuleNotFoundError:
+                pass
+        self._makeAttributeAndRegister(
+            'Prandl',
+            'Rayleigh',
+            'nx',
+            'nz',
+            'BCs',
+            'dealiasing',
+            'comm',
+            'debug',
+            localVars=locals(),
+            readOnly=True,
+        )
+
+        bases = [{'base': 'fft', 'N': nx, 'x0': 0, 'x1': 8}, {'base': 'ultraspherical', 'N': nz}]
+        components = ['u', 'v', 'T', 'p']
+        super().__init__(bases, components, comm=comm, **kwargs)
+
+        self.Z, self.X = self.get_grid()
+        self.Kz, self.Kx = self.get_wavenumbers()
+
+        # construct 2D matrices
+        Dx = self.get_differentiation_matrix(axes=(0,))
+        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
+        Dz = self.get_differentiation_matrix(axes=(1,))
+        Dzz = self.get_differentiation_matrix(axes=(1,), p=2)
+        Id = self.get_Id()
+
+        S1 = self.get_basis_change_matrix(p=1)
+        S2 = self.get_basis_change_matrix(p=2)
+
+        U1 = self.get_basis_change_matrix(p=1, direction='forward')
+        U2 = self.get_basis_change_matrix(p=2, direction='forward')
+
+        self.Dx = S2 @ Dx
+        self.Dxx = S2 @ Dxx
+        self.Dz = S1 @ Dz
+        self.Dzz = S2 @ Dzz
+
+        kappa = (Rayleigh * Prandl) ** (-1 / 2.0)
+        nu = (Rayleigh / Prandl) ** (-1 / 2.0)
+
+        # construct operators
+        L_lhs = {
+            'p': {'u': Dx, 'v': Dz},  # divergence free constraint
+            'u': {'p': U2 @ Dx, 'u': -nu * (U2 @ Dxx + Dzz)},
+            'v': {'p': U1 @ Dz, 'v': -nu * (U2 @ Dxx + Dzz), 'T': -U2 @ Id},
+            'T': {'T': -kappa * (U2 @ Dxx + Dzz)},
+        }
+        self.setup_L(L_lhs)
+
+        # mass matrix
+        M_lhs = {i: {i: Id} for i in ['u', 'v', 'T']}
+        self.setup_M(M_lhs)
+
+        self.add_BC(
+            component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1, scalar=True
+        )
+        self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet')
+        self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-2)
+        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet')
+        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2)
+        self.remove_BC(
+            component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2, scalar=True
+        )
+        self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet', line=-2)
+        self.add_BC(
+            component='u',
+            equation='u',
+            axis=1,
+            v=self.BCs['u_bottom'],
+            x=-1,
+            kind='Dirichlet',
+            line=-1,
+        )
+        self.setup_BCs()
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+
+        u_hat = self.transform(u)
+        f_impl_hat = self.u_init_forward
+
+        Dz = self.Dz
+        Dzz = self.Dzz
+        Dx = self.Dx
+        Dxx = self.Dxx
+
+        shape = u[0].shape
+        iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
+
+        kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
+        nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
+
+        # evaluate implicit terms
+        f_impl_hat[iT][:] = (kappa * (Dxx + Dzz) @ u_hat[iT].flatten()).reshape(shape)
+        f_impl_hat[iu][:] = (-Dx @ u_hat[ip].flatten() + nu * (Dxx + Dzz) @ u_hat[iu].flatten()).reshape(shape)
+        f_impl_hat[iv][:] = (-Dz @ u_hat[ip].flatten() + nu * (Dxx + Dzz) @ u_hat[iv].flatten()).reshape(shape) + u_hat[
+            iT
+        ]
+
+        f.impl[:] = self.itransform(f_impl_hat).real
+
+        # treat convection explicitly with dealiasing
+        Dx_u_hat = self.u_init_forward
+        for i in [iu, iv, iT]:
+            Dx_u_hat[i][:] = (Dx @ u_hat[i].flatten()).reshape(Dx_u_hat[i].shape)
+        Dz_u_hat = self.u_init_forward
+        for i in [iu, iv, iT]:
+            Dz_u_hat[i][:] = (Dz @ u_hat[i].flatten()).reshape(Dz_u_hat[i].shape)
+
+        padding = [self.dealiasing, self.dealiasing]
+        Dx_u_pad = self.itransform(Dx_u_hat, padding=padding).real
+        Dz_u_pad = self.itransform(Dz_u_hat, padding=padding).real
+        u_pad = self.itransform(u_hat, padding=padding).real
+
+        fexpl_pad = self.xp.zeros_like(u_pad)
+        fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * Dz_u_pad[iu])
+        fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dz_u_pad[iv])
+        fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dz_u_pad[iT])
+
+        f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
+
+        return f
+
+    def u_exact(self, t=0, noise_level=1e-3, seed=99, kxmax=None, kzmax=None, raiseExceptions=False):
+        assert t == 0
+        assert (
+            self.BCs['v_top'] == self.BCs['v_bottom']
+        ), 'Initial conditions are only implemented for zero velocity gradient'
+
+        me = self.u_init
+        iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
+
+        # linear temperature gradient
+        for comp in ['T', 'v', 'u']:
+            a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
+            b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
+            me[self.index(comp)] = a * self.Z + b
+
+        # perturb slightly
+        rng = self.xp.random.default_rng(seed=seed)
+
+        noise = self.u_init
+        noise[iT] = rng.random(size=me[iT].shape)
+
+        Kz, Kx = self.get_wavenumbers()
+        kzmax = self.nz - 3 if kzmax is None else kzmax
+        kxmax = self.nx // 2 if kxmax is None else kxmax
+        noise_hat = self.u_init_forward
+        noise_hat[:] = rng.random(size=noise_hat[iT].shape)
+        noise_hat[iT, np.abs(Kx) > kxmax] *= 0
+        noise_hat[iT, Kz > kzmax] *= 0
+        noise = self.itransform(noise_hat).real
+
+        me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
+
+        # enforce boundary conditions in spite of noise
+        me_hat = self.transform(me, axes=(-1,))
+        bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
+        bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
+
+        if noise_level > 0:
+            rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
+            rhs[0] = (
+                self.BCs["T_top"]
+                - self.xp.sum(bc_top[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
+                - self.xp.sum(bc_top[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
+            )
+            rhs[1] = (
+                self.BCs["T_bottom"]
+                - self.xp.sum(bc_bottom[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
+                - self.xp.sum(bc_bottom[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
+            )
+
+            A = self.xp.array([bc_top[kzmax - 2 : kzmax], bc_bottom[kzmax - 2 : kzmax]], complex)
+            me_hat[iT, :, kzmax - 2 : kzmax] = self.xp.linalg.solve(A, rhs).T
+
+            me[...] = self.itransform(me_hat, axes=(-1,)).real
+
+        u_hat = self.transform(me)
+
+        me[...] = self.itransform(u_hat).real
+        # # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
+
+        return me
+
+    def compute_vorticity(self, u):
+        u_hat = self.transform(u)
+        Dz = self.Dz
+        Dx = self.Dx
+        iu, iv = self.index(['u', 'v'])
+
+        vorticity_hat = self.u_init_forward
+        vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        return self.itransform(vorticity_hat)[0].real
+
+
 class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh

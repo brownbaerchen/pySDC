@@ -145,7 +145,7 @@ class Heat1DUltraspherical(GenericSpectralLinear):
             _noise[:] = self.itransform(noise_hat)
             u += _noise * noise * (self.x - 1) * (self.x + 1)
 
-        # self.check_BCs(u)
+        self.check_BCs(u)
         return u
 
 
@@ -233,5 +233,91 @@ class Heat2DChebychov(GenericSpectralLinear):
         u[iu] = xp.sin(fx * self.X) * xp.sin(fy * self.Y) * time_dep + alpha * self.X + beta * self.Y + gamma
         u[iux] = fx * xp.cos(fx * self.X) * xp.sin(fy * self.Y) * time_dep + alpha
         u[iuy] = fy * xp.sin(fx * self.X) * xp.cos(fy * self.Y) * time_dep + beta
+
+        return u
+
+
+class Heat2DUltraspherical(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = mesh
+
+    def __init__(
+        self, nx=128, ny=128, base_x='fft', base_y='ultraspherical', a=0, b=0, c=0, fx=1, fy=1, nu=1.0, **kwargs
+    ):
+        self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
+
+        bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
+        components = ['u']
+
+        super().__init__(bases, components, **kwargs)
+
+        self.Y, self.X = self.get_grid()
+
+        self.Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
+        self.Dyy = self.get_differentiation_matrix(axes=(1,), p=2)
+        self.S2 = self.get_basis_change_matrix(p=2)
+        I = self.get_Id()
+
+        L_lhs = {
+            'u': {'u': -nu * self.Dxx - nu * self.Dyy},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {'u': {'u': I}}
+        self.setup_M(M_lhs)
+
+        for base in [base_x, base_y]:
+            assert base in ['ultraspherical', 'fft']
+
+        alpha = (self.b - self.a) / 2.0
+        beta = (self.c - self.b) / 2.0
+        gamma = (self.c + self.a) / 2.0
+
+        if base_x == 'ultraspherical':
+            y = self.Y[0, :]
+            if self.base_y == 'fft':
+                self.add_BC(component='u', equation='u', axis=0, x=-1, v=beta * y - alpha + gamma, kind='Dirichlet')
+            self.add_BC(component='u', equation='u', axis=0, v=beta * y + alpha + gamma, x=1, line=-2, kind='Dirichlet')
+        else:
+            assert a == b, f'Need periodic boundary conditions in x for {base_x} method!'
+        if base_y == 'ultraspherical':
+            x = self.X[:, 0]
+            self.add_BC(
+                component='u', equation='u', axis=1, x=-1, v=alpha * x - beta + gamma, kind='Dirichlet', line=-1
+            )
+            self.add_BC(
+                component='u', equation='u', axis=1, x=+1, v=alpha * x + beta + gamma, kind='Dirichlet', line=-2
+            )
+        else:
+            assert c == b, f'Need periodic boundary conditions in y for {base_y} method!'
+        self.setup_BCs()
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+        iu = self.index('u')
+
+        me_hat = self.u_init_forward
+        me_hat[:] = self.transform(u)
+        me_hat[iu] = self.nu * (self.S2 @ (self.Dxx + self.Dyy) @ me_hat[iu].flatten()).reshape(me_hat[iu].shape)
+        me = self.itransform(me_hat)
+
+        f[iu] = me[iu].real
+        return f
+
+    def u_exact(self, t):
+        xp = self.xp
+        iu = self.index('u')
+        u = self.u_init
+
+        fx = self.fx if self.base_x == 'fft' else np.pi * self.fx
+        fy = self.fy if self.base_y == 'fft' else np.pi * self.fy
+
+        time_dep = xp.exp(-self.nu * (fx**2 + fy**2) * t)
+
+        alpha = (self.b - self.a) / 2.0
+        beta = (self.c - self.b) / 2.0
+        gamma = (self.c + self.a) / 2.0
+
+        u[iu] = xp.sin(fx * self.X) * xp.sin(fy * self.Y) * time_dep + alpha * self.X + beta * self.Y + gamma
 
         return u
