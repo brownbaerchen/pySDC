@@ -14,7 +14,7 @@ def test_differentiation_matrix(N, p):
     coeffs = np.random.random(N)
 
     D = helper.get_differentiation_matrix(p=p)
-    Q = helper.get_basis_change_matrix(p)
+    Q = helper.get_basis_change_matrix(p_in=p, p_out=0, direction='backward')
 
     du = helper.itransform(Q @ D @ coeffs)
     exact = np.polynomial.Chebyshev(coeffs).deriv(p)(x)
@@ -42,7 +42,7 @@ def test_poisson_problem(N, deg):
     Dxx = helper.get_differentiation_matrix(p=2)
     BC_l = helper.get_Dirichlet_BC_row_T(x=-1)
     BC_r = helper.get_Dirichlet_BC_row_T(x=1)
-    P = helper.get_basis_change_matrix(direction='forward', p=0)
+    P = helper.get_basis_change_matrix(direction='forward', p_in=0)
 
     A = Dxx.tolil()
     A[-1, :] = BC_l

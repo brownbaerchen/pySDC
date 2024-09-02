@@ -742,6 +742,46 @@ def test_refinement_2D(nz):
     # print(u_hat, u_hat_
 
 
+@pytest.mark.mpi4py
+def test_Poisson_problem_v():
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+
+    BCs = {
+        'u_top': 0,
+        'u_bottom': 0,
+        'v_top': 0,
+        'v_bottom': 0,
+        'T_top': 0,
+        'T_bottom': 2,
+    }
+    P = RayleighBenard(nx=1, nz=8, BCs=BCs, Rayleigh=1.0)
+    rhs = P.u_init
+
+    idx = P.index('v')
+
+    A = P.put_BCs_in_matrix(-P.L)
+    rhs_real = P.put_BCs_in_rhs(rhs)
+    rhs = P.transform(rhs_real)
+    # rhs[idx][0, 2] = 6
+    # rhs[idx][0, 0] = 6
+    u = P.sparse_lib.linalg.spsolve(A, P.M @ rhs.flatten()).reshape(rhs.shape).real
+
+    u_exact = P.u_init
+    iT = P.index('T')
+    u_exact[iT][0, 1] = 1
+    u_exact[iT][0, 0] = 1
+
+    ip = P.index('p')
+    u_exact[ip][0, 5] = 1 / (16 * 5)
+    u_exact[ip][0, 3] = 5 / (16 * 5)
+    u_exact[ip][0, 1] = -70 / (16 * 5)
+
+    print(u[iT])
+    # print(u_exact[ip])
+    assert np.allclose(u_exact, u)
+
+
 if __name__ == '__main__':
     # test_limit_case('Pr->inf', plotting=True)
     # test_derivatives(64, 64, 'z', 'T2U')
@@ -751,7 +791,8 @@ if __name__ == '__main__':
     # test_solver(2**8, 2**6 + 0, 'T2U', noise=1e3, plotting=True)
     # test_resolution_derefinement(6, 3)
     # test_resolution_refinement(4, 4)
-    test_refinement_2D(2)
+    # test_refinement_2D(2)
+    test_Poisson_problem_v()
     # test_solver_small_step_size(True)
     # test_vorticity(64, 4, 'T2T', 'x')
     # test_linear_operator(2**4, 2**4, 'T2U', 'x')

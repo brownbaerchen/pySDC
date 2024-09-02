@@ -478,13 +478,15 @@ class Ultraspherical(ChebychovHelper):
 
             return self.sparse_lib.csr_matrix(mat_bck)
 
-    def get_basis_change_matrix(self, p=0, direction='backward'):
+    def get_basis_change_matrix(self, p_in=0, p_out=None, direction='backward'):
         if direction == 'forward':
-            return self.get_conv(p_out=self.derivative_base, p_in=p)
+            p_out = self.derivative_base if p_out is None else p_out
+            return self.get_conv(p_out=p_out, p_in=p_in)
         elif direction == 'backward':
-            return self.get_conv(p_in=p, p_out=0)
+            p_out = 0 if p_out is None else p_out
+            return self.get_conv(p_in=p_in, p_out=p_out)
         else:
-            return self.get_conv(direction)
+            return self.get_conv(p_in=p_in, p_out=p_out)
 
     def get_Id(self):
         return self.sparse_lib.eye(self.N)

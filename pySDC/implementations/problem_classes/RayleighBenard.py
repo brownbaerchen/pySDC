@@ -68,11 +68,12 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
         Id = self.get_Id()
 
-        S1 = self.get_basis_change_matrix(p=1, direction='backward')
-        S2 = self.get_basis_change_matrix(p=2, direction='backward')
+        S1 = self.get_basis_change_matrix(p_out=0, p_in=1)
+        S2 = self.get_basis_change_matrix(p_out=0, p_in=2)
 
-        U1 = self.get_basis_change_matrix(p=1, direction='forward')
-        U2 = self.get_basis_change_matrix(p=0, direction='forward')
+        U01 = self.get_basis_change_matrix(p_in=0, p_out=1)
+        U12 = self.get_basis_change_matrix(p_in=1, p_out=2)
+        U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
 
         self.Dx = Dx
         self.Dxx = Dxx
@@ -84,29 +85,27 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
 
         # construct operators
         L_lhs = {
-            'p': {'u': U2 @ Dx, 'v': U1 @ Dz},  # divergence free constraint
-            'u': {'p': U2 @ Dx, 'u': -nu * (U2 @ Dxx + Dzz)},
-            'v': {'p': U1 @ Dz, 'v': -nu * (U2 @ Dxx + Dzz), 'T': -U2 @ Id},
-            'T': {'T': -kappa * (U2 @ Dxx + Dzz)},
+            'p': {'u': U01 @ Dx, 'v': Dz},  # divergence free constraint
+            'u': {'p': U02 @ Dx, 'u': -nu * (U02 @ Dxx + Dzz)},
+            'v': {'p': U12 @ Dz, 'v': -nu * (U02 @ Dxx + Dzz), 'T': -U02 @ Id},
+            'T': {'T': -kappa * (U02 @ Dxx + Dzz)},
         }
         self.setup_L(L_lhs)
 
-        # mass matrix  TODO: use different base in different equations!
-        M_lhs = {i: {i: U2 @ Id} for i in ['u', 'v', 'T']}
+        # mass matrix
+        M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'T']}
         self.setup_M(M_lhs)
 
-        self.base_change = self._setup_operator({comp: {comp: S2} for comp in self.spectral.components})
+        self.base_change = self._setup_operator({**{comp: {comp: S2} for comp in ['u', 'v', 'T']}, 'p': {'p': S1}})
 
         self.add_BC(
             component='p', equation='p', axis=1, v=self.BCs['p_integral'], kind='integral', line=-1, scalar=True
         )
         self.add_BC(component='T', equation='T', axis=1, x=-1, v=self.BCs['T_bottom'], kind='Dirichlet', line=-1)
         self.add_BC(component='T', equation='T', axis=1, x=1, v=self.BCs['T_top'], kind='Dirichlet', line=-2)
-        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', line=-1)
-        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2)
-        self.remove_BC(
-            component='v', equation='v', axis=1, x=1, v=self.BCs['v_top'], kind='Dirichlet', line=-2, scalar=True
-        )
+        self.add_BC(component='v', equation='v', axis=1, x=1, v=self.BCs['v_bottom'], kind='Dirichlet', line=-1)
+        self.add_BC(component='v', equation='v', axis=1, x=-1, v=self.BCs['v_bottom'], kind='Dirichlet', line=-2)
+        self.remove_BC(component='v', equation='v', axis=1, x=-1, kind='Dirichlet', line=-2, scalar=True)
         self.add_BC(component='u', equation='u', axis=1, v=self.BCs['u_top'], x=1, kind='Dirichlet', line=-2)
         self.add_BC(
             component='u',
@@ -139,6 +138,8 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         # evaluate implicit terms
         f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
         f.impl[:] = self.itransform(f_impl_hat).real
+
+        # print(abs(f.impl[ip]))
 
         # treat convection explicitly with dealiasing
         Dx_u_hat = self.u_init_forward

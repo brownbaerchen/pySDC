@@ -184,6 +184,7 @@ class GenericSpectralLinear(Problem):
         #     # M = self.spectral.put_BCs_in_matrix(self.L.copy())
         #     M = A  # self.L
         #     im = plt.imshow((M / abs(M)).real)
+        #     # im = plt.imshow(self.base_change.toarray().real)
         #     # im = plt.imshow(np.log10(abs(A.toarray())).real)
         #     # im = plt.imshow(((A.toarray())).real)
         #     plt.colorbar(im)

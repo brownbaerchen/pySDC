@@ -181,4 +181,4 @@ class LogToFileAfterXs(LogToFile):
 
         if L.time + L.dt >= self.t_next_log and not step.status.restart:
             super().post_step(step, level_number)
-            self.t_next_log += self.time_increment
+            self.t_next_log = max([L.time + L.dt, self.t_next_log]) + self.time_increment

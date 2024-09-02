@@ -6,6 +6,7 @@ from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFi
 def run_RBC(useGPU=False):
     from pySDC.implementations.problem_classes.RayleighBenard import (
         RayleighBenardUltraspherical,
+        RayleighBenard,
         CFLLimit,
         SpaceAdaptivity,
     )
@@ -33,9 +34,9 @@ def run_RBC(useGPU=False):
             'X': L.prob.X.get().view(np.ndarray),
             'Z': L.prob.Z.get().view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
-            # 'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence']))
-            # .get()
-            # .view(np.ndarray),
+            'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')]))
+            .get()
+            .view(np.ndarray),
         }
     else:
         LogToFile.process_solution = lambda L: {
@@ -44,6 +45,7 @@ def run_RBC(useGPU=False):
             'X': L.prob.X.view(np.ndarray),
             'Z': L.prob.Z.view(np.ndarray),
             'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
+            'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
             # 'divergence': L.uend.xp.log10(
             #     L.uend.xp.abs(L.prob.compute_constraint_violation(L.uend)['divergence'])
             # ).view(np.ndarray),
@@ -54,7 +56,7 @@ def run_RBC(useGPU=False):
 
     level_params = {}
     level_params['dt'] = 0.5
-    level_params['restol'] = -1e-7
+    level_params['restol'] = -1e-5
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e-3, 'dt_max': level_params['dt']},
@@ -71,25 +73,24 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 3
-    sweeper_params['QI'] = 'LU'
+    sweeper_params['num_nodes'] = 1
+    sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 16,
+        'Rayleigh': 2e6 / 2**4,
         'nx': max([2 * comm.size, 2**8]),
         'nz': max([comm.size, 2**6]),
-        'cheby_mode': 'T2U',
         'dealiasing': 3 / 2,
-        'debug': True,
+        # 'debug': True,
         'left_preconditioner': False,
-        # 'right_preconditioning': 'T2T',
+        'right_preconditioning': 'T2T',
     }
 
     step_params = {}
-    step_params['maxiter'] = 5
+    step_params['maxiter'] = 1
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
