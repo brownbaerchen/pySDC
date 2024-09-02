@@ -82,7 +82,7 @@ class RayleighBenardUltraspherical(RayleighBenard):
         self,
         Prandl=1,
         Rayleigh=2e6,
-        nx=256,
+        nx=257,
         nz=64,
         BCs=None,
         dealiasing=3 / 2,
@@ -187,6 +187,11 @@ class RayleighBenardUltraspherical(RayleighBenard):
         )
         self.setup_BCs()
 
+        if nx % 2 == 0:
+            self.logger.warning(
+                f'The resolution is x-direction is even at {nx}. Keep in mind that the Nyquist mode is only partially resolved in this case. Consider changing the solution by one.'
+            )
+
     def eval_f(self, u, *args, **kwargs):
         f = self.f_init
 
@@ -228,7 +233,7 @@ class RayleighBenardUltraspherical(RayleighBenard):
         fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dz_u_pad[iv])
         fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dz_u_pad[iT])
 
-        f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding).real)
+        f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
 
         return f
 

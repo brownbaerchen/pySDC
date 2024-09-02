@@ -66,7 +66,7 @@ def run_RBC(useGPU=False):
         #     # 'dt_max': level_params['dt'],
         #     # 'dt_slope_max': 2,
         # },
-        CFLLimit: {'dt_max': level_params['dt'], 'dt_min': 1e-6, 'cfl': 0.8},
+        CFLLimit: {'dt_max': level_params['dt'], 'dt_min': 1e-6, 'cfl': 0.4},
         StopAtNan: {'thresh': 1e6},
         # SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2, 'nx_max': 2**10,},
     }
@@ -80,8 +80,8 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 2**4,
-        'nx': max([2 * comm.size, 2**8 + 1]),
+        'Rayleigh': 2e6 / 2**3,
+        'nx': max([2 * comm.size, 2**8]) + 1,
         'nz': max([comm.size, 2**6]),
         'dealiasing': 3 / 2,
         # 'debug': True,
@@ -90,7 +90,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 9
+    step_params['maxiter'] = 3
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
