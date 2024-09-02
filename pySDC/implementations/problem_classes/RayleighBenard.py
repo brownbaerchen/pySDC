@@ -7,9 +7,76 @@ from pySDC.core.convergence_controller import ConvergenceController
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
 
-class RayleighBenardUltraspherical(GenericSpectralLinear):
+class RayleighBenard(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = imex_mesh
+
+    def compute_vorticity(self, u):
+        u_hat = self.transform(u)
+        Dz = self.Dz
+        Dx = self.Dx
+        iu, iv = self.index(['u', 'v'])
+
+        vorticity_hat = self.u_init_forward
+        vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        return self.itransform(vorticity_hat)[0].real
+
+    def get_fig(self):  # pragma: no cover
+        """
+        Get a figure suitable to plot the solution of this problem
+
+        Returns
+        -------
+        self.fig : matplotlib.pyplot.figure.Figure
+        """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        plt.rcParams['figure.constrained_layout.use'] = True
+        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
+        self.cax = []
+        divider = make_axes_locatable(axs[0])
+        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
+        divider2 = make_axes_locatable(axs[1])
+        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+        return self.fig
+
+    def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
+        r"""
+        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution to be plotted
+        t : float
+            Time to display at the top of the figure
+        fig : matplotlib.pyplot.figure.Figure
+            Figure with the correct structure
+
+        Returns
+        -------
+        None
+        """
+        fig = self.get_fig() if fig is None else fig
+        axs = fig.axes
+
+        imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
+        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
+
+        for i, label in zip([0, 1], [rf'${quantity}$', 'vorticity']):
+            axs[i].set_aspect(1)
+            axs[i].set_title(label)
+
+        if t is not None:
+            fig.suptitle(f't = {t:.2f}')
+        axs[1].set_xlabel(r'$x$')
+        axs[1].set_ylabel(r'$z$')
+        fig.colorbar(imT, self.cax[0])
+        fig.colorbar(imV, self.cax[1])
+
+
+class RayleighBenardUltraspherical(RayleighBenard):
 
     def __init__(
         self,
@@ -74,6 +141,8 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         U01 = self.get_basis_change_matrix(p_in=0, p_out=1)
         U12 = self.get_basis_change_matrix(p_in=1, p_out=2)
         U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
+
+        # self.FZ = self.get_filter_matrix(axis=1, kmax=nz-8)
 
         self.Dx = Dx
         self.Dxx = Dxx
@@ -159,11 +228,11 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dz_u_pad[iv])
         fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dz_u_pad[iT])
 
-        f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
+        f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding).real)
 
         return f
 
-    def u_exact(self, t=0, noise_level=1e-3, seed=99, kxmax=None, kzmax=None, raiseExceptions=False):
+    def u_exact(self, t=0, noise_level=1e-3, seed=99):
         assert t == 0
         assert (
             self.BCs['v_top'] == self.BCs['v_bottom']
@@ -184,115 +253,12 @@ class RayleighBenardUltraspherical(GenericSpectralLinear):
         noise = self.u_init
         noise[iT] = rng.random(size=me[iT].shape)
 
-        Kz, Kx = self.get_wavenumbers()
-        kzmax = self.nz - 3 if kzmax is None else kzmax
-        kxmax = self.nx // 2 if kxmax is None else kxmax
-        noise_hat = self.u_init_forward
-        noise_hat[:] = rng.random(size=noise_hat[iT].shape)
-        noise_hat[iT, np.abs(Kx) > kxmax] *= 0
-        noise_hat[iT, Kz > kzmax] *= 0
-        noise = self.itransform(noise_hat).real
-
         me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
-
-        # enforce boundary conditions in spite of noise
-        me_hat = self.transform(me, axes=(-1,))
-        bc_top = self.spectral.axes[1].get_BC(x=1, kind='Dirichlet')
-        bc_bottom = self.spectral.axes[1].get_BC(x=-1, kind='Dirichlet')
-
-        if noise_level > 0:
-            rhs = self.xp.empty(shape=(2, me_hat.shape[1]), dtype=complex)
-            rhs[0] = (
-                self.BCs["T_top"]
-                - self.xp.sum(bc_top[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
-                - self.xp.sum(bc_top[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
-            )
-            rhs[1] = (
-                self.BCs["T_bottom"]
-                - self.xp.sum(bc_bottom[: kzmax - 2] * me_hat[iT, :, : kzmax - 2], axis=1)
-                - self.xp.sum(bc_bottom[kzmax:] * me_hat[iT, :, kzmax:], axis=1)
-            )
-
-            A = self.xp.array([bc_top[kzmax - 2 : kzmax], bc_bottom[kzmax - 2 : kzmax]], complex)
-            me_hat[iT, :, kzmax - 2 : kzmax] = self.xp.linalg.solve(A, rhs).T
-
-            me[...] = self.itransform(me_hat, axes=(-1,)).real
-
-        u_hat = self.transform(me)
-
-        me[...] = self.itransform(u_hat).real
-        # # me[ip] += -1.0 / 12.0 * self.BCs['T_top'] + 1 / 12.0 * self.BCs['T_bottom'] + self.BCs['p_integral'] / 2.0
 
         return me
 
-    def compute_vorticity(self, u):
-        u_hat = self.transform(u)
-        Dz = self.Dz
-        Dx = self.Dx
-        iu, iv = self.index(['u', 'v'])
 
-        vorticity_hat = self.u_init_forward
-        vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.itransform(vorticity_hat)[0].real
-
-    def get_fig(self):  # pragma: no cover
-        """
-        Get a figure suitable to plot the solution of this problem
-
-        Returns
-        -------
-        self.fig : matplotlib.pyplot.figure.Figure
-        """
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-        plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
-        self.cax = []
-        divider = make_axes_locatable(axs[0])
-        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
-        divider2 = make_axes_locatable(axs[1])
-        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
-        return self.fig
-
-    def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
-        r"""
-        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
-
-        Parameters
-        ----------
-        u : dtype_u
-            Solution to be plotted
-        t : float
-            Time to display at the top of the figure
-        fig : matplotlib.pyplot.figure.Figure
-            Figure with the correct structure
-
-        Returns
-        -------
-        None
-        """
-        fig = self.get_fig() if fig is None else fig
-        axs = fig.axes
-
-        imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
-        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
-
-        for i, label in zip([0, 1], [rf'${quantity}$', 'vorticity']):
-            axs[i].set_aspect(1)
-            axs[i].set_title(label)
-
-        if t is not None:
-            fig.suptitle(f't = {t:.2f}')
-        axs[1].set_xlabel(r'$x$')
-        axs[1].set_ylabel(r'$z$')
-        fig.colorbar(imT, self.cax[0])
-        fig.colorbar(imV, self.cax[1])
-
-
-class RayleighBenard(GenericSpectralLinear):
-    dtype_u = mesh
-    dtype_f = imex_mesh
+class RayleighBenardChebychov(GenericSpectralLinear):
 
     def __init__(
         self,
@@ -590,16 +556,6 @@ class RayleighBenard(GenericSpectralLinear):
 
         return sol
 
-    def compute_vorticity(self, u):
-        u_hat = self.transform(u)
-        Dz = self.U2T @ self.Dz
-        Dx = self.U2T @ self.Dx
-        iu, iv = self.index(['u', 'v'])
-
-        vorticity_hat = self.u_init_forward
-        vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.itransform(vorticity_hat)[0].real
-
     def compute_constraint_violation(self, u):
         iu, iv, ivz, iT, iTz, ip, iuz = self.index(self.components)
         idxu, idxv, idzu, idzv, idzT = 0, 1, 2, 3, 4
@@ -777,60 +733,6 @@ class RayleighBenard(GenericSpectralLinear):
 
         self.logger.debug(f'Derefined spatial resolution by {remove_modes} modes to nx={P_new.nx} and nz={P_new.nz}')
         return me, P_new
-
-    def get_fig(self):  # pragma: no cover
-        """
-        Get a figure suitable to plot the solution of this problem
-
-        Returns
-        -------
-        self.fig : matplotlib.pyplot.figure.Figure
-        """
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-        plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
-        self.cax = []
-        divider = make_axes_locatable(axs[0])
-        self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
-        divider2 = make_axes_locatable(axs[1])
-        self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
-        return self.fig
-
-    def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
-        r"""
-        Plot the solution. Please supply a figure with the same structure as returned by ``self.get_fig``.
-
-        Parameters
-        ----------
-        u : dtype_u
-            Solution to be plotted
-        t : float
-            Time to display at the top of the figure
-        fig : matplotlib.pyplot.figure.Figure
-            Figure with the correct structure
-
-        Returns
-        -------
-        None
-        """
-        fig = self.get_fig() if fig is None else fig
-        axs = fig.axes
-
-        imT = axs[0].pcolormesh(self.X, self.Z, u[self.index(quantity)].real)
-        imV = axs[1].pcolormesh(self.X, self.Z, self.compute_vorticity(u).real)
-
-        for i, label in zip([0, 1], [rf'${quantity}$', 'vorticity']):
-            axs[i].set_aspect(1)
-            axs[i].set_title(label)
-
-        if t is not None:
-            fig.suptitle(f't = {t:.2f}')
-        axs[1].set_xlabel(r'$x$')
-        axs[1].set_ylabel(r'$z$')
-        fig.colorbar(imT, self.cax[0])
-        fig.colorbar(imV, self.cax[1])
 
 
 class CFLLimit(ConvergenceController):

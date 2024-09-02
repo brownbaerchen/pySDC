@@ -411,12 +411,11 @@ class ChebychovHelper(SpectralHelper1D):
 
 class Ultraspherical(ChebychovHelper):
     """
-    This implementation follows https://arxiv.org/abs/2006.08756
+    This implementation follows https://doi.org/10.1137/120865458.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.derivative_base = 0
 
     def get_differentiation_matrix(self, p=1):
         sp = self.sparse_lib
@@ -425,7 +424,6 @@ class Ultraspherical(ChebychovHelper):
         l = p
         from scipy.special import factorial
 
-        self.derivative_base = max([p, self.derivative_base])
         return 2 ** (l - 1) * factorial(l - 1) * sp.diags(xp.arange(N - l) + l, offsets=l)
 
     def get_S(self, lmbda):
@@ -478,20 +476,11 @@ class Ultraspherical(ChebychovHelper):
 
             return self.sparse_lib.csr_matrix(mat_bck)
 
-    def get_basis_change_matrix(self, p_in=0, p_out=None, direction='backward'):
-        if direction == 'forward':
-            p_out = self.derivative_base if p_out is None else p_out
-            return self.get_conv(p_out=p_out, p_in=p_in)
-        elif direction == 'backward':
-            p_out = 0 if p_out is None else p_out
-            return self.get_conv(p_in=p_in, p_out=p_out)
-        else:
-            return self.get_conv(p_in=p_in, p_out=p_out)
+    def get_basis_change_matrix(self, p_in=0, p_out=0, **kwargs):
+        return self.get_conv(p_in=p_in, p_out=p_out)
 
     def get_Id(self):
         return self.sparse_lib.eye(self.N)
-
-    # return self.get_basis_change_matrix(p=0, direction='forward')
 
 
 class FFTHelper(SpectralHelper1D):

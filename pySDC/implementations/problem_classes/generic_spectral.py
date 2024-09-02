@@ -174,7 +174,6 @@ class GenericSpectralLinear(Problem):
         rhs_hat = self.Pl @ self.spectral.transform(rhs).flatten()
 
         A = self.M + dt * self.L
-        # A[2*self.nx*self.nz, 2*self.nx*self.nz] = 1
         A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
         # import numpy as np

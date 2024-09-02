@@ -55,8 +55,8 @@ def run_RBC(useGPU=False):
     LogGrid.file_logger = LogToFile
 
     level_params = {}
-    level_params['dt'] = 0.5
-    level_params['restol'] = -1e-5
+    level_params['dt'] = 0.1
+    level_params['restol'] = 1e-7
 
     convergence_controllers = {
         # Adaptivity: {'e_tol': 1e-3, 'dt_max': level_params['dt']},
@@ -66,22 +66,22 @@ def run_RBC(useGPU=False):
         #     # 'dt_max': level_params['dt'],
         #     # 'dt_slope_max': 2,
         # },
-        CFLLimit: {'dt_max': 2e-1, 'dt_min': 1e-6, 'cfl': 0.2},
+        CFLLimit: {'dt_max': level_params['dt'], 'dt_min': 1e-6, 'cfl': 0.8},
         StopAtNan: {'thresh': 1e6},
         # SpaceAdaptivity: {'nx_min': 2 * comm.size, 'nz_min': comm.size, 'factor': 2, 'nx_max': 2**10,},
     }
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 1
-    sweeper_params['QI'] = 'IE'
+    sweeper_params['num_nodes'] = 2
+    sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6 / 2**4,
-        'nx': max([2 * comm.size, 2**8]),
+        'nx': max([2 * comm.size, 2**8 + 1]),
         'nz': max([comm.size, 2**6]),
         'dealiasing': 3 / 2,
         # 'debug': True,
@@ -90,7 +90,7 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 9
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
@@ -112,11 +112,21 @@ def run_RBC(useGPU=False):
     Tend = 50
     P = controller.MS[0].levels[0].prob
 
-    relaxation_steps = 0
+    relaxation_steps = 5
     u0_noise = P.u_exact(t0, seed=comm.rank, noise_level=1e-3)
     uinit = u0_noise
     for _ in range(relaxation_steps):
-        uinit = P.solve_system(uinit, dt=0.25)
+        uinit = P.solve_system(uinit, dt=0.1)
+
+    # f = P.eval_f(uinit)
+    # f_hat = P.transform(f.impl)
+    # ip = P.index('p')
+    # import matplotlib.pyplot as plt
+    # im = plt.imshow(np.log10(np.abs(f_hat[ip])))
+    # plt.colorbar(im)
+    # plt.show()
+    # breakpoint()
+    # return None
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 

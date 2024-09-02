@@ -94,12 +94,12 @@ class Heat1DUltraspherical(GenericSpectralLinear):
 
         self.x = self.get_grid()[0]
 
-        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
         I = self.get_Id()
-        S2 = self.get_basis_change_matrix(p=2)
+        S2 = self.get_basis_change_matrix(p_in=2, p_out=0)
+        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
         self.Dxx = S2 @ Dxx
 
-        U2 = self.get_basis_change_matrix(p=0, direction='forward')
+        U2 = self.get_basis_change_matrix(p_in=0, p_out=2)
 
         L_lhs = {
             'u': {'u': -nu * Dxx},
