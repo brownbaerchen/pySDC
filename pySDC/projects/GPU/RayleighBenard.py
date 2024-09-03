@@ -80,7 +80,7 @@ def run_RBC(useGPU=False):
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6 / 2**3,
+        'Rayleigh': 2e6,
         'nx': max([2 * comm.size, 2**8]) + 1,
         'nz': max([comm.size, 2**6]),
         'dealiasing': 3 / 2,
