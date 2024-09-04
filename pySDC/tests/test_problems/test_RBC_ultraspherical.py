@@ -95,19 +95,25 @@ def test_vorticity(nx, nz, direction):
     assert np.allclose(P.compute_vorticity(u), expect)
 
 
-def test_Nusselt_numbers(nx=5, nz=4):
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('v', [0, 3.14])
+def test_Nusselt_numbers(v, nx=5, nz=4):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardUltraspherical
 
     BCs = {
-        'v_top': 1,
-        'v_bottom': 1,
+        'v_top': v,
+        'v_bottom': v,
     }
 
     P = RayleighBenardUltraspherical(nx=nx, nz=nz, BCs=BCs)
 
     u = P.u_exact(noise_level=0)
-    P.compute_Nusselt_numbers(u)
+
+    nusselt = P.compute_Nusselt_numbers(u)
+    expect = {'V': 1 + v, 't': 1, 'b': +1 + 2 * v}
+    for key in nusselt.keys():
+        assert np.isclose(nusselt[key], expect[key])
 
 
 @pytest.mark.mpi4py
@@ -202,4 +208,4 @@ if __name__ == '__main__':
     # test_eval_f(2**7, 2**5, 'mixed')
     # test_Poisson_problem(1, 'T')
     # test_Poisson_problem_v()
-    test_Nusselt_numbers()
+    test_Nusselt_numbers(1)

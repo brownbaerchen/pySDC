@@ -142,8 +142,6 @@ class RayleighBenardUltraspherical(RayleighBenard):
         U12 = self.get_basis_change_matrix(p_in=1, p_out=2)
         U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
 
-        # self.FZ = self.get_filter_matrix(axis=1, kmax=nz-8)
-
         self.Dx = Dx
         self.Dxx = Dxx
         self.Dz = S1 @ Dz
@@ -213,8 +211,6 @@ class RayleighBenardUltraspherical(RayleighBenard):
         f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
         f.impl[:] = self.itransform(f_impl_hat).real
 
-        # print(abs(f.impl[ip]))
-
         # treat convection explicitly with dealiasing
         Dx_u_hat = self.u_init_forward
         for i in [iu, iv, iT]:
@@ -261,6 +257,50 @@ class RayleighBenardUltraspherical(RayleighBenard):
         me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
 
         return me
+
+    def compute_Nusselt_numbers(self, u):
+        """
+        Compute the various versions of the Nusselt number. This reflects the type of heat transport.
+        If the Nusselt number is equal to one, it indicates heat transport due to conduction. If it is larger,
+        advection is present.
+        Computing the Nusselt number at various places can be used to check the code.
+
+        Args:
+            u: The solution you want to compute the Nusselt numbers of
+
+        Returns:
+            dict: Nusselt number averaged over the entire volume and horizontally averaged at the top and bottom.
+        """
+        iv, iT = self.index(['v', 'T'])
+
+        DzT_hat = self.u_init_forward
+
+        u_hat = self.transform(u)
+        DzT_hat[iT] = (self.Dz @ u_hat[iT].flatten()).reshape(DzT_hat[iT].shape)
+
+        # compute vT with dealiasing
+        padding = [self.dealiasing, self.dealiasing]
+        u_pad = self.itransform(u_hat, padding=padding).real
+        _me = self.xp.zeros_like(u_pad)
+        _me[0] = u_pad[iv] * u_pad[iT]
+        vT_hat = self.transform(_me, padding=padding)
+
+        nusselt_hat = (vT_hat[0] - DzT_hat[iT]) / self.nx
+
+        integral_z = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='integral'), axis=-1).real
+        integral_V = (
+            integral_z[0] * self.axes[0].L
+        )  # only the first Fourier mode has non-zero integral with periodic BCs
+        Nusselt_V = integral_V / self.spectral.V
+
+        Nusselt_t = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0]
+        Nusselt_b = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0]
+
+        return {
+            'V': Nusselt_V,
+            't': Nusselt_t,
+            'b': Nusselt_b,
+        }
 
 
 class RayleighBenardChebychov(GenericSpectralLinear):

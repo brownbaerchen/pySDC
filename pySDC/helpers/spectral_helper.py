@@ -351,7 +351,7 @@ class ChebychovHelper(SpectralHelper1D):
     def get_integ_BC_row(self, **kwargs):
         """
         Get a row for generating integral BCs with T polynomials.
-        It returns the values of the T polynomials at x.
+        It returns the values of the integrals of T polynomials over the entire interval.
 
         Returns:
             self.xp.ndarray: Row to put into a matrix
@@ -593,6 +593,10 @@ class SpectralHelper:
     @property
     def ncomponents(self):
         return len(self.components)
+
+    @property
+    def V(self):
+        return np.prod([me.L for me in self.axes])
 
     def add_axis(self, base, *args, **kwargs):
         kwargs['useGPU'] = self.useGPU
