@@ -81,7 +81,7 @@ class SpectralHelper1D:
 
 
 class ChebychovHelper(SpectralHelper1D):
-    def __init__(self, *args, mode='T2U', transform_type='fft', x0=-1, x1=1, **kwargs):
+    def __init__(self, *args, mode='T2T', transform_type='fft', x0=-1, x1=1, **kwargs):
         assert x0 == -1
         assert x1 == 1
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
@@ -481,6 +481,17 @@ class Ultraspherical(ChebychovHelper):
 
     def get_Id(self):
         return self.sparse_lib.eye(self.N)
+
+    def get_integration_matrix(self):
+        return self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1) @ self.get_conv(p_out=1, p_in=0)
+
+    def get_integration_constant(self, u_hat, axis):
+        slices = [
+            None,
+        ] * u_hat.ndim
+        slices[axis] = slice(1, u_hat.shape[axis])
+        return self.xp.sum(u_hat[(*slices,)] * (-1) ** (self.xp.arange(u_hat.shape[axis] - 1)), axis=axis)
+        return None
 
 
 class FFTHelper(SpectralHelper1D):

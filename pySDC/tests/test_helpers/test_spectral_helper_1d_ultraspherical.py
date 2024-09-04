@@ -24,6 +24,27 @@ def test_differentiation_matrix(N, p):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('N', [4, 7, 32])
+def test_integration(N):
+    import numpy as np
+    import scipy
+    from pySDC.helpers.spectral_helper import Ultraspherical
+
+    helper = Ultraspherical(N)
+    x = helper.get_1dgrid()
+    coeffs = np.random.random(N)
+    coeffs[-1] = 0
+
+    poly = np.polynomial.Chebyshev(coeffs)
+
+    S = helper.get_integration_matrix()
+    U_hat = S @ coeffs
+    U_hat[0] = helper.get_integration_constant(U_hat, axis=-1)
+
+    assert np.allclose(poly.integ(lbnd=-1).coef[:-1], U_hat)
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('N', [6, 33])
 @pytest.mark.parametrize('deg', [1, 3])
 def test_poisson_problem(N, deg):
@@ -65,4 +86,5 @@ def test_poisson_problem(N, deg):
 
 if __name__ == '__main__':
     # test_differentiation_matrix(6, 2)
-    test_poisson_problem(6, 1)
+    # test_poisson_problem(6, 1)
+    test_integration()
