@@ -84,6 +84,7 @@ class ChebychovHelper(SpectralHelper1D):
     def __init__(self, *args, mode='T2T', transform_type='fft', x0=-1, x1=1, **kwargs):
         assert x0 == -1
         assert x1 == 1
+        assert mode in ['T2T', 'T2U']
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
         self.mode = mode
         self.transform_type = transform_type
@@ -106,8 +107,6 @@ class ChebychovHelper(SpectralHelper1D):
         return self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5))
 
     def get_Id(self):
-        if self.mode == 'D2U':
-            return self.get_conv('T2U') @ self.get_conv('D2T')
         return self.get_conv(self.mode)
 
     def get_differentiation_matrix(self):
@@ -115,8 +114,6 @@ class ChebychovHelper(SpectralHelper1D):
             return self.get_T2T_differentiation_matrix()
         elif self.mode == 'T2U':
             return self.get_T2U_differentiation_matrix()
-        elif self.mode == 'D2U':
-            return self.get_T2U_differentiation_matrix() @ self.get_conv('D2T')
         else:
             raise NotImplementedError(f'{self.mode=!r} not implemented')
 
@@ -161,15 +158,6 @@ class ChebychovHelper(SpectralHelper1D):
                 mat[:, 0] *= 2
             elif name == 'D2T':
                 mat = sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)
-            elif name == 'D2U':
-                mat = self.get_conv('D2T') @ self.get_conv('T2U')
-            # elif name[:3] == 'C2T':
-            #     l = int(name[3:])
-            #     if l == 0:
-            #         mat = (sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)) / 2.0 + sp.diags(xp.append([0.5], xp.zeros(N-1)))
-            #     else:
-            #         mat = sp.diags(xp.append([1, l/(l+1)], xp.ones(N-2) * l/(l+2))) \
-            #             - sp.diags(l / (l+xp.arange(N-2) + 2), offsets=+2)
             elif name[0] == name[-1]:
                 mat = self.sparse_lib.eye(self.N)
             else:

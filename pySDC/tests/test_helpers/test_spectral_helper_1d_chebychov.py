@@ -59,7 +59,7 @@ def test_T_U_conversion(N):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('name', ['T2U', 'T2D', 'U2D', 'T2T'])
+@pytest.mark.parametrize('name', ['T2U', 'T2D', 'T2T'])
 def test_conversion_inverses(name):
     from pySDC.helpers.spectral_helper import ChebychovHelper
     import numpy as np
@@ -72,26 +72,8 @@ def test_conversion_inverses(name):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('N', [4])
-@pytest.mark.parametrize('convs', [['D2T', 'T2U'], ['U2D', 'D2T'], ['T2U', 'U2D'], ['T2U', 'U2D', 'D2T']])
-def test_multi_conversion(N, convs):
-    from pySDC.helpers.spectral_helper import ChebychovHelper
-    import numpy as np
-
-    N = 8
-    cheby = ChebychovHelper(N)
-
-    full_conv = cheby.get_conv(f'{convs[0][0]}2{convs[-1][-1]}')
-    P = cheby.get_conv(convs[-1])
-    for i in range(1, len(convs)):
-        P = cheby.get_conv(convs[-i - 1]) @ P
-
-    assert np.allclose(P.toarray(), full_conv.toarray())
-
-
-@pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T', 'D2U'])
+@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 def test_differentiation_matrix(N, variant):
     import numpy as np
     import scipy
@@ -110,14 +92,6 @@ def test_differentiation_matrix(N, variant):
         D = cheby.get_T2T_differentiation_matrix(1)
         P = cheby.get_conv('T2T')
         Q = cheby.get_conv('T2T')
-    elif variant == 'D2U':
-        D = cheby.get_T2U_differentiation_matrix() @ cheby.get_conv('D2T')
-        Q = cheby.get_conv('U2T')
-        P = cheby.get_conv('T2D')
-    # elif variant == 'T2C':
-    #     D = cheby.get_T2C_differentiation_matrix()
-    #     P = cheby.get_conv('T2T')
-    #     Q = cheby.get_conv('T2C1')
     else:
         raise NotImplementedError
 
