@@ -34,7 +34,7 @@ class GenericSpectralLinear(Problem):
         bases,
         components,
         comm=None,
-        right_preconditioning='D2T',
+        Dirichlet_recombination=True,
         left_preconditioner=True,
         solver_type='direct',
         solver_args=None,
@@ -60,7 +60,7 @@ class GenericSpectralLinear(Problem):
 
         self.work_counters[solver_type] = WorkCounter()
 
-        self.setup_preconditioner(right_preconditioning, left_preconditioner)
+        self.setup_preconditioner(Dirichlet_recombination, left_preconditioner)
 
         self.base_change = self._setup_operator(
             {comp: {comp: self.spectral.get_basis_change_matrix()} for comp in self.spectral.components}
@@ -112,7 +112,7 @@ class GenericSpectralLinear(Problem):
         self.diff_mask = [me in self.diff_index for me in self.components]
         self.M = self._setup_operator(LHS)
 
-    def setup_preconditioner(self, right_preconditioning='D2T', left_preconditioner=True):
+    def setup_preconditioner(self, Dirichlet_recombination=True, left_preconditioner=True):
         """
         Get left and right precondioners. A right preconditioner of D2T will result in Dirichlet recombination. 10/10 would recommend!
 
@@ -142,14 +142,13 @@ class GenericSpectralLinear(Problem):
 
             self.Pl = self.spectral.sparse_lib.csc_matrix(R)
 
-        try:
-            basis_conversion_matrix = self.spectral.get_basis_change_matrix(direction=right_preconditioning)
-            Pr_lhs = {comp: {comp: basis_conversion_matrix} for comp in self.components}
-            self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
-        except:
-            Id = sp.eye(N)
-            Pr_lhs = {comp: {comp: Id} for comp in self.components}
-            self.Pr = self._setup_operator(Pr_lhs)
+        if Dirichlet_recombination:
+            _Pr = self.spectral.get_Dirichlet_recombination_matrix(axis=-1)
+        else:
+            _Pr = Id
+
+        Pr_lhs = {comp: {comp: _Pr} for comp in self.components}
+        self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
     def solve_system(self, rhs, dt, u0=None, *args, skip_itransform=False, **kwargs):
         """

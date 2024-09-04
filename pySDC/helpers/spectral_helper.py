@@ -408,6 +408,20 @@ class ChebychovHelper(SpectralHelper1D):
     #     else:
     #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
 
+    def get_Dirichlet_recombination_matrix(self):
+        '''
+        Get matrix for Dirichlet recombination, which changes the basis to have sparse boundary conditions.
+        This makes for a good right preconditioner.
+
+        Returns:
+            scipy.sparse: Sparse conversion matrix
+        '''
+        N = self.N
+        sp = self.sparse_lib
+        xp = self.xp
+
+        return sp.eye(N) - sp.diags(xp.ones(N - 2), offsets=+2)
+
 
 class Ultraspherical(ChebychovHelper):
     """
@@ -1291,6 +1305,37 @@ class SpectralHelper:
             raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
 
         return I
+
+    def get_Dirichlet_recombination_matrix(self, axis=-1, **kwargs):
+        """
+        Get Dirichlet recombination matrix along axis. Not that it only makes sense in directions discretized with variations of Chebychov bases.
+
+        Args:
+            axis (int): Axis you discretized with Chebychov
+
+        Returns:
+            sparse matrix
+        """
+        sp = self.sparse_lib
+        ndim = len(self.axes)
+
+        if ndim == 1:
+            C = self.axes[0].get_Dirichlet_recombination_matrix(**kwargs)
+        elif ndim == 2:
+            axis2 = (axis + 1) % ndim
+            C1D = self.axes[axis].get_Dirichlet_recombination_matrix(**kwargs)
+
+            I1D = self.axes[axis2].get_Id()
+
+            mats = [None] * ndim
+            mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
+            mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
+
+            C = sp.kron(*mats)
+        else:
+            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+
+        return C
 
     def get_basis_change_matrix(self, axes=None, **kwargs):
         """

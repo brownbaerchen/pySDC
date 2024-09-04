@@ -47,7 +47,8 @@ def test_integration(N):
 @pytest.mark.base
 @pytest.mark.parametrize('N', [6, 33])
 @pytest.mark.parametrize('deg', [1, 3])
-def test_poisson_problem(N, deg):
+@pytest.mark.parametrize('Dirichlet_recombination', [False, True])
+def test_poisson_problem(N, deg, Dirichlet_recombination):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.helpers.spectral_helper import Ultraspherical
@@ -70,11 +71,26 @@ def test_poisson_problem(N, deg):
     A[-2, :] = BC_r
     A = A.tocsr()
 
+    if Dirichlet_recombination:
+        Pr = helper.get_Dirichlet_recombination_matrix()
+
+        BC_D_r = np.zeros(N)
+        BC_D_r[0] = 1
+        BC_D_r[1] = 1
+
+        BC_D_l = np.zeros(N)
+        BC_D_l[0] = 1
+        BC_D_l[1] = -1
+        assert np.allclose((A @ Pr).toarray()[-1], BC_D_l)
+        assert np.allclose((A @ Pr).toarray()[-2], BC_D_r)
+    else:
+        Pr = helper.get_Id()
+
     rhs = P @ helper.transform(f)
     rhs[-2] = a
     rhs[-1] = b
 
-    u_hat = sp.linalg.spsolve(A, rhs)
+    u_hat = Pr @ sp.linalg.spsolve(A @ Pr, rhs)
 
     u = helper.itransform(u_hat)
 
@@ -86,5 +102,5 @@ def test_poisson_problem(N, deg):
 
 if __name__ == '__main__':
     # test_differentiation_matrix(6, 2)
-    # test_poisson_problem(6, 1)
-    test_integration()
+    test_poisson_problem(6, 1, True)
+    # test_integration()
