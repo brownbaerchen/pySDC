@@ -62,8 +62,8 @@ def test_poisson_problem(N, deg, Dirichlet_recombination):
     f = x**deg * (deg + 1) * (deg + 2) * (a - b) / 2
 
     Dxx = helper.get_differentiation_matrix(p=2)
-    BC_l = helper.get_Dirichlet_BC_row_T(x=-1)
-    BC_r = helper.get_Dirichlet_BC_row_T(x=1)
+    BC_l = helper.get_Dirichlet_BC_row(x=-1)
+    BC_r = helper.get_Dirichlet_BC_row(x=1)
     P = helper.get_basis_change_matrix(p_in=0, p_out=2)
 
     A = Dxx.tolil()

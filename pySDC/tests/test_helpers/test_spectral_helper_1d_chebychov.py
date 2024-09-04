@@ -208,7 +208,7 @@ def test_integration_BC(N):
     cheby = ChebychovHelper(N)
     coef = np.random.random(N)
 
-    BC = cheby.get_integ_BC_row_T()
+    BC = cheby.get_integ_BC_row()
 
     polynomial = np.polynomial.Chebyshev(coef)
     reference_integral = polynomial.integ(lbnd=-1, k=0)
@@ -239,7 +239,7 @@ def test_norm(N):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
-@pytest.mark.parametrize('mode', ['T2T', 'T2U', 'D2U'])
+@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('N', [3, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
 def test_tau_method(mode, bc, N, bc_val):
@@ -267,7 +267,7 @@ def test_tau_method(mode, bc, N, bc_val):
         Id = np.diag(np.ones(N))
 
         A = D - Id
-        A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+        A[-1, :] = cheby.get_Dirichlet_BC_row(bc)
 
         sol_hat = np.linalg.solve(A, rhs)
 
@@ -280,26 +280,9 @@ def test_tau_method(mode, bc, N, bc_val):
         Id = T2U
 
         A = D - Id
-        A[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+        A[-1, :] = cheby.get_Dirichlet_BC_row(bc)
 
         sol_hat = sp.linalg.spsolve(A, rhs)
-
-    elif mode == 'D2U':
-        if bc == 0:
-            return None
-
-        U2T = cheby.get_conv('U2T')
-        T2U = cheby.get_conv('T2U')
-        D2T = cheby.get_conv('D2T')
-
-        P = np.polynomial.Chebyshev(U2T @ coef)
-        D = cheby.get_T2U_differentiation_matrix() @ D2T
-        Id = T2U @ D2T
-
-        A = D - Id
-        A[-1, :] = cheby.get_Dirichlet_BC_row_D(bc)
-
-        sol_hat = D2T @ sp.linalg.spsolve(A, rhs)
 
     else:
         raise NotImplementedError
@@ -352,7 +335,7 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
 
     # put BCs in the system matrix
     BCz = sp.eye(nz, format='lil') * 0
-    BCz[-1, :] = cheby.get_Dirichlet_BC_row_T(bc)
+    BCz[-1, :] = cheby.get_Dirichlet_BC_row(bc)
     BC = sp.kron(Ix, BCz, format='lil')
     A[BC != 0] = BC[BC != 0]
 
@@ -436,11 +419,11 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
 
     # generate BC matrices
     BCa = sp.eye(nz, format='lil') * 0
-    BCa[-1, :] = cheby.get_Dirichlet_BC_row_T(-1)
+    BCa[-1, :] = cheby.get_Dirichlet_BC_row(-1)
     BCa = sp.kron(Ix, BCa, format='lil')
 
     BCb = sp.eye(nz, format='lil') * 0
-    BCb[-1, :] = cheby.get_Dirichlet_BC_row_T(1)
+    BCb[-1, :] = cheby.get_Dirichlet_BC_row(1)
     BCb = sp.kron(Ix, BCb, format='lil')
     BC = sp.bmat([[BCa, O], [BCb, O]], format='lil')
 

@@ -342,13 +342,13 @@ class ChebychovHelper(SpectralHelper1D):
 
     def get_BC(self, kind, **kwargs):
         if kind.lower() == 'integral':
-            return self.get_integ_BC_row_T(**kwargs)
+            return self.get_integ_BC_row(**kwargs)
         elif kind.lower() == 'dirichlet':
-            return self.get_Dirichlet_BC_row_T(**kwargs)
+            return self.get_Dirichlet_BC_row(**kwargs)
         else:
             return super().get_BC(kind, **kwargs)
 
-    def get_integ_BC_row_T(self, **kwargs):
+    def get_integ_BC_row(self, **kwargs):
         """
         Get a row for generating integral BCs with T polynomials.
         It returns the values of the T polynomials at x.
@@ -362,7 +362,7 @@ class ChebychovHelper(SpectralHelper1D):
         me[0] = 2.0
         return me
 
-    def get_Dirichlet_BC_row_T(self, x, **kwargs):
+    def get_Dirichlet_BC_row(self, x, **kwargs):
         """
         Get a row for generating Dirichlet BCs at x with T polynomials.
         It returns the values of the T polynomials at x.
@@ -383,30 +383,6 @@ class ChebychovHelper(SpectralHelper1D):
             return n
         else:
             raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
-
-    def get_Dirichlet_BC_row_D(self, x):
-        res = self.xp.zeros(self.N)
-        if x == -1:
-            res[0] = 1
-            res[1] = -1
-        elif x == 1:
-            res[0] = 1
-            res[1] = 1
-        else:
-            raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
-        return res
-
-    # def get_Dirichlet_BC_row_U(self, x):
-    #     if x == -1:
-    #         n = self.xp.arange(self.N)
-    #         return (-1)**n * (n + 1)
-    #     elif x == 1:
-    #         return self.xp.arange(self.N) + 1
-    #     elif x == 0:
-    #         return self.get_Dirichlet_BC_row_T(x)
-    #         return n
-    #     else:
-    #         raise NotImplementedError(f'Don\'t know how to generate Dirichlet BC\'s at {x=}!')
 
     def get_Dirichlet_recombination_matrix(self):
         '''
