@@ -4,6 +4,7 @@ from mpi4py import MPI
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 from pySDC.core.convergence_controller import ConvergenceController
+from pySDC.core.hooks import Hooks
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 
 
@@ -286,21 +287,51 @@ class RayleighBenardUltraspherical(RayleighBenard):
         vT_hat = self.transform(_me, padding=padding)
 
         nusselt_hat = (vT_hat[0] - DzT_hat[iT]) / self.nx
+        nusselt_no_v_hat = (-DzT_hat[iT]) / self.nx
 
         integral_z = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='integral'), axis=-1).real
         integral_V = (
             integral_z[0] * self.axes[0].L
         )  # only the first Fourier mode has non-zero integral with periodic BCs
-        Nusselt_V = integral_V / self.spectral.V
+        Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
 
-        Nusselt_t = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0]
-        Nusselt_b = self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0]
+        Nusselt_t = self.comm.bcast(
+            self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0], root=0
+        )
+        Nusselt_b = self.comm.bcast(
+            self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0], root=0
+        )
+        Nusselt_no_v_t = self.comm.bcast(
+            self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0], root=0
+        )
+        Nusselt_no_v_b = self.comm.bcast(
+            self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0],
+            root=0,
+        )
 
         return {
             'V': Nusselt_V,
             't': Nusselt_t,
             'b': Nusselt_b,
+            't_no_v': Nusselt_no_v_t,
+            'b_no_v': Nusselt_no_v_b,
         }
+
+    def compute_viscous_dissipation(self, u):
+        iu, iv = self.index(['u', 'v'])
+
+        Lap_u_hat = self.u_init_forward
+
+        u_hat = self.transform(u)
+        Lap_u_hat[iu] = ((self.Dzz + self.Dxx) @ u_hat[iu].flatten()).reshape(u_hat[iu].shape)
+        Lap_u_hat[iv] = ((self.Dzz + self.Dxx) @ u_hat[iv].flatten()).reshape(u_hat[iu].shape)
+        Lap_u = self.itransform(Lap_u_hat)
+
+        return abs(u[iu] * Lap_u[iu] + u[iv] * Lap_u[iv])
+
+    def compute_buoyancy_generation(self, u):
+        iv, iT = self.index(['v', 'T'])
+        return abs(u[iv] * self.Rayleigh * u[iT])
 
 
 class RayleighBenardChebychov(GenericSpectralLinear):
@@ -781,6 +812,22 @@ class RayleighBenardChebychov(GenericSpectralLinear):
 
 
 class CFLLimit(ConvergenceController):
+
+    def dependencies(self, controller, *args, **kwargs):
+        from pySDC.implementations.hooks.log_step_size import LogStepSize
+
+        controller.add_hook(LogCFL)
+        controller.add_hook(LogStepSize)
+
+    def setup_status_variables(self, controller, **kwargs):
+        """
+        Add the embedded error variable to the error function.
+
+        Args:
+            controller (pySDC.Controller): The controller
+        """
+        self.add_status_variable_to_level('CFL_limit')
+
     def setup(self, controller, params, description, **kwargs):
         """
         Define default parameters here.
@@ -831,11 +878,79 @@ class CFLLimit(ConvergenceController):
         L.sweep.compute_end_point()
         max_step_size = self.compute_max_step_size(P, L.uend)
 
+        L.status.CFL_limit = max_step_size
+
         dt_new = L.status.dt_new if L.status.dt_new else max([self.params.dt_max, L.params.dt])
         L.status.dt_new = min([dt_new, self.params.cfl * max_step_size])
         L.status.dt_new = max([self.params.dt_min, L.status.dt_new])
 
         self.log(f'dt max: {max_step_size:.2e} -> New step size: {L.status.dt_new:.2e}', step)
+
+
+class LogCFL(Hooks):
+
+    def post_step(self, step, level_number):
+        """
+        Record CFL limit.
+
+        Args:
+            step (pySDC.Step.step): the current step
+            level_number (int): the current level number
+
+        Returns:
+            None
+        """
+        super().post_step(step, level_number)
+
+        L = step.levels[level_number]
+
+        self.add_to_stats(
+            process=step.status.slot,
+            time=L.time + L.dt,
+            level=L.level_index,
+            iter=step.status.iter,
+            sweep=L.status.sweep,
+            type='CFL_limit',
+            value=L.status.CFL_limit,
+        )
+
+
+class LogAnalysisVariables(Hooks):
+
+    def post_step(self, step, level_number):
+        """
+        Record Nusselt numbers.
+
+        Args:
+            step (pySDC.Step.step): the current step
+            level_number (int): the current level number
+
+        Returns:
+            None
+        """
+        super().post_step(step, level_number)
+
+        L = step.levels[level_number]
+        P = L.prob
+
+        L.sweep.compute_end_point()
+        Nusselt = P.compute_Nusselt_numbers(L.uend)
+        buoyancy_production = P.compute_buoyancy_generation(L.uend)
+        viscous_dissipation = P.compute_viscous_dissipation(L.uend)
+
+        for key, value in zip(
+            ['Nusselt', 'buoyancy_production', 'viscous_dissipation'],
+            [Nusselt, buoyancy_production, viscous_dissipation],
+        ):
+            self.add_to_stats(
+                process=step.status.slot,
+                time=L.time + L.dt,
+                level=L.level_index,
+                iter=step.status.iter,
+                sweep=L.status.sweep,
+                type=key,
+                value=value,
+            )
 
 
 class SpaceAdaptivity(ConvergenceController):

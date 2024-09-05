@@ -1,6 +1,9 @@
 from mpi4py import MPI
 import numpy as np
 from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFile
+import pickle
+from pySDC.helpers.stats_helper import filter_stats, get_sorted
+from pySDC.implementations.hooks.log_step_size import LogStepSize
 
 
 def run_RBC(useGPU=False):
@@ -9,6 +12,7 @@ def run_RBC(useGPU=False):
         RayleighBenard,
         CFLLimit,
         SpaceAdaptivity,
+        LogAnalysisVariables,
     )
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
@@ -73,7 +77,7 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 2
+    sweeper_params['num_nodes'] = 3
     sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
@@ -81,8 +85,8 @@ def run_RBC(useGPU=False):
         'comm': comm,
         'useGPU': useGPU,
         'Rayleigh': 2e6,
-        'nx': max([2 * comm.size, 2**8]) + 1,
-        'nz': max([comm.size, 2**6]),
+        'nx': max([2 * comm.size, 2**9]) + 1,
+        'nz': max([comm.size, 2**7]),
         'dealiasing': 3 / 2,
         # 'debug': True,
         'left_preconditioner': False,
@@ -90,11 +94,11 @@ def run_RBC(useGPU=False):
     }
 
     step_params = {}
-    step_params['maxiter'] = 3
+    step_params['maxiter'] = 5
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40
-    controller_params['hook_class'] = [LogToFile, LogGrid]
+    controller_params['hook_class'] = [LogToFile, LogGrid, LogAnalysisVariables, LogStepSize]
     controller_params['mssdc_jac'] = False
 
     description = {}
@@ -109,7 +113,7 @@ def run_RBC(useGPU=False):
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
     t0 = 0.0
-    Tend = 50
+    Tend = 18
     P = controller.MS[0].levels[0].prob
 
     relaxation_steps = 5
@@ -130,6 +134,12 @@ def run_RBC(useGPU=False):
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
 
+    combined_stats = filter_stats(stats, comm=comm)
+
+    if comm.rank == 0:
+        path = 'data/RBC-stats'
+        with open(f'{path}.pickle', 'wb') as file:
+            pickle.dump(combined_stats, file)
     return stats
 
 
@@ -212,12 +222,53 @@ def plot_RBC(size, quantitiy='T', quantitiy2='vorticity', render=True, start_idx
     plt.show()
 
 
+def analyse():
+    import matplotlib.pyplot as plt
+
+    path = 'data/RBC-stats'
+    with open(f'{path}.pickle', 'rb') as file:
+        stats = pickle.load(file)
+
+    # plot step size distribution
+    dt = get_sorted(stats, type='dt', sortby='time')
+    CFL = get_sorted(stats, type='CFL_limit', sortby='time')
+    fig, ax = plt.subplots()
+    ax.plot([me[0] for me in dt], [me[1] for me in dt], label=r'$\Delta t$')
+    ax.plot([me[0] for me in CFL], [me[1] for me in CFL], label='CFL limit')
+    ax.legend(frameon=False)
+    ax.set_yscale('log')
+
+    # plot Nusselt numbers
+    Nusselt = get_sorted(stats, type='Nusselt')
+    fig, ax = plt.subplots()
+    colors = {
+        'V': 'blue',
+        't': 'green',
+        'b': 'magenta',
+        't_no_v': 'green',
+        'b_no_v': 'magenta',
+    }
+    for key in ['V', 't', 'b']:
+        ax.plot([me[0] for me in Nusselt], [me[1][f'{key}'] for me in Nusselt], label=f'{key}', color=colors[key])
+        ax.axhline(np.mean([me[1][f'{key}'] for me in Nusselt]), color=colors[key], ls='--')
+    ax.legend(frameon=False)
+
+    fig, ax = plt.subplots()
+    buoyancy = get_sorted(stats, type='buoyancy_production')
+    dissipation = get_sorted(stats, type='viscous_dissipation')
+    ax.plot([me[0] for me in buoyancy], [me[1] for me in buoyancy], label=r'buoyancy')
+    ax.plot([me[0] for me in dissipation], [me[1] for me in dissipation], label=r'dissipation')
+    ax.legend(frameon=False)
+    plt.show()
+
+
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--run', type=bool)
     parser.add_argument('--plot', type=bool)
+    parser.add_argument('--analyse', type=bool)
     parser.add_argument('--useGPU', type=bool)
     parser.add_argument('--render', type=bool)
     parser.add_argument('--startIdx', type=int, default=0)
@@ -229,3 +280,5 @@ if __name__ == '__main__':
         run_RBC(useGPU=args.useGPU)
     if args.plot:
         plot_RBC(size=args.np, render=args.render, start_idx=args.startIdx)
+    if args.analyse:
+        analyse()

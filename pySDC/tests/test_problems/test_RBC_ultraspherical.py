@@ -111,9 +111,48 @@ def test_Nusselt_numbers(v, nx=5, nz=4):
     u = P.u_exact(noise_level=0)
 
     nusselt = P.compute_Nusselt_numbers(u)
-    expect = {'V': 1 + v, 't': 1, 'b': +1 + 2 * v}
+    expect = {'V': 1 + v, 't': 1, 'b': +1 + 2 * v, 'b_no_v': 1, 't_no_v': 1}
     for key in nusselt.keys():
         assert np.isclose(nusselt[key], expect[key])
+
+
+def test_viscous_dissipation(nx=2**5 + 1, nz=2**3 + 1):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardUltraspherical
+
+    P = RayleighBenardUltraspherical(nx=nx, nz=nz)
+    iu, iv = P.index(['u', 'v'])
+    X, Z = P.X, P.Z
+
+    u = P.u_init
+    u[iu] = np.sin(X * np.pi)
+    u[iv] = Z**3
+
+    expect = P.u_init
+    expect[iu] = u[iu] * (-np.pi) ** 2 * u[iu]
+    expect[iv] = Z**3 * 6 * Z
+
+    viscous_dissipation = P.compute_viscous_dissipation(u)
+    assert np.isclose(viscous_dissipation, abs(expect))
+
+
+def test_buoyancy_computation(nx=9, nz=6):
+    import numpy as np
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardUltraspherical
+
+    P = RayleighBenardUltraspherical(nx=nx, nz=nz)
+    iT, iv = P.index(['T', 'v'])
+    X, Z = P.X, P.Z
+
+    u = P.u_init
+    u[iT] = Z - 1
+    u[iv] = Z**3
+
+    expect = P.u_init
+    expect[iv] = u[iv] * P.Rayleigh * u[iT]
+
+    buoyancy_production = P.compute_buoyancy_generation(u)
+    assert np.isclose(buoyancy_production, abs(expect))
 
 
 @pytest.mark.mpi4py
@@ -208,4 +247,6 @@ if __name__ == '__main__':
     # test_eval_f(2**7, 2**5, 'mixed')
     # test_Poisson_problem(1, 'T')
     # test_Poisson_problem_v()
-    test_Nusselt_numbers(1)
+    # test_Nusselt_numbers(1)
+    # test_buoyancy_computation()
+    test_viscous_dissipation()

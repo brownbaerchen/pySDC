@@ -191,9 +191,7 @@ class ChebychovHelper(SpectralHelper1D):
 
     def get_T2U_differentiation_matrix(self):
         '''
-        Sparse differentiation matrix from Chebychov polynomials of first kind to second. When using this, you must
-        formulate your problem in first order derivatives.
-
+        Sparse differentiation matrix from Chebychov polynomials of first kind to second.
         Returns:
             scipy.sparse: Sparse differentiation matrix
         '''
@@ -390,6 +388,12 @@ class ChebychovHelper(SpectralHelper1D):
 class Ultraspherical(ChebychovHelper):
     """
     This implementation follows https://doi.org/10.1137/120865458.
+    The ultraspherical method works in Chebychov polynomials as well, but also uses various Gegenbauer polynomials.
+    The idea is that for every derivative of Chebychov T polynomials, there is a basis of Gegenbauer polynomials where the differentiation matrix is a single off-diagonal.
+    There are also conversion operators from one derivative basis to the next that are sparse.
+
+    This basis is used like this: For every equation that you have, look for the highest derivative and bump all matrices to the correct basis. If your highest derivative is 2 and you have an identity, it needs to get bumped from 0 to 1 and from 1 to 2. If you have a first derivative as well, it needs to be bumped from 1 to 2.
+    You don't need the same resulting basis in all equations. You just need to take care that you translate the right hand side to the correct basis as well.
     """
 
     def __init__(self, *args, **kwargs):
@@ -469,7 +473,6 @@ class Ultraspherical(ChebychovHelper):
         ] * u_hat.ndim
         slices[axis] = slice(1, u_hat.shape[axis])
         return self.xp.sum(u_hat[(*slices,)] * (-1) ** (self.xp.arange(u_hat.shape[axis] - 1)), axis=axis)
-        return None
 
 
 class FFTHelper(SpectralHelper1D):
