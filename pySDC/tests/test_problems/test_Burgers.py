@@ -21,7 +21,7 @@ def test_Burgers_f(mode):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('mode', ['T2U'])
+@pytest.mark.parametrize('mode', ['T2U', 'T2T'])
 def test_Burgers_solver(mode, N=2**8, plotting=False):
     import numpy as np
     import matplotlib.pyplot as plt

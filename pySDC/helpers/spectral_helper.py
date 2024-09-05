@@ -181,7 +181,8 @@ class ChebychovHelper(SpectralHelper1D):
         self.cache[name] = mat
         return mat
 
-    def get_basis_change_matrix(self, direction='backward'):
+    def get_basis_change_matrix(self, conv='T2T', direction='backward'):
+        return self.get_conv(conv)
         if direction == 'forward':
             return self.get_conv(self.mode)
         elif direction == 'backward':

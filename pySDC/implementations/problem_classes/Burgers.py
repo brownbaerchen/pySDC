@@ -12,7 +12,7 @@ class Burgers1D(GenericSpectralLinear):
     def __init__(self, N=64, epsilon=0.1, BCl=1, BCr=-1, f=0, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        bases = [{'base': 'cheby', 'N': N, 'mode': mode}]
+        bases = [{'base': 'cheby', 'N': N}]
         components = ['u', 'ux']
 
         super().__init__(bases=bases, components=components, **kwargs)
@@ -22,15 +22,17 @@ class Burgers1D(GenericSpectralLinear):
         # prepare matrices
         Dx = self.get_differentiation_matrix(axes=(0,))
         I = self.get_Id()
+
+        T2U = self.get_basis_change_matrix(conv=mode)
+
         self.Dx = Dx
-        self.C = self.get_basis_change_matrix()
 
         # construct linear operator
-        L_lhs = {'u': {'ux': -epsilon * Dx}, 'ux': {'u': -Dx, 'ux': I}}
+        L_lhs = {'u': {'ux': -epsilon * (T2U @ Dx)}, 'ux': {'u': -T2U @ Dx, 'ux': T2U @ I}}
         self.setup_L(L_lhs)
 
         # construct mass matrix
-        M_lhs = {'u': {'u': I}}
+        M_lhs = {'u': {'u': T2U @ I}}
         self.setup_M(M_lhs)
 
         # boundary conditions
@@ -73,26 +75,11 @@ class Burgers1D(GenericSpectralLinear):
         u_hat = self.transform(u)
 
         Dx_u_hat = self.u_init_forward
-        Dx_u_hat[iux] = (self.C @ self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
+        Dx_u_hat[iux] = (self.Dx @ u_hat[iux].flatten()).reshape(u_hat[iu].shape)
 
         f.impl[iu] = self.epsilon * self.itransform(Dx_u_hat)[iux].real
         f.expl[iu] = -u[iu] * u[iux]
         return f
-
-    def solve_system(self, rhs, factor, *args, **kwargs):
-        sol = self.u_init
-
-        rhs_hat = self.transform(rhs)
-        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(sol.shape)
-        rhs_hat = self.put_BCs_in_rhs(rhs_hat, istransformed=True)
-
-        A = self.M + factor * self.L
-        A = self.put_BCs_in_matrix(A)
-
-        sol_hat = (self.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(sol.shape)
-
-        sol[:] = self.itransform(sol_hat).real
-        return sol
 
     def get_fig(self):  # pragma: no cover
         """
@@ -147,7 +134,7 @@ class Burgers2D(GenericSpectralLinear):
 
         bases = [
             {'base': 'fft', 'N': nx},
-            {'base': 'cheby', 'N': nz, 'mode': mode},
+            {'base': 'cheby', 'N': nz},
         ]
         components = ['u', 'v', 'ux', 'uz', 'vx', 'vz']
         super().__init__(bases=bases, components=components, **kwargs)
@@ -158,25 +145,27 @@ class Burgers2D(GenericSpectralLinear):
         Dx = self.get_differentiation_matrix(axes=(0,))
         Dz = self.get_differentiation_matrix(axes=(1,))
         I = self.get_Id()
+
+        T2U = self.get_basis_change_matrix(axes=(1,), conv=mode)
+
         self.Dx = Dx
         self.Dz = Dz
-        self.C = self.get_basis_change_matrix()
 
         # construct linear operator
         L_lhs = {
-            'u': {'ux': -epsilon * Dx, 'uz': -epsilon * Dz},
-            'v': {'vx': -epsilon * Dx, 'vz': -epsilon * Dz},
-            'ux': {'u': -Dx, 'ux': I},
-            'uz': {'u': -Dz, 'uz': I},
-            'vx': {'v': -Dx, 'vx': I},
-            'vz': {'v': -Dz, 'vz': I},
+            'u': {'ux': -epsilon * T2U @ Dx, 'uz': -epsilon * T2U @ Dz},
+            'v': {'vx': -epsilon * T2U @ Dx, 'vz': -epsilon * T2U @ Dz},
+            'ux': {'u': -T2U @ Dx, 'ux': T2U @ I},
+            'uz': {'u': -T2U @ Dz, 'uz': T2U @ I},
+            'vx': {'v': -T2U @ Dx, 'vx': T2U @ I},
+            'vz': {'v': -T2U @ Dz, 'vz': T2U @ I},
         }
         self.setup_L(L_lhs)
 
         # construct mass matrix
         M_lhs = {
-            'u': {'u': I},
-            'v': {'v': I},
+            'u': {'u': T2U @ I},
+            'v': {'v': T2U @ I},
         }
         self.setup_M(M_lhs)
 
@@ -220,10 +209,10 @@ class Burgers2D(GenericSpectralLinear):
 
         u_hat = self.transform(u)
         f_hat = self.u_init_forward
-        f_hat[iu] = self.epsilon * (self.C @ (self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())).reshape(
+        f_hat[iu] = self.epsilon * ((self.Dx @ u_hat[iux].flatten() + self.Dz @ u_hat[iuz].flatten())).reshape(
             u_hat[iux].shape
         )
-        f_hat[iv] = self.epsilon * (self.C @ (self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())).reshape(
+        f_hat[iv] = self.epsilon * ((self.Dx @ u_hat[ivx].flatten() + self.Dz @ u_hat[ivz].flatten())).reshape(
             u_hat[iux].shape
         )
         f.impl[...] = self.itransform(f_hat).real
@@ -238,7 +227,7 @@ class Burgers2D(GenericSpectralLinear):
         u_hat = self.transform(u)
         iu, iv = self.index(['u', 'v'])
 
-        me[iu] = (self.C @ self.Dx @ u_hat[iv].flatten() + self.C @ self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
+        me[iu] = (self.Dx @ u_hat[iv].flatten() + self.Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
         return self.itransform(me)[iu].real
 
     def get_fig(self):  # pragma: no cover

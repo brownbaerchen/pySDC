@@ -249,6 +249,7 @@ def analyse():
         ax.plot([me[0] for me in Nusselt], [me[1][f'{key}'] for me in Nusselt], label=f'{key}', color=colors[key])
         ax.axhline(np.mean([me[1][f'{key}'] for me in Nusselt]), color=colors[key], ls='--')
     ax.legend(frameon=False)
+    fig.savefig('plots/Nusselt.pdf')
 
     fig, ax = plt.subplots()
     buoyancy = get_sorted(stats, type='buoyancy_production')

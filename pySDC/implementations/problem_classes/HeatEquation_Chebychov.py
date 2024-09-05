@@ -13,7 +13,7 @@ class Heat1DChebychov(GenericSpectralLinear):
     def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
-        bases = [{'base': 'chebychov', 'N': nvars, 'mode': 'T2U'}]
+        bases = [{'base': 'chebychov', 'N': nvars}]
         components = ['u', 'ux']
 
         super().__init__(bases, components, **kwargs)
@@ -23,7 +23,6 @@ class Heat1DChebychov(GenericSpectralLinear):
         I = self.get_Id()
         Dx = self.get_differentiation_matrix(axes=(0,))
         self.Dx = Dx
-        self.U2T = self.get_basis_change_matrix()
 
         L_lhs = {
             'ux': {'u': -Dx, 'ux': I},
@@ -44,7 +43,7 @@ class Heat1DChebychov(GenericSpectralLinear):
 
         me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
-        me_hat[iu] = (self.nu * self.U2T @ self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
+        me_hat[iu] = (self.nu * self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat).real
 
         f[self.index("u")] = me[iu]
@@ -170,7 +169,6 @@ class Heat2DChebychov(GenericSpectralLinear):
         I = self.get_Id()
         self.Dx = self.get_differentiation_matrix(axes=(0,))
         self.Dy = self.get_differentiation_matrix(axes=(1,))
-        self.U2T = self.get_basis_change_matrix()
 
         L_lhs = {
             'ux': {'u': -self.Dx, 'ux': I},
@@ -210,9 +208,9 @@ class Heat2DChebychov(GenericSpectralLinear):
 
         me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
-        me_hat[iu] = self.nu * (
-            self.U2T @ self.Dx @ me_hat[iux].flatten() + self.U2T @ self.Dy @ me_hat[iuy].flatten()
-        ).reshape(me_hat[iu].shape)
+        me_hat[iu] = self.nu * (self.Dx @ me_hat[iux].flatten() + self.Dy @ me_hat[iuy].flatten()).reshape(
+            me_hat[iu].shape
+        )
         me = self.itransform(me_hat)
 
         f[self.index("u")] = me[iu].real
