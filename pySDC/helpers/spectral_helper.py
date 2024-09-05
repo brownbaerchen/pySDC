@@ -72,7 +72,7 @@ class SpectralHelper1D:
 
         mask = self.xp.logical_or(k >= kmax, k < kmin)
 
-        F = self.get_Id().tocsc()
+        F = self.get_Id().tolil()
         F[:, mask] = 0
         return F.tocsc()
 
@@ -637,7 +637,7 @@ class SpectralHelper:
     def get_BC(self, axis, kind, line=-1, scalar=False, **kwargs):
         base = self.axes[axis]
 
-        BC = base.get_Id().tocsc() * 0
+        BC = base.get_Id().tolil() * 0
         BC[line, :] = base.get_BC(kind=kind, **kwargs)
 
         ndim = len(self.axes)

@@ -153,7 +153,6 @@ class RayleighBenardRegular(Config):
         desc['problem_params']['nx'] = 2**8 + 1
         desc['problem_params']['nz'] = 2**6
         desc['problem_params']['dealiasing'] = 3 / 2
-        desc['problem_params']['dealiasing'] = 3 / 2
 
         desc['step_params']['maxiter'] = 3
 
