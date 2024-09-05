@@ -75,7 +75,7 @@ class Config(object):
 
     def get_path(self, *args, ranks=None, **kwargs):
         ranks = self.ranks if ranks is None else ranks
-        return f'{self.name}-{self.experiment_name}-{ranks[0]}-{ranks[2]}'
+        return f'{self.name}-{type(self).__name__}-{ranks[0]}-{ranks[2]}'
 
     def plot(self, P, idx):
         raise NotImplementedError
@@ -84,6 +84,7 @@ class Config(object):
         if restart_idx > 0:
             LogToFile = self.get_LogToFile()[0]
             file = LogToFile.load(restart_idx)
+            LogToFile.counter = restart_idx
             u0 = P.u_init
             u0[...] = file['u']
             return u0, file['t']

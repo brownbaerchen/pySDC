@@ -20,25 +20,20 @@ def parse_args():
         '--logger_level', type=int, help='Logger level on the first rank in space and in the sweeper', default=15
     )
 
-    return parser.parse_args()
+    return vars(parser.parse_args())
 
 
-def run_experiment():
+def run_experiment(args, config, **kwargs):
     import pickle
     from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
     from pySDC.helpers.stats_helper import filter_stats
-    from pySDC.projects.GPU.configs import get_config
 
-    args = parse_args()
-
-    config = get_config(args.config, n_procs_list=args.procs)
-
-    description = config.get_description()
+    description = config.get_description(**kwargs)
     controller_params = config.get_controller_params()
 
     controller = controller_MPI(controller_params, description, config.comms[0])
 
-    u0, t0 = config.get_initial_condition(controller.S.levels[0].prob, restart_idx=args.restart_idx)
+    u0, t0 = config.get_initial_condition(controller.S.levels[0].prob, restart_idx=args['restart_idx'])
 
     uend, stats = controller.run(u0=u0, t0=t0, Tend=config.Tend)
 
@@ -49,13 +44,12 @@ def run_experiment():
         with open(path, 'wb') as file:
             pickle.dump(combined_stats, file)
 
+    return uend
 
-def plot_experiment():
-    from pySDC.projects.GPU.configs import get_config
+
+def plot_experiment(args, config):
     import gc
-
-    args = parse_args()
-    config = get_config(args.config, n_procs_list=args.procs)
+    import matplotlib.pyplot as plt
 
     description = config.get_description()
 
@@ -63,15 +57,14 @@ def plot_experiment():
 
     comm = config.comm_world
 
-    for idx in range(args.restart_idx, 9999, comm.size):
-        fig = config.plot(P, idx + comm.rank, args.procs)
-        import matplotlib.pyplot as plt
+    for idx in range(args['restart_idx'], 9999, comm.size):
+        fig = config.plot(P, idx + comm.rank, args['procs'])
 
-        path = f'config.get_path(ranks=[0,0,0])-{idx:06d}.png'
+        path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-{idx+comm.rank:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
         print(f'{comm.rank} Stored figure {path!r}', flush=True)
 
-        if args.mode == 'render':
+        if args['mode'] == 'render':
             plt.pause(1e-9)
 
         plt.close(fig)
@@ -80,8 +73,13 @@ def plot_experiment():
 
 
 if __name__ == '__main__':
+    from pySDC.projects.GPU.configs import get_config
+
     args = parse_args()
-    if args.mode == 'run':
-        run_experiment()
-    elif args.mode in ['plot', 'render']:
-        plot_experiment()
+
+    config = get_config(args['config'], n_procs_list=args['procs'])
+
+    if args['mode'] == 'run':
+        run_experiment(args, config)
+    elif args['mode'] in ['plot', 'render']:
+        plot_experiment(args, config)
