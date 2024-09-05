@@ -63,7 +63,7 @@ def run_RBC(useGPU=False):
     level_params['restol'] = -1e-7
 
     convergence_controllers = {
-        Adaptivity: {'e_tol': 1e-3, 'dt_max': level_params['dt']},
+        Adaptivity: {'e_tol': 1e-6, 'dt_max': level_params['dt']},
         # AdaptivityPolynomialError: {
         #     'e_tol': 1e-3,
         #     'interpolate_between_restarts': False,
@@ -77,24 +77,22 @@ def run_RBC(useGPU=False):
 
     sweeper_params = {}
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = 3
+    sweeper_params['num_nodes'] = 2
     sweeper_params['QI'] = 'LU'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = {
         'comm': comm,
         'useGPU': useGPU,
-        'Rayleigh': 2e6,
+        'Rayleigh': 2e6 / 16,
         'nx': max([2 * comm.size, 2**9]) + 1,
         'nz': max([comm.size, 2**7]),
         'dealiasing': 3 / 2,
-        # 'debug': True,
         'left_preconditioner': False,
-        'right_preconditioning': 'T2T',
     }
 
     step_params = {}
-    step_params['maxiter'] = 5
+    step_params['maxiter'] = 3
 
     controller_params = {}
     controller_params['logger_level'] = 15 if comm.rank == 0 else 40

@@ -878,7 +878,7 @@ class CFLLimit(ConvergenceController):
         L.sweep.compute_end_point()
         max_step_size = self.compute_max_step_size(P, L.uend)
 
-        L.status.CFL_limit = max_step_size
+        L.status.CFL_limit = self.params.cfl * max_step_size
 
         dt_new = L.status.dt_new if L.status.dt_new else max([self.params.dt_max, L.params.dt])
         L.status.dt_new = min([dt_new, self.params.cfl * max_step_size])
