@@ -1,6 +1,10 @@
 def get_config(name, n_procs_list):
     if name == 'RBC':
         return RayleighBenardRegular(n_procs_list=n_procs_list)
+    if name == 'RBC_dt':
+        return RayleighBenard_dt_adaptivity(n_procs_list=n_procs_list)
+    if name == 'RBC_dt_k':
+        return RayleighBenard_dt_k_adaptivity(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -142,7 +146,7 @@ class RayleighBenardRegular(Config):
         desc['level_params']['dt'] = 0.1
         desc['level_params']['restol'] = 1e-7
 
-        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.4}
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.8}
 
         desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         desc['sweeper_params']['num_nodes'] = 2
@@ -216,3 +220,36 @@ class RayleighBenardRegular(Config):
             axs[0].set_aspect(1.0)
             axs[1].set_aspect(1.0)
         return fig
+
+
+class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'][AdaptivityPolynomialError] = {'e_tol': 1e-4, 'abort_at_growing_residual': False}
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        desc['level_params']['restol'] = 1e-7
+        desc['level_params']['e_tol'] = 1e-1
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['step_params']['maxiter'] = 12
+
+        return desc
+
+
+class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4}
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        desc['level_params']['restol'] = -1
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['step_params']['maxiter'] = 5
+
+        return desc
