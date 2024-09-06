@@ -130,7 +130,7 @@ class RayleighBenardRegular(Config):
 
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import (
-            RayleighBenardUltraspherical,
+            RayleighBenard,
             CFLLimit,
         )
         from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
@@ -156,7 +156,7 @@ class RayleighBenardRegular(Config):
 
         desc['step_params']['maxiter'] = 3
 
-        desc['problem_class'] = RayleighBenardUltraspherical
+        desc['problem_class'] = RayleighBenard
 
         return desc
 

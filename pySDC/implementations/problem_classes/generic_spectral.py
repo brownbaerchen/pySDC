@@ -43,10 +43,17 @@ class GenericSpectralLinear(Problem):
         **kwargs,
     ):
         """
-        TODO: write docstring
+        Base class for problems discretized with spectral methods.
 
         Args:
+            bases (list of dictionaries): 1D Bases
+            components (list of strings): Components of the equations
+            comm (mpi4py.Intracomm or None): MPI communicator
             Dirichlet_recombination (bool): Use Dirichlet recombination in the last axis as right preconditioner
+            left_preconditioner (bool): Reverse the Kronecker product if yes
+            solver_type (str): Solver for linear systems
+            solver_args (dict): Arguments for linear solver
+            useGPU (bool): Run on GPU or CPU
         """
         self.spectral = SpectralHelper(comm=comm, useGPU=useGPU)
 
@@ -135,7 +142,6 @@ class GenericSpectralLinear(Problem):
 
         if left_preconditioner:
             # reverse Kronecker product
-            # TODO this is way to slow on GPUs. Need to find a better way!
 
             if self.spectral.useGPU:
                 R = self.Pl.get().tolil() * 0
@@ -148,7 +154,7 @@ class GenericSpectralLinear(Problem):
 
             self.Pl = self.spectral.sparse_lib.csc_matrix(R)
 
-        if Dirichlet_recombination:
+        if Dirichlet_recombination and type(self.axes[-1]).__name__ in ['ChebychovHelper, Ultraspherical'] :
             _Pr = self.spectral.get_Dirichlet_recombination_matrix(axis=-1)
         else:
             _Pr = Id
@@ -244,7 +250,7 @@ class GenericSpectralLinear(Problem):
 
 def compute_residual_DAE(self, stage=''):
     """
-    Computation of the residual using the collocation matrix Q
+    Computation of the residual that does not add u_0 - u_m in algebraic equations.
 
     Args:
         stage (str): The current stage of the step the level belongs to

@@ -202,7 +202,7 @@ class ChebychovHelper(SpectralHelper1D):
                 else:
                     mat = self.sparse_lib.csr_matrix(sp.linalg.inv(fwd.tocsc().get()))
             except NotImplementedError:
-                raise E
+                raise NotImplementedError from E
 
         self.cache[name] = mat
         return mat

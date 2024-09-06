@@ -7,7 +7,7 @@ def test_SWE_linearized(plotting=False):
     import numpy as np
 
     P = ShallowWaterLinearized(
-        k=0, f=0, g=1e-2, H=1e2, nx=2**5 + 1, ny=2**4, left_preconditioner=False, right_preconditioning='T2T'
+        k=0, f=0, g=1e-2, H=1e2, nx=2**5 + 1, ny=2**4
     )
 
     def implicit_euler(u, dt):
@@ -18,7 +18,7 @@ def test_SWE_linearized(plotting=False):
 
     un = implicit_euler(u0, dt)
     u_backward = un - dt * P.eval_f(un)
-    # assert np.allclose(u0, u_backward)
+    assert np.allclose(u0, u_backward)
 
     if not plotting:
         return None
