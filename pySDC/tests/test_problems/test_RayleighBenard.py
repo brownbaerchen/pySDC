@@ -142,7 +142,7 @@ def test_buoyancy_computation(nx=9, nz=6):
 
     P = RayleighBenard(nx=nx, nz=nz)
     iT, iv = P.index(['T', 'v'])
-    X, Z = P.X, P.Z
+    Z = P.Z
 
     u = P.u_init
     u[iT] = Z - 1
@@ -236,11 +236,31 @@ def test_Poisson_problem_v():
     ip = P.index('p')
     u_exact_real[ip] = P.Z - 1 / 2 * P.Z**2 - 32 * P.Z**6
 
-    u_real = P.itransform(u)
-
     u_exact = P.transform(u_exact_real)
     u_exact[ip, 0, 0] = u[ip, 0, 0]  # nobody cares about the constant offset
     assert np.allclose(u_exact, u)
+
+
+def test_CFL():
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
+    import numpy as np
+
+    P = RayleighBenard(nx=5, nz=2)
+    iu, iv = P.index(['u', 'v'])
+
+    u = P.u_init
+    u[iu] = 2.77
+    u[iv] = 1e-3
+
+    dt = CFLLimit.compute_max_step_size(P, u)
+    assert np.allclose(dt, P.X[1, 0] / u[iu])
+
+    u2 = P.u_init
+    u2[iu] = 1e-3
+    u2[iv] = 3.14
+
+    dt2 = CFLLimit.compute_max_step_size(P, u2)
+    assert np.allclose(dt2, 1 / u2[iv])
 
 
 if __name__ == '__main__':
@@ -249,4 +269,5 @@ if __name__ == '__main__':
     # test_Poisson_problem_v()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
-    test_viscous_dissipation()
+    # test_viscous_dissipation()
+    test_CFL()

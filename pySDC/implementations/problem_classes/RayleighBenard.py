@@ -131,15 +131,9 @@ class RayleighBenard(GenericSpectralLinear):
         f_impl_hat = self.u_init_forward
 
         Dz = self.Dz
-        Dzz = self.Dzz
         Dx = self.Dx
-        Dxx = self.Dxx
 
-        shape = u[0].shape
         iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
-
-        kappa = (self.Rayleigh * self.Prandl) ** (-1 / 2)
-        nu = (self.Rayleigh / self.Prandl) ** (-1 / 2)
 
         # evaluate implicit terms
         f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
@@ -376,7 +370,12 @@ class CFLLimit(ConvergenceController):
     @staticmethod
     def compute_max_step_size(P, u):
         grid_spacing_x = P.X[1, 0] - P.X[0, 0]
-        grid_spacing_z = P.xp.append(P.Z[0, :-1] - P.Z[0, 1:], P.Z[0, -1] - P.axes[1].x0)
+
+        cell_wallz = P.xp.zeros(P.nz + 1)
+        cell_wallz[0] = 1
+        cell_wallz[-1] = -1
+        cell_wallz[1:-1] = (P.Z[0, :-1] + P.Z[0, 1:]) / 2
+        grid_spacing_z = cell_wallz[:-1] - cell_wallz[1:]
 
         iu, iv = P.index(['u', 'v'])
 
