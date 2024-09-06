@@ -6,7 +6,6 @@ import pytest
 @pytest.mark.parametrize('p', [1, 2, 3, 4])
 def test_differentiation_matrix(N, p):
     import numpy as np
-    import scipy
     from pySDC.helpers.spectral_helper import Ultraspherical
 
     helper = Ultraspherical(N)
@@ -18,7 +17,6 @@ def test_differentiation_matrix(N, p):
 
     du = helper.itransform(Q @ D @ coeffs)
     exact = np.polynomial.Chebyshev(coeffs).deriv(p)(x)
-    P = helper.get_conv(p_out=p)
 
     assert np.allclose(exact, du)
 
@@ -27,11 +25,9 @@ def test_differentiation_matrix(N, p):
 @pytest.mark.parametrize('N', [4, 7, 32])
 def test_integration(N):
     import numpy as np
-    import scipy
     from pySDC.helpers.spectral_helper import Ultraspherical
 
     helper = Ultraspherical(N)
-    x = helper.get_1dgrid()
     coeffs = np.random.random(N)
     coeffs[-1] = 0
 

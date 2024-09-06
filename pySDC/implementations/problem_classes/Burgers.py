@@ -5,6 +5,19 @@ from pySDC.implementations.problem_classes.generic_spectral import GenericSpectr
 
 
 class Burgers1D(GenericSpectralLinear):
+    """
+    See https://en.wikipedia.org/wiki/Burgers'_equation for the equation that is solved.
+    Discretization is done with a Chebychev method, which requires a first order derivative formulation.
+    Feel free to do a more efficient implementation using an ultraspherical method to avoid the first order business.
+
+    Parameters:
+       N (int): Spatial resolution
+       epsilon (float): viscosity
+       BCl (float): Value at left boundary
+       BCr (float): Value at right boundary
+       f (int): Frequency of the initial conditions
+       mode (str): 'T2U' or 'T2T'. Use 'T2U' to get sparse differentiation matrices
+    """
 
     dtype_u = mesh
     dtype_f = imex_mesh
@@ -125,9 +138,23 @@ class Burgers1D(GenericSpectralLinear):
 
 
 class Burgers2D(GenericSpectralLinear):
+    """
+    See https://en.wikipedia.org/wiki/Burgers'_equation for the equation that is solved.
+    This implementation is discretized with FFTs in x and Chebychev in z.
+
+    Parameters:
+       nx (int): Spatial resolution in x direction
+       nz (int): Spatial resolution in z direction
+       epsilon (float): viscosity
+       BCl (float): Value at left boundary
+       BCr (float): Value at right boundary
+       fux (int): Frequency of the initial conditions in x-direction
+       fuz (int): Frequency of the initial conditions in z-direction
+       mode (str): 'T2U' or 'T2T'. Use 'T2U' to get sparse differentiation matrices
+    """
+
     dtype_u = mesh
     dtype_f = imex_mesh
-    xp = np
 
     def __init__(self, nx=64, nz=64, epsilon=0.1, fux=2, fuz=1, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
@@ -187,9 +214,6 @@ class Burgers2D(GenericSpectralLinear):
             me[iu] = self.xp.cos(self.X * self.fux) * self.xp.sin(self.Z * np.pi * self.fuz) + self.BCtopu
             me[iux] = -self.xp.sin(self.X * self.fux) * self.fux * self.xp.sin(self.Z * np.pi * self.fuz)
             me[iuz] = self.xp.cos(self.X * self.fux) * self.xp.cos(self.Z * np.pi * self.fuz) * np.pi * self.fuz
-            # me[iu] = self.xp.cos(self.X * self.fux) * (self.Z+1)*(self.Z-1) + self.BCtopu
-            # me[iux] = -self.xp.sin(self.X * self.fux) * self.fux * (self.Z+1)*(self.Z-1)
-            # me[iuz] = self.xp.cos(self.X * self.fux) * 2 * self.Z
 
             me[iv] = (self.BCtop + self.BCbottom) / 2 + (self.BCtop - self.BCbottom) / 2 * self.Z
             me[ivz][:] = (self.BCtop - self.BCbottom) / 2

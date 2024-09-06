@@ -163,7 +163,6 @@ def test_Burgers2D_solver(mode, nx=2**6, nz=2**6, plotting=False):
     small_step_size = 1e-8
     small_step = imex_euler(u.copy(), small_step_size)
     f = P.eval_f(small_step)
-    rhs = P.transform(u)
 
     for comp in ['u', 'v', 'ux', 'uz', 'vz', 'vx']:
         i = P.index(comp)
