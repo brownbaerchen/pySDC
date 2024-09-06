@@ -10,7 +10,7 @@ class Heat1DChebychov(GenericSpectralLinear):
     dtype_u = mesh
     dtype_f = mesh
 
-    def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, **kwargs):
+    def __init__(self, nvars=128, a=0, b=0, f=1, nu=1.0, mode='T2U', **kwargs):
         self._makeAttributeAndRegister(*locals().keys(), localVars=locals(), readOnly=True)
 
         bases = [{'base': 'chebychov', 'N': nvars}]
@@ -24,13 +24,15 @@ class Heat1DChebychov(GenericSpectralLinear):
         Dx = self.get_differentiation_matrix(axes=(0,))
         self.Dx = Dx
 
+        self.T2U = self.get_basis_change_matrix(conv=mode)
+
         L_lhs = {
-            'ux': {'u': -Dx, 'ux': I},
-            'u': {'ux': -nu * Dx},
+            'ux': {'u': -self.T2U @ Dx, 'ux': self.T2U @ I},
+            'u': {'ux': -nu * (self.T2U @ Dx)},
         }
         self.setup_L(L_lhs)
 
-        M_lhs = {'u': {'u': I}}
+        M_lhs = {'u': {'u': self.T2U @ I}}
         self.setup_M(M_lhs)
 
         self.add_BC(component='u', equation='u', axis=0, x=-1, v=a, kind="Dirichlet")
@@ -46,7 +48,7 @@ class Heat1DChebychov(GenericSpectralLinear):
         me_hat[iu] = (self.nu * self.Dx @ me_hat[iux].flatten()).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat).real
 
-        f[self.index("u")] = me[iu]
+        f[iu] = me[iu]
         return f
 
     def u_exact(self, t, noise=0):
@@ -94,11 +96,12 @@ class Heat1DUltraspherical(GenericSpectralLinear):
         self.x = self.get_grid()[0]
 
         I = self.get_Id()
-        S2 = self.get_basis_change_matrix(p_in=2, p_out=0)
         Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
-        self.Dxx = S2 @ Dxx
 
+        S2 = self.get_basis_change_matrix(p_in=2, p_out=0)
         U2 = self.get_basis_change_matrix(p_in=0, p_out=2)
+
+        self.Dxx = S2 @ Dxx
 
         L_lhs = {
             'u': {'u': -nu * Dxx},
@@ -118,7 +121,7 @@ class Heat1DUltraspherical(GenericSpectralLinear):
 
         me_hat = self.u_init_forward
         me_hat[:] = self.transform(u)
-        me_hat[iu] = (self.nu * self.Dxx @ me_hat[iu].flatten()).reshape(me_hat[iu].shape)
+        me_hat[iu] = (self.nu * (self.Dxx @ me_hat[iu].flatten())).reshape(me_hat[iu].shape)
         me = self.itransform(me_hat).real
 
         f[iu][...] = me[iu]
@@ -162,7 +165,7 @@ class Heat2DChebychov(GenericSpectralLinear):
         bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
         components = ['u', 'ux', 'uy']
 
-        super().__init__(bases, components, **kwargs)
+        super().__init__(bases, components, Dirichlet_recombination=False, **kwargs)
 
         self.Y, self.X = self.get_grid()
 
@@ -249,7 +252,7 @@ class Heat2DUltraspherical(GenericSpectralLinear):
         bases = [{'base': base_x, 'N': nx}, {'base': base_y, 'N': ny}]
         components = ['u']
 
-        super().__init__(bases, components, **kwargs)
+        super().__init__(bases, components, Dirichlet_recombination=False, **kwargs)
 
         self.Y, self.X = self.get_grid()
 

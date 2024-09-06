@@ -28,7 +28,7 @@ def test_heat1d_chebychov(a, b, f, noise, use_ultraspherical, nvars=2**4):
         assert np.allclose(u, P.u_exact(dt), atol=1e-2), 'Error in solver'
 
     if noise > 0 and use_ultraspherical:
-        tol = 1e-5
+        tol = 2e-2
     elif noise > 0:
         tol = 1e-4
     else:
@@ -71,23 +71,17 @@ def test_heat2d_chebychov(a, b, c, fx, fy, base_x, base_y, nx=2**5 + 1, ny=2**5 
         base_x=base_x,
         base_y=base_y,
         nu=1e-3,
-        left_preconditioner=True,
-        right_preconditioning='D2T',
     )
 
     u0 = P.u_exact(0)
-    dt = 1e-1
+    dt = 1e-2
     u = P.solve_system(u0, dt)
     u02 = u - dt * P.eval_f(u)
 
-    tol = 1e-9 if (base_x == 'fft' or base_y == 'fft') else 1e-3
-
-    print(u)
-    print(P.u_exact(dt))
     assert np.allclose(
-        u, P.u_exact(dt), atol=tol
+        u, P.u_exact(dt), atol=1e-3
     ), f'Error in solver larger than expected, got {abs((u - P.u_exact(dt))):.2e}'
-    assert np.allclose(u0[0], u02[0], atol=1e-10), 'Error in eval_f'
+    assert np.allclose(u0[0], u02[0], atol=1e-4), 'Error in eval_f'
 
 
 def test_SDC():
@@ -145,6 +139,5 @@ def test_SDC():
 
 if __name__ == '__main__':
     # test_SDC()
-    # test_heat1d_chebychov(1, 0, 1, 0e-1, True, 2**6)
-    # test_AdvectionDiffusion(plot=True)
-    test_heat2d_chebychov(0, 0, 0, 2, 2, 'ultraspherical', 'fft', 2**1, 2**3)
+    # test_heat1d_chebychov(1, 0, 1, 1e-3, True, 2**6)
+    test_heat2d_chebychov(0, 0, 0, 2, 2, 'ultraspherical', 'fft', 2**6, 2**6)

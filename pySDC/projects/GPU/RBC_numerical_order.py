@@ -68,7 +68,7 @@ def get_order(starting_idx, increment, order):
     config = RayleighBenardOrder(n_procs_list=args['procs'])
     desc = config.get_description()
     P = desc['problem_class'](**desc['problem_params'])
-    config.get_initial_condition(P, restart_idx=starting_idx)
+    _, t = config.get_initial_condition(P, restart_idx=starting_idx)
 
     config.t_inc = increment
 
@@ -82,7 +82,7 @@ def get_order(starting_idx, increment, order):
         u[dt] = run_experiment(args, config, dt=dt, order=order)
 
     with open(path, 'wb') as file:
-        pickle.dump(u, file)
+        pickle.dump({'t': t, 'u': u, 'increment': increment}, file)
 
 
 def compute_orders(starting_idx, increment):
@@ -113,7 +113,8 @@ def plot_orders(starting_idx):
     for order in orders:
         path = f'data/numerical_order-{config.comm_world.rank}-{starting_idx}-{order}.pickle'
         with open(path, 'rb') as file:
-            u = pickle.load(file)
+            data = pickle.load(file)
+        u = data['u']
 
         errors = []
         idx = 0
@@ -132,7 +133,7 @@ def plot_orders(starting_idx):
     ax.set_ylabel('global error')
     ax.set_xlabel(r'$\Delta t$')
     ax.legend(frameon=False)
-    # ax.set_title(f't={t:.2f}')
+    ax.set_title(f't={data["t"]:.2f}')
     fig.savefig(f'plots/RBC-order-{starting_idx}.pdf')
     plt.show()
 
@@ -140,4 +141,6 @@ def plot_orders(starting_idx):
 if __name__ == '__main__':
     # get_order(70, run=False, increment=1)
     # get_order(130, increment=5e-2, order=3)
+    idx = 130
+    compute_orders(130, increment=5e-2)
     plot_orders(130)

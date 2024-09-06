@@ -42,6 +42,12 @@ class GenericSpectralLinear(Problem):
         *args,
         **kwargs,
     ):
+        """
+        TODO: write docstring
+
+        Args:
+            Dirichlet_recombination (bool): Use Dirichlet recombination in the last axis as right preconditioner
+        """
         self.spectral = SpectralHelper(comm=comm, useGPU=useGPU)
 
         if useGPU:

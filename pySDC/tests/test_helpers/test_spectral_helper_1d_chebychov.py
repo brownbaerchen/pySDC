@@ -73,8 +73,7 @@ def test_conversion_inverses(name):
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-def test_differentiation_matrix(N, variant):
+def test_differentiation_matrix(N):
     import numpy as np
     import scipy
     from pySDC.helpers.spectral_helper import ChebychovHelper
@@ -84,18 +83,9 @@ def test_differentiation_matrix(N, variant):
     coeffs = np.random.random(N)
     norm = cheby.get_norm()
 
-    if variant == 'T2U':
-        D = cheby.get_T2U_differentiation_matrix()
-        P = cheby.get_conv('T2T')
-        Q = cheby.get_conv('U2T')
-    elif variant == 'T2T':
-        D = cheby.get_T2T_differentiation_matrix(1)
-        P = cheby.get_conv('T2T')
-        Q = cheby.get_conv('T2T')
-    else:
-        raise NotImplementedError
+    D = cheby.get_differentiation_matrix(1)
 
-    du = scipy.fft.idct(Q @ D @ P @ coeffs / norm)
+    du = scipy.fft.idct(D @ coeffs / norm)
     exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
 
     assert np.allclose(exact, du)
@@ -103,49 +93,20 @@ def test_differentiation_matrix(N, variant):
 
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4, 32])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
-def test_integration_matrix(N, variant):
+def test_integration_matrix(N):
     import numpy as np
     from pySDC.helpers.spectral_helper import ChebychovHelper
 
-    cheby = ChebychovHelper(N, mode=variant)
+    cheby = ChebychovHelper(N)
     coeffs = np.random.random(N)
     coeffs[-1] = 0
 
     D = cheby.get_integration_matrix()
 
-    if variant == 'T2U':
-        P = cheby.get_conv('U2T')
-    elif variant == 'T2T':
-        P = cheby.get_conv('T2T')
-    else:
-        raise NotImplementedError
-
-    du = P @ D @ coeffs
+    du = D @ coeffs
     exact = np.polynomial.Chebyshev(coeffs).integ(1, lbnd=0)
 
     assert np.allclose(exact.coef[:-1], du)
-
-
-# @pytest.mark.base
-# @pytest.mark.parametrize('N', [8])
-# @pytest.mark.parametrize('kmin', [0, 3])
-# @pytest.mark.parametrize('kmax', [8, 3])
-# @pytest.mark.parametrize('mode', ['T2T', 'T2U'])
-# def test_filter(N, kmin, kmax, mode):
-#     import numpy as np
-#     from pySDC.helpers.spectral_helper import ChebychovHelper
-#
-#     coef = np.random.random(N)
-#
-#     cheby = ChebychovHelper(N, mode=mode)
-#     F = cheby.get_filter_matrix(kmin=kmin, kmax=kmax)
-#     U2T = cheby.get_conv(cheby.mode[::-1])
-#
-#     filtered_coef = U2T @ F @ coef
-#     assert np.allclose(filtered_coef[:kmin], 0)
-#     assert np.allclose(filtered_coef[kmax:], 0)
-#     assert np.allclose(filtered_coef[kmin:kmax], coef[kmin:kmax])
 
 
 @pytest.mark.base
@@ -213,10 +174,9 @@ def test_norm(N):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 0, 1])
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('N', [3, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
-def test_tau_method(mode, bc, N, bc_val):
+def test_tau_method(bc, N, bc_val):
     '''
     solve u_x - u + tau P = 0, u(bc) = bc_val
 
@@ -235,31 +195,14 @@ def test_tau_method(mode, bc, N, bc_val):
     coef = np.append(np.zeros(N - 1), [1])
     rhs = np.append(np.zeros(N - 1), [bc_val])
 
-    if mode == 'T2T':
-        P = np.polynomial.Chebyshev(coef)
-        D = cheby.get_T2T_differentiation_matrix()
-        Id = np.diag(np.ones(N))
+    P = np.polynomial.Chebyshev(coef)
+    D = cheby.get_differentiation_matrix()
+    Id = np.diag(np.ones(N))
 
-        A = D - Id
-        A[-1, :] = cheby.get_Dirichlet_BC_row(bc)
+    A = D - Id
+    A[-1, :] = cheby.get_Dirichlet_BC_row(bc)
 
-        sol_hat = np.linalg.solve(A, rhs)
-
-    elif mode == 'T2U':
-        T2U = cheby.get_conv('T2U')
-        U2T = cheby.get_conv('U2T')
-
-        P = np.polynomial.Chebyshev(U2T @ coef)
-        D = cheby.get_T2U_differentiation_matrix()
-        Id = T2U
-
-        A = D - Id
-        A[-1, :] = cheby.get_Dirichlet_BC_row(bc)
-
-        sol_hat = sp.linalg.spsolve(A, rhs)
-
-    else:
-        raise NotImplementedError
+    sol_hat = np.linalg.solve(A, rhs)
 
     sol_poly = np.polynomial.Chebyshev(sol_hat)
     d_sol_poly = sol_poly.deriv(1)
@@ -273,11 +216,10 @@ def test_tau_method(mode, bc, N, bc_val):
 
 @pytest.mark.base
 @pytest.mark.parametrize('bc', [-1, 1])
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
+def test_tau_method2D(bc, nz, nx, bc_val, plotting=False):
     '''
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
@@ -286,7 +228,7 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
     import numpy as np
     import scipy.sparse as sp
 
-    cheby = ChebychovHelper(nz, mode=mode)
+    cheby = ChebychovHelper(nz)
     fft = FFTHelper(nx)
 
     # generate grid
@@ -301,7 +243,7 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
     rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychov spectral space
 
     # generate matrices
-    Dx = sp.linalg.matrix_power(fft.get_differentiation_matrix(), 2) * 1e-1 + fft.get_differentiation_matrix()
+    Dx = fft.get_differentiation_matrix(p=2) * 1e-1 + fft.get_differentiation_matrix()
     Ix = fft.get_Id()
     Dz = cheby.get_differentiation_matrix()
     Iz = cheby.get_Id()
@@ -351,11 +293,10 @@ def test_tau_method2D(mode, bc, nz, nx, bc_val, plotting=False):
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('mode', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('bc_val', [4.0])
-def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
+def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
     '''
     Solve a Poisson problem with funny Dirichlet BCs in z-direction and periodic in x-direction.
     '''
@@ -363,7 +304,7 @@ def test_tau_method2D_diffusion(mode, nz, nx, bc_val, plotting=False):
     import numpy as np
     import scipy.sparse as sp
 
-    cheby = ChebychovHelper(nz, mode=mode)
+    cheby = ChebychovHelper(nz)
     fft = FFTHelper(nx)
 
     # generate grid

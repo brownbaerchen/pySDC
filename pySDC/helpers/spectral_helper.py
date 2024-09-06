@@ -4,6 +4,10 @@ from pySDC.implementations.datatype_classes.mesh import mesh
 
 
 class SpectralHelper1D:
+    """
+    Base class for 1D spectral discretizations.
+    """
+
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
     linalg = scipy.sparse.linalg
@@ -32,7 +36,7 @@ class SpectralHelper1D:
         cls.linalg = linalg
 
     def get_Id(self):
-        raise NotImplementedError
+        return self.sparse_lib.eye(self.N)
 
     def get_zero(self):
         return 0 * self.get_Id()
@@ -44,6 +48,9 @@ class SpectralHelper1D:
         raise NotImplementedError()
 
     def get_wavenumbers(self):
+        """
+        Get the grid in spectral space
+        """
         raise NotImplementedError
 
     def get_empty_operator_matrix(self, S, O):
@@ -55,17 +62,41 @@ class SpectralHelper1D:
             O (sparse matrix): Zero matrix used for initialization
 
         Returns:
-            list containing sparse zeros
+            list of lists containing sparse zeros
         """
         return [[O for _ in range(S)] for _ in range(S)]
 
     def get_basis_change_matrix(self, *args, **kwargs):
+        """
+        Some spectral discretization change the basis during differentiation. This method can be used to transfer between the various bases.
+        """
         return self.sparse_lib.eye(self.N)
 
     def get_BC(self, kind, **kwargs):
+        """
+        To facilitate boundary conditions (BCs) we use either a basis where all functions satisfy the BCs automatically,
+        as is the case in FFT basis for periodic BCs, or boundary bordering. In boundary bordering, specific lines in
+        the matrix are replaced by the boundary conditions as obtained by this method.
+
+        Args:
+            kind (str): The type of BC you want to implement
+
+        Returns:
+            self.xp.array: Boundary condition
+        """
         raise NotImplementedError(f'No boundary conditions of {kind=!r} implemented!')
 
     def get_filter_matrix(self, kmin=0, kmax=None):
+        """
+        Get a bandpass filter.
+
+        Args:
+            kmin (int): Lower limit of the bandpass filter
+            kmax (int): Upper limit of the bandpass filter
+
+        Returns:
+            sparse matrix
+        """
         k = abs(self.get_wavenumbers())
 
         kmax = max(k) if kmax is None else kmax
@@ -77,16 +108,30 @@ class SpectralHelper1D:
         return F.tocsc()
 
     def get_1dgrid(self):
+        """
+        Get the grid in physical space
+
+        Returns:
+            self.xp.array: Grid
+        """
         raise NotImplementedError
 
 
 class ChebychovHelper(SpectralHelper1D):
-    def __init__(self, *args, mode='T2T', transform_type='fft', x0=-1, x1=1, **kwargs):
+    """
+    The Chebychov base consists of special kinds of polynomials, with the main advantage that you can easily transform
+    between physical and spectral space by discrete cosine transform.
+    The differentiation in the Chebychov T base is dense, but can be preconditioned to yield a differentiation operator
+    that moves to Chebychov U basis during differentiation, which is sparse. When using this technique, problems need to
+    be formulated in first order formulation.
+
+    This implementation is largely based on the Dedalus paper (arXiv:1905.10388).
+    """
+
+    def __init__(self, *args, transform_type='fft', x0=-1, x1=1, **kwargs):
         assert x0 == -1
         assert x1 == 1
-        assert mode in ['T2T', 'T2U']
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
-        self.mode = mode
         self.transform_type = transform_type
 
         if self.transform_type == 'fft':
@@ -105,25 +150,6 @@ class ChebychovHelper(SpectralHelper1D):
             numpy.ndarray: 1D grid
         '''
         return self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5))
-
-    def get_Id(self):
-        return self.get_conv(self.mode)
-
-    def get_differentiation_matrix(self):
-        if self.mode == 'T2T':
-            return self.get_T2T_differentiation_matrix()
-        elif self.mode == 'T2U':
-            return self.get_T2U_differentiation_matrix()
-        else:
-            raise NotImplementedError(f'{self.mode=!r} not implemented')
-
-    def get_integration_matrix(self, lbnd=0):
-        if self.mode == 'T2T':
-            return self.get_T2T_integration_matrix(lbnd=lbnd)
-        elif self.mode == 'T2U':
-            return self.get_conv('T2U') @ self.get_T2T_integration_matrix(lbnd=lbnd)
-        else:
-            raise NotImplementedError(f'{self.mode=!r} not implemented')
 
     def get_wavenumbers(self):
         return self.xp.arange(self.N)
@@ -181,31 +207,11 @@ class ChebychovHelper(SpectralHelper1D):
         self.cache[name] = mat
         return mat
 
-    def get_basis_change_matrix(self, conv='T2T', direction='backward'):
+    def get_basis_change_matrix(self, conv='T2T', **kwargs):
         return self.get_conv(conv)
-        if direction == 'forward':
-            return self.get_conv(self.mode)
-        elif direction == 'backward':
-            return self.get_conv(self.mode[::-1])
-        else:
-            return self.get_conv(direction)
 
-    def get_T2U_differentiation_matrix(self):
-        '''
-        Sparse differentiation matrix from Chebychov polynomials of first kind to second.
-        Returns:
-            scipy.sparse: Sparse differentiation matrix
-        '''
-        return self.sparse_lib.diags(self.xp.arange(self.N - 1) + 1, offsets=1)
-
-    def get_U2T_integration_matrix(self):
-        # TODO: missing integration constant, use T2T instead!
-        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1)
-        return S
-
-    def get_T2T_integration_matrix(self, lbnd=0):
-        # TODO: this is a bit fishy
-        S = self.get_U2T_integration_matrix() @ self.get_conv('T2U')
+    def get_integration_matrix(self, lbnd=0):
+        S = self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1) @ self.get_conv('T2U')
         n = self.xp.arange(self.N)
         if lbnd == 0:
             S = S.tocsc()
@@ -218,13 +224,12 @@ class ChebychovHelper(SpectralHelper1D):
             raise NotImplementedError
         return S
 
-    def get_T2T_differentiation_matrix(self, p=1):
+    def get_differentiation_matrix(self, p=1):
         '''
-        This is adapted from the Dedalus paper. Keep in mind that the T2T differentiation matrix is dense. But you can
-        compute any derivative by simply raising it to some power `p`.
+        Keep in mind that the T2T differentiation matrix is dense.
 
         Args:
-            p (int): Derivative you want to compute (can be negative for integration)
+            p (int): Derivative you want to compute
 
         Returns:
             numpy.ndarray: Differentiation matrix
@@ -245,6 +250,18 @@ class ChebychovHelper(SpectralHelper1D):
         return norm
 
     def get_fft_shuffle(self, forward, N):
+        """
+        In order to more easily parallelize using distributed FFT libraries, we express the DCT via an FFT following
+        doi.org/10.1109/TASSP.1980.1163351. The idea is based on reshuffling the data to be periodic and rotating it
+        in the complex plane. This function returns a mask to do the shuffling.
+
+        Args:
+            forward (bool): Whether you want the shuffle for forward transform or backward transform
+            N (int): size of the grid
+
+        Returns:
+            self.xp.array: Use as mask
+        """
         xp = self.xp
         if forward:
             return xp.append(xp.arange((N + 1) // 2) * 2, -xp.arange(N // 2) * 2 - 1 - N % 2)
@@ -256,6 +273,16 @@ class ChebychovHelper(SpectralHelper1D):
             return mask
 
     def get_fft_shift(self, forward, N):
+        """
+        As described in the docstring for `get_fft_shuffle`, we need to rotate in the complex plane in order to use FFT for DCT.
+
+        Args:
+            forward (bool): Whether you want the rotation for forward transform or backward transform
+            N (int): size of the grid
+
+        Returns:
+            self.xp.array: Rotation
+        """
         k = self.get_wavenumbers()
         norm = self.get_norm()
         xp = self.xp
@@ -267,6 +294,10 @@ class ChebychovHelper(SpectralHelper1D):
             return shift / norm
 
     def get_fft_utils(self):
+        """
+        Get the required utilities for using FFT to do DCT as described in the docstring for `get_fft_shuffle` and keep
+        them cached.
+        """
         self.fft_utils = {
             'fwd': {},
             'bck': {},
@@ -328,6 +359,9 @@ class ChebychovHelper(SpectralHelper1D):
             raise NotImplementedError
 
     def get_BC(self, kind, **kwargs):
+        """
+        Get boundary condition row for boundary bordering.
+        """
         if kind.lower() == 'integral':
             return self.get_integ_BC_row(**kwargs)
         elif kind.lower() == 'dirichlet':
@@ -397,10 +431,16 @@ class Ultraspherical(ChebychovHelper):
     You don't need the same resulting basis in all equations. You just need to take care that you translate the right hand side to the correct basis as well.
     """
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def get_differentiation_matrix(self, p=1):
+        """
+        Notice that while sparse, this matrix is not diagonal, which means the inversion cannot be parallelized easily.
+
+        Args:
+            p (int): Order of the derivative
+
+        Returns:
+            sparse differentiation matrix
+        """
         sp = self.sparse_lib
         xp = self.xp
         N = self.N
@@ -462,9 +502,6 @@ class Ultraspherical(ChebychovHelper):
     def get_basis_change_matrix(self, p_in=0, p_out=0, **kwargs):
         return self.get_conv(p_in=p_in, p_out=p_out)
 
-    def get_Id(self):
-        return self.sparse_lib.eye(self.N)
-
     def get_integration_matrix(self):
         return self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1) @ self.get_conv(p_out=1, p_in=0)
 
@@ -481,29 +518,41 @@ class FFTHelper(SpectralHelper1D):
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
 
     def get_1dgrid(self):
+        """
+        We use equally spaced points including the left boundary and not including the right one, which is the left boundary.
+        """
         dx = self.L / self.N
         return self.xp.arange(self.N) * dx + self.x0
 
     def get_wavenumbers(self):
+        """
+        Be careful that this ordering is very unintuitive.
+        """
         return self.xp.fft.fftfreq(self.N, 1.0 / self.N) * 2 * np.pi / self.L
 
     def get_differentiation_matrix(self, p=1):
+        """
+        This matrix is diagonal, allowing to invert concurrently.
+
+        Args:
+            p (int): Order of the derivative
+
+        Returns:
+            sparse differentiation matrix
+        """
         k = self.get_wavenumbers()
         import scipy.sparse as sp
 
-        if self.sparse_lib == sp:
-            return self.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
-        else:
+        if self.useGPU:
             D = self.sparse_lib.diags(1j * k).get()
             return self.sparse_lib.csr_matrix(sp.linalg.matrix_power(D, p))
+        elif self.sparse_lib == sp:
+            return self.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
 
     def get_integration_matrix(self, p=1):
         k = self.xp.array(self.get_wavenumbers(), dtype='complex128')
         k[0] = 1j * self.L
         return self.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
-
-    def get_Id(self):
-        return self.sparse_lib.eye(self.N)
 
     def transform(self, u, axis=-1, **kwargs):
         return self.fft_lib.fft(u, axis=axis, **kwargs)
@@ -518,12 +567,22 @@ class FFTHelper(SpectralHelper1D):
             return super().get_BC(kind, **kwargs)
 
     def get_integ_BC_row(self, **kwargs):
+        """
+        Only the 0-mode has non-zero integral with FFT basis in periodic BCs
+        """
         me = self.xp.zeros(self.N)
         me[0] = self.L / self.N
         return me
 
 
 class SpectralHelper:
+    """
+    This class has three functions:
+      - Easily assemble matrices containing multiple equations
+      - Direct product of 1D bases to solve problems in more dimensions
+      - Distribute the FFTs to facilitate concurrency.
+    """
+
     xp = np
     fft_lib = scipy.fft
     sparse_lib = scipy.sparse
@@ -568,14 +627,23 @@ class SpectralHelper:
 
     @property
     def u_init(self):
+        """
+        Get empty data container in physical space
+        """
         return self.dtype(self.init)
 
     @property
     def u_init_forward(self):
+        """
+        Get empty data container in spectral space
+        """
         return self.dtype(self.init_forward)
 
     @property
     def shape(self):
+        """
+        Get shape of individual solution component
+        """
         return self.init[0][1:]
 
     @property
@@ -588,9 +656,18 @@ class SpectralHelper:
 
     @property
     def V(self):
+        """
+        Get domain volume
+        """
         return np.prod([me.L for me in self.axes])
 
     def add_axis(self, base, *args, **kwargs):
+        """
+        Add an axis to the domain by deciding on suitable 1D base.
+
+        Args:
+            base (str): 1D spectral method
+        """
         kwargs['useGPU'] = self.useGPU
 
         if base.lower() in ['chebychov', 'chebychev', 'cheby', 'chebychovhelper']:
@@ -606,6 +683,12 @@ class SpectralHelper:
         self.axes[-1].sparse_lib = self.sparse_lib
 
     def add_component(self, name):
+        """
+        Add solution component(s).
+
+        Args:
+            name (str or list of strings): Name(s) of component(s)
+        """
         if type(name) in [list, tuple]:
             for me in name:
                 self.add_component(me)
@@ -617,6 +700,15 @@ class SpectralHelper:
             raise NotImplementedError
 
     def index(self, name):
+        """
+        Get the index of component `name`.
+
+        Args:
+            name (str or list of strings): Name(s) of component(s)
+
+        Returns:
+            int: Index of the component
+        """
         if type(name) in [str, int]:
             return self.components.index(name)
         elif type(name) in [list, tuple]:
@@ -636,6 +728,20 @@ class SpectralHelper:
         return [[O for _ in range(S)] for _ in range(S)]
 
     def get_BC(self, axis, kind, line=-1, scalar=False, **kwargs):
+        """
+        Use this method for boundary bordering. It gets the respective matrix row and embeds it into a matrix.
+        Pay attention that if you have multiple BCs in a single equation, you need to put them in different lines.
+        Typically, the last line that does not contain a BC is the best choice.
+
+        Args:
+            axis (int): Axis you want to add the BC to
+            kind (str): kind of BC, e.g. Dirichlet
+            line (int): Line you want the BC to go in
+            scalar (bool): Put the BC in all space positions in the other direction
+
+        Returns:
+            sparse matrix containing the BC
+        """
         base = self.axes[axis]
 
         BC = base.get_Id().tolil() * 0
@@ -652,7 +758,7 @@ class SpectralHelper:
             else:
                 _Id = self.axes[axis2].get_Id()
 
-            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_basis_change_matrix() @ _Id, axis=axis2)
+            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id() @ _Id, axis=axis2)
             mats = [
                 None,
             ] * ndim
@@ -660,8 +766,21 @@ class SpectralHelper:
             mats[axis2] = Id
             return self.sparse_lib.kron(*mats)
 
-    def remove_BC(self, component, equation, axis, kind, scale=1.0, line=-1, scalar=False, **kwargs):
-        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
+    def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, **kwargs):
+        """
+        Remove a BC from the matrix. This is useful e.g. when you add a non-scalar BC and then need to selectively
+        remove single BCs again, as in incompressible Navier-Stokes, for instance.
+
+        Args:
+            component (str): Name of the component the BC should act on
+            equation (str): Name of the equation for the component you want to put the BC in
+            axis (int): Axis you want to add the BC to
+            kind (str): kind of BC, e.g. Dirichlet
+            v: Value of the BC
+            line (int): Line you want the BC to go in
+            scalar (bool): Put the BC in all space positions in the other direction
+        """
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] -= _BC
 
         if scalar:
@@ -680,8 +799,21 @@ class SpectralHelper:
         if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
             self.BC_rhs_mask[(*slices,)] = False
 
-    def add_BC(self, component, equation, axis, kind, v, scale=1.0, line=-1, scalar=False, **kwargs):
-        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs) * scale
+    def add_BC(self, component, equation, axis, kind, v, line=-1, scalar=False, **kwargs):
+        """
+        Add a BC to the matrix. Note that you need to convert the list of lists of BCs that this method generates to a
+        single sparse matrix by calling `setup_BCs` after adding/removing all BCs.
+
+        Args:
+            component (str): Name of the component the BC should act on
+            equation (str): Name of the equation for the component you want to put the BC in
+            axis (int): Axis you want to add the BC to
+            kind (str): kind of BC, e.g. Dirichlet
+            v: Value of the BC
+            line (int): Line you want the BC to go in
+            scalar (bool): Put the BC in all space positions in the other direction
+        """
+        _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
         self.full_BCs += [
             {
@@ -689,7 +821,7 @@ class SpectralHelper:
                 'equation': equation,
                 'axis': axis,
                 'kind': kind,
-                'v': v * scale,
+                'v': v,
                 'line': line,
                 'scalar': scalar,
                 **kwargs,
@@ -718,6 +850,11 @@ class SpectralHelper:
                 self.BC_rhs_mask[(*slices,)] = True
 
     def setup_BCs(self):
+        """
+        Convert the list of lists of BCs to the boundary condition operator.
+        Also, boundary bordering requires to zero out all other entries in the matrix in rows containing a boundary
+        condition. This method sets up a suitable sparse matrix to do this.
+        """
         sp = self.sparse_lib
         self.BCs = self.convert_operator_matrix_to_operator(self.BC_mat)
         self.BC_zero_index = self.xp.arange(np.prod(self.init[0]))[self.BC_rhs_mask.flatten()]
@@ -727,6 +864,12 @@ class SpectralHelper:
         self.BC_line_zero_matrix = sp.diags(diags)
 
     def check_BCs(self, u):
+        """
+        Check that the solution satisfies the boundary conditions
+
+        Args:
+            u: The solution you want to check
+        """
         assert self.ndim < 3
         for axis in range(self.ndim):
             BCs = [me for me in self.full_BCs if me["axis"] == axis and not me["scalar"]]
@@ -743,19 +886,28 @@ class SpectralHelper:
                         get, want
                     ), f'Unexpected BC in {BC["component"]} in equation {BC["equation"]}, line {BC["line"]}! Got {get}, wanted {want}'
 
-    def put_BCs_in_matrix(self, A, rescale=1.0):
-        return self.BC_line_zero_matrix @ A + self.BCs * rescale
+    def put_BCs_in_matrix(self, A):
+        """
+        Put the boundary conditions in a matrix by replacing rows with BCs.
+        """
+        return self.BC_line_zero_matrix @ A + self.BCs
 
-    def put_BCs_in_rhs(self, rhs, istransformed=False, rescale=1.0):
+    def put_BCs_in_rhs(self, rhs):
+        """
+        Put the BCs in the right hand side for solving.
+
+        Args:
+            rhs: Right hand side in physical space
+
+        Returns:
+            rhs in physical space with BCs
+        """
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
 
         ndim = len(self.axes)
 
         for axis in range(ndim):
-            if istransformed:
-                _rhs_hat = rhs
-            else:
-                _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
+            _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
 
             for bc in self.full_BCs:
                 slices = (
@@ -765,34 +917,69 @@ class SpectralHelper:
                 )
                 if axis == bc['axis']:
                     _slice = [self.index(bc['equation'])] + slices
-                    _rhs_hat[(*_slice,)] = bc['v'] * rescale
+                    _rhs_hat[(*_slice,)] = bc['v']
 
-            if istransformed:
-                rhs = _rhs_hat
-            else:
-                rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
+            rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
 
         return rhs
 
     def add_equation_lhs(self, A, equation, relations):
+        """
+        Add the left hand part (that you want to solve implicitly) of an equation to a list of lists of sparse matrices
+        that you will convert to an operator later.
+        For instance, the `relations` for diffusion in component `u` would look like `relations = {'u': -Dxx}`.
+
+        Args:
+            A (list of lists of sparse matrices): The operator to be
+            equation (str): The equation of the component you want this in
+            relations: (dict): Relations between quantities
+        """
         for k, v in relations.items():
             A[self.index(equation)][self.index(k)] = v
 
     def convert_operator_matrix_to_operator(self, M):
+        """
+        Promote the list of lists of sparse matrices to a single sparse matrix that can be used as linear operator.
+
+        Args:
+            M (list of lists of sparse matrices): The operator to be
+
+        Returns:
+            sparse linear operator
+        """
         if len(self.components) == 1:
             return M[0][0]
         else:
             return self.sparse_lib.bmat(M, format='csc')
 
     def get_wavenumbers(self):
+        """
+        Get grid in spectral space
+        """
         grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
     def get_grid(self):
+        """
+        Get grid in physical space
+        """
         grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None, comm=None):
+        """
+        When using MPI, we use `PFFT` objects generated by mpi4py-fft
+
+        Args:
+            axes (tuple): Axes you want to transform over
+            direction (str): use "forward" or "backward" to get functions for performing the transforms or "object" to get the PFFT object
+            padding (tuple): Padding for dealiasing
+            shape (tuple): Shape of the transform
+            comm (mpi4py.Intracomm): MPI communicator
+
+        Returns:
+            transform
+        """
         axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
         shape = self.global_shape[1:] if shape is None else shape
         padding = (
@@ -838,6 +1025,10 @@ class SpectralHelper:
         return self.fft_cache[key]
 
     def setup_fft(self):
+        """
+        This function must be called after all axes have been setup in order to prepare the local shapes of the data.
+        This must also be called before setting up any BCs.
+        """
         if len(self.components) == 0:
             self.add_component('u')
 
@@ -880,19 +1071,33 @@ class SpectralHelper:
             dtype=bool,
         )
 
-    def _redistribute(self, u, axis):
-        if self.comm is None:
-            return u
-        else:
-            return u.redistribute(axis)
-
     def _transform_fft(self, u, axes, **kwargs):
+        """
+        FFT along `axes`
+
+        Args:
+            u: The solution
+            axes (tuple): Axes you want to transform over
+
+        Returns:
+            transformed solution
+        """
         fft = self.get_fft(axes, 'forward', **kwargs)
         return fft(u, axes=axes)
 
     def _transform_dct(self, u, axes, padding=None, **kwargs):
         '''
-        This will only ever return real values!
+        DCT along `axes`.
+        This will only return real values!
+        When padding the solution, we cannot just use the mpi4py-fft implementation, because of the unusual ordering of
+        wavenumbers in FFTs.
+
+        Args:
+            u: The solution
+            axes (tuple): Axes you want to transform over
+
+        Returns:
+            transformed solution
         '''
         if self.debug:
             assert self.xp.allclose(u.imag, 0), 'This function can only handle real input.'
@@ -937,6 +1142,9 @@ class SpectralHelper:
         return v.real
 
     def transform_single_component(self, u, axes=None, padding=None):
+        """
+        Transform a single component of the solution
+        """
         trfs = {
             ChebychovHelper: self._transform_dct,
             Ultraspherical: self._transform_dct,
@@ -994,6 +1202,9 @@ class SpectralHelper:
         return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft, forward=True)
 
     def transform(self, u, axes=None, padding=None):
+        """
+        Transform all components of the solution
+        """
         axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
         padding = (
             [
@@ -1122,6 +1333,16 @@ class SpectralHelper:
         return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft)
 
     def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, fill=True, **kwargs):
+        """
+        Realign the data along the axis when using distributed FFTs
+
+        Args:
+            u: The solution
+            axis (int): New alignment
+
+        Returns:
+            solution aligned on `axis`
+        """
         if self.comm is None:
             if fill:
                 return u
@@ -1165,6 +1386,9 @@ class SpectralHelper:
         return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]
 
     def get_filter_matrix(self, axis, **kwargs):
+        """
+        Get bandpass filter along `axis`
+        """
         if self.ndim == 1:
             return self.axes[0].get_filter_matrix(**kwargs)
 
@@ -1311,12 +1535,11 @@ class SpectralHelper:
 
     def get_basis_change_matrix(self, axes=None, **kwargs):
         """
-        Some spectral bases do a change between bases while differentiating. You can use this matrix to change back to
-        the original basis afterwards.
+        Some spectral bases do a change between bases while differentiating. This method returns matrices that changes the basis to whatever you want.
+        Refer to the methods of the same name of the 1D bases to learn what parameters you need to pass here.
 
         Args:
             axes (tuple): Axes along which to change basis.
-            direction (str): Direction of the basis change
 
         Returns:
             sparse basis change matrix
