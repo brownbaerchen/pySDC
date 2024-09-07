@@ -229,10 +229,15 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'][AdaptivityPolynomialError] = {'e_tol': 1e-4, 'abort_at_growing_residual': False}
+        desc['convergence_controllers'][AdaptivityPolynomialError] = {
+            'e_tol': 1e-4,
+            'abort_at_growing_residual': False,
+            'interpolate_between_restarts': False,
+            'dt_min': 1e-3,
+        }
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
-        desc['level_params']['restol'] = 1e-7
-        desc['level_params']['e_tol'] = 1e-1
+        desc['level_params']['restol'] = 1e-10
+        desc['level_params']['e_tol'] = 1e-10
         desc['sweeper_params']['num_nodes'] = 3
         desc['step_params']['maxiter'] = 12
 
