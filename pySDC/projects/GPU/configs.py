@@ -46,10 +46,10 @@ class Config(object):
         self.comms = get_comms(n_procs_list=n_procs_list)
         self.ranks = [me.rank for me in self.comms]
 
-    def get_description(self, *args, MPIsweeper=False, **kwargs):
+    def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
         description = {}
         description['problem_class'] = None
-        description['problem_params'] = {}
+        description['problem_params'] = {'useGPU': useGPU}
         description['sweeper_class'] = self.get_sweeper(useMPI=MPIsweeper)
         description['sweeper_params'] = {}
         description['level_params'] = {'comm': self.comms[2]}

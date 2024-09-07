@@ -28,7 +28,7 @@ def run_experiment(args, config, **kwargs):
     from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
     from pySDC.helpers.stats_helper import filter_stats
 
-    description = config.get_description(**kwargs)
+    description = config.get_description(useGPU=arg['useGPU'], **kwargs)
     controller_params = config.get_controller_params(logger_level=args['logger_level'])
 
     controller = controller_MPI(controller_params, description, config.comms[0])
