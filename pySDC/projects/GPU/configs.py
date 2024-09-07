@@ -1,10 +1,12 @@
 def get_config(name, n_procs_list):
     if name == 'RBC':
         return RayleighBenardRegular(n_procs_list=n_procs_list)
-    if name == 'RBC_dt':
+    elif name == 'RBC_dt':
         return RayleighBenard_dt_adaptivity(n_procs_list=n_procs_list)
-    if name == 'RBC_dt_k':
+    elif name == 'RBC_dt_k':
         return RayleighBenard_dt_k_adaptivity(n_procs_list=n_procs_list)
+    elif name == 'RBC_HR':
+        return RayleighBenardHighResolution(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -195,7 +197,6 @@ class RayleighBenardRegular(Config):
             vmax[quantitiy] = max([vmax[quantitiy], buffer[f'u-{rank}']['u'][P.index(quantitiy)].real.max()])
 
         for rank in range(n_procs_list[2]):
-
             im = axs[1].pcolormesh(
                 buffer[f'u-{rank}']['X'],
                 buffer[f'u-{rank}']['Z'],
@@ -256,5 +257,19 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 3
         desc['step_params']['maxiter'] = 5
+        return desc
+
+
+class RayleighBenardHighResolution(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+
+        desc['sweeper_params']['num_nodes'] = 4
+
+        desc['problem_params']['Rayleigh'] = 2e6
+        desc['problem_params']['nx'] = 2**10 + 1
+        desc['problem_params']['nz'] = 2**8
+
+        desc['step_params']['maxiter'] = 4
 
         return desc
