@@ -82,6 +82,7 @@ class GenericSpectralLinear(Problem):
         super().__init__(init=self.spectral.init)
 
         self.work_counters[solver_type] = WorkCounter()
+        self.work_counters['factorizations'] = WorkCounter()
 
         self.setup_preconditioner(Dirichlet_recombination, left_preconditioner)
 
@@ -209,12 +210,13 @@ class GenericSpectralLinear(Problem):
         #     plt.show()
 
         if self.solver_type.lower() == 'cached_direct':
-            if not dt in self.cached_factorizations.keys():
+            if dt not in self.cached_factorizations.keys():
                 if len(self.cached_factorizations) >= self.max_cached_factorizations:
                     self.cached_factorizations.pop(list(self.cached_factorizations.keys())[0])
                     self.logger.debug(f'Evicted matrix factorization for {dt=:.6f} from cache')
                 self.cached_factorizations[dt] = self.spectral.linalg.factorized(A)
                 self.logger.debug(f'Cached matrix factorization for {dt=:.6f}')
+                self.work_counters['factorizations']()
 
             sol_hat = self.cached_factorizations[dt](rhs_hat)
             self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
