@@ -7,6 +7,8 @@ def get_config(name, n_procs_list):
         return RayleighBenard_dt_k_adaptivity(n_procs_list=n_procs_list)
     elif name == 'RBC_HR':
         return RayleighBenardHighResolution(n_procs_list=n_procs_list)
+    elif name == 'RBC_dt_HR':
+        return RayleighBenard_dt_adaptivity_high_res(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -114,14 +116,27 @@ class RayleighBenardRegular(Config):
         LogToFile.file_name = f'{self.get_path(ranks=ranks)}-solution.pickle'
         LogToFile.time_increment = 1e-1
 
-        LogToFile.process_solution = lambda L: {
-            't': L.time + L.dt,
-            'u': L.uend.view(np.ndarray),
-            'X': L.prob.X.view(np.ndarray),
-            'Z': L.prob.Z.view(np.ndarray),
-            'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
-            'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
-        }
+        def process_solution(L):
+            if L.prob.useGPU:
+                return {
+                    't': L.time + L.dt,
+                    'u': L.uend.get().view(np.ndarray),
+                    'X': L.prob.X.get().view(np.ndarray),
+                    'Z': L.prob.Z.get().view(np.ndarray),
+                    'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
+                    'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])).get(),
+                }
+            else:
+                return {
+                    't': L.time + L.dt,
+                    'u': L.uend.view(np.ndarray),
+                    'X': L.prob.X.view(np.ndarray),
+                    'Z': L.prob.Z.view(np.ndarray),
+                    'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
+                    'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
+                }
+
+        LogToFile.process_solution = process_solution
         return [LogToFile]
 
     def get_controller_params(self, *args, **kwargs):
@@ -257,6 +272,18 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 3
         desc['step_params']['maxiter'] = 5
+        return desc
+
+
+class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['problem_params']['nx'] = 2**9 + 1
+        desc['problem_params']['nz'] = 2**7
         return desc
 
 

@@ -396,7 +396,8 @@ class CFLLimit(ConvergenceController):
 
         if hasattr(P, 'comm'):
             max_step_size = P.comm.allreduce(max_step_size, op=MPI.MIN)
-        return max_step_size
+
+        return float(max_step_size)
 
     def get_new_step_size(self, controller, step, **kwargs):
         if not CheckConvergence.check_convergence(step):
