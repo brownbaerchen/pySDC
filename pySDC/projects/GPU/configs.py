@@ -9,6 +9,8 @@ def get_config(name, n_procs_list):
         return RayleighBenardHighResolution(n_procs_list=n_procs_list)
     elif name == 'RBC_dt_HR':
         return RayleighBenard_dt_adaptivity_high_res(n_procs_list=n_procs_list)
+    elif name == 'RBC_RK':
+        return RayleighBenardRK(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -53,7 +55,7 @@ class Config(object):
         description['problem_class'] = None
         description['problem_params'] = {'useGPU': useGPU}
         description['sweeper_class'] = self.get_sweeper(useMPI=MPIsweeper)
-        description['sweeper_params'] = {}
+        description['sweeper_params'] = {'initial_guess': 'copy'}
         description['level_params'] = {'comm': self.comms[2]}
         description['step_params'] = {}
         description['convergence_controllers'] = {}
@@ -155,6 +157,7 @@ class RayleighBenardRegular(Config):
             CFLLimit,
         )
         from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
 
         desc = super().get_description(*args, **kwargs)
 
@@ -164,6 +167,7 @@ class RayleighBenardRegular(Config):
         desc['level_params']['restol'] = 1e-7
 
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.8}
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': .1}
 
         desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         desc['sweeper_params']['num_nodes'] = 2
@@ -267,10 +271,12 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4}
-        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
+        # desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        desc['convergence_controllers'].pop(CFLLimit)
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['step_params']['maxiter'] = 5
         return desc
 
@@ -298,5 +304,18 @@ class RayleighBenardHighResolution(RayleighBenardRegular):
         desc['problem_params']['nz'] = 2**8
 
         desc['step_params']['maxiter'] = 4
+
+        return desc
+
+
+class RayleighBenardRK(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK222
+        desc = super().get_description(*args, **kwargs)
+
+        desc['sweeper_class'] = ARK222
+
+        desc['step_params']['maxiter'] = 1
+        # desc['level_params']['dt'] = 0.1
 
         return desc

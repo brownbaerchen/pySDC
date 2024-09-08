@@ -107,7 +107,7 @@ class SpectralHelper1D:
         if self.useGPU:
             Id = self.get_Id().get()
         else:
-            Id = self.get_Id().get()
+            Id = self.get_Id()
         F = Id.tolil()
         F[:, mask] = 0
         return F.tocsc()

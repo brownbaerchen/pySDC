@@ -46,7 +46,6 @@ class RayleighBenardOrder(RayleighBenardRegular):
         desc['convergence_controllers'].pop(CFLLimit)
         desc['convergence_controllers'][ReachTendExactly] = {'Tend': self.Tend}
 
-        # desc['problem_params']['Rayleigh'] = 2e3
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
@@ -104,11 +103,6 @@ def plot_orders(starting_idx):
     args['restart_idx'] = starting_idx
 
     config = RayleighBenardOrder(n_procs_list=args['procs'])
-    # desc = config.get_description()
-    # P = desc['problem_class'](**desc['problem_params'])
-    # _, t = config.get_initial_condition(P, restart_idx=starting_idx)
-    # if config.comm_world.rank > 0:
-    #     return None
 
     for order in orders:
         path = f'data/numerical_order-{config.comm_world.rank}-{starting_idx}-{order}.pickle'
@@ -124,7 +118,7 @@ def plot_orders(starting_idx):
 
         errors = np.array(errors)
 
-        num_order = np.log(errors[1:] / errors[:-1]) / np.log(dts[1:-1] / dts[:-2])
+        # num_order = np.log(errors[1:] / errors[:-1]) / np.log(dts[1:-1] / dts[:-2])
 
         ax.loglog(dts[:-1], errors, color=cmap[order - min(orders)], label=f'Order {order}')
         ax.loglog(dts[:-1], errors[0] * (dts[:-1] / dts[0]) ** order, color=cmap[order - min(orders)], ls='--')

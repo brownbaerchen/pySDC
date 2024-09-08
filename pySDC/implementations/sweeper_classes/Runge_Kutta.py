@@ -433,6 +433,9 @@ class RungeKuttaIMEX(RungeKutta):
             for j in range(1, m + 1):
                 rhs += lvl.dt * (self.QI[m + 1, j] * lvl.f[j].impl + self.QE[m + 1, j] * lvl.f[j].expl)
 
+            print(m, M)
+            breakpoint()
+
             # implicit solve with prefactor stemming from the diagonal of Qd, use previous stage as initial guess
             lvl.u[m + 1][:] = prob.solve_system(
                 rhs, lvl.dt * self.QI[m + 1, m + 1], lvl.u[m], lvl.time + lvl.dt * self.coll.nodes[m + 1]
@@ -695,3 +698,11 @@ class IMEXEuler(RungeKuttaIMEX):
     weights = BackwardEuler.weights
     matrix = BackwardEuler.matrix
     matrix_explicit = ForwardEuler.matrix
+
+
+class ARK222(RungeKuttaIMEX):
+    generator = RK_SCHEMES["ARK222EDIRK"]()
+    generator_EXP = RK_SCHEMES["ARK222ERK"]()
+    nodes, weights, matrix = generator.genCoeffs()
+    matrix_explicit = generator_EXP.Q
+

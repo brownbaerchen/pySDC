@@ -9,7 +9,7 @@ def parse_args():
         return [int(p) for p in procs]
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs', default=True)
+    parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs', default=False)
     parser.add_argument(
         '--mode', type=str, help='Mode for this script', default='run', choices=['run', 'plot', 'render']
     )
