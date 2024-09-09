@@ -13,6 +13,8 @@ def get_config(name, n_procs_list):
         return RayleighBenardRK(n_procs_list=n_procs_list)
     elif name == 'RBC_fast':
         return RayleighBenard_fast(n_procs_list=n_procs_list)
+    elif name == 'RBC_Tibo':
+        return RayleighBenard_Thibaut(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -360,3 +362,28 @@ class RayleighBenardRK(RayleighBenardRegular):
         # desc['level_params']['dt'] = 0.1
 
         return desc
+
+
+class RayleighBenard_Thibaut(RayleighBenardRegular):
+    Tend = 1
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'].pop(CFLLimit)
+        desc['level_params']['restol'] = -1
+        desc['level_params']['dt'] = 2e-2 / 4
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
+        desc['sweeper_params']['node_type'] = 'LEGENDRE'
+        desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['step_params']['maxiter'] = 4
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = []
+        return controller_params
