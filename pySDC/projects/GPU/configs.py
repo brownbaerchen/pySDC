@@ -11,6 +11,8 @@ def get_config(name, n_procs_list):
         return RayleighBenard_dt_adaptivity_high_res(n_procs_list=n_procs_list)
     elif name == 'RBC_RK':
         return RayleighBenardRK(n_procs_list=n_procs_list)
+    elif name == 'RBC_fast':
+        return RayleighBenard_fast(n_procs_list=n_procs_list)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -287,11 +289,28 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         return desc
 
 
-class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
+class RayleighBenard_fast(RayleighBenardRegular):
+    Tend = 13
+
     def get_description(self, *args, **kwargs):
-        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
         from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
 
+        desc = super().get_description(*args, **kwargs)
+
+        desc['problem_params']['nx'] = 2**8 + 1
+        desc['problem_params']['nz'] = 2**6
+        desc['level_params']['restol'] = -1
+        desc['sweeper_params']['num_nodes'] = 2
+        # desc['sweeper_params']['do_coll_update'] = True
+        # desc['sweeper_params']['coll_type'] = 'GAUSS'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['step_params']['maxiter'] = 3
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.3}
+        return desc
+
+
+class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
+    def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
         desc['problem_params']['nx'] = 2**9 + 1
