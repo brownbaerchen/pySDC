@@ -53,10 +53,10 @@ class Config(object):
     def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
         description = {}
         description['problem_class'] = None
-        description['problem_params'] = {'useGPU': useGPU}
+        description['problem_params'] = {'useGPU': useGPU, 'comm': self.comms[2]}
         description['sweeper_class'] = self.get_sweeper(useMPI=MPIsweeper)
-        description['sweeper_params'] = {'initial_guess': 'copy'}
-        description['level_params'] = {'comm': self.comms[2]}
+        description['sweeper_params'] = {'initial_guess': 'copy', 'comm': self.comms[1]}
+        description['level_params'] = {}
         description['step_params'] = {}
         description['convergence_controllers'] = {}
 
@@ -151,23 +151,29 @@ class RayleighBenardRegular(Config):
         controller_params['hook_class'] += [LogAnalysisVariables, LogStepSize]
         return controller_params
 
-    def get_description(self, *args, **kwargs):
+    def get_description(self, *args, MPIsweeper=False, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import (
             RayleighBenard,
             CFLLimit,
         )
-        from pySDC.implementations.problem_classes.generic_spectral import compute_residual_DAE
+        from pySDC.implementations.problem_classes.generic_spectral import (
+            compute_residual_DAE,
+            compute_residual_DAE_MPI,
+        )
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
 
-        desc = super().get_description(*args, **kwargs)
+        desc = super().get_description(*args, MPIsweeper=MPIsweeper, **kwargs)
 
-        desc['sweeper_class'].compute_residual = compute_residual_DAE
+        if MPIsweeper:
+            desc['sweeper_class'].compute_residual = compute_residual_DAE_MPI
+        else:
+            desc['sweeper_class'].compute_residual = compute_residual_DAE
 
         desc['level_params']['dt'] = 0.1
         desc['level_params']['restol'] = 1e-7
 
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.8}
-        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': .1}
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.1}
 
         desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         desc['sweeper_params']['num_nodes'] = 2
@@ -311,6 +317,7 @@ class RayleighBenardHighResolution(RayleighBenardRegular):
 class RayleighBenardRK(RayleighBenardRegular):
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK222
+
         desc = super().get_description(*args, **kwargs)
 
         desc['sweeper_class'] = ARK222

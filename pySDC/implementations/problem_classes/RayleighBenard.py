@@ -106,7 +106,8 @@ class RayleighBenard(GenericSpectralLinear):
 
         # mass matrix
         M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'T']}
-        self.setup_M(M_lhs)
+        M_lhs_expl = {i: {i: Id} for i in ['u', 'v', 'T']}
+        self.setup_M(M_lhs, M_lhs_expl)
 
         self.base_change = self._setup_operator({**{comp: {comp: S2} for comp in ['u', 'v', 'T']}, 'p': {'p': S1}})
 

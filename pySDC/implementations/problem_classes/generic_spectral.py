@@ -88,6 +88,13 @@ class GenericSpectralLinear(Problem):
 
         self.cached_factorizations = {}
 
+    def apply_mass_matrix(self, u):
+        u_hat = self.transform(u)
+
+        me = self.u_init
+        me[:] = self.itransform((self.M_expl @ u_hat.flatten()).reshape(u_hat.shape))
+        return me
+
     def __getattr__(self, name):
         return getattr(self.spectral, name)
 
@@ -126,13 +133,14 @@ class GenericSpectralLinear(Problem):
         """
         self.L = self._setup_operator(LHS)
 
-    def setup_M(self, LHS):
+    def setup_M(self, LHS, LHS_expl):
         '''
         Setup mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
         '''
         self.diff_index = list(LHS.keys())
         self.diff_mask = [me in self.diff_index for me in self.components]
         self.M = self._setup_operator(LHS)
+        self.M_expl = self._setup_operator(LHS_expl)
 
     def setup_preconditioner(self, Dirichlet_recombination=True, left_preconditioner=True):
         """
@@ -179,8 +187,7 @@ class GenericSpectralLinear(Problem):
 
         We use a tau method to enforce boundary conditions in Chebychov methods. This means we replace a line in the system matrix by the polynomials evaluated at a boundary and put the value we want there in the rhs at the respective position. Since we have to do that in spectral space along only the axis we want to apply the boundary condition to, we transform back to real space after applying the mass matrix, and then transform only along one axis, apply the boundary conditions and transform back. Then we transform along all dimensions again. If you desire speed, you may wish to overload this function with something less generic that avoids a few transformations.
         """
-        if dt == 0:
-            return rhs
+        dt = max([dt, 1e-9])
 
         sp = self.spectral.sparse_lib
 
@@ -300,6 +307,53 @@ def compute_residual_DAE(self, stage=''):
             f'residual_type = {L.params.residual_type} not implemented, choose '
             f'full_abs, last_abs, full_rel or last_rel instead'
         )
+
+    # indicate that the residual has seen the new values
+    L.status.updated = False
+
+    return None
+
+
+def compute_residual_DAE_MPI(self, stage=None):
+    """
+    Computation of the residual using the collocation matrix Q
+
+    Args:
+        stage (str): The current stage of the step the level belongs to
+    """
+    from mpi4py import MPI
+
+    L = self.level
+
+    # Check if we want to skip the residual computation to gain performance
+    # Keep in mind that skipping any residual computation is likely to give incorrect outputs of the residual!
+    if stage in self.params.skip_residual_computation:
+        L.status.residual = 0.0 if L.status.residual is None else L.status.residual
+        return None
+
+    # compute the residual for each node
+
+    # build QF(u)
+    res = self.integrate(last_only=L.params.residual_type[:4] == 'last')
+    mask = L.prob.diff_mask
+    res[mask] += L.u[0][mask] - L.u[self.rank + 1][mask]
+    # add tau if associated
+    if L.tau[self.rank] is not None:
+        res += L.tau[self.rank]
+    # use abs function from data type here
+    res_norm = abs(res)
+
+    # find maximal residual over the nodes
+    if L.params.residual_type == 'full_abs':
+        L.status.residual = self.comm.allreduce(res_norm, op=MPI.MAX)
+    elif L.params.residual_type == 'last_abs':
+        L.status.residual = self.comm.bcast(res_norm, root=self.comm.size - 1)
+    elif L.params.residual_type == 'full_rel':
+        L.status.residual = self.comm.allreduce(res_norm / abs(L.u[0]), op=MPI.MAX)
+    elif L.params.residual_type == 'last_rel':
+        L.status.residual = self.comm.bcast(res_norm / abs(L.u[0]), root=self.comm.size - 1)
+    else:
+        raise NotImplementedError(f'residual type \"{L.params.residual_type}\" not implemented!')
 
     # indicate that the residual has seen the new values
     L.status.updated = False
