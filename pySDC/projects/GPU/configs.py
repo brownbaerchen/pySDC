@@ -121,23 +121,28 @@ class RayleighBenardRegular(Config):
         LogToFile.time_increment = 1e-1
 
         def process_solution(L):
-            if L.prob.useGPU:
+            P = L.prob
+
+            if P.spectral_space:
+                uend = P.itransform(L.uend)
+
+            if P.useGPU:
                 return {
                     't': L.time + L.dt,
-                    'u': L.uend.get().view(np.ndarray),
+                    'u': uend.get().view(np.ndarray),
                     'X': L.prob.X.get().view(np.ndarray),
                     'Z': L.prob.Z.get().view(np.ndarray),
                     'vorticity': L.prob.compute_vorticity(L.uend).get().view(np.ndarray),
-                    'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])).get(),
+                    # 'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])).get(),
                 }
             else:
                 return {
                     't': L.time + L.dt,
-                    'u': L.uend.view(np.ndarray),
+                    'u': uend.view(np.ndarray),
                     'X': L.prob.X.view(np.ndarray),
                     'Z': L.prob.Z.view(np.ndarray),
                     'vorticity': L.prob.compute_vorticity(L.uend).view(np.ndarray),
-                    'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
+                    # 'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
                 }
 
         LogToFile.process_solution = process_solution
@@ -290,7 +295,6 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
 
 
 class RayleighBenard_fast(RayleighBenardRegular):
-    Tend = 13
 
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
@@ -307,6 +311,17 @@ class RayleighBenard_fast(RayleighBenardRegular):
         desc['step_params']['maxiter'] = 3
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.3}
         return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
 
 
 class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
