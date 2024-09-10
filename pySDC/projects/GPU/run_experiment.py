@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     args = parse_args()
 
-    config = get_config(args['config'], n_procs_list=args['procs'])
+    config = get_config(args)
 
     if args['mode'] == 'run':
         run_experiment(args, config)

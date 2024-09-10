@@ -1,20 +1,21 @@
-def get_config(name, n_procs_list):
+def get_config(args):
+    name = args['config']
     if name == 'RBC':
-        return RayleighBenardRegular(n_procs_list=n_procs_list)
+        return RayleighBenardRegular(args)
     elif name == 'RBC_dt':
-        return RayleighBenard_dt_adaptivity(n_procs_list=n_procs_list)
+        return RayleighBenard_dt_adaptivity(args)
     elif name == 'RBC_dt_k':
-        return RayleighBenard_dt_k_adaptivity(n_procs_list=n_procs_list)
+        return RayleighBenard_dt_k_adaptivity(args)
     elif name == 'RBC_HR':
-        return RayleighBenardHighResolution(n_procs_list=n_procs_list)
+        return RayleighBenardHighResolution(args)
     elif name == 'RBC_dt_HR':
-        return RayleighBenard_dt_adaptivity_high_res(n_procs_list=n_procs_list)
+        return RayleighBenard_dt_adaptivity_high_res(args)
     elif name == 'RBC_RK':
-        return RayleighBenardRK(n_procs_list=n_procs_list)
+        return RayleighBenardRK(args)
     elif name == 'RBC_fast':
-        return RayleighBenard_fast(n_procs_list=n_procs_list)
+        return RayleighBenard_fast(args)
     elif name == 'RBC_Tibo':
-        return RayleighBenard_Thibaut(n_procs_list=n_procs_list)
+        return RayleighBenard_Thibaut(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -46,12 +47,13 @@ class Config(object):
     experiment_name = 'regular'
     Tend = None
 
-    def __init__(self, n_procs_list, comm_world=None):
+    def __init__(self, args, comm_world=None):
         from mpi4py import MPI
 
+        self.args = args
         self.comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
-        self.n_procs_list = n_procs_list
-        self.comms = get_comms(n_procs_list=n_procs_list)
+        self.n_procs_list = args["procs"]
+        self.comms = get_comms(n_procs_list=self.n_procs_list)
         self.ranks = [me.rank for me in self.comms]
 
     def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
@@ -89,7 +91,15 @@ class Config(object):
 
     def get_path(self, *args, ranks=None, **kwargs):
         ranks = self.ranks if ranks is None else ranks
-        return f'{self.name}-{type(self).__name__}-{ranks[0]}-{ranks[2]}'
+        return f'{self.name}-{type(self).__name__}{self.args_to_str()}-{ranks[0]}-{ranks[2]}'
+
+    def args_to_str(self, args=None):
+        args = self.args if args is None else args
+        name = ''
+
+        name = f'{name}-useGPU_{args["useGPU"]}'
+        name = f'{name}-procs_{args["procs"][0]}_{args["procs"][1]}_{args["procs"][2]}'
+        return name
 
     def plot(self, P, idx):
         raise NotImplementedError
