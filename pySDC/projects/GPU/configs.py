@@ -359,6 +359,7 @@ class RayleighBenardHighResolution(RayleighBenardRegular):
 
         return desc
 
+
 class RayleighBenard_Thibaut(RayleighBenardRegular):
     Tend = 1
 
@@ -383,14 +384,20 @@ class RayleighBenard_Thibaut(RayleighBenardRegular):
         controller_params['hook_class'] = []
         return controller_params
 
-# class RayleighBenardRK(RayleighBenardRegular):
-#     def get_description(self, *args, **kwargs):
-#         from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK222
-#         desc = super().get_description(*args, **kwargs)
-# 
-#         desc['sweeper_class'] = ARK222
-# 
-#         desc['step_params']['maxiter'] = 1
-#         # desc['level_params']['dt'] = 0.1
-# 
-#         return desc
+
+class RayleighBenardRK(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK222
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['sweeper_class'] = ARK222
+
+        desc['step_params']['maxiter'] = 1
+        # desc['level_params']['dt'] = 0.1
+
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.3}
+        # desc['problem_params']['nx'] = 2**8
+        return desc
