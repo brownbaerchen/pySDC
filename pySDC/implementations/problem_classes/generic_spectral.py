@@ -191,7 +191,6 @@ class GenericSpectralLinear(Problem):
 
         Note that in implicit Euler, the right hand side will be composed of the initial conditions. We don't want that in lines that don't depend on time. Therefore, we multiply the right hand side by the mass matrix. This means you can only do algebraic conditions that add up to zero. But you can easily overload this function with something more generic if needed.
         """
-        dt = max([dt, 1e-9])
 
         sp = self.spectral.sparse_lib
 

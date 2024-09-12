@@ -157,10 +157,9 @@ class LogToFile(Hooks):
             process_solution = lambda L: {
                 **type(self).process_solution(L),
                 't': L.time,
-                'u': cp.asnumpy(L.u[0]).view(np.ndarray),
             }
         else:
-            process_solution = lambda L: {**type(self).process_solution(L), 't': L.time, 'u': L.u[0].view(np.ndarray)}
+            process_solution = lambda L: {**type(self).process_solution(L), 't': L.time}
         self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod
@@ -184,6 +183,9 @@ class LogToFileAfterXs(LogToFile):
 
     def post_step(self, step, level_number):
         L = step.levels[level_number]
+
+        if self.t_next_log == 0:
+            self.t_next_log = self.time_increment
 
         if L.time + L.dt >= self.t_next_log and not step.status.restart:
             super().post_step(step, level_number)

@@ -12,6 +12,8 @@ def get_config(args):
         return RayleighBenard_dt_adaptivity_high_res(args)
     elif name == 'RBC_RK':
         return RayleighBenardRK(args)
+    elif name == 'RBC_dedalus':
+        return RayleighBenardDedalusComp(args)
     elif name == 'RBC_fast':
         return RayleighBenard_fast(args)
     elif name == 'RBC_Tibo':
@@ -71,9 +73,11 @@ class Config(object):
         return description
 
     def get_controller_params(self, *args, logger_level=15, **kwargs):
+        from pySDC.implementations.hooks.log_work import LogWork
+
         controller_params = {}
         controller_params['logger_level'] = logger_level if self.comm_world.rank == 0 else 40
-        controller_params['hook_class'] = [] + self.get_LogToFile()
+        controller_params['hook_class'] = [LogWork] + self.get_LogToFile()
         controller_params['mssdc_jac'] = False
         return controller_params
 
@@ -200,7 +204,7 @@ class RayleighBenardRegular(Config):
         desc['sweeper_params']['QE'] = 'PIC'
 
         desc['problem_params']['Rayleigh'] = 2e6
-        desc['problem_params']['nx'] = 2**8 + 1
+        desc['problem_params']['nx'] = 2**8
         desc['problem_params']['nz'] = 2**6
         desc['problem_params']['dealiasing'] = 3 / 2
 
@@ -313,7 +317,7 @@ class RayleighBenard_fast(RayleighBenardRegular):
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['problem_params']['nx'] = 2**8 + 1
+        desc['problem_params']['nx'] = 2**8
         desc['problem_params']['nz'] = 2**6
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 2
@@ -340,7 +344,7 @@ class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
-        desc['problem_params']['nx'] = 2**9 + 1
+        desc['problem_params']['nx'] = 2**9
         desc['problem_params']['nz'] = 2**7
         return desc
 
@@ -352,7 +356,7 @@ class RayleighBenardHighResolution(RayleighBenardRegular):
         desc['sweeper_params']['num_nodes'] = 4
 
         desc['problem_params']['Rayleigh'] = 2e6
-        desc['problem_params']['nx'] = 2**10 + 1
+        desc['problem_params']['nx'] = 2**10
         desc['problem_params']['nz'] = 2**8
 
         desc['step_params']['maxiter'] = 4
@@ -398,6 +402,46 @@ class RayleighBenardRK(RayleighBenardRegular):
 
         from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
 
-        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.3}
-        # desc['problem_params']['nx'] = 2**8
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.2}
         return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
+
+
+class RayleighBenardDedalusComp(RayleighBenardRK):
+    Tend = 150
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK222
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['sweeper_class'] = ARK222
+
+        desc['step_params']['maxiter'] = 1
+        desc['level_params']['dt'] = 5e-3
+
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc['convergence_controllers'].pop(CFLLimit)
+        return desc
+
+
+# class RayleighBenardDedalusComp(RayleighBenardRK):
+#     Tend = 150
+#     # def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+#     #     args = {'procs': self.n_procs_list, 'comm_world': self.comm_world}
+#     #     regular = RayleighBenardRegular(n_procs_list=self.n_procs_list, comm_world=self.comm_world)
+#     #     u, t = regular.get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+#     #     type(self).Tend = t + self.t_inc
+#
+#     #     return u, t
