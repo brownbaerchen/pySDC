@@ -135,7 +135,7 @@ class RayleighBenardRegular(Config):
         from pySDC.implementations.hooks.log_solution import LogToFileAfterXs as LogToFile
 
         LogToFile.path = './data/'
-        LogToFile.file_name = f'{self.get_path(ranks=ranks)}-solution.pickle'
+        LogToFile.file_name = f'{self.get_path(ranks=ranks)}-solution'
         LogToFile.time_increment = 1e-1
 
         def process_solution(L):
@@ -163,7 +163,18 @@ class RayleighBenardRegular(Config):
                     # 'divergence': L.uend.xp.log10(L.uend.xp.abs(L.prob.eval_f(L.uend).impl[L.prob.index('p')])),
                 }
 
+        def logging_condition(L):
+            sweep = L.sweep
+            if hasattr(sweep, 'comm'):
+                if sweep.comm.rank == sweep.comm.size - 1:
+                    return True
+                else:
+                    return False
+            else:
+                return True
+
         LogToFile.process_solution = process_solution
+        LogToFile.logging_condition = logging_condition
         return [LogToFile]
 
     def get_controller_params(self, *args, **kwargs):
@@ -236,7 +247,7 @@ class RayleighBenardRegular(Config):
         vmax = {quantitiy: -np.inf, quantitiy2: -np.inf}
 
         for rank in range(n_procs_list[2]):
-            ranks = [me for me in self.ranks[:-1]] + [rank]
+            ranks = self.ranks[:-1] + [rank]
             LogToFile = self.get_LogToFile(ranks=ranks)[0]
 
             buffer[f'u-{rank}'] = LogToFile.load(idx)
