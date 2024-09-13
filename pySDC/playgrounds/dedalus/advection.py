@@ -13,13 +13,13 @@ from utils import plt  # import matplotlib with improved graph settings
 # Bases and field
 coords = d3.CartesianCoordinates('x')
 dist = d3.Distributor(coords, dtype=np.float64)
-xbasis = d3.RealFourier(coords['x'], size=16, bounds=(0, 2 * np.pi))
+xbasis = d3.RealFourier(coords['x'], size=16, bounds=(0, 2*np.pi))
 u = dist.Field(name='u', bases=xbasis)
 
 # Initial solution
 x = xbasis.local_grid()
 listK = [0, 1, 2]
-u0 = np.sum([np.cos(k * x) for k in listK], axis=0)
+u0 = np.sum([np.cos(k*x) for k in listK], axis=0)
 np.copyto(u['g'], u0)
 
 plt.figure('Initial solution')
@@ -34,18 +34,16 @@ problem = d3.IVP([u], namespace=locals())
 problem.add_equation("dt(u) + dx(u) = 0")
 
 # Prepare plots
-orderPlot = {'RK111': 1, 'RK222': 2, 'RK443': 3, 'ERK4': 4}
+orderPlot = {'RK111': 1,
+             'RK222': 2,
+             'RK443': 3,
+             'ERK4': 4}
 plt.figure('Error')
 
 SpectralDeferredCorrectionIMEX.setParameters(
-    M=3,
-    quadType='RADAU-RIGHT',
-    nodeDistr='LEGENDRE',
-    implSweep='OPT-QmQd-0',
-    explSweep='PIC',
-    initSweep='COPY',
-    forceProl=True,
-)
+    M=3, quadType='RADAU-RIGHT', nodeDistr='LEGENDRE',
+    implSweep='OPT-QmQd-0', explSweep='PIC', initSweep='COPY',
+    forceProl=True)
 
 for timeStepper in [d3.RK111, ERK4, 1, 2]:
 
@@ -61,21 +59,21 @@ for timeStepper in [d3.RK111, ERK4, 1, 2]:
 
     # Build solver
     solver = problem.build_solver(timeStepper)
-    solver.stop_sim_time = 2 * np.pi
+    solver.stop_sim_time = 2*np.pi
     name = timeStepper.__name__
 
     # Function to run the simulation with one given time step
     def getErr(nStep):
         np.copyto(u['g'], u0)
         solver.sim_time = 0
-        dt = 2 * np.pi / nStep
+        dt = 2*np.pi/nStep
         for _ in range(nStep):
             solver.step(dt)
-        err = np.linalg.norm(u0 - u['g'], ord=np.inf)
+        err = np.linalg.norm(u0-u['g'], ord=np.inf)
         return dt, err
 
     # Run all simulations
-    listNumStep = [2 ** (i + 2) for i in range(11)]
+    listNumStep = [2**(i+2) for i in range(11)]
     dt, err = np.array([getErr(n) for n in listNumStep]).T
 
     # Plot error VS time step
@@ -86,8 +84,8 @@ for timeStepper in [d3.RK111, ERK4, 1, 2]:
     # Eventually plot order curve
     if name in orderPlot:
         order = orderPlot[name]
-        c = err[-1] / dt[-1] ** order * 2
-        plt.plot(dt, c * dt**order, '--', color='gray')
+        c = err[-1]/dt[-1]**order * 2
+        plt.plot(dt, c*dt**order, '--', color='gray')
 
 plt.xlabel(r'$\Delta{t}$')
 plt.ylabel(r'error ($L_{inf}$)')

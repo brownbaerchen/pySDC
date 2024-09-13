@@ -17,12 +17,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import dedalus.public as d3
 import logging
-
 logger = logging.getLogger(__name__)
 
 from pySDC.playgrounds.dedalus.sdc import SpectralDeferredCorrectionIMEX
 
-SpectralDeferredCorrectionIMEX.setParameters(nSweeps=4, nNodes=4, implSweep="MIN-SR-S", explSweep="PIC")
+SpectralDeferredCorrectionIMEX.setParameters(
+    nSweeps=4,
+    nNodes=4,
+    implSweep="MIN-SR-S",
+    explSweep="PIC")
 
 useSDC = True
 
@@ -31,7 +34,7 @@ Lx = 10
 Nx = 1024
 a = 1e-4
 b = 2e-4
-dealias = 3 / 2
+dealias = 3/2
 stop_sim_time = 10
 timestepper = SpectralDeferredCorrectionIMEX if useSDC else d3.SBDF2
 timestep = 2e-3
@@ -55,7 +58,7 @@ problem.add_equation("dt(u) - a*dx(dx(u)) - b*dx(dx(dx(u))) = - u*dx(u)")
 # Initial conditions
 x = dist.local_grid(xbasis)
 n = 20
-u['g'] = np.log(1 + np.cosh(n) ** 2 / np.cosh(n * (x - 0.2 * Lx)) ** 2) / (2 * n)
+u['g'] = np.log(1 + np.cosh(n)**2/np.cosh(n*(x-0.2*Lx))**2) / (2*n)
 
 # Solver
 solver = problem.build_solver(timestepper)
@@ -70,7 +73,7 @@ while solver.proceed:
     solver.step(timestep)
     if solver.iteration % 100 == 0:
         print(f"step {solver.iteration}/...")
-        logger.info('Iteration=%i, Time=%e, dt=%e' % (solver.iteration, solver.sim_time, timestep))
+        logger.info('Iteration=%i, Time=%e, dt=%e' %(solver.iteration, solver.sim_time, timestep))
     if solver.iteration % 25 == 0:
         u.change_scales(1)
         u_list.append(np.copy(u['g']))
@@ -79,9 +82,7 @@ while solver.proceed:
 
 # Plot
 plt.figure(figsize=(6, 4))
-plt.pcolormesh(
-    x.ravel(), np.array(t_list), np.array(u_list), cmap='RdBu_r', shading='gouraud', rasterized=True, clim=(-0.8, 0.8)
-)
+plt.pcolormesh(x.ravel(), np.array(t_list), np.array(u_list), cmap='RdBu_r', shading='gouraud', rasterized=True, clim=(-0.8, 0.8))
 plt.xlim(0, Lx)
 plt.ylim(0, stop_sim_time)
 plt.xlabel('x')

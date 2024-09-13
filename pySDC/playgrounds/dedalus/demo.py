@@ -15,13 +15,13 @@ from pySDC.implementations.controller_classes.controller_nonMPI import controlle
 
 coords = d3.CartesianCoordinates('x')
 dist = d3.Distributor(coords, dtype=np.float64)
-xbasis = d3.RealFourier(coords['x'], size=32, bounds=(0, 2 * np.pi))
+xbasis = d3.RealFourier(coords['x'], size=32, bounds=(0, 2*np.pi))
 u = dist.Field(name='u', bases=xbasis)
 
 # Initial solution
 x = xbasis.local_grid(dist, scale=1)
 listK = [0, 1, 2]
-u0 = np.sum([np.cos(k * x) for k in listK], axis=0)
+u0 = np.sum([np.cos(k*x) for k in listK], axis=0)
 np.copyto(u['g'], u0)
 
 plt.figure('Initial solution')
@@ -37,7 +37,7 @@ problem.add_equation("dt(u) + dx(u) - dx(dx(u)) = 0")
 
 nSweeps = 4
 nNodes = 4
-tEnd = 2 * np.pi
+tEnd = 2*np.pi
 nSteps = 500
 dt = tEnd / nSteps
 
@@ -69,10 +69,12 @@ description = {
     "problem_params": {
         'problem': problem,
         'nNodes': nNodes,
-    },
+    }
 }
 
-controller = controller_nonMPI(num_procs=1, controller_params={'logger_level': 30}, description=description)
+controller = controller_nonMPI(
+    num_procs=1, controller_params={'logger_level': 30},
+    description=description)
 
 prob = controller.MS[0].levels[0].prob
 uSol = prob.solver.state

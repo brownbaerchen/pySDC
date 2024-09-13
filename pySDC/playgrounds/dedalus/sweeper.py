@@ -12,10 +12,8 @@ from pySDC.core.sweeper import Sweeper
 class DedalusSweeperIMEX(Sweeper):
 
     def __init__(self, params):
-        if 'QI' not in params:
-            params['QI'] = 'IE'
-        if 'QE' not in params:
-            params['QE'] = 'EE'
+        if 'QI' not in params: params['QI'] = 'IE'
+        if 'QE' not in params: params['QE'] = 'EE'
         # call parent's initialization routine
         super().__init__(params)
         # IMEX integration matrices
@@ -29,7 +27,7 @@ class DedalusSweeperIMEX(Sweeper):
         t0, dt = L.time, L.dt
         qI = self.QI[1:, 1:]
 
-        P: DedalusProblem = L.prob
+        P:DedalusProblem = L.prob
         assert type(P) == DedalusProblem
         assert self.coll.num_nodes == P.M
 
@@ -63,6 +61,7 @@ class DedalusSweeperIMEX(Sweeper):
         L.status.unlocked = True
         L.status.updated = True
 
+
     def update_nodes(self):
         """
         TODO
@@ -75,7 +74,7 @@ class DedalusSweeperIMEX(Sweeper):
         t0, dt = L.time, L.dt
         tau, qI, qE, q = self.coll.nodes, self.QI[1:, 1:], self.QE[1:, 1:], self.coll.Qmat[1:, 1:]
 
-        P: DedalusProblem = L.prob
+        P:DedalusProblem = L.prob
         assert type(P) == DedalusProblem
 
         # get number of collocation nodes for easier access
@@ -95,19 +94,19 @@ class DedalusSweeperIMEX(Sweeper):
 
             # Add quadrature terms
             for j in range(M):
-                axpy(a=dt * q[m, j], x=Fk[j].data, y=RHS.data)
-                axpy(a=-dt * q[m, j], x=LXk[j].data, y=RHS.data)
+                axpy(a=dt*q[m, j], x=Fk[j].data, y=RHS.data)
+                axpy(a=-dt*q[m, j], x=LXk[j].data, y=RHS.data)
 
             # Add F and LX terms from iteration k+1
             for j in range(m):
-                axpy(a=dt * qE[m, j], x=Fk1[j].data, y=RHS.data)
-                axpy(a=-dt * qI[m, j], x=LXk1[j].data, y=RHS.data)
+                axpy(a=dt*qE[m, j], x=Fk1[j].data, y=RHS.data)
+                axpy(a=-dt*qI[m, j], x=LXk1[j].data, y=RHS.data)
 
             # Add F and LX terms from iteration k
             for j in range(m):
-                axpy(a=-dt * qE[m, j], x=Fk[j].data, y=RHS.data)
-                axpy(a=dt * qI[m, j], x=LXk[j].data, y=RHS.data)
-            axpy(a=dt * qI[m, m], x=LXk[m].data, y=RHS.data)
+                axpy(a=-dt*qE[m, j], x=Fk[j].data, y=RHS.data)
+                axpy(a=dt*qI[m, j], x=LXk[j].data, y=RHS.data)
+            axpy(a=dt*qI[m, m], x=LXk[m].data, y=RHS.data)
 
             # Solve system and store node solution in solver state
             P.solveAndStoreState(m)
@@ -115,10 +114,10 @@ class DedalusSweeperIMEX(Sweeper):
             # Evaluate and store LX with current state
             P.evalLX(LXk1[m])
             # Evaluate and store F(X, t) with current state
-            P.evalF(t0 + dt * tau[m], Fk1[m])
+            P.evalF(t0+dt*tau[m], Fk1[m])
 
             # Update u for pySDC
-            L.u[m + 1] = P.stateCopy()
+            L.u[m+1] = P.stateCopy()
 
         # Inverse position for iterate k and k+1 in storage
         # ie making the new evaluation the old for next iteration
@@ -127,6 +126,7 @@ class DedalusSweeperIMEX(Sweeper):
 
         # indicate presence of new values at this level
         L.status.updated = True
+
 
     def compute_end_point(self):
         """
@@ -141,7 +141,7 @@ class DedalusSweeperIMEX(Sweeper):
         # get current level and problem description
         L = self.level
         t0, dt = L.time, L.dt
-        P: DedalusProblem = L.prob
+        P:DedalusProblem = L.prob
 
         # check if Mth node is equal to right point and do_coll_update is false, perform a simple copy
         if self.coll.right_is_node and not self.params.do_coll_update:

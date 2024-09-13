@@ -29,34 +29,43 @@ DEFAULT = {
     'initSweep': 'COPY',
     'initSweepQDelta': 'BE',
     'forceProl': False,
-}
+    }
 
 PARAMS = {
-    ('nNodes', '-sM', '--sdcNNodes'): dict(help='number of nodes for SDC', type=int, default=DEFAULT['nNodes']),
-    ('quadType', '-sqt', '--sdcQuadType'): dict(help='quadrature type for SDC', default=DEFAULT['quadType']),
-    ('nodeDistr', '-snd', '--sdcNodeDistr'): dict(help='node distribution for SDC', default=DEFAULT['nodeDistr']),
-    ('nSweeps', '-sK', '--sdcNSweeps'): dict(help='number of sweeps for SDC', type=int, default=DEFAULT['nSweeps']),
-    ('initSweep', '-si', '--sdcInitSweep'): dict(
-        help='initial sweep to get initialized nodes values', default=DEFAULT['initSweep']
-    ),
-    ('initSweepQDelta', '-siq', '--sdcInitSweepQDelta'): dict(
-        help='QDelta matrix used with initSweep=QDELTA', default=DEFAULT['initSweepQDelta']
-    ),
-    ('implSweep', '-sis', '--sdcImplSweep'): dict(
-        help='type of QDelta matrix for implicit sweep', default=DEFAULT['implSweep']
-    ),
-    ('explSweep', '-ses', '--sdcExplSweep'): dict(
-        help='type of QDelta matrix for explicit sweep', default=DEFAULT['explSweep']
-    ),
-    ('forceProl', '-sfp', '--sdcForceProl'): dict(
-        help='if specified force the prolongation stage ' '(ignored for quadType=GAUSS or RADAU-LEFT)',
-        action='store_true',
-    ),
-}
-
+    ('nNodes', '-sM', '--sdcNNodes'):
+        dict(help='number of nodes for SDC', type=int,
+             default=DEFAULT['nNodes']),
+    ('quadType', '-sqt', '--sdcQuadType'):
+        dict(help='quadrature type for SDC',
+             default=DEFAULT['quadType']),
+    ('nodeDistr', '-snd', '--sdcNodeDistr'):
+        dict(help='node distribution for SDC',
+             default=DEFAULT['nodeDistr']),
+    ('nSweeps', '-sK', '--sdcNSweeps'):
+        dict(help='number of sweeps for SDC', type=int,
+             default=DEFAULT['nSweeps']),
+    ('initSweep', '-si', '--sdcInitSweep'):
+        dict(help='initial sweep to get initialized nodes values',
+             default=DEFAULT['initSweep']),
+    ('initSweepQDelta', '-siq', '--sdcInitSweepQDelta'):
+        dict(help='QDelta matrix used with initSweep=QDELTA',
+             default=DEFAULT['initSweepQDelta']),
+    ('implSweep', '-sis', '--sdcImplSweep'):
+        dict(help='type of QDelta matrix for implicit sweep',
+             default=DEFAULT['implSweep']),
+    ('explSweep', '-ses', '--sdcExplSweep'):
+        dict(help='type of QDelta matrix for explicit sweep',
+             default=DEFAULT['explSweep']),
+    ('forceProl', '-sfp', '--sdcForceProl'):
+        dict(help='if specified force the prolongation stage '
+             '(ignored for quadType=GAUSS or RADAU-LEFT)',
+             action='store_true')
+    }
 
 # Printing function
-def sdcInfos(nNodes, quadType, nodeDistr, nSweeps, implSweep, explSweep, initSweep, forceProl, **kwargs):
+def sdcInfos(nNodes, quadType, nodeDistr, nSweeps,
+             implSweep, explSweep, initSweep, forceProl,
+             **kwargs):
     return f"""
 -- nNodes : {nNodes}
 -- quadType : {quadType}
@@ -68,16 +77,15 @@ def sdcInfos(nNodes, quadType, nodeDistr, nSweeps, implSweep, explSweep, initSwe
 -- forceProl : {forceProl}
 """.strip()
 
-
 # -----------------------------------------------------------------------------
 # Base class implementation
 # -----------------------------------------------------------------------------
 class IMEXSDCCore(object):
 
     # Initialize parameters with default values
-    nSweeps: int = DEFAULT['nSweeps']
-    nodeType: str = DEFAULT['nodeDistr']
-    quadType: str = DEFAULT['quadType']
+    nSweeps:int = DEFAULT['nSweeps']
+    nodeType:str = DEFAULT['nodeDistr']
+    quadType:str = DEFAULT['quadType']
     implSweep = DEFAULT['implSweep']
     explSweep = DEFAULT['explSweep']
     initSweep = DEFAULT['initSweep']
@@ -85,37 +93,27 @@ class IMEXSDCCore(object):
     forceProl = DEFAULT['forceProl']
 
     # Collocation method attributes
-    coll = Collocation(nNodes=DEFAULT['nNodes'], nodeType=nodeType, quadType=quadType)
+    coll = Collocation(
+        nNodes=DEFAULT['nNodes'], nodeType=nodeType, quadType=quadType)
     nodes, weights, Q = coll.genCoeffs()
     # IMEX SDC attributes, QDelta matrices are 3D with shape (K, M, M)
     QDeltaI, dtauI = genQDeltaCoeffs(
-        implSweep,
-        dTau=True,
-        nSweeps=nSweeps,
-        Q=Q,
-        nodes=nodes,
-        nNodes=DEFAULT['nNodes'],
-        nodeType=nodeType,
-        quadType=quadType,
-    )
+        implSweep, dTau=True, nSweeps=nSweeps,
+        Q=Q, nodes=nodes, nNodes=DEFAULT['nNodes'],
+        nodeType=nodeType, quadType=quadType)
     QDeltaE, dtauE = genQDeltaCoeffs(
-        explSweep,
-        dTau=True,
-        nSweeps=nSweeps,
-        Q=Q,
-        nodes=nodes,
-        nNodes=DEFAULT['nNodes'],
-        nodeType=nodeType,
-        quadType=quadType,
-    )
+        explSweep, dTau=True, nSweeps=nSweeps,
+        Q=Q, nodes=nodes, nNodes=DEFAULT['nNodes'],
+        nodeType=nodeType, quadType=quadType)
     QDelta0 = genQDeltaCoeffs(
-        initSweepQDelta, Q=Q, nodes=nodes, nNodes=DEFAULT['nNodes'], nodeType=nodeType, quadType=quadType
-    )
+        initSweepQDelta,
+        Q=Q, nodes=nodes, nNodes=DEFAULT['nNodes'],
+        nodeType=nodeType, quadType=quadType)
 
     diagonal = np.all([np.diag(np.diag(qD)) == qD for qD in QDeltaI])
     diagonal *= np.all([np.diag(np.diag(qD)) == 0 for qD in QDeltaE])
     if initSweep == "QDelta":
-        diagonal *= np.all(np.diag(np.diag(QDelta0)) == QDelta0)
+        diagonal *=  np.all(np.diag(np.diag(QDelta0)) == QDelta0)
 
     # Default attributes, used later as instance attributes
     # => should be defined in inherited class
@@ -123,18 +121,9 @@ class IMEXSDCCore(object):
     axpy = None
 
     @classmethod
-    def setParameters(
-        cls,
-        nNodes=None,
-        nodeType=None,
-        quadType=None,
-        implSweep=None,
-        explSweep=None,
-        initSweep=None,
-        initSweepQDelta=None,
-        nSweeps=None,
-        forceProl=None,
-    ):
+    def setParameters(cls, nNodes=None, nodeType=None, quadType=None,
+                      implSweep=None, explSweep=None, initSweep=None,
+                      initSweepQDelta=None, nSweeps=None, forceProl=None):
 
         # Get non-changing parameters
         keepNNodes = nNodes is None
@@ -162,50 +151,38 @@ class IMEXSDCCore(object):
 
         # Update parameters
         if updateNode:
-            cls.coll = Collocation(nNodes=nNodes, nodeType=nodeType, quadType=quadType)
+            cls.coll = Collocation(
+                nNodes=nNodes, nodeType=nodeType, quadType=quadType)
             cls.nodes, cls.weights, cls.Q = cls.coll.genCoeffs()
             cls.nodeType, cls.quadType = nodeType, quadType
         if updateQDeltaI:
             cls.QDeltaI, cls.dtauI = genQDeltaCoeffs(
-                implSweep,
-                dTau=True,
-                nSweeps=nSweeps,
-                Q=cls.Q,
-                nodes=cls.nodes,
-                nNodes=nNodes,
-                nodeType=nodeType,
-                quadType=quadType,
-            )
+                implSweep, dTau=True, nSweeps=nSweeps,
+                Q=cls.Q, nodes=cls.nodes, nNodes=nNodes,
+                nodeType=nodeType, quadType=quadType)
             cls.implSweep = implSweep
         if updateQDeltaE:
             cls.QDeltaE, cls.dtauE = genQDeltaCoeffs(
-                explSweep,
-                dTau=True,
-                nSweeps=nSweeps,
-                Q=cls.Q,
-                nodes=cls.nodes,
-                nNodes=nNodes,
-                nodeType=nodeType,
-                quadType=quadType,
-            )
+                explSweep, dTau=True, nSweeps=nSweeps,
+                Q=cls.Q, nodes=cls.nodes, nNodes=nNodes,
+                nodeType=nodeType, quadType=quadType)
             cls.explSweep = explSweep
         if updateQDelta0:
             cls.QDelta0 = genQDeltaCoeffs(
-                initSweepQDelta, Q=cls.Q, nodes=cls.nodes, nNodes=nNodes, nodeType=nodeType, quadType=quadType
-            )
+                initSweepQDelta,
+                Q=cls.Q, nodes=cls.nodes, nNodes=nNodes,
+                nodeType=nodeType, quadType=quadType)
 
         # Eventually update additional parameters
-        if forceProl is not None:
-            cls.forceProl = forceProl
-        if initSweep is not None:
-            cls.initSweep = initSweep
+        if forceProl is not None: cls.forceProl = forceProl
+        if initSweep is not None: cls.initSweep = initSweep
         if not keepNSweeps:
             cls.nSweeps = nSweeps
 
         diagonal = np.all([np.diag(np.diag(qD)) == qD for qD in cls.QDeltaI])
         diagonal *= np.all([np.diag(np.diag(qD)) == 0 for qD in cls.QDeltaE])
         if cls.initSweep == "QDELTA":
-            diagonal *= np.all(np.diag(np.diag(cls.QDelta0)) == cls.QDelta0)
+            diagonal *=  np.all(np.diag(np.diag(cls.QDelta0)) == cls.QDelta0)
         cls.diagonal = diagonal
 
     # -------------------------------------------------------------------------
@@ -215,22 +192,15 @@ class IMEXSDCCore(object):
     def getMaxOrder(cls):
         # TODO : adapt to non-LEGENDRE node distributions
         M = len(cls.nodes)
-        return (
-            2 * M if cls.quadType == 'GAUSS' else 2 * M - 1 if cls.quadType.startswith('RADAU') else 2 * M - 2
-        )  # LOBATTO
+        return 2*M if cls.quadType == 'GAUSS' else \
+            2*M-1 if cls.quadType.startswith('RADAU') else \
+            2*M-2  # LOBATTO
 
     @classmethod
     def getInfos(cls):
         return sdcInfos(
-            len(cls.nodes),
-            cls.quadType,
-            cls.nodeType,
-            cls.nSweeps,
-            cls.implSweep,
-            cls.explSweep,
-            cls.initSweep,
-            cls.forceProl,
-        )
+            len(cls.nodes), cls.quadType, cls.nodeType, cls.nSweeps,
+            cls.implSweep, cls.explSweep, cls.initSweep, cls.forceProl)
 
     @classmethod
     def getM(cls):
@@ -267,7 +237,7 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
         # Store solver as attribute
         self.solver = solver
         self.subproblems = [sp for sp in solver.subproblems if sp.size]
-        self.stages = self.M  # need this for solver.log_stats()
+        self.stages = self.M    # need this for solver.log_stats()
 
         # Create coefficient systems for steps history
         c = lambda: CoeffSystem(solver.subproblems, dtype=solver.dtype)
@@ -339,9 +309,9 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
                     if solver.store_expanded_matrices:
                         raise NotImplementedError("code correction required")
                         np.copyto(sp.LHS.data, sp.M_exp.data)
-                        self.axpy(a=dt * qI[k, m, m], x=sp.L_exp.data, y=sp.LHS.data)
+                        self.axpy(a=dt*qI[k, m, m], x=sp.L_exp.data, y=sp.LHS.data)
                     else:
-                        sp.LHS = sp.M_min + dt * qI[k, m, m] * sp.L_min
+                        sp.LHS = (sp.M_min + dt*qI[k, m, m]*sp.L_min)
                     sp.LHS_solvers[k][m] = solver.matsolver(sp.LHS, solver)
             if self.initSweep == "QDELTA":
                 raise NotImplementedError()
@@ -395,8 +365,8 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
         solver.sim_time = time
         if self.firstEval:
             solver.evaluator.evaluate_scheduled(
-                wall_time=wall_time, timestep=dt, sim_time=time, iteration=solver.iteration
-            )
+                wall_time=wall_time, timestep=dt, sim_time=time,
+                iteration=solver.iteration)
             self.firstEval = False
         else:
             solver.evaluator.evaluate_group('F')
@@ -486,14 +456,14 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
                     # Add eventual initial field evaluation
                     if not self.leftIsNode:
                         if self.dtauE[m]:
-                            axpy(a=dt * self.dtauE[m], x=F0.data, y=RHS.data)
+                            axpy(a=dt*self.dtauE[m], x=F0.data, y=RHS.data)
                         if self.dtauI[m]:
-                            axpy(a=-dt * self.dtauI[m], x=LX0.data, y=RHS.data)
+                            axpy(a=-dt*self.dtauI[m], x=LX0.data, y=RHS.data)
 
                     # Add F and LX terms (already computed)
                     for i in range(m):
-                        axpy(a=dt * qE[m, i], x=Fk[i].data, y=RHS.data)
-                        axpy(a=-dt * qI[m, i], x=LXk[i].data, y=RHS.data)
+                        axpy(a=dt*qE[m, i], x=Fk[i].data, y=RHS.data)
+                        axpy(a=-dt*qI[m, i], x=LXk[i].data, y=RHS.data)
 
                 # Solve system and store node solution in solver state
                 self._solveAndStoreState(m)
@@ -502,7 +472,7 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
                 self._evalLX(LXk[m])
 
                 # Evaluate and store F(X, t) with current state
-                self._evalF(Fk[m], t0 + dt * tau[m], dt, wall_time)
+                self._evalF(Fk[m], t0+dt*tau[m], dt, wall_time)
 
         elif self.initSweep == 'COPY':
             self._evalLX(LXk[0])
@@ -535,36 +505,36 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
 
                 # Add quadrature terms
                 for i in range(self.M):
-                    axpy(a=dt * q[m, i], x=Fk[i].data, y=RHS.data)
-                    axpy(a=-dt * q[m, i], x=LXk[i].data, y=RHS.data)
+                    axpy(a=dt*q[m, i], x=Fk[i].data, y=RHS.data)
+                    axpy(a=-dt*q[m, i], x=LXk[i].data, y=RHS.data)
 
                 if not self.diagonal:
                     # Add F and LX terms from iteration k+1 and previous nodes
                     for i in range(m):
-                        axpy(a=dt * qE[k, m, i], x=Fk1[i].data, y=RHS.data)
-                        axpy(a=-dt * qI[k, m, i], x=LXk1[i].data, y=RHS.data)
+                        axpy(a=dt*qE[k, m, i], x=Fk1[i].data, y=RHS.data)
+                        axpy(a=-dt*qI[k, m, i], x=LXk1[i].data, y=RHS.data)
                     # Add F and LX terms from iteration k and previous nodes
                     for i in range(m):
-                        axpy(a=-dt * qE[k, m, i], x=Fk[i].data, y=RHS.data)
-                        axpy(a=dt * qI[k, m, i], x=LXk[i].data, y=RHS.data)
+                        axpy(a=-dt*qE[k, m, i], x=Fk[i].data, y=RHS.data)
+                        axpy(a=dt*qI[k, m, i], x=LXk[i].data, y=RHS.data)
 
                 # Add LX terms from iteration k+1 and current nodes
-                axpy(a=dt * qI[k, m, m], x=LXk[m].data, y=RHS.data)
+                axpy(a=dt*qI[k, m, m], x=LXk[m].data, y=RHS.data)
 
             # Solve system and store node solution in solver state
             self._solveAndStoreState(k, m)
 
             # Avoid non necessary RHS evaluations work
-            if not self.forceProl and k == self.nSweeps - 1:
+            if not self.forceProl and k == self.nSweeps-1:
                 if self.diagonal:
                     continue
-                elif m == self.M - 1:
+                elif m == self.M-1:
                     continue
 
             # Evaluate and store LX with current state
             self._evalLX(LXk1[m])
             # Evaluate and store F(X, t) with current state
-            self._evalF(Fk1[m], t0 + dt * tau[m], dt, wall_time)
+            self._evalF(Fk1[m], t0+dt*tau[m], dt, wall_time)
 
         # Inverse position for iterate k and k+1 in storage
         # ie making the new evaluation the old for next iteration
@@ -585,19 +555,21 @@ class SpectralDeferredCorrectionIMEX(IMEXSDCCore):
             np.copyto(RHS.data, MX0.data)
             # Add quadrature terms
             for i in range(self.M):
-                axpy(a=dt * w[i], x=Fk[i].data, y=RHS.data)
-                axpy(a=-dt * w[i], x=LXk[i].data, y=RHS.data)
+                axpy(a=dt*w[i], x=Fk[i].data, y=RHS.data)
+                axpy(a=-dt*w[i], x=LXk[i].data, y=RHS.data)
 
         self._presetStateCoeffSpace(solver.state)
 
         # Solve and store for each subproblem
         for sp in solver.subproblems:
             # Slice out valid subdata, skipping invalid components
-            spRHS = RHS.get_subdata(sp)[: sp.LHS.shape[0]]
+            spRHS = RHS.get_subdata(sp)[:sp.LHS.shape[0]]
             # Solve using LHS of the node
             spX = sp.M_solver.solve(spRHS)
             # Make output buffer including invalid components for scatter
-            spX2 = np.zeros((sp.pre_right.shape[0], len(sp.subsystems)), dtype=spX.dtype)
+            spX2 = np.zeros(
+                (sp.pre_right.shape[0], len(sp.subsystems)),
+                dtype=spX.dtype)
             # Store X to state_fields
             csr_matvecs(sp.pre_right, spX, spX2)
             sp.scatter(spX2, solver.state)

@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import dedalus.public as d3
 import logging
-
 logger = logging.getLogger(__name__)
 
 from problem import DedalusProblem
@@ -21,7 +20,7 @@ Lx = 10
 Nx = 1024
 a = 1e-4
 b = 2e-4
-dealias = 3 / 2
+dealias = 3/2
 dtype = np.float64
 
 tEnd = 10
@@ -46,7 +45,7 @@ problem.add_equation("dt(u) - a*dx(dx(u)) - b*dx(dx(dx(u))) = - u*dx(u)")
 # Initial conditions
 x = dist.local_grid(xbasis)
 n = 20
-u['g'] = np.log(1 + np.cosh(n) ** 2 / np.cosh(n * (x - 0.2 * Lx)) ** 2) / (2 * n)
+u['g'] = np.log(1 + np.cosh(n)**2/np.cosh(n*(x-0.2*Lx))**2) / (2*n)
 
 # pySDC parameters
 dt = tEnd / nSteps
@@ -64,7 +63,8 @@ description = {
         "do_coll_update": False,
         "QI": "IE",
         "QE": "EE",
-        'skip_residual_computation': ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE'),
+        'skip_residual_computation':
+            ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE'),
     },
     # Step parameters
     "step_params": {
@@ -80,7 +80,7 @@ description = {
     "problem_params": {
         'problem': problem,
         'nNodes': nNodes,
-    },
+    }
 }
 
 # Main loop
@@ -90,7 +90,9 @@ t_list = [0]
 
 size = u_list[0].size
 
-controller = controller_nonMPI(num_procs=1, controller_params={'logger_level': 30}, description=description)
+controller = controller_nonMPI(
+    num_procs=1, controller_params={'logger_level': 30},
+    description=description)
 
 prob = controller.MS[0].levels[0].prob
 uSol = prob.solver.state
@@ -99,9 +101,9 @@ tVals = np.linspace(0, tEnd, nSteps + 1)
 
 for i in range(nSteps):
     uSol, _ = controller.run(u0=uSol, t0=tVals[i], Tend=tVals[i + 1])
-    if (i + 1) % 100 == 0:
+    if (i+1) % 100 == 0:
         print(f"step {i+1}/{nSteps}")
-    if (i + 1) % 25 == 0:
+    if (i+1) % 25 == 0:
 
         u.change_scales(1)
         u_list.append(np.copy(u['g']))
@@ -111,8 +113,8 @@ for i in range(nSteps):
 # Plot
 plt.figure(figsize=(6, 4))
 plt.pcolormesh(
-    x.ravel(), np.array(t_list), np.array(u_list), cmap='RdBu_r', shading='gouraud', rasterized=True, clim=(-0.8, 0.8)
-)
+    x.ravel(), np.array(t_list), np.array(u_list), cmap='RdBu_r',
+    shading='gouraud', rasterized=True, clim=(-0.8, 0.8))
 plt.xlim(0, Lx)
 plt.ylim(0, tEnd)
 plt.xlabel('x')

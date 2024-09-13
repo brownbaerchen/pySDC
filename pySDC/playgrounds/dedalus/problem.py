@@ -30,11 +30,10 @@ class DedalusProblem(Problem):
     class DedalusTimeStepper:
         steps = 1
         stages = 1
-
         def __init__(self, solver):
             self.solver = solver
 
-    def __init__(self, problem: d3.IVP, nNodes, collUpdate=False):
+    def __init__(self, problem:d3.IVP, nNodes, collUpdate=False):
 
         self.DedalusTimeStepper.stages = nNodes
         solver = problem.build_solver(self.DedalusTimeStepper)
@@ -42,7 +41,7 @@ class DedalusProblem(Problem):
 
         # From new version
         self.subproblems = [sp for sp in solver.subproblems if sp.size]
-        self.evaluator: Evaluator = solver.evaluator
+        self.evaluator:Evaluator = solver.evaluator
         self.F_fields = solver.F
 
         self.M = nNodes
@@ -75,6 +74,7 @@ class DedalusProblem(Problem):
     def stateCopy(self):
         return [f.copy() for f in self.solver.state]
 
+
     def computeMX0(self):
         """
         Compute MX0 term used in RHS of both initStep and sweep methods
@@ -82,7 +82,7 @@ class DedalusProblem(Problem):
         Update the MX0 attribute of the timestepper object.
         """
         MX0 = self.MX0
-        state: list[Field] = self.solver.state
+        state:list[Field] = self.solver.state
 
         # Require coefficient space
         for f in state:
@@ -92,6 +92,7 @@ class DedalusProblem(Problem):
         for sp in self.subproblems:
             spX = sp.gather_inputs(state)
             apply_sparse(sp.M_min, spX, axis=0, out=MX0.get_subdata(sp))
+
 
     def updateLHS(self, dt, qI, init=False):
         """Update LHS and LHS solvers for each subproblem
@@ -123,10 +124,11 @@ class DedalusProblem(Problem):
                 if solver.store_expanded_matrices:
                     # sp.LHS.data[:] = sp.M_exp.data + k_Hii*sp.L_exp.data
                     np.copyto(sp.LHS.data, sp.M_exp.data)
-                    self.axpy(a=dt * qI[i, i], x=sp.L_exp.data, y=sp.LHS.data)
+                    self.axpy(a=dt*qI[i, i], x=sp.L_exp.data, y=sp.LHS.data)
                 else:
-                    sp.LHS = sp.M_min + dt * qI[i, i] * sp.L_min  # CREATES TEMPORARY
+                    sp.LHS = (sp.M_min + dt*qI[i, i]*sp.L_min)  # CREATES TEMPORARY
                 sp.LHS_solvers[i] = solver.matsolver(sp.LHS, solver)
+
 
     def evalLX(self, LX):
         """
@@ -142,7 +144,7 @@ class DedalusProblem(Problem):
         None.
 
         """
-        state: list[Field] = self.solver.state
+        state:list[Field] = self.solver.state
         # Require coefficient space
         for f in state:
             f.require_coeff_space()
@@ -151,6 +153,7 @@ class DedalusProblem(Problem):
         for sp in self.solver.subproblems:
             spX = sp.gather_inputs(self.solver.state)
             apply_sparse(sp.L_min, spX, axis=0, out=LX.get_subdata(sp))
+
 
     def evalF(self, time, F):
         """
@@ -172,7 +175,9 @@ class DedalusProblem(Problem):
         t0 = solver.sim_time
         solver.sim_time = time
         if self.firstEval:
-            solver.evaluator.evaluate_scheduled(sim_time=time, timestep=solver.dt, iteration=0, wall_time=0)
+            solver.evaluator.evaluate_scheduled(
+                sim_time=time, timestep=solver.dt,
+                iteration=0, wall_time=0)
             self.firstEval = False
         else:
             solver.evaluator.evaluate_group('F')
