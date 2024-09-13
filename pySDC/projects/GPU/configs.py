@@ -18,6 +18,8 @@ def get_config(args):
         return RayleighBenard_fast(args)
     elif name == 'RBC_Tibo':
         return RayleighBenard_Thibaut(args)
+    elif name == 'RBC_TiboHR':
+        return RayleighBenard_Thibaut_HighRes(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -301,7 +303,6 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         desc = super().get_description(*args, **kwargs)
 
         desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
-        # desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
         desc['convergence_controllers'].pop(CFLLimit)
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 3
@@ -310,8 +311,16 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         return desc
 
 
-class RayleighBenard_fast(RayleighBenardRegular):
+class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
 
+        desc['problem_params']['nx'] = 2**10
+        desc['problem_params']['nz'] = 2**8
+        return desc
+
+
+class RayleighBenard_fast(RayleighBenardRegular):
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
 
@@ -321,8 +330,6 @@ class RayleighBenard_fast(RayleighBenardRegular):
         desc['problem_params']['nz'] = 2**6
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 2
-        # desc['sweeper_params']['do_coll_update'] = True
-        # desc['sweeper_params']['coll_type'] = 'GAUSS'
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['step_params']['maxiter'] = 3
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.3}
@@ -338,15 +345,6 @@ class RayleighBenard_fast(RayleighBenardRegular):
             me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
         ]
         return controller_params
-
-
-class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
-    def get_description(self, *args, **kwargs):
-        desc = super().get_description(*args, **kwargs)
-
-        desc['problem_params']['nx'] = 2**9
-        desc['problem_params']['nz'] = 2**7
-        return desc
 
 
 class RayleighBenardHighResolution(RayleighBenardRegular):
@@ -387,6 +385,15 @@ class RayleighBenard_Thibaut(RayleighBenardRegular):
         controller_params = super().get_controller_params(*args, **kwargs)
         controller_params['hook_class'] = []
         return controller_params
+
+
+class RayleighBenard_Thibaut_HighRes(RayleighBenard_Thibaut):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+
+        desc['problem_params']['nx'] = 2**9
+        desc['problem_params']['nz'] = 2**7
+        return desc
 
 
 class RayleighBenardRK(RayleighBenardRegular):

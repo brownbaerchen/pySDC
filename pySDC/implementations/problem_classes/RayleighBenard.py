@@ -135,7 +135,7 @@ class RayleighBenard(GenericSpectralLinear):
             Nyquist_mode_index = self.axes[0].get_Nyquist_mode_index()
             for component in self.components:
                 self.add_BC(
-                    component=component, equation=component, axis=0, kind='Nyquist', line=Nyquist_mode_index, v=0
+                    component=component, equation=component, axis=0, kind='Nyquist', line=int(Nyquist_mode_index), v=0
                 )
         self.setup_BCs()
 
@@ -373,7 +373,6 @@ class RayleighBenard(GenericSpectralLinear):
 
 
 class CFLLimit(ConvergenceController):
-
     def dependencies(self, controller, *args, **kwargs):
         from pySDC.implementations.hooks.log_step_size import LogStepSize
 
@@ -458,7 +457,6 @@ class CFLLimit(ConvergenceController):
 
 
 class LogCFL(Hooks):
-
     def post_step(self, step, level_number):
         """
         Record CFL limit.
@@ -486,7 +484,6 @@ class LogCFL(Hooks):
 
 
 class LogAnalysisVariables(Hooks):
-
     def post_step(self, step, level_number):
         """
         Record Nusselt numbers.

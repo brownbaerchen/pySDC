@@ -7,7 +7,6 @@ from pySDC.helpers.stats_helper import get_sorted
 
 
 def plot_scaling(args, procs_time, list_procs_space, ax, plot_ideal=False):
-
     timings = {}
 
     for procs_space in list_procs_space:
@@ -32,13 +31,30 @@ def plot_scaling(args, procs_time, list_procs_space, ax, plot_ideal=False):
     ax.set_ylabel(r'$t_\mathrm{step}$')
 
 
-if __name__ == '__main__':
+def scaling_normal_res():
     fig, ax = plt.subplots()
     args = parse_args()
     args['config'] = 'RBC_Tibo'
     plot_scaling(args, procs_time=1, list_procs_space=[1, 2, 4, 8, 16, 32, 64], ax=ax, plot_ideal=True)
     plot_scaling(args, procs_time=4, list_procs_space=[1, 2, 4, 8, 16, 32, 64], ax=ax)
-    plot_scaling({**args, 'useGPU': True}, procs_time=1, list_procs_space=[1], ax=ax)
-    plot_scaling({**args, 'useGPU': True}, procs_time=4, list_procs_space=[1], ax=ax)
+    plot_scaling({**args, 'useGPU': True}, procs_time=1, list_procs_space=[1, 2], ax=ax)
+    plot_scaling({**args, 'useGPU': True}, procs_time=4, list_procs_space=[1, 2], ax=ax)
     ax.legend(frameon=False)
-    fig.savefig('plots/RBC_space_scaling.pdf')
+    fig.savefig('plots/RBC_space_scaling_normal.pdf')
+
+
+def scaling_high_res():
+    fig, ax = plt.subplots()
+    args = parse_args()
+    args['config'] = 'RBC_TiboHR'
+    plot_scaling(args, procs_time=1, list_procs_space=[1, 2, 4, 8, 16, 32, 64, 128], ax=ax, plot_ideal=True)
+    plot_scaling(args, procs_time=4, list_procs_space=[1, 2, 4, 8, 16, 32, 64, 128], ax=ax)
+    plot_scaling({**args, 'useGPU': True}, procs_time=1, list_procs_space=[1, 2, 4], ax=ax)
+    plot_scaling({**args, 'useGPU': True}, procs_time=4, list_procs_space=[1, 2], ax=ax)
+    ax.legend(frameon=False)
+    fig.savefig('plots/RBC_space_scaling_high.pdf')
+
+
+if __name__ == '__main__':
+    scaling_normal_res()
+    scaling_high_res()

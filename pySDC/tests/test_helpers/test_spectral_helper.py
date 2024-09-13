@@ -340,7 +340,7 @@ def _test_transform_dealias(
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
+def test_transform(nx, nz, bx, bz, axes, useMPI=False, useGPU=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -352,21 +352,23 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm, debug=True)
+    helper = SpectralHelper(comm=comm, debug=False, useGPU=useGPU)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
 
-    u = helper.u_init
-    u[...] = np.random.random(u.shape)
+    xp = helper.xp
 
-    u_all = np.empty(shape=(1, nx, nz), dtype=u.dtype)
+    u = helper.u_init
+    u[...] = xp.random.random(u.shape)
+
+    u_all = xp.empty(shape=(1, nx, nz), dtype=u.dtype)
 
     if useMPI:
         rank = comm.rank
-        u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
+        u_all[...] = (xp.array(comm.allgather(u[0]))).reshape(u_all.shape)
         if comm.size == 1:
-            assert np.allclose(u_all, u)
+            assert xp.allclose(u_all, u)
     else:
         rank = 0
         u_all[...] = u
@@ -389,8 +391,8 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
 
     expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
 
-    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    assert xp.allclose(expect_local, trf), 'Forward transform is unexpected'
+    assert xp.allclose(itrf, u), 'Backward transform is unexpected'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -591,7 +593,6 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
         plt.show()
 
     for i in range(shape[0]):
-
         assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
 
         assert np.allclose(
@@ -637,6 +638,7 @@ if __name__ == '__main__':
     parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau', 'dealias'])
     parser.add_argument('--variant', type=str, help='Chebychov mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
+    parser.add_argument('--useGPU', type=str_to_bool, help='use GPU or not', choices=[True, False], default=False)
     args = parser.parse_args()
 
     if args.test == 'transform':

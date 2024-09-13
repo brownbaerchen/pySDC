@@ -18,8 +18,6 @@ class GenericSpectralLinear(Problem):
         from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh, imex_cupy_mesh
         from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
-        cls.xp = cp
-
         cls.dtype_u = cupy_mesh
 
         GPU_versions = {
@@ -255,7 +253,6 @@ class GenericSpectralLinear(Problem):
         if self.spectral_space:
             return sol_hat
         else:
-
             sol = self.spectral.u_init
             sol[:] = self.spectral.itransform(sol_hat).real
 
