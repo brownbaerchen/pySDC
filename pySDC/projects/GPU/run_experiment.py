@@ -77,6 +77,10 @@ def plot_experiment(args, config):
 
 
 def make_video(args, config):
+    comm = config.comm_world
+    if comm.rank > 0:
+        return None
+
     import subprocess
 
     path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-%06d.png'
