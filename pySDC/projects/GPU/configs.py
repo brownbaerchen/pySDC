@@ -120,7 +120,6 @@ class Config(object):
         args = self.args if args is None else args
         name = ''
 
-        name = f'{name}-useGPU_{args["useGPU"]}'
         name = f'{name}-procs_{args["procs"][0]}_{args["procs"][1]}_{args["procs"][2]}'
         return name
 
@@ -133,7 +132,10 @@ class Config(object):
             file = LogToFile.load(restart_idx)
             LogToFile.counter = restart_idx
             u0 = P.u_init
-            u0[...] = file['u']
+            if P.spectral_space:
+                u0[...] = P.transform(file['u'])
+            else:
+                u0[...] = file['u']
             return u0, file['t']
         else:
             raise NotImplementedError
