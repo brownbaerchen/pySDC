@@ -90,7 +90,9 @@ class StepSizeSlopeLimiter(ConvergenceController):
     """
     Class to set limits to adaptive step size computation during run time
 
-    Please supply dt_min or dt_max in the params to limit in either direction
+    Please supply `dt_slope_min` or `dt_slope_max` in the params to limit in either direction.
+    You can also supply `dt_rel_min_slope` in order to keep the old step size in case the relative change is smaller
+    than this minimum.
     """
 
     def setup(self, controller, params, description, **kwargs):
