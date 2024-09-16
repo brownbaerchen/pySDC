@@ -92,13 +92,6 @@ class GenericSpectralLinear(Problem):
 
         self.cached_factorizations = {}
 
-    def apply_mass_matrix(self, u):
-        u_hat = self.transform(u)
-
-        me = self.u_init
-        me[:] = self.itransform((self.M_expl @ u_hat.flatten()).reshape(u_hat.shape))
-        return me
-
     def __getattr__(self, name):
         return getattr(self.spectral, name)
 
@@ -137,14 +130,13 @@ class GenericSpectralLinear(Problem):
         """
         self.L = self._setup_operator(LHS)
 
-    def setup_M(self, LHS, LHS_expl):
+    def setup_M(self, LHS):
         '''
         Setup mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
         '''
         self.diff_index = list(LHS.keys())
         self.diff_mask = [me in self.diff_index for me in self.components]
         self.M = self._setup_operator(LHS)
-        self.M_expl = self._setup_operator(LHS_expl)
 
     def setup_preconditioner(self, Dirichlet_recombination=True, left_preconditioner=True):
         """

@@ -106,8 +106,7 @@ class RayleighBenard(GenericSpectralLinear):
 
         # mass matrix
         M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'T']}
-        M_lhs_expl = {i: {i: Id} for i in ['u', 'v', 'T']}
-        self.setup_M(M_lhs, M_lhs_expl)
+        self.setup_M(M_lhs)
 
         self.base_change = self._setup_operator({**{comp: {comp: S2} for comp in ['u', 'v', 'T']}, 'p': {'p': S1}})
 
@@ -326,28 +325,25 @@ class RayleighBenard(GenericSpectralLinear):
         integral_V = (
             integral_z[0] * self.axes[0].L
         )  # only the first Fourier mode has non-zero integral with periodic BCs
-        Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
 
-        Nusselt_t = self.comm.bcast(
-            self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0], root=0
+        buf = self.xp.array(
+            [
+                integral_V / self.spectral.V,
+                self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0],
+                self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0],
+                self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0],
+                self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0],
+            ]
         )
-        Nusselt_b = self.comm.bcast(
-            self.xp.sum(nusselt_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0], root=0
-        )
-        Nusselt_no_v_t = self.comm.bcast(
-            self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=1), axis=-1).real[0], root=0
-        )
-        Nusselt_no_v_b = self.comm.bcast(
-            self.xp.sum(nusselt_no_v_hat * self.spectral.axes[1].get_BC(kind='Dirichlet', x=-1), axis=-1).real[0],
-            root=0,
-        )
+
+        self.comm.Bcast(buf=buf, root=0)
 
         return {
-            'V': Nusselt_V,
-            't': Nusselt_t,
-            'b': Nusselt_b,
-            't_no_v': Nusselt_no_v_t,
-            'b_no_v': Nusselt_no_v_b,
+            'V': buf[0],
+            't': buf[1],
+            'b': buf[2],
+            't_no_v': buf[3],
+            'b_no_v': buf[4],
         }
 
     def compute_viscous_dissipation(self, u):
