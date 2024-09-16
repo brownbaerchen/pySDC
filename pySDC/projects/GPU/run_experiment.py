@@ -26,15 +26,22 @@ def parse_args():
 
 def run_experiment(args, config, **kwargs):
     import pickle
-    from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
+
+    # from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
+    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.stats_helper import filter_stats
 
     description = config.get_description(useGPU=args['useGPU'], MPIsweeper=args['procs'][1] > 1, **kwargs)
     controller_params = config.get_controller_params(logger_level=args['logger_level'])
 
-    controller = controller_MPI(controller_params, description, config.comms[0])
+    # controller = controller_MPI(controller_params, description, config.comms[0])
+    assert (
+        config.comms[0].size == 1
+    ), 'Have not figured out how to do MPI controller with GPUs yet because I need NCCL for that!'
+    controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
 
-    u0, t0 = config.get_initial_condition(controller.S.levels[0].prob, restart_idx=args['restart_idx'])
+    # u0, t0 = config.get_initial_condition(controller.S.levels[0].prob, restart_idx=args['restart_idx'])
+    u0, t0 = config.get_initial_condition(controller.MS[0].levels[0].prob, restart_idx=args['restart_idx'])
 
     uend, stats = controller.run(u0=u0, t0=t0, Tend=config.Tend)
 
