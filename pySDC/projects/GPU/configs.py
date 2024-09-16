@@ -24,7 +24,7 @@ def get_config(args):
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
 
-def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None):
+def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None, useGPU=False):
     from mpi4py import MPI
 
     comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
@@ -34,12 +34,29 @@ def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None
     if len(n_procs_list) > 0:
         color = _tot_rank + _rank // n_procs_list[0]
         new_comm = comm_world.Split(color)
+
+        if useGPU:
+            import cupy_backends
+
+            try:
+                import cupy
+                from pySDC.helpers.NCCL_communicator import NCCLComm
+
+                new_comm = NCCLComm(new_comm)
+            except (
+                ImportError,
+                cupy_backends.cuda.api.runtime.CUDARuntimeError,
+                cupy_backends.cuda.libs.nccl.NcclError,
+            ):
+                print('Warning: Communicator is MPI instead of NCCL in spite of using GPUs!')
+
         return [new_comm] + get_comms(
             n_procs_list[1:],
             comm_world,
             _comm=new_comm,
             _tot_rank=_tot_rank + _comm.size * new_comm.rank,
             _rank=_comm.rank // new_comm.size,
+            useGPU=useGPU,
         )
     else:
         return []
@@ -57,7 +74,7 @@ class Config(object):
         self.args = args
         self.comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
         self.n_procs_list = args["procs"]
-        self.comms = get_comms(n_procs_list=self.n_procs_list)
+        self.comms = get_comms(n_procs_list=self.n_procs_list, useGPU=args['useGPU'])
         self.ranks = [me.rank for me in self.comms]
 
     def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
@@ -328,6 +345,11 @@ class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
 
         desc['problem_params']['nx'] = 2**10
         desc['problem_params']['nz'] = 2**8
+
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['step_params']['maxiter'] = 5
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         return desc
 
 

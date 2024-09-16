@@ -5,6 +5,11 @@ try:
 except ImportError:
     MPI = None
 
+try:
+    from pySDC.helpers.NCCL_communicator import NCCLComm
+except ImportError:
+    NCCLComm = None
+
 
 class cupy_mesh(cp.ndarray):
     """
@@ -31,7 +36,7 @@ class cupy_mesh(cp.ndarray):
             obj[:] = init[:]
         elif (
             isinstance(init, tuple)
-            and (init[1] is None or isinstance(init[1], MPI.Intracomm))
+            and (init[1] is None or isinstance(init[1], MPI.Intracomm) or isinstance(init[1], NCCLComm))
             and isinstance(init[2], cp.dtype)
         ):
             obj = cp.ndarray.__new__(cls, init[0], dtype=init[2], **kwargs)

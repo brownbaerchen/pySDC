@@ -700,15 +700,14 @@ class ARK548L2SA(RungeKuttaIMEX):
 
 
 class IMEXEuler(RungeKuttaIMEX):
-
     nodes = BackwardEuler.nodes
     weights = BackwardEuler.weights
     matrix = BackwardEuler.matrix
     matrix_explicit = ForwardEuler.matrix
 
 
-class ARK222(RungeKuttaIMEX):
-    generator = RK_SCHEMES["ARK222EDIRK"]()
-    generator_EXP = RK_SCHEMES["ARK222ERK"]()
-    nodes, weights, matrix = generator.genCoeffs()
-    matrix_explicit = generator_EXP.Q
+# class ARK222(RungeKuttaIMEX):
+#     generator = RK_SCHEMES["ARK222EDIRK"]()
+#     generator_EXP = RK_SCHEMES["ARK222ERK"]()
+#     nodes, weights, matrix = generator.genCoeffs()
+#     matrix_explicit = generator_EXP.Q

@@ -359,17 +359,20 @@ class RayleighBenard(GenericSpectralLinear):
             u_hat = u.copy()
         else:
             u_hat = self.transform(u)
+
         Lap_u_hat[iu] = ((self.Dzz + self.Dxx) @ u_hat[iu].flatten()).reshape(u_hat[iu].shape)
         Lap_u_hat[iv] = ((self.Dzz + self.Dxx) @ u_hat[iv].flatten()).reshape(u_hat[iu].shape)
-        Lap_u = self.itransform(Lap_u_hat)
 
-        return abs(u[iu] * Lap_u[iu] + u[iv] * Lap_u[iv])
+        Lap_u = self.u_init
+        Lap_u[...] = self.itransform(Lap_u_hat)
+
+        return abs((u[iu] * Lap_u[iu] + u[iv] * Lap_u[iv]).view(self.dtype_u))
 
     def compute_buoyancy_generation(self, u):
         if self.spectral_space:
             u = self.itransform(u)
         iv, iT = self.index(['v', 'T'])
-        return abs(u[iv] * self.Rayleigh * u[iT])
+        return abs((u[iv] * self.Rayleigh * u[iT]).view(self.dtype_u))
 
 
 class CFLLimit(ConvergenceController):
