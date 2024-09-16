@@ -120,6 +120,7 @@ class Config(object):
         args = self.args if args is None else args
         name = ''
 
+        name = f'{name}-useGPU_{args["useGPU"]}'
         name = f'{name}-procs_{args["procs"][0]}_{args["procs"][1]}_{args["procs"][2]}'
         return name
 
