@@ -1,7 +1,8 @@
 def parse_args():
     import argparse
 
-    cast_to_bool = lambda me: False if me == 'False' else True
+    def cast_to_bool(me):
+        return False if me in ['False', '0', 0] else True
 
     def str_to_procs(me):
         procs = me.split('/')
@@ -11,7 +12,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--useGPU', type=cast_to_bool, help='Toggle for GPUs', default=False)
     parser.add_argument(
-        '--mode', type=str, help='Mode for this script', default='run', choices=['run', 'plot', 'render']
+        '--mode', type=str, help='Mode for this script', default='run', choices=['run', 'plot', 'render', 'video']
     )
     parser.add_argument('--config', type=str, help='Configuration to load', default='RBC')
     parser.add_argument('--restart_idx', type=int, help='Restart from file by index', default=0)
@@ -58,7 +59,10 @@ def plot_experiment(args, config):
     comm = config.comm_world
 
     for idx in range(args['restart_idx'], 9999, comm.size):
-        fig = config.plot(P, idx + comm.rank, args['procs'])
+        try:
+            fig = config.plot(P, idx + comm.rank, args['procs'])
+        except FileNotFoundError:
+            break
 
         path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-{idx+comm.rank:06d}.png'
         fig.savefig(path, dpi=300, bbox_inches='tight')
@@ -72,6 +76,17 @@ def plot_experiment(args, config):
         gc.collect()
 
 
+def make_video(args, config):
+    import subprocess
+
+    path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-%06d.png'
+    path_target = f'videos/{args["config"]}.mp4'
+
+    cmd = f'ffmpeg -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 {path_target}'.split()
+
+    subprocess.run(cmd)
+
+
 if __name__ == '__main__':
     from pySDC.projects.GPU.configs import get_config
 
@@ -83,3 +98,5 @@ if __name__ == '__main__':
         run_experiment(args, config)
     elif args['mode'] in ['plot', 'render']:
         plot_experiment(args, config)
+    elif args['mode'] == 'video':
+        make_video(args, config)
