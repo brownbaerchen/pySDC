@@ -925,7 +925,7 @@ class SpectralHelper:
         """
         return self.BC_line_zero_matrix @ A + self.BCs
 
-    def put_BCs_in_rhs_hat(self, rhs_hat):
+    def put_BCs_in_rhs_hat(self, rhs_hat, zero_only=False):
         """
         Put the BCs in the right hand side in spectral space for solving.
         This function needs no transforms.
@@ -952,6 +952,8 @@ class SpectralHelper:
                         _slice[axis + 1] -= self.local_slice[axis].start
                         rhs_hat[(*_slice,)] = 0
 
+        if zero_only:
+            return rhs_hat
         return rhs_hat + self.rhs_BCs_hat
 
     def put_BCs_in_rhs(self, rhs):
@@ -1072,18 +1074,22 @@ class SpectralHelper:
                 elif direction == 'object':
                     self.fft_cache[key] = None
             else:
-                from mpi4py_fft import PFFT
+                if direction == 'object':
+                    from mpi4py_fft import PFFT
 
-                _fft = PFFT(
-                    comm=self.comm if comm is None else comm,
-                    shape=shape,
-                    axes=sorted(axes),
-                    dtype='D',
-                    collapse=False,
-                    backend=self.fft_backend,
-                    comm_backend=self.fft_comm_backend,
-                    padding=padding,
-                )
+                    _fft = PFFT(
+                        comm=self.comm if comm is None else comm,
+                        shape=shape,
+                        axes=sorted(axes),
+                        dtype='D',
+                        collapse=False,
+                        backend=self.fft_backend,
+                        comm_backend=self.fft_comm_backend,
+                        padding=padding,
+                    )
+                else:
+                    _fft = self.get_fft(axes=axes, direction='object', padding=padding, shape=shape)
+
                 if direction == 'forward':
                     self.fft_cache[key] = _fft.forward
                 elif direction == 'backward':

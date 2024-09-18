@@ -211,10 +211,109 @@ class RayleighBenard(GenericSpectralLinear):
 
         if self.spectral_space:
             me_hat = self.spectral.u_init_forward
-            me_hat[:] = self.transform(me)
+            me_hat[:] = self.put_BCs_in_rhs_hat(self.transform(me), zero_only=True)
             return me_hat
         else:
             return me
+
+    def refine_resolution(self, u, factor=2):
+
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        padding = [
+            factor,
+        ] * 2
+        u = self.itransform(u_hat, padding=padding).real
+
+        nz_new = u.shape[2]
+        if self.comm:
+            nx_new = self.comm.allreduce(u.shape[1], op=MPI.SUM)
+        else:
+            nx_new = u.shape[1]
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new, 'useGPU': self.useGPU}
+        P_new = type(self)(**new_params)
+
+        me = P_new.u_init
+        me[...] = u[...]
+
+        self.logger.debug(f'Refined spatial resolution by {factor} to nx={P_new.nx} and nz={P_new.nz}')
+        if self.spectral_space:
+            me_hat = P_new.u_init_forward
+            me_hat[...] = P_new.transform(me)
+            return me_hat, P_new
+
+        return me, P_new
+
+    def check_refinement_needed(self, u, thresh):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        u_zero_at_BCs = self.put_BCs_in_rhs_hat(u_hat.copy(), zero_only=True)
+        diff = abs(u_zero_at_BCs - u_hat)
+        return diff > thresh
+
+    def check_derefinement_ok(self, u, factor, thresh):
+        xp = self.xp
+
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        nx_new = int(np.ceil(self.nx / factor))
+        nz_new = int(np.ceil(self.nz / factor))
+
+        kx = xp.fft.fftfreq(self.nx, 1 / self.nx)[self.local_slice[0]]
+        mask_x = xp.abs(kx) > nx_new // 2
+
+        slices = [slice(0, u_hat.shape[0]), mask_x, slice(0, u_hat.shape[2])]
+        local = u_hat[(*slices,)]
+        if 0 in local.shape:
+            less_is_fine_x = True
+        else:
+            less_is_fine_x = self.xp.max(self.xp.abs(local)) > thresh
+        self.comm.Barrier()
+
+        slices = [slice(0, u_hat.shape[0]), slice(0, u_hat.shape[1]), slice(nz_new, u_hat.shape[2])]
+        less_is_fine_z = xp.allclose(u_hat[(*slices,)], 0, atol=thresh)
+
+        less_is_fine = less_is_fine_x and less_is_fine_z
+
+        if self.comm:
+            less_is_fine = self.comm.allreduce(less_is_fine, op=MPI.BAND)
+        return less_is_fine
+
+    def derefine_resolution(self, u, factor=2):
+        if self.spectral_space:
+            u = self.itransform(u)
+        else:
+            u = u.copy()
+
+        nx_new = int(np.ceil(self.nx / factor))
+        nz_new = int(np.ceil(self.nz / factor))
+
+        new_params = {**self.params, 'nx': nx_new, 'nz': nz_new, 'useGPU': self.useGPU}
+        P_new = type(self)(**new_params)
+
+        padding = [
+            factor,
+        ] * 2
+        u_hat = P_new.transform(u, padding=padding)
+
+        me = P_new.u_init_forward
+        me[...] = u_hat[...]
+        self.logger.debug(f'Derefined spatial resolution by {factor} to nx={P_new.nx} and nz={P_new.nz}')
+
+        if not self.spectral_space:
+            me = P_new.itransform(me)
+
+        return me, P_new
 
     def get_fig(self):  # pragma: no cover
         """
@@ -517,3 +616,72 @@ class LogAnalysisVariables(Hooks):
                 type=key,
                 value=value,
             )
+
+
+class SpaceAdaptivity(ConvergenceController):
+    def setup(self, controller, params, description, **kwargs):
+        """
+        Define default parameters here.
+
+        Default parameters are:
+         - control_order (int): The order relative to other convergence controllers
+
+        Args:
+            controller (pySDC.Controller): The controller
+            params (dict): The params passed for this specific convergence controller
+            description (dict): The description object used to instantiate the controller
+
+        Returns:
+            (dict): The updated params dictionary
+        """
+        defaults = {
+            "control_order": 100,
+            "nx_max": np.inf,
+            "nx_min": 0,
+            "nz_max": np.inf,
+            "nz_min": 0,
+            "factor": 2,
+            "refinement_tol": 1e-8,
+            "derefinement_tol": 1e-8,
+        }
+        return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
+    def determine_restart(self, controller, S, *args, **kwargs):
+        L = S.levels[0]
+        P = L.prob
+
+        if not CheckConvergence.check_convergence(S):
+            return None
+
+        L.sweep.compute_end_point()
+
+        refinement_needed = P.check_refinement_needed(L.uend, self.params.refinement_tol)
+
+        if refinement_needed:
+            if P.nx < self.params.nx_max and P.nz < self.params.nz_max:
+                L.u[0], P_new = P.refine_resolution(L.u[0], factor=self.params.factor)
+                L.__dict__['_Level__prob'] = P_new
+                L.status.dt_new = L.params.dt
+                S.status.restart = True
+                self.log(f"Restarting with refined resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)
+            else:
+                self.log('Skipping refinement because maximum resolution has already been reached', S)
+        elif (
+            P.check_derefinement_ok(
+                L.uend,
+                factor=self.params.factor,
+                thresh=self.params.derefinement_tol,
+            )
+            and not S.status.restart
+        ):
+            for i in range(len(L.u)):
+                u_hat, P_new = P.derefine_resolution(L.u[i], factor=self.params.factor)
+
+                if P_new.spectral_space:
+                    L.u[i] = P_new.u_init_forward
+                    L.u[i][:] = u_hat[:]
+                else:
+                    L.u[i] = P_new.u_init
+                    L.u[i][:] = P_new.itransform(u_hat).real
+            L.__dict__['_Level__prob'] = P_new
+            self.log(f"Derefining resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)

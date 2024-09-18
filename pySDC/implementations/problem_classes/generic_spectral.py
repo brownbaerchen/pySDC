@@ -285,8 +285,9 @@ def compute_residual_DAE(self, stage=''):
         if L.tau[m] is not None:
             res[m] += L.tau[m]
         # use abs function from data type here
+        # res[m] = L.prob.put_BCs_in_rhs_hat(res[m], zero_only=True)
         res_norm.append(abs(res[m]))
-        # print(m, [abs(me) for me in res[m]], [abs(me) for me in L.u[0] - L.u[m + 1]])
+        # print(m, [abs(me) for me in res[m]])
 
     # find maximal residual over the nodes
     if L.params.residual_type == 'full_abs':

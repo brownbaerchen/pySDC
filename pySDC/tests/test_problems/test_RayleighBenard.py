@@ -272,67 +272,40 @@ def test_CFL():
     assert np.allclose(dt2, 1 / u2[iv])
 
 
-# def test_interpolation():
-#     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
-#     import numpy as np
-#     from mpi4py import MPI
-#
-#     P = RayleighBenard(nx=11, nz=4)
-#
-#     iu, iv, iT, ip = P.index(['u', 'v', 'T', 'p'])
-#
-#     u = P.u_init
-#
-#     u[iu] = np.sin(P.X * np.pi)
-#     u[iv] = P.Z
-#     u[iT] = np.cos(P.X * np.pi) + P.Z**2
-#
-#     u_hat = P.transform(u)
-#
-#     padding = 1.5
-#     u_pad = P.itransform(u_hat, padding=[padding,]*2).real
-#
-#     nx_new = P.comm.allreduce(u_pad.shape[1], op=MPI.SUM)
-#     nz_new = u_pad.shape[2]
-#     print(P.nx, nx_new)
-#
-#     P_new = RayleighBenard(**{**P.params, 'nx': nx_new, 'nz': nz_new})
-#
-#     # import matplotlib.pyplot as plt
-#     # plt.plot(u_pad[iu][:,0])
-#     # plt.plot(np.sin(P_new.X * np.pi)[:,0])
-#     # plt.show()
-#
-#     assert np.allclose(u_pad[iv], P_new.Z)
-#     assert np.allclose(u_pad[iu], np.sin(P_new.X * np.pi))
-#     assert np.allclose(u_pad[iT], np.cos(P_new.X * np.pi) + P_new.Z**2)
-#
-# def test_restriction():
-#
-#     def derefine_resolution(self, u_hat, remove_modes=4):
-#         min_res = 1
-#         if self.comm:
-#             min_res = self.comm.size
-#
-#         xp = self.xp
-#
-#         nz_new = max([min_res, int(self.nz - remove_modes)])
-#         nx_new = max([min_res, int(self.nx - remove_modes * self.nx // self.nz)])
-#
-#         kx = xp.fft.fftfreq(self.nx, 1 / self.nx)
-#         mask_x = xp.abs(kx) <= nx_new // 2
-#         if nx_new % 2 == 0:
-#             mask_x = xp.logical_and(mask_x, kx != nx_new // 2)
-#         slices = [slice(0, u_hat.shape[0]), mask_x, slice(0, nz_new)]
-#
-#         new_params = {**self.params, 'nx': nx_new, 'nz': nz_new}
-#         P_new = type(self)(**new_params)
-#
-#         me = P_new.u_init_forward
-#         me[...] = u_hat[(*slices,)] * nx_new / self.nx
-#
-#         self.logger.debug(f'Derefined spatial resolution by {remove_modes} modes to nx={P_new.nx} and nz={P_new.nz}')
-#         return me, P_new
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('refine', [True, False])
+@pytest.mark.parametrize('factor', [1, 2])
+def test_interpolation(refine, factor):
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard, CFLLimit
+    import numpy as np
+    from mpi4py import MPI
+
+    P = RayleighBenard(nx=2**5, nz=2**3)
+
+    iu, iv, iT, ip = P.index(['u', 'v', 'T', 'p'])
+
+    u = P.u_init
+
+    u[iu] = np.sin(P.X * np.pi)
+    u[iv] = P.Z**2
+    u[iT] = np.cos(P.X * np.pi) + P.Z**2
+    u[ip] = P.Z * np.sin(P.X * np.pi)
+
+    u_hat = P.transform(u)
+
+    if refine:
+        u_hat_new, P_new = P.refine_resolution(u_hat, factor)
+    else:
+        u_hat_new, P_new = P.derefine_resolution(u_hat, factor)
+
+    u_new = P_new.itransform(u_hat_new)
+
+    assert np.allclose(u_new[iv], P_new.Z**2)
+    assert np.allclose(u_new[iu], np.sin(P_new.X * np.pi))
+    assert np.allclose(u_new[iT], np.cos(P_new.X * np.pi) + P_new.Z**2)
+    assert np.allclose(u_new[ip], np.sin(P_new.X * np.pi) * P_new.Z)
+
+
 @pytest.mark.mpi4py
 def test_Nyquist_mode_elimination():
     from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
@@ -355,5 +328,5 @@ if __name__ == '__main__':
     # test_buoyancy_computation()
     # test_viscous_dissipation()
     # test_CFL()
-    # test_interpolation()
-    test_Nyquist_mode_elimination()
+    test_interpolation(False, 2)
+    # test_Nyquist_mode_elimination()

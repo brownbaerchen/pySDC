@@ -4,6 +4,8 @@ def get_config(args):
         return RayleighBenardRegular(args)
     elif name == 'RBC_dt':
         return RayleighBenard_dt_adaptivity(args)
+    elif name == 'RBC_k':
+        return RayleighBenard_k_adaptivity(args)
     elif name == 'RBC_dt_k':
         return RayleighBenard_dt_k_adaptivity(args)
     elif name == 'RBC_HR':
@@ -82,7 +84,7 @@ class Config(object):
         description['problem_class'] = None
         description['problem_params'] = {'useGPU': useGPU, 'comm': self.comms[2]}
         description['sweeper_class'] = self.get_sweeper(useMPI=MPIsweeper)
-        description['sweeper_params'] = {'initial_guess': 'copy', 'comm': self.comms[1]}
+        description['sweeper_params'] = {'initial_guess': 'copy'}
         description['level_params'] = {}
         description['step_params'] = {}
         description['convergence_controllers'] = {}
@@ -304,26 +306,65 @@ class RayleighBenardRegular(Config):
         return fig
 
 
-class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
+class RayleighBenard_k_adaptivity(RayleighBenardRegular):
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
-        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit, SpaceAdaptivity
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'][AdaptivityPolynomialError] = {
-            'e_tol': 1e-4,
-            'abort_at_growing_residual': False,
-            'interpolate_between_restarts': False,
-            'dt_min': 1e-3,
-        }
-        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
-        desc['level_params']['restol'] = 1e-10
-        desc['level_params']['e_tol'] = 1e-10
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.8}
+        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 256}
+        desc['level_params']['restol'] = 1e-7
         desc['sweeper_params']['num_nodes'] = 3
         desc['step_params']['maxiter'] = 12
 
         return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
+
+
+class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit, SpaceAdaptivity
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'][AdaptivityPolynomialError] = {
+            'e_tol': 1e-2,
+            'abort_at_growing_residual': False,
+            'interpolate_between_restarts': False,
+            # 'dt_min': 1e-3,
+        }
+        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 256}
+        desc['level_params']['restol'] = 1e-7
+        # desc['level_params']['e_tol'] = 1e-10
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['step_params']['maxiter'] = 12
+
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
 
 
 class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
