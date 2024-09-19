@@ -255,7 +255,9 @@ class RayleighBenardRegular(Config):
         if restart_idx > 0:
             return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
         else:
-            return P.u_exact(t=0, seed=self.comm_world.rank, noise_level=1e-3), 0
+            u0 = P.u_exact(t=0, seed=self.comm_world.rank, noise_level=1e-3)
+            u0_with_pressure = P.solve_system(u0, 1e-9, u0)
+            return u0_with_pressure, 0
 
     def plot(self, P, idx, n_procs_list, quantitiy='T', quantitiy2='vorticity'):
         import numpy as np

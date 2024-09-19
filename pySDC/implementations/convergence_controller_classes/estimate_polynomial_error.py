@@ -150,9 +150,9 @@ class EstimatePolynomialError(ConvergenceController):
             if self.comm:
                 buf = np.array(abs(u_inter - high_order_sol) if self.comm.rank == rank else 0.0)
                 self.comm.Bcast(buf, root=rank)
-                L.status.error_embedded_estimate = buf
+                L.status.error_embedded_estimate = float(buf)
             else:
-                L.status.error_embedded_estimate = abs((u_inter - high_order_sol)[L.prob.diff_mask])
+                L.status.error_embedded_estimate = abs(u_inter - high_order_sol)
 
             self.debug(
                 f'Obtained error estimate: {L.status.error_embedded_estimate:.2e} of order {L.status.order_embedded_estimate}',
