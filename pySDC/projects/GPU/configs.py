@@ -314,9 +314,10 @@ class RayleighBenard_k_adaptivity(RayleighBenardRegular):
         desc = super().get_description(*args, **kwargs)
 
         desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 0.8}
-        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 256}
+        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 512}
         desc['level_params']['restol'] = 1e-7
-        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['step_params']['maxiter'] = 12
 
         return desc
