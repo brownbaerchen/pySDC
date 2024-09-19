@@ -344,16 +344,19 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
         desc = super().get_description(*args, **kwargs)
 
         desc['convergence_controllers'][AdaptivityPolynomialError] = {
-            'e_tol': 1e-2,
+            'e_tol': 1e-3,
             'abort_at_growing_residual': False,
             'interpolate_between_restarts': False,
-            # 'dt_min': 1e-3,
+            'dt_min': 1e-3,
         }
-        # desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
-        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 256}
-        desc['level_params']['restol'] = 1e-4
+        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 2**9}
+        desc['convergence_controllers'].pop(CFLLimit)
+        desc['level_params']['restol'] = 1e-7
         desc['sweeper_params']['num_nodes'] = 3
-        desc['step_params']['maxiter'] = 12
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['step_params']['maxiter'] = 16
+        desc['problem_params']['nx'] = 2**9
+        desc['problem_params']['nz'] = 2**7
 
         return desc
 
@@ -391,7 +394,7 @@ class RayleighBenard_dt_h_adaptivity(RayleighBenard_dt_adaptivity):
 
         desc = super().get_description(*args, **kwargs)
         desc['problem_params']['nx'] = 2**9
-        desc['problem_params']['nz'] = 2**8
+        desc['problem_params']['nz'] = 2**7
         desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 512}
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['skip_residual_computation'] = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
