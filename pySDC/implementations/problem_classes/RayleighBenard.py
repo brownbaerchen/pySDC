@@ -664,9 +664,7 @@ class SpaceAdaptivity(ConvergenceController):
                 L.status.dt_new = L.params.dt
                 S.status.restart = True
                 if hasattr(L.sweep, 'comm'):
-                    L.u[L.sweep.comm.rank + 1], _ = P.refine_resolution(
-                        L.u[L.sweep.comm.rank + 1], factor=self.params.factor
-                    )
+                    L.u[L.sweep.comm.rank + 1] = L.u[0].copy()
                 self.log(f"Restarting with refined resolution. New resolution: nx={L.prob.nx} nz={L.prob.nz}", S)
             else:
                 self.log('Skipping refinement because maximum resolution has already been reached', S)
