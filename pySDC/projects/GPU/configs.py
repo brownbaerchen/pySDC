@@ -348,6 +348,7 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
             'abort_at_growing_residual': False,
             'interpolate_between_restarts': False,
             'dt_min': 1e-3,
+            'dt_rel_min_slope': 0.1,
         }
         desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 2**9}
         desc['convergence_controllers'].pop(CFLLimit)
