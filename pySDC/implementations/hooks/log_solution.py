@@ -81,13 +81,13 @@ class LogToFile(Hooks):
 
     Keep in mind that the hook will overwrite files without warning!
     You can give a custom file name by setting the ``file_name`` class attribute and give a custom way of rendering the
-    index associated with individual files by giving a different lambda function ``format_index`` class attribute. This
-    lambda should accept one index and return one string.
+    index associated with individual files by giving a different function ``format_index`` class attribute. This should
+    accept one index and return one string.
 
     You can also give a custom ``logging_condition`` function, accepting the current level if you want to log selectively.
 
     Importantly, you may need to change ``process_solution``. By default, this will return a numpy view of the solution.
-    Of course, if you are not using numpy, you need to change this. Again, this is a lambda accepting the level.
+    Of course, if you are not using numpy, you need to change this. Again, this is a function accepting the level.
 
     After the fact, you can use the classmethod `get_path` to get the path to a certain data or the `load` function to
     directly load the solution at a given index. Just configure the hook like you did when you recorded the data
@@ -151,15 +151,13 @@ class LogToFile(Hooks):
     def pre_run(self, step, level_number):
         L = step.levels[level_number]
         L.uend = L.u[0]
-        if type(L.u[0]).__name__ in ['cupy_mesh']:
-            import cupy as cp
 
-            process_solution = lambda L: {
+        def process_solution(L):
+            return {
                 **type(self).process_solution(L),
                 't': L.time,
             }
-        else:
-            process_solution = lambda L: {**type(self).process_solution(L), 't': L.time}
+
         self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod
