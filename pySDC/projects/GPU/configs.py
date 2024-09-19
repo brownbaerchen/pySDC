@@ -4,6 +4,8 @@ def get_config(args):
         return RayleighBenardRegular(args)
     elif name == 'RBC_dt':
         return RayleighBenard_dt_adaptivity(args)
+    elif name == 'RBC_dt_h':
+        return RayleighBenard_dt_h_adaptivity(args)
     elif name == 'RBC_k':
         return RayleighBenard_k_adaptivity(args)
     elif name == 'RBC_dt_k':
@@ -347,10 +349,9 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
             'interpolate_between_restarts': False,
             # 'dt_min': 1e-3,
         }
-        desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
+        # desc['convergence_controllers'][CFLLimit] = {'dt_max': 0.1, 'dt_min': 1e-6, 'cfl': 1.0}
         desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 256}
-        desc['level_params']['restol'] = 1e-7
-        # desc['level_params']['e_tol'] = 1e-10
+        desc['level_params']['restol'] = 1e-4
         desc['sweeper_params']['num_nodes'] = 3
         desc['step_params']['maxiter'] = 12
 
@@ -382,6 +383,30 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['step_params']['maxiter'] = 5
         return desc
+
+
+class RayleighBenard_dt_h_adaptivity(RayleighBenard_dt_adaptivity):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import SpaceAdaptivity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['nx'] = 2**9
+        desc['problem_params']['nz'] = 2**8
+        desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 512}
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
 
 
 class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
