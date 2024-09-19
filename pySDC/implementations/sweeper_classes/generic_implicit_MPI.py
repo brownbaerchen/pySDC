@@ -105,10 +105,10 @@ class SweeperMPI(Sweeper):
         if 'full' in L.params.residual_type:
             recvbuf = np.empty(1)
             self.comm.Allreduce(sendbuf, recvbuf, op=MPI.MAX)
-            L.status.residual = recvbuf[0]
+            L.status.residual = float(recvbuf)
         elif 'last' in L.params.residual_type:
             self.comm.Bcast(sendbuf, root=self.comm.size - 1)
-            L.status.residual = sendbuf[0]
+            L.status.residual = float(sendbuf)
         else:
             raise NotImplementedError(f'residual type \"{L.params.residual_type}\" not implemented!')
 
