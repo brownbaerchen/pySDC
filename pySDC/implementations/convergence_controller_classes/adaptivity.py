@@ -52,7 +52,7 @@ class AdaptivityBase(ConvergenceController):
         Returns:
             None
         """
-        step_limiter_keys = ['dt_min', 'dt_max', 'dt_slope_min', 'dt_slope_max']
+        step_limiter_keys = ['dt_min', 'dt_max', 'dt_slope_min', 'dt_slope_max', 'dt_rel_min_slope']
         available_keys = [me for me in step_limiter_keys if me in self.params.__dict__.keys()]
 
         if len(available_keys) > 0:
@@ -230,7 +230,7 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             self.res_last_iter = np.inf
 
             if self.params.restart_at_maxiter and S.levels[0].status.residual > S.levels[0].params.restol:
-                self.trigger_restart_upon_nonconvergence(S, ' within k_max iterations')
+                self.trigger_restart_upon_nonconvergence(S)
             elif self.get_local_error_estimate(controller, S, **kwargs) > self.params.e_tol:
                 S.status.restart = True
         elif (
@@ -239,24 +239,22 @@ class AdaptivityForConvergedCollocationProblems(AdaptivityBase):
             and S.status.iter > 0
             and self.params.abort_at_growing_residual
         ):
-            self.trigger_restart_upon_nonconvergence(
-                S, f', residual is growing ({S.levels[0].status.residual:.2e} > {self.res_last_iter:.2e})'
-            )
-        elif S.levels[0].status.residual > self.params.residual_max_tol and S.status.iter > 0:
-            self.trigger_restart_upon_nonconvergence(S, ', max. residual exceeded')
+            self.trigger_restart_upon_nonconvergence(S)
+        elif S.levels[0].status.residual > self.params.residual_max_tol:
+            self.trigger_restart_upon_nonconvergence(S)
 
         if self.params.useMPI:
             self.communicate_convergence(self, controller, S, **kwargs)
 
         self.res_last_iter = S.levels[0].status.residual * 1.0
 
-    def trigger_restart_upon_nonconvergence(self, S, msg):
+    def trigger_restart_upon_nonconvergence(self, S):
         S.status.restart = True
         S.status.force_done = True
         for L in S.levels:
             L.status.dt_new = L.params.dt / self.params.factor_if_not_converged
             self.log(
-                f'Collocation problem not converged{msg}. Reducing step size to {L.status.dt_new:.2e}',
+                f'Collocation problem not converged. Reducing step size to {L.status.dt_new:.2e}',
                 S,
             )
         if self.params.interpolate_between_restarts:
