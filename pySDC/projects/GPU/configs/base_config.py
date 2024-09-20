@@ -55,7 +55,6 @@ def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None
 
 class Config(object):
     sweeper_type = None
-    name = None
     Tend = None
 
     def __init__(self, args, comm_world=None):
@@ -112,7 +111,7 @@ class Config(object):
 
     def get_path(self, *args, ranks=None, **kwargs):
         ranks = self.ranks if ranks is None else ranks
-        return f'{self.name}-{type(self).__name__}{self.args_to_str()}-{ranks[0]}-{ranks[2]}'
+        return f'{type(self).__name__}{self.args_to_str()}-{ranks[0]}-{ranks[2]}'
 
     def args_to_str(self, args=None):
         args = self.args if args is None else args

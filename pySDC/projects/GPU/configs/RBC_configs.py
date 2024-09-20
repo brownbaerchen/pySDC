@@ -33,7 +33,6 @@ def get_config(args):
 
 class RayleighBenardRegular(Config):
     sweeper_type = 'IMEX'
-    name = 'RBC'
     Tend = 50
 
     def get_LogToFile(self, ranks=None):
