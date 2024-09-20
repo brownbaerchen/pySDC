@@ -54,9 +54,10 @@ def run_experiment(args, config, **kwargs):
     combined_stats = filter_stats(combined_stats, comm=config.comm_world)
 
     if config.comm_world.rank == config.comm_world.size - 1:
-        path = f'data/{config.get_path()}-stats.pickle'
+        path = f'data/{config.get_path()}-stats-whole-run.pickle'
         with open(path, 'wb') as file:
             pickle.dump(combined_stats, file)
+        print(f'Stored stats in {path}', flush=True)
 
     return uend
 

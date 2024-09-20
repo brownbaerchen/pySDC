@@ -1,5 +1,6 @@
 from pySDC.core.convergence_controller import ConvergenceController
 import pickle
+import numpy as np
 
 
 def get_config(args):
@@ -22,6 +23,8 @@ def get_comms(n_procs_list, comm_world=None, _comm=None, _tot_rank=0, _rank=None
     if len(n_procs_list) > 0:
         color = _tot_rank + _rank // n_procs_list[0]
         new_comm = comm_world.Split(color)
+
+        assert new_comm.size == n_procs_list[0]
 
         if useGPU:
             import cupy_backends
@@ -72,7 +75,10 @@ class Config(object):
         description['sweeper_params'] = {'initial_guess': 'copy'}
         description['level_params'] = {}
         description['step_params'] = {}
-        description['convergence_controllers'] = {LogStats: {}}
+        description['convergence_controllers'] = {}
+
+        if self.get_LogToFile():
+            description['convergence_controllers'][LogStats] = {}
 
         if MPIsweeper:
             description['sweeper_params']['comm'] = self.comms[1]
@@ -83,19 +89,24 @@ class Config(object):
 
         controller_params = {}
         controller_params['logger_level'] = logger_level if self.comm_world.rank == 0 else 40
-        controller_params['hook_class'] = [LogWork] + self.get_LogToFile()
+        controller_params['hook_class'] = [LogWork]
+        logToFile = self.get_LogToFile()
+        if logToFile:
+            controller_params['hook_class'] += [logToFile]
         controller_params['mssdc_jac'] = False
         return controller_params
 
     def get_sweeper(self, useMPI):
         if useMPI and self.sweeper_type == 'IMEX':
             from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as sweeper
-        elif useMPI and self.sweeper_type == 'generic_implicit':
-            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI as sweeper
         elif not useMPI and self.sweeper_type == 'IMEX':
             from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper
+        elif useMPI and self.sweeper_type == 'generic_implicit':
+            from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI as sweeper
+        elif not useMPI and self.sweeper_type == 'generic_implicit':
+            from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper
         else:
-            raise NotImplementedError
+            raise NotImplementedError(f'Don\'t know the sweeper for {self.sweeper_type=}')
 
         return sweeper
 
@@ -117,36 +128,39 @@ class Config(object):
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
         if restart_idx > 0:
-            LogToFile = self.get_LogToFile()[0]
+            LogToFile = self.get_LogToFile()
             file = LogToFile.load(restart_idx)
             LogToFile.counter = restart_idx
             u0 = P.u_init
-            if P.spectral_space:
-                u0[...] = P.transform(file['u'])
+            if hasattr(P, 'spectral_space'):
+                if P.spectral_space:
+                    u0[...] = P.transform(file['u'])
+                else:
+                    u0[...] = file['u']
             else:
                 u0[...] = file['u']
             return u0, file['t']
         else:
-            raise NotImplementedError
+            return P.u_exact(t=0), 0
 
     def get_previous_stats(self, P, restart_idx):
         if restart_idx == 0:
             return {}
         else:
-            hook = self.get_LogToFile()[0]
-            path = LogStats.get_stats_path(hook)
+            hook = self.get_LogToFile()
+            path = LogStats.get_stats_path(hook, counter_offset=0)
             with open(path, 'rb') as file:
                 return pickle.load(file)
 
     def get_LogToFile(self):
-        return []
+        return None
 
 
 class LogStats(ConvergenceController):
 
     @staticmethod
-    def get_stats_path(hook):
-        return f'{hook.path}/{hook.file_name}_{hook.format_index(hook.counter-1)}-stats.pickle'
+    def get_stats_path(hook, counter_offset=-1):
+        return f'{hook.path}/{hook.file_name}_{hook.format_index(hook.counter+counter_offset)}-stats.pickle'
 
     def setup(self, controller, params, *args, **kwargs):
         params['control_order'] = 999
@@ -161,11 +175,12 @@ class LogStats(ConvergenceController):
 
     def post_step_processing(self, controller, S, **kwargs):
         hook = self.params.hook
-        if self.counter <= hook.counter:
-            path = self.get_stats_path(hook)
-            for _hook in controller.hooks:
-                _hook.post_step(S, 0)
 
+        for _hook in controller.hooks:
+            _hook.post_step(S, 0)
+
+        if self.counter < hook.counter:
+            path = self.get_stats_path(hook)
             stats = controller.return_stats()
             if hook.logging_condition(S.levels[0]):
                 with open(path, 'wb') as file:

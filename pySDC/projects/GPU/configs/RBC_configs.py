@@ -81,7 +81,7 @@ class RayleighBenardRegular(Config):
 
         LogToFile.process_solution = process_solution
         LogToFile.logging_condition = logging_condition
-        return [LogToFile]
+        return LogToFile
 
     def get_controller_params(self, *args, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import (
@@ -156,7 +156,7 @@ class RayleighBenardRegular(Config):
 
         for rank in range(n_procs_list[2]):
             ranks = self.ranks[:-1] + [rank]
-            LogToFile = self.get_LogToFile(ranks=ranks)[0]
+            LogToFile = self.get_LogToFile(ranks=ranks)
 
             buffer[f'u-{rank}'] = LogToFile.load(idx)
 
