@@ -99,7 +99,7 @@ def make_video(args, config):
 
 
 if __name__ == '__main__':
-    from pySDC.projects.GPU.configs import get_config
+    from pySDC.projects.GPU.configs.base_config import get_config
 
     args = parse_args()
 
