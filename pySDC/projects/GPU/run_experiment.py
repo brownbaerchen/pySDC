@@ -17,6 +17,7 @@ def parse_args():
     parser.add_argument('--config', type=str, help='Configuration to load', default='RBC')
     parser.add_argument('--restart_idx', type=int, help='Restart from file by index', default=0)
     parser.add_argument('--procs', type=str_to_procs, help='Processes in steps/sweeper/space', default='1/1/1')
+    parser.add_argument('--res', type=int, help='Space resolution along first axis', default=-1)
     parser.add_argument(
         '--logger_level', type=int, help='Logger level on the first rank in space and in the sweeper', default=15
     )
@@ -31,7 +32,9 @@ def run_experiment(args, config, **kwargs):
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.stats_helper import filter_stats
 
-    description = config.get_description(useGPU=args['useGPU'], MPIsweeper=args['procs'][1] > 1, **kwargs)
+    description = config.get_description(
+        useGPU=args['useGPU'], MPIsweeper=args['procs'][1] > 1, res=args['res'], **kwargs
+    )
     controller_params = config.get_controller_params(logger_level=args['logger_level'])
 
     # controller = controller_MPI(controller_params, description, config.comms[0])
@@ -55,7 +58,7 @@ def run_experiment(args, config, **kwargs):
     return uend
 
 
-def plot_experiment(args, config):
+def plot_experiment(args, config):  # pragma: no cover
     import gc
     import matplotlib.pyplot as plt
 
@@ -83,7 +86,7 @@ def plot_experiment(args, config):
         gc.collect()
 
 
-def make_video(args, config):
+def make_video(args, config):  # pragma: no cover
     comm = config.comm_world
     if comm.rank > 0:
         return None
@@ -107,7 +110,7 @@ if __name__ == '__main__':
 
     if args['mode'] == 'run':
         run_experiment(args, config)
-    elif args['mode'] in ['plot', 'render']:
+    elif args['mode'] in ['plot', 'render']:  # pragma: no cover
         plot_experiment(args, config)
-    elif args['mode'] == 'video':
+    elif args['mode'] == 'video':  # pragma: no cover
         make_video(args, config)

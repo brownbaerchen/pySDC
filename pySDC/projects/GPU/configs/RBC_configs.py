@@ -93,7 +93,7 @@ class RayleighBenardRegular(Config):
         controller_params['hook_class'] += [LogAnalysisVariables, LogStepSize]
         return controller_params
 
-    def get_description(self, *args, MPIsweeper=False, **kwargs):
+    def get_description(self, *args, MPIsweeper=False, res=-1, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import (
             RayleighBenard,
             CFLLimit,
@@ -123,8 +123,8 @@ class RayleighBenardRegular(Config):
         desc['sweeper_params']['QE'] = 'PIC'
 
         desc['problem_params']['Rayleigh'] = 2e6
-        desc['problem_params']['nx'] = 2**8
-        desc['problem_params']['nz'] = 2**6
+        desc['problem_params']['nx'] = 2**8 if res == -1 else res
+        desc['problem_params']['nz'] = desc['problem_params']['nx'] // 4
         desc['problem_params']['dealiasing'] = 3 / 2
 
         desc['step_params']['maxiter'] = 3
@@ -240,8 +240,8 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
         desc['sweeper_params']['num_nodes'] = 3
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['step_params']['maxiter'] = 16
-        desc['problem_params']['nx'] = 2**9
-        desc['problem_params']['nz'] = 2**7
+        desc['problem_params']['nx'] *= 2
+        desc['problem_params']['nz'] *= 2
 
         return desc
 
@@ -278,8 +278,8 @@ class RayleighBenard_dt_h_adaptivity(RayleighBenard_dt_adaptivity):
         from pySDC.implementations.problem_classes.RayleighBenard import SpaceAdaptivity
 
         desc = super().get_description(*args, **kwargs)
-        desc['problem_params']['nx'] = 2**9
-        desc['problem_params']['nz'] = 2**7
+        desc['problem_params']['nx'] *= 2
+        desc['problem_params']['nz'] *= 2
         desc['convergence_controllers'][SpaceAdaptivity] = {'nz_max': 512}
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['skip_residual_computation'] = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
@@ -301,8 +301,8 @@ class RayleighBenard_dt_adaptivity_high_res(RayleighBenard_dt_adaptivity):
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
-        desc['problem_params']['nx'] = 2**10
-        desc['problem_params']['nz'] = 2**8
+        desc['problem_params']['nx'] *= 4
+        desc['problem_params']['nz'] *= 4
 
         desc['sweeper_params']['num_nodes'] = 3
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
@@ -317,8 +317,6 @@ class RayleighBenard_fast(RayleighBenardRegular):
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['problem_params']['nx'] = 2**8
-        desc['problem_params']['nz'] = 2**6
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 2
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
@@ -345,8 +343,8 @@ class RayleighBenardHighResolution(RayleighBenardRegular):
         desc['sweeper_params']['num_nodes'] = 4
 
         desc['problem_params']['Rayleigh'] = 2e6
-        desc['problem_params']['nx'] = 2**10
-        desc['problem_params']['nz'] = 2**8
+        desc['problem_params']['nx'] *= 4
+        desc['problem_params']['nz'] *= 4
 
         desc['step_params']['maxiter'] = 4
 
@@ -382,8 +380,8 @@ class RayleighBenard_Thibaut_HighRes(RayleighBenard_Thibaut):
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
-        desc['problem_params']['nx'] = 2**9
-        desc['problem_params']['nz'] = 2**7
+        desc['problem_params']['nx'] *= 2
+        desc['problem_params']['nz'] *= 2
         return desc
 
 
