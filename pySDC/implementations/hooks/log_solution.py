@@ -81,13 +81,13 @@ class LogToFile(Hooks):
 
     Keep in mind that the hook will overwrite files without warning!
     You can give a custom file name by setting the ``file_name`` class attribute and give a custom way of rendering the
-    index associated with individual files by giving a different lambda function ``format_index`` class attribute. This
-    lambda should accept one index and return one string.
+    index associated with individual files by giving a different function ``format_index`` class attribute. This should
+    accept one index and return one string.
 
-    You can also give a custom ``logging_condition`` lambda, accepting the current level if you want to log selectively.
+    You can also give a custom ``logging_condition`` function, accepting the current level if you want to log selectively.
 
     Importantly, you may need to change ``process_solution``. By default, this will return a numpy view of the solution.
-    Of course, if you are not using numpy, you need to change this. Again, this is a lambda accepting the level.
+    Of course, if you are not using numpy, you need to change this. Again, this is a function accepting the level.
 
     After the fact, you can use the classmethod `get_path` to get the path to a certain data or the `load` function to
     directly load the solution at a given index. Just configure the hook like you did when you recorded the data
@@ -99,10 +99,16 @@ class LogToFile(Hooks):
 
     path = None
     file_name = 'solution'
-    logging_condition = lambda L: True
-    process_solution = lambda L: {'t': L.time + L.dt, 'u': L.uend.view(np.ndarray)}
-    format_index = lambda index: f'{index:06d}'
     counter = 0
+
+    def logging_condition(L):
+        return True
+
+    def process_solution(L):
+        return {'t': L.time + L.dt, 'u': L.uend.view(np.ndarray)}
+
+    def format_index(index):
+        return f'{index:06d}'
 
     def __init__(self):
         super().__init__()
@@ -144,12 +150,14 @@ class LogToFile(Hooks):
 
     def pre_run(self, step, level_number):
         L = step.levels[level_number]
-        if type(L.u[0]).__name__ in ['cupy_mesh']:
-            import cupy as cp
+        L.uend = L.u[0]
 
-            process_solution = lambda L: {'t': L.time, 'u': cp.asnumpy(L.u[0]).view(np.ndarray)}
-        else:
-            process_solution = lambda L: {'t': L.time, 'u': L.u[0].view(np.ndarray)}
+        def process_solution(L):
+            return {
+                **type(self).process_solution(L),
+                't': L.time,
+            }
+
         self.log_to_file(step, level_number, True, process_solution=process_solution)
 
     @classmethod
@@ -174,6 +182,9 @@ class LogToFileAfterXs(LogToFile):
     def post_step(self, step, level_number):
         L = step.levels[level_number]
 
+        if self.t_next_log == 0:
+            self.t_next_log = self.time_increment
+
         if L.time + L.dt >= self.t_next_log and not step.status.restart:
             super().post_step(step, level_number)
-            self.t_next_log += self.time_increment
+            self.t_next_log = max([L.time + L.dt, self.t_next_log]) + self.time_increment

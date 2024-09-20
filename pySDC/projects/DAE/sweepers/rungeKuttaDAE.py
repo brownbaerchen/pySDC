@@ -2,7 +2,7 @@ from pySDC.projects.DAE.sweepers.fullyImplicitDAE import FullyImplicitDAE
 from pySDC.implementations.sweeper_classes.Runge_Kutta import (
     RungeKutta,
     BackwardEuler,
-    CrankNicholson,
+    CrankNicolson,
     EDIRK4,
     DIRK43_2,
 )
@@ -15,7 +15,7 @@ class RungeKuttaDAE(RungeKutta):
 
     .. math::
         0 = F(u, u', t).
-    
+
     RK methods for general DAEs have the form
 
     .. math::
@@ -171,7 +171,7 @@ class BackwardEulerDAE(RungeKuttaDAE, BackwardEuler):
     pass
 
 
-class TrapezoidalRuleDAE(RungeKuttaDAE, CrankNicholson):
+class TrapezoidalRuleDAE(RungeKuttaDAE, CrankNicolson):
     pass
 
 
