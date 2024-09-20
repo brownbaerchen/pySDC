@@ -1,3 +1,7 @@
+from pySDC.core.convergence_controller import ConvergenceController
+import pickle
+
+
 def get_config(args):
     name = args['config']
     if name[:3] == 'RBC':
@@ -68,7 +72,7 @@ class Config(object):
         description['sweeper_params'] = {'initial_guess': 'copy'}
         description['level_params'] = {}
         description['step_params'] = {}
-        description['convergence_controllers'] = {}
+        description['convergence_controllers'] = {LogStats: {}}
 
         if MPIsweeper:
             description['sweeper_params']['comm'] = self.comms[1]
@@ -125,5 +129,46 @@ class Config(object):
         else:
             raise NotImplementedError
 
+    def get_previous_stats(self, P, restart_idx):
+        if restart_idx == 0:
+            return {}
+        else:
+            hook = self.get_LogToFile()[0]
+            path = LogStats.get_stats_path(hook)
+            with open(path, 'rb') as file:
+                return pickle.load(file)
+
     def get_LogToFile(self):
         return []
+
+
+class LogStats(ConvergenceController):
+
+    @staticmethod
+    def get_stats_path(hook):
+        return f'{hook.path}/{hook.file_name}_{hook.format_index(hook.counter-1)}-stats.pickle'
+
+    def setup(self, controller, params, *args, **kwargs):
+        params['control_order'] = 999
+        if 'hook' not in params.keys():
+            from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
+
+            params['hook'] = LogToFileAfterXs
+
+        self.counter = params['hook'].counter
+
+        return super().setup(controller, params, *args, **kwargs)
+
+    def post_step_processing(self, controller, S, **kwargs):
+        hook = self.params.hook
+        if self.counter <= hook.counter:
+            path = self.get_stats_path(hook)
+            for _hook in controller.hooks:
+                _hook.post_step(S, 0)
+
+            stats = controller.return_stats()
+            if hook.logging_condition(S.levels[0]):
+                with open(path, 'wb') as file:
+                    pickle.dump(stats, file)
+                    self.log(f'Stored stats in {path!r}', S)
+            self.counter = hook.counter

@@ -42,13 +42,16 @@ def run_experiment(args, config, **kwargs):
         config.comms[0].size == 1
     ), 'Have not figured out how to do MPI controller with GPUs yet because I need NCCL for that!'
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+    prob = controller.MS[0].levels[0].prob
 
-    # u0, t0 = config.get_initial_condition(controller.S.levels[0].prob, restart_idx=args['restart_idx'])
-    u0, t0 = config.get_initial_condition(controller.MS[0].levels[0].prob, restart_idx=args['restart_idx'])
+    u0, t0 = config.get_initial_condition(prob, restart_idx=args['restart_idx'])
+
+    previous_stats = config.get_previous_stats(prob, restart_idx=args['restart_idx'])
 
     uend, stats = controller.run(u0=u0, t0=t0, Tend=config.Tend)
 
-    combined_stats = filter_stats(stats, comm=config.comm_world)
+    combined_stats = {**previous_stats, **stats}
+    combined_stats = filter_stats(combined_stats, comm=config.comm_world)
 
     if config.comm_world.rank == config.comm_world.size - 1:
         path = f'data/{config.get_path()}-stats.pickle'
