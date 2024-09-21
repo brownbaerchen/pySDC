@@ -14,7 +14,7 @@ def parse_args():
     parser.add_argument(
         '--mode', type=str, help='Mode for this script', default='run', choices=['run', 'plot', 'render', 'video']
     )
-    parser.add_argument('--config', type=str, help='Configuration to load', default='RBC')
+    parser.add_argument('--config', type=str, help='Configuration to load', default=None)
     parser.add_argument('--restart_idx', type=int, help='Restart from file by index', default=0)
     parser.add_argument('--procs', type=str_to_procs, help='Processes in steps/sweeper/space', default='1/1/1')
     parser.add_argument('--res', type=int, help='Space resolution along first axis', default=-1)
@@ -74,7 +74,7 @@ def plot_experiment(args, config):  # pragma: no cover
 
     for idx in range(args['restart_idx'], 9999, comm.size):
         try:
-            fig = config.plot(P, idx + comm.rank, args['procs'])
+            fig = config.plot(P=P, idx=idx + comm.rank, n_procs_list=args['procs'])
         except FileNotFoundError:
             break
 

@@ -5,8 +5,8 @@ import numpy as np
 
 def get_config(args):
     name = args['config']
-    if name[:3] == 'RBC':
-        from pySDC.projects.GPU.configs.RBC_configs import get_config
+    if name[:2] == 'GS':
+        from pySDC.projects.GPU.configs.GS_configs import get_config
 
         return get_config(args)
     else:
@@ -63,7 +63,10 @@ class Config(object):
         self.args = args
         self.comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
         self.n_procs_list = args["procs"]
-        self.comms = get_comms(n_procs_list=self.n_procs_list, useGPU=args['useGPU'])
+        if args['mode'] == 'run':
+            self.comms = get_comms(n_procs_list=self.n_procs_list, useGPU=args['useGPU'], comm_world=self.comm_world)
+        else:
+            self.comms = [self.comm_world, self.comm_world, self.comm_world]
         self.ranks = [me.rank for me in self.comms]
 
     def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
@@ -122,7 +125,7 @@ class Config(object):
         name = f'{name}-procs_{args["procs"][0]}_{args["procs"][1]}_{args["procs"][2]}'
         return name
 
-    def plot(self, P, idx):
+    def plot(self, P, idx, num_procs_list):
         raise NotImplementedError
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
