@@ -1,4 +1,3 @@
-import numpy as np
 import scipy.sparse as sp
 
 from pySDC.core.errors import ProblemError
@@ -47,6 +46,8 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         Denotes the period of the function to be approximated for the Fourier transform.
     comm : COMM_WORLD, optional
         Communicator for ``mpi4py-fft``.
+    num_blobs : int, optional
+        Number of blobs in the initial conditions. Negative values give rectangles.
 
     Attributes
     ----------
@@ -87,7 +88,8 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         self.iU = 0
         self.iV = 1
         self.ncomp = 2  # needed for transfer class
-        self.init = (shape, self.comm, self.xp.dtype('float'))
+
+        self.init = (shape, self.comm, self.xp.dtype('complex') if self.spectral else self.xp.dtype('float'))
 
         self._makeAttributeAndRegister(
             'Du',
@@ -183,7 +185,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
 
         return me
 
-    def u_exact(self, t):
+    def u_exact(self, t, seed=10700000):
         r"""
         Routine to compute the exact solution at time :math:`t = 0`, see [3]_.
 
@@ -200,37 +202,76 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         assert t == 0.0, 'Exact solution only valid as initial condition'
         assert self.ndim == 2, 'The initial conditions are 2D for now..'
 
-        me = self.dtype_u(self.init, val=0.0)
+        xp = self.xp
 
-        inc = self.L[0] / (self.num_blobs + 1)
+        _u = xp.zeros_like(self.X[0])
+        _v = xp.zeros_like(self.X[0])
 
-        for i in range(1, self.num_blobs + 1):
-            for j in range(1, self.num_blobs + 1):
+        rng = xp.random.default_rng(seed)
 
-                # This assumes that the box is [-L/2, L/2]^2
-                if self.spectral:
-                    tmp = -self.xp.exp(
-                        -80.0
-                        * ((self.X[0] + self.x0 + inc * i + 0.05) ** 2 + (self.X[1] + self.x0 + inc * j + 0.02) ** 2)
-                    )
-                    me[0, ...] += self.fft.forward(tmp)
-                    tmp = self.xp.exp(
-                        -80.0
-                        * ((self.X[0] + self.x0 + inc * i - 0.05) ** 2 + (self.X[1] + self.x0 + inc * j - 0.02) ** 2)
-                    )
-                    me[1, ...] += self.fft.forward(tmp)
-                else:
-                    me[0, ...] += -self.xp.exp(
-                        -80.0
-                        * ((self.X[0] + self.x0 + inc * i + 0.05) ** 2 + (self.X[1] + self.x0 + inc * j + 0.02) ** 2)
-                    )
-                    me[1, ...] += self.xp.exp(
-                        -80.0
-                        * ((self.X[0] + self.x0 + inc * i - 0.05) ** 2 + (self.X[1] + self.x0 + inc * j - 0.02) ** 2)
-                    )
-        me[0] += 1
+        if self.num_blobs < 0:
+            """
+            Rectangles with stationary background, see arXiv:1501.01990
+            """
+            F, k = self.A, self.B - self.A
+            A = xp.sqrt(F) / (F + k)
 
-        return me
+            # set stable background state from Equation 2
+            assert 2 * k < xp.sqrt(F) - 2 * F, 'Kill rate is too large to facilitate stable background'
+            _u[...] = (A - xp.sqrt(A**2 - 4)) / (2 * A)
+            _v[...] = xp.sqrt(F) * (A + xp.sqrt(A**2 - 4)) / 2
+
+            for _ in range(-self.num_blobs):
+                x0, y0 = rng.random(size=2) * self.L[0] - self.L[0] / 2
+                lx, ly = rng.random(size=2) * self.L[0] / self.nvars[0] * 30
+
+                mask_x = xp.logical_and(self.X[0] > x0, self.X[0] < x0 + lx)
+                mask_y = xp.logical_and(self.X[1] > y0, self.X[1] < y0 + ly)
+                mask = xp.logical_and(mask_x, mask_y)
+
+                _u[mask] = rng.random()
+                _v[mask] = rng.random()
+
+        elif self.num_blobs > 0:
+            """
+            Blobs as in https://www.chebfun.org/examples/pde/GrayScott.html
+            """
+
+            inc = self.L[0] / (self.num_blobs + 1)
+
+            for i in range(1, self.num_blobs + 1):
+                for j in range(1, self.num_blobs + 1):
+                    signs = (-1) ** rng.integers(low=0, high=2, size=2)
+
+                    # This assumes that the box is [-L/2, L/2]^2
+                    _u[...] += -xp.exp(
+                        -80.0
+                        * (
+                            (self.X[0] + self.x0 + inc * i + signs[0] * 0.05) ** 2
+                            + (self.X[1] + self.x0 + inc * j + signs[1] * 0.02) ** 2
+                        )
+                    )
+                    _v[...] += xp.exp(
+                        -80.0
+                        * (
+                            (self.X[0] + self.x0 + inc * i - signs[0] * 0.05) ** 2
+                            + (self.X[1] + self.x0 + inc * j - signs[1] * 0.02) ** 2
+                        )
+                    )
+
+            _u += 1
+        else:
+            raise NotImplementedError
+
+        u = self.u_init
+        if self.spectral:
+            u[0, ...] = self.fft.forward(_u)
+            u[1, ...] = self.fft.forward(_v)
+        else:
+            u[0, ...] = _u
+            u[1, ...] = _v
+
+        return u
 
     def get_fig(self, n_comps=2):  # pragma: no cover
         """
@@ -253,7 +294,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
             divider = make_axes_locatable(axs[1])
             self.cax = divider.append_axes('right', size='3%', pad=0.03)
         else:
-            self.fig, ax = plt.subplots(1, 1, figsize=((4, 3)))
+            self.fig, ax = plt.subplots(1, 1, figsize=((6, 5)))
             divider = make_axes_locatable(ax)
             self.cax = divider.append_axes('right', size='3%', pad=0.03)
         return self.fig
