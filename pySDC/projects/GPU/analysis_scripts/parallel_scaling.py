@@ -179,6 +179,11 @@ if __name__ == '__main__':
             configClass = GrayScottSpaceScalingCPU
         else:
             configClass = GrayScottSpaceScalingGPU
+    elif args.problem == 'RBC':
+        if args.XPU == 'CPU':
+            configClass = RayleighBenardSpaceScalingCPU
+        else:
+            configClass = RayleighBenardSpaceScalingGPU
     else:
         raise NotImplementedError(f'Don\'t know problem {args.problem!r}')
 
