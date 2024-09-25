@@ -27,6 +27,8 @@ def get_config(args):
         return RayleighBenard_Thibaut(args)
     elif name == 'RBC_TiboHR':
         return RayleighBenard_Thibaut_HighRes(args)
+    elif name == 'RBC_scaling':
+        return RayleighBenard_scaling(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -440,3 +442,28 @@ class RayleighBenardDedalusComp(RayleighBenardRK):
 #     #     type(self).Tend = t + self.t_inc
 #
 #     #     return u, t
+
+
+class RayleighBenard_scaling(RayleighBenardRegular):
+    Tend = 8
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
+        desc['convergence_controllers'].pop(CFLLimit)
+        desc['level_params']['restol'] = -1
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['step_params']['maxiter'] = 5
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.hooks.log_work import LogWork
+
+        params = super().get_controller_params(*args, **kwargs)
+        params['hook_class'] = [LogWork]
+        return params

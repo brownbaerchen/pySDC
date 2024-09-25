@@ -119,6 +119,24 @@ class GrayScottSpaceScalingGPU(GPUConfig, ScalingConfig):
     tasks_time = 3
 
 
+class RayleighBenardSpaceScalingCPU(CPUConfig, ScalingConfig):
+    base_resolution = 1024
+    base_resolution_weak = 256
+    config = 'RBC_scaling'
+    max_steps_space = 10
+    max_steps_space_weak = 6
+    tasks_time = 3
+
+
+class RayleighBenardSpaceScalingGPU(GPUConfig, ScalingConfig):
+    base_resolution_weak = 256 * 2
+    base_resolution = 4096
+    config = 'RBC_scaling'
+    max_steps_space = 6
+    max_steps_space_weak = 4
+    tasks_time = 3
+
+
 def plot_scalings(strong, problem, kwargs):  # pragma: no cover
     if problem == 'GS':
         fig, ax = plt.subplots()
