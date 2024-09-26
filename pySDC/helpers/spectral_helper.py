@@ -1188,19 +1188,24 @@ class SpectralHelper:
         """
         ndim = self.ndim
 
-        for axis in range(ndim):
-            for bc in self.full_BCs:
-                slices = (
-                    [slice(0, self.init[0][i + 1]) for i in range(axis)]
-                    + [bc['line']]
-                    + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-                )
-                if axis == bc['axis']:
-                    _slice = [self.index(bc['equation'])] + slices
-                    N = self.axes[axis].N
-                    if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                        _slice[axis + 1] -= self.local_slice[axis].start
-                        rhs_hat[(*_slice,)] = 0
+        if hasattr(self, '_rhs_hat_zero_mask'):
+            rhs_hat[self._rhs_hat_zero_mask] = 0
+        else:
+            self._rhs_hat_zero_mask = self.xp.zeros(shape=rhs_hat.shape, dtype=bool)
+
+            for axis in range(ndim):
+                for bc in self.full_BCs:
+                    slices = (
+                        [slice(0, self.init[0][i + 1]) for i in range(axis)]
+                        + [bc['line']]
+                        + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
+                    )
+                    if axis == bc['axis']:
+                        _slice = [self.index(bc['equation'])] + slices
+                        N = self.axes[axis].N
+                        if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
+                            _slice[axis + 1] -= self.local_slice[axis].start
+                            self._rhs_hat_zero_mask[(*_slice,)] = True
 
         if zero_only:
             return rhs_hat
