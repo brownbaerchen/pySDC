@@ -5,6 +5,7 @@ from pySDC.projects.GPU.configs import get_config
 from pySDC.projects.GPU.run_experiment import parse_args
 from pySDC.helpers.stats_helper import get_sorted
 
+
 def plot_Nusselt(args):
     config = get_config(args['config'], args['procs'])
     print(config)
@@ -31,6 +32,7 @@ def plot_Nusselt(args):
     ax.set_ylabel('Nusselt numbers')
     ax.set_xlabel('$t$')
     plt.show()
+
 
 if __name__ == '__main__':
     args = parse_args()

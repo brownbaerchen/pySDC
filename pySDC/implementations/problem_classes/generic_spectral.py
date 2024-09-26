@@ -28,21 +28,26 @@ class GenericSpectralLinear(Problem):
         Pr (sparse matrix): Right preconditioner
     """
 
-    @classmethod
-    def setup_GPU(cls):
+    def setup_GPU(self):
         """switch to GPU modules"""
         import cupy as cp
         from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh, imex_cupy_mesh
         from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
-        cls.dtype_u = cupy_mesh
+        self.dtype_u = cupy_mesh
 
         GPU_versions = {
             mesh: cupy_mesh,
             imex_mesh: imex_cupy_mesh,
         }
 
-        cls.dtype_f = GPU_versions[cls.dtype_f]
+        self.dtype_f = GPU_versions[self.dtype_f]
+
+        if self.comm is not None:
+            from pySDC.helpers.NCCL_communicator import NCCLComm
+
+            if not isinstance(self.comm, NCCLComm):
+                self.comm = NCCLComm(self.comm)
 
     def __init__(
         self,
