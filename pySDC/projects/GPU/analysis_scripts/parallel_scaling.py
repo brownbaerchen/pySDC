@@ -130,7 +130,7 @@ class RayleighBenardSpaceScalingCPU(CPUConfig, ScalingConfig):
 
 class RayleighBenardSpaceScalingGPU(GPUConfig, ScalingConfig):
     base_resolution_weak = 256 * 2
-    base_resolution = 4096
+    base_resolution = 1024
     config = 'RBC_scaling'
     max_steps_space = 6
     max_steps_space_weak = 4
@@ -138,8 +138,8 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, ScalingConfig):
 
 
 def plot_scalings(strong, problem, kwargs):  # pragma: no cover
+    fig, ax = plt.subplots()
     if problem == 'GS':
-        fig, ax = plt.subplots()
 
         plottings_params = [
             {'plot_ideal': strong, 'marker': 'x', 'label': 'CPU'},
@@ -151,13 +151,25 @@ def plot_scalings(strong, problem, kwargs):  # pragma: no cover
             GrayScottSpaceScalingCPU(space_time_parallel=True),
             GrayScottSpaceScalingGPU(space_time_parallel=False),
         ]
+    elif problem == 'RBC':
+        plottings_params = [
+            {'plot_ideal': strong, 'marker': 'x', 'label': 'CPU'},
+            {'marker': '>', 'label': 'CPU space time parallel'},
+            {'marker': '^', 'label': 'GPU'},
+        ]
+        configs = [
+            RayleighBenardSpaceScalingCPU(space_time_parallel=False),
+            RayleighBenardSpaceScalingCPU(space_time_parallel=True),
+            RayleighBenardSpaceScalingGPU(space_time_parallel=False),
+        ]
 
-        for config, params in zip(configs, plottings_params):
-            config.plot_scaling_test(strong=strong, ax=ax, **params)
-        ax.legend(frameon=False)
-        fig.savefig(f'{PROJECT_PATH}/plots/{"strong" if strong else "weak"}_scaling_{problem}.pdf', bbox_inches='tight')
     else:
         raise NotImplementedError
+
+    for config, params in zip(configs, plottings_params):
+        config.plot_scaling_test(strong=strong, ax=ax, **params)
+    ax.legend(frameon=False)
+    fig.savefig(f'{PROJECT_PATH}/plots/{"strong" if strong else "weak"}_scaling_{problem}.pdf', bbox_inches='tight')
 
 
 if __name__ == '__main__':

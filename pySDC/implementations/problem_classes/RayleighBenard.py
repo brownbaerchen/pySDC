@@ -191,7 +191,7 @@ class RayleighBenard(GenericSpectralLinear):
         iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
 
         # evaluate implicit terms
-        f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
+        f_impl_hat = -((self.base_change @ self.L) @ u_hat.flatten()).reshape(u_hat.shape)
 
         if self.spectral_space:
             f.impl[:] = f_impl_hat
