@@ -812,6 +812,13 @@ class SpectralHelper:
       - Direct product of 1D bases to solve problems in more dimensions
       - Distribute the FFTs to facilitate concurrency.
 
+    Beyond distributed FFTs, this class has infrastructure to enable solving the problems thread-parallel. This feature
+    is mainly targeting GPUs. As typical HPC machines have fewer GPUs than CPU cores per node, the problem size per
+    device is usually much larger on GPUs and local parallelism via streams is required to efficiently do linear solves.
+    Beyond the `local_slice` attribute, which allows to identify the local data on an MPI level, the class has an
+    attribute `thread_local_slices`, which is a tuple of the local slices of individual threads which may run
+    concurrently and all matrices are returned as tuples with the local matrices belonging to the respective thread.
+
     Attributes:
         comm (mpi4py.Intracomm): MPI communicator
         debug (bool): Perform additional checks at extra computational cost
@@ -828,6 +835,7 @@ class SpectralHelper:
         rhs_BCs_hat (self.xp.ndarray): Boundary conditions in spectral space
         global_shape (tuple): Global shape of the solution as in `mpi4py-fft`
         local_slice (slice): Local slice of the solution as in `mpi4py-fft`
+        thread_local_slices (tuple): Tuple of slices with thread-local data
         fft_obj: When using distributed FFTs, this will be a parallel transform object from `mpi4py-fft`
         init (tuple): This is the same `init` that is used throughout the problem classes
         init_forward (tuple): This is the equivalent of `init` in spectral space
@@ -858,17 +866,19 @@ class SpectralHelper:
 
         cls.dtype = cupy_mesh
 
-    def __init__(self, comm=None, useGPU=False, debug=False):
+    def __init__(self, comm=None, useGPU=False, num_threads=1, debug=False):
         """
         Constructor
 
         Args:
             comm (mpi4py.Intracomm): MPI communicator
             useGPU (bool): Whether to use GPUs
+            num_treads (int): Number of local threads
             debug (bool): Perform additional checks at extra computational cost
         """
         self.comm = comm
         self.debug = debug
+        self.num_threads = num_threads
         self.useGPU = useGPU
 
         if useGPU:
@@ -987,7 +997,29 @@ class SpectralHelper:
         O = self.get_Id() * 0
         return [[O for _ in range(S)] for _ in range(S)]
 
-    def get_BC(self, axis, kind, line=-1, scalar=False, **kwargs):
+    def get_thread_local_slices(self, num_threads, axis):
+        """
+        Get slices to construct smaller matrices locally than dictated by the FFT to facilitate thread parallelism
+
+        Args:
+            num_threads (int): Number of threads you want to use
+            axis (int): Axis along which you want to parallelize
+
+        Returns:
+            list of slices
+        """
+        s = self.local_slice[axis]
+        local_size = s.stop - s.start
+        assert (
+            num_threads <= local_size
+        ), f'Cannot thread parallelize along axis {axis} with more than {local_size} tasks, you requested {num_threads}.'
+        thread_size = local_size // num_threads
+        starts = [s.start + thread_size * i for i in range(num_threads)]
+        return tuple(
+            [slice(starts[i], starts[i] + thread_size) for i in range(num_threads - 1)] + [slice(starts[-1], s.stop)]
+        )
+
+    def get_BC(self, axis, kind, line=-1, scalar=False, local_slice=None, **kwargs):
         """
         Use this method for boundary bordering. It gets the respective matrix row and embeds it into a matrix.
         Pay attention that if you have multiple BCs in a single equation, you need to put them in different lines.
@@ -999,6 +1031,7 @@ class SpectralHelper:
             kind (str): kind of BC, e.g. Dirichlet
             line (int): Line you want the BC to go in
             scalar (bool): Put the BC in all space positions in the other direction
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
 
         Returns:
             sparse matrix containing the BC
@@ -1024,7 +1057,7 @@ class SpectralHelper:
             else:
                 _Id = self.axes[axis2].get_Id()
 
-            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id() @ _Id, axis=axis2)
+            Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id() @ _Id, axis=axis2, local_slice=local_slice)
 
             if self.useGPU:
                 Id = Id.get()
@@ -1032,11 +1065,11 @@ class SpectralHelper:
             mats = [
                 None,
             ] * ndim
-            mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
+            mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis, local_slice=local_slice)
             mats[axis2] = Id
             return self.sparse_lib.csc_matrix(sp.kron(*mats))
 
-    def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, **kwargs):
+    def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, local_slice=None, **kwargs):
         """
         Remove a BC from the matrix. This is useful e.g. when you add a non-scalar BC and then need to selectively
         remove single BCs again, as in incompressible Navier-Stokes, for instance.
@@ -1050,9 +1083,11 @@ class SpectralHelper:
             v: Value of the BC
             line (int): Line you want the BC to go in
             scalar (bool): Put the BC in all space positions in the other direction
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
         """
         _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] -= _BC
+        local_slice = self.local_slice if local_slice is None else local_slice
 
         if scalar:
             slices = [self.index(equation)] + [
@@ -1067,10 +1102,10 @@ class SpectralHelper:
                 + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
             )
         N = self.axes[axis].N
-        if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
+        if (N + line) % N in self.xp.arange(N)[local_slice[axis]]:
             self.BC_rhs_mask[(*slices,)] = False
 
-    def add_BC(self, component, equation, axis, kind, v, line=-1, scalar=False, **kwargs):
+    def add_BC(self, component, equation, axis, kind, v, line=-1, scalar=False, local_slice=None, **kwargs):
         """
         Add a BC to the matrix. Note that you need to convert the list of lists of BCs that this method generates to a
         single sparse matrix by calling `setup_BCs` after adding/removing all BCs.
@@ -1084,9 +1119,12 @@ class SpectralHelper:
             v: Value of the BC
             line (int): Line you want the BC to go in
             scalar (bool): Put the BC in all space positions in the other direction
+            local_slice (slice): Local slice of the solution as in `mpi4py-fft`
         """
         _BC = self.get_BC(axis=axis, kind=kind, line=line, scalar=scalar, **kwargs)
         self.BC_mat[self.index(equation)][self.index(component)] += _BC
+        local_slice = self.local_slice if local_slice is None else local_slice
+
         self.full_BCs += [
             {
                 'component': component,
@@ -1118,8 +1156,8 @@ class SpectralHelper:
                 + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
             )
             N = self.axes[axis].N
-            if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                slices[axis + 1] -= self.local_slice[axis].start
+            if (N + line) % N in self.xp.arange(N)[local_slice[axis]]:
+                slices[axis + 1] -= local_slice[axis].start
                 self.BC_rhs_mask[(*slices,)] = True
 
     def setup_BCs(self):
@@ -1175,18 +1213,20 @@ class SpectralHelper:
         """
         return self.BC_line_zero_matrix @ A + self.BCs
 
-    def put_BCs_in_rhs_hat(self, rhs_hat):
+    def put_BCs_in_rhs_hat(self, rhs_hat, local_slice=None):
         """
         Put the BCs in the right hand side in spectral space for solving.
         This function needs no transforms.
 
         Args:
             rhs_hat: Right hand side in spectral space
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
 
         Returns:
             rhs in spectral space with BCs
         """
         ndim = self.ndim
+        local_slice = self.local_slice if local_slice is None else local_slice
 
         for axis in range(ndim):
             for bc in self.full_BCs:
@@ -1198,13 +1238,13 @@ class SpectralHelper:
                 if axis == bc['axis']:
                     _slice = [self.index(bc['equation'])] + slices
                     N = self.axes[axis].N
-                    if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                        _slice[axis + 1] -= self.local_slice[axis].start
+                    if (N + bc['line']) % N in self.xp.arange(N)[local_slice[axis]]:
+                        _slice[axis + 1] -= local_slice[axis].start
                         rhs_hat[(*_slice,)] = 0
 
         return rhs_hat + self.rhs_BCs_hat
 
-    def put_BCs_in_rhs(self, rhs):
+    def put_BCs_in_rhs(self, rhs, local_slice=None):
         """
         Put the BCs in the right hand side for solving.
         This function will transform along each axis individually and add all BCs in that axis.
@@ -1212,11 +1252,13 @@ class SpectralHelper:
 
         Args:
             rhs: Right hand side in physical space
+            local_slice (slice): Local slice of the solution as in `mpi4py-fft`
 
         Returns:
             rhs in physical space with BCs
         """
         assert rhs.ndim > 1, 'rhs must not be flattened here!'
+        local_slice = self.local_slice if local_slice is None else local_slice
 
         ndim = self.ndim
 
@@ -1233,8 +1275,8 @@ class SpectralHelper:
                     _slice = [self.index(bc['equation'])] + slices
 
                     N = self.axes[axis].N
-                    if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                        _slice[axis + 1] -= self.local_slice[axis].start
+                    if (N + bc['line']) % N in self.xp.arange(N)[local_slice[axis]]:
+                        _slice[axis + 1] -= local_slice[axis].start
 
                         _rhs_hat[(*_slice,)] = bc['v']
 
@@ -1297,18 +1339,32 @@ class SpectralHelper:
         else:
             return self.sparse_lib.bmat(M, format='csc')
 
-    def get_wavenumbers(self):
+    def get_wavenumbers(self, local_slice=None):
         """
         Get grid in spectral space
+
+        Args:
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
+
+        Returns:
+            ndarray: Grid in spectral space
         """
-        grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
+        local_slice = self.local_slice if local_slice is None else local_slice
+        grids = [self.axes[i].get_wavenumbers()[local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
-    def get_grid(self):
+    def get_grid(self, local_slice=None):
         """
         Get grid in physical space
+
+        Args:
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
+
+        Returns:
+            ndarray: Grid in physical space
         """
-        grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
+        local_slice = self.local_slice if local_slice is None else local_slice
+        grids = [self.axes[i].get_1dgrid()[local_slice[i]] for i in range(len(self.axes))][::-1]
         return self.xp.meshgrid(*grids)
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None):
@@ -1816,7 +1872,7 @@ class SpectralHelper:
 
         return self.xp.stack(result)
 
-    def get_local_slice_of_1D_matrix(self, M, axis):
+    def get_local_slice_of_1D_matrix(self, M, axis, local_slice=None):
         """
         Get the local version of a 1D matrix. When using distributed FFTs, each rank will carry only a subset of modes,
         which you can sort out via the `SpectralHelper.local_slice` attribute. When constructing a 1D matrix, you can
@@ -1825,11 +1881,13 @@ class SpectralHelper:
         Args:
             M (sparse matrix): Global 1D matrix you want to get the local version of
             axis (int): Direction in which you want the local version. You will get the global matrix in other directions. This means slab decomposition only.
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
 
         Returns:
             sparse local matrix
         """
-        return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]
+        local_slice = self.local_slice if local_slice is None else local_slice
+        return M.tocsc()[local_slice[axis], local_slice[axis]]
 
     def get_filter_matrix(self, axis, **kwargs):
         """
@@ -1856,35 +1914,9 @@ class SpectralHelper:
         Returns:
             sparse differentiation matrix
         """
-        sp = self.sparse_lib
-        ndim = self.ndim
+        return self.get_local_ND_matrix('get_differentiation_matrix', axes, **kwargs)
 
-        if ndim == 1:
-            D = self.axes[0].get_differentiation_matrix(**kwargs)
-        elif ndim == 2:
-            for axis in axes:
-                axis2 = (axis + 1) % ndim
-                D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
-
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(D1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-                if axis == axes[0]:
-                    D = sp.kron(*mats)
-                else:
-                    D = D @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Differentiation matrix not implemented for {ndim} dimension!')
-
-        return D
-
-    def get_integration_matrix(self, axes):
+    def get_integration_matrix(self, axes, **kwargs):
         """
         Get integration matrix to integrate along specified axis.
 
@@ -1894,65 +1926,18 @@ class SpectralHelper:
         Returns:
             sparse integration matrix
         """
-        sp = self.sparse_lib
-        ndim = len(self.axes)
+        return self.get_local_ND_matrix('get_integration_matrix', axes, **kwargs)
 
-        if ndim == 1:
-            S = self.axes[0].get_integration_matrix()
-        elif ndim == 2:
-            for axis in axes:
-                axis2 = (axis + 1) % ndim
-                S1D = self.axes[axis].get_integration_matrix()
-
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(S1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-                if axis == axes[0]:
-                    S = sp.kron(*mats)
-                else:
-                    S = S @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
-
-        return S
-
-    def get_Id(self):
+    def get_Id(self, **kwargs):
         """
         Get identity matrix
 
         Returns:
             sparse identity matrix
         """
-        sp = self.sparse_lib
-        ndim = self.ndim
-        I = sp.eye(np.prod(self.init[0][1:]), dtype=complex)
+        return self.get_local_ND_matrix('get_Id', **kwargs)
 
-        if ndim == 1:
-            I = self.axes[0].get_Id()
-        elif ndim == 2:
-            for axis in range(ndim):
-                axis2 = (axis + 1) % ndim
-                I1D = self.axes[axis].get_Id()
-
-                I1D2 = sp.eye(self.axes[axis2].N)
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D2, axis2)
-
-                I = I @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
-
-        return I
-
-    def get_Dirichlet_recombination_matrix(self, axis=-1):
+    def get_Dirichlet_recombination_matrix(self, axis=-1, **kwargs):
         """
         Get Dirichlet recombination matrix along axis. Not that it only makes sense in directions discretized with variations of Chebychev bases.
 
@@ -1962,64 +1947,53 @@ class SpectralHelper:
         Returns:
             sparse matrix
         """
-        sp = self.sparse_lib
-        ndim = len(self.axes)
+        return self.get_local_ND_matrix('get_Dirichlet_recombination_matrix', axis=axis, **kwargs)
 
-        if ndim == 1:
-            C = self.axes[0].get_Dirichlet_recombination_matrix()
-        elif ndim == 2:
-            axis2 = (axis + 1) % ndim
-            C1D = self.axes[axis].get_Dirichlet_recombination_matrix()
-
-            I1D = self.axes[axis2].get_Id()
-
-            mats = [None] * ndim
-            mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
-            mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-            C = sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
-
-        return C
-
-    def get_basis_change_matrix(self, axes=None, **kwargs):
+    def get_basis_change_matrix(self, **kwargs):
         """
         Some spectral bases do a change between bases while differentiating. This method returns matrices that changes the basis to whatever you want.
         Refer to the methods of the same name of the 1D bases to learn what parameters you need to pass here as `kwargs`.
 
-        Args:
-            axes (tuple): Axes along which to change basis.
-
         Returns:
             sparse basis change matrix
         """
-        axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
+        return self.get_local_ND_matrix('get_basis_change_matrix', **kwargs)
 
+    def get_local_ND_matrix(self, function_name, axes=None, local_slice=None, **kwargs):
+        """
+        Construct ND matrix from 1D matrices.
+
+        Args:
+            function_name (str): Name of a function that returns a 1D matrix from the 1D bases.
+            axes (tuple): Axes along which to use the function.
+            local_slice (tuple, optional): Optionally supply a different local slice than the one given by the FFT library
+
+        Returns:
+            sparse ND version of the matrix
+        """
         sp = self.sparse_lib
-        ndim = len(self.axes)
+        ndim = self.ndim
+
+        axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
+        local_slice = self.local_slice if local_slice is None else local_slice
+
+        M = sp.eye(np.prod(self.init[0][1:]), dtype=complex)
 
         if ndim == 1:
-            C = self.axes[0].get_basis_change_matrix(**kwargs)
+            M = getattr(self.axes[0], function_name)(**kwargs)
         elif ndim == 2:
             for axis in axes:
                 axis2 = (axis + 1) % ndim
-                C1D = self.axes[axis].get_basis_change_matrix(**kwargs)
 
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
+                M1D = getattr(self.axes[axis], function_name)(**kwargs)
+                I1D = self.axes[axis2].get_Id()
 
                 mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
+                mats[axis] = self.get_local_slice_of_1D_matrix(M1D, axis, local_slice=local_slice)
+                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2, local_slice=local_slice)
 
-                if axis == axes[0]:
-                    C = sp.kron(*mats)
-                else:
-                    C = C @ sp.kron(*mats)
+                M = M @ sp.kron(*mats)
         else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
+            raise NotImplementedError(f'Matrices not implemented in {ndim} dimensions!')
 
-        return C
+        return M

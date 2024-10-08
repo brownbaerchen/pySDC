@@ -70,7 +70,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useMPI=False, *
 
     Z, X = helper.get_grid()
     conv = helper.get_basis_change_matrix()
-    D = helper.get_differentiation_matrix(axes)
+    D = helper.get_differentiation_matrix(axes=axes)
 
     u = helper.u_init
 
@@ -551,6 +551,37 @@ def test_dealias_MPI(num_procs, axis, bx, bz, nx=32, nz=64, **kwargs):
     run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, nz=nz, bx=bx, bz=bz, test='dealias')
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('num_threads', [1, 5, 10])
+def test_threading(num_threads, nx=10, nz=8, useMPI=False):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis(base='fft', N=nx)
+    helper.add_axis(base='gegenbauer', N=nz)
+    helper.setup_fft()
+    thread_local_slices = helper.get_thread_local_slices(num_threads, axis=0)
+
+    print(comm.rank, thread_local_slices, helper.local_slice)
+
+    u = helper.u_init
+    for s in thread_local_slices:
+        u[s] += 1
+
+    if comm:
+        u = comm.allreduce(u)
+
+    assert helper.xp.allclose(u, 1)
+
+
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
     str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
@@ -585,9 +616,10 @@ if __name__ == '__main__':
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', (-1, -2))
+        test_threading(2, useMPI=True)
     else:
         raise NotImplementedError
     print('done')
