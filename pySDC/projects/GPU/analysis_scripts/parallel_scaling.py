@@ -52,8 +52,10 @@ class ScalingConfig(object):
 
             write_jobscript(sbatch_options, srun_options, command, self.cluster)
 
-    def plot_scaling_test(self, strong, ax, plot_ideal=False, **plotting_params):  # pragma: no cover
+    def plot_scaling_test(self, strong, ax, plot_ideal=False, plot_range=False, **plotting_params):  # pragma: no cover
         timings = {}
+        max_timings = []
+        min_timings = []
 
         max_steps = self.max_steps_space if strong else self.max_steps_space_weak
         for i in range(max_steps):
@@ -70,11 +72,18 @@ class ScalingConfig(object):
 
                 timing_step = get_sorted(stats, type='timing_step')
 
-                timings[np.prod(procs) / self.tasks_per_node] = np.mean([me[1] for me in timing_step])
+                key = np.prod(procs) / self.tasks_per_node
+                timings[key] = np.mean([me[1] for me in timing_step])
+                max_timings += [np.max([me[1] for me in timing_step]) - timings[key]]
+                min_timings += [timings[key] - np.min([me[1] for me in timing_step])]
             except FileNotFoundError:
                 pass
 
-        ax.loglog(timings.keys(), timings.values(), **plotting_params)
+        if plot_range:
+            yerr = [min_timings, max_timings]
+            ax.errorbar(timings.keys(), timings.values(), yerr=yerr, **plotting_params)
+        else:
+            ax.loglog(timings.keys(), timings.values(), **plotting_params)
         if plot_ideal:
             ax.loglog(
                 timings.keys(),
@@ -202,6 +211,7 @@ def plot_scalings(strong, problem, kwargs):  # pragma: no cover
     for config, params in zip(configs, plottings_params):
         config.plot_scaling_test(strong=strong, ax=ax, **params)
     ax.legend(frameon=False)
+    plt.show()
     fig.savefig(f'{PROJECT_PATH}/plots/{"strong" if strong else "weak"}_scaling_{problem}.pdf', bbox_inches='tight')
 
 

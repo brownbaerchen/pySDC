@@ -1563,12 +1563,14 @@ class SpectralHelper:
             if self.comm is not None:
                 _out *= np.prod([self.axes[i].N for i in _axes])
 
-            axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            # axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            axes_next_base = (axes_collapsed + [(-1,)])[trf + 1]
             alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[-1]
             result = self.get_aligned(
                 _out, axis_in=self.ndim + _axes[0], axis_out=alignment, fft=fft, forward=True, shape=shape
             )
 
+        return result
         fft = self.get_fft(axes=axes, padding=padding)
         return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft, forward=True, shape=shape)
 
@@ -1723,12 +1725,14 @@ class SpectralHelper:
                 else:
                     shape[_ax] = _out.shape[_ax]
 
-            axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            # axes_next_base = axes_collapsed[(trf + 1) % len(axes_collapsed)]
+            axes_next_base = (axes_collapsed + [(-1,)])[trf + 1]
             alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[0]
             result = self.get_aligned(
                 _out, axis_in=self.ndim + _axes[-1], axis_out=alignment, fft=fft, forward=False, shape=shape
             )
 
+        return result
         fft = self.get_fft(axes=axes, padding=padding)
         return self.get_aligned(result, axis_in=alignment, axis_out=self.ndim - 1, fft=fft, shape=shape)
 
@@ -1748,12 +1752,13 @@ class SpectralHelper:
         Returns:
             solution aligned on `axis_in`
         """
+        # if self.comm.rank == 0:
+        #     print(axis_in, axis_out, forward, flush=True)
+        #     breakpoint()
         if self.comm is None or axis_in == axis_out:
             return u.copy()
         if self.comm.size == 1:
             return u.copy()
-
-        fft = self.get_fft(**kwargs) if fft is None else fft
 
         global_fft = self.get_fft(**kwargs)
         axisA = [me.axisA for me in global_fft.transfer]
@@ -1791,6 +1796,8 @@ class SpectralHelper:
             return u
         else:  # go the potentially slower route of not reusing transfer classes
             from mpi4py_fft import newDistArray
+
+            fft = self.get_fft(**kwargs) if fft is None else fft
 
             _in = newDistArray(fft, forward).redistribute(axis_in)
             _in[...] = u
