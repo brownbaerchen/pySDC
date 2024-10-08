@@ -2,7 +2,6 @@ from pySDC.core.problem import Problem, WorkCounter
 from pySDC.helpers.spectral_helper import SpectralHelper
 import numpy as np
 from pySDC.core.errors import ParameterError
-import nvtx
 
 
 class GenericSpectralLinear(Problem):
@@ -208,8 +207,6 @@ class GenericSpectralLinear(Problem):
         Pr_lhs = {comp: {comp: _Pr} for comp in self.components}
         self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
-    
-    @nvtx.annotate('solve_system')
     def solve_system(self, rhs, dt, u0=None, *args, skip_itransform=False, **kwargs):
         """
         Do an implicit Euler step to solve M u_t + Lu = rhs, with M the mass matrix and L the linear operator as setup by
@@ -234,12 +231,8 @@ class GenericSpectralLinear(Problem):
         rhs_hat = self.Pl @ rhs_hat.flatten()
 
         if dt not in self.cached_factorizations.keys():
-            rng = nvtx.start_range(message="build matrix", color="orange")
             A = self.M + dt * self.L
-            nvtx.end_range(rng)
-            rng = nvtx.start_range(message="put BCs in matrix", color="orange")
             A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
-            nvtx.end_range(rng)
 
         # import numpy as np
         # if A.shape[0] < 200:
@@ -255,18 +248,14 @@ class GenericSpectralLinear(Problem):
 
         if self.solver_type.lower() == 'cached_direct':
             if dt not in self.cached_factorizations.keys():
-                rng = nvtx.start_range(message="factorize matrix", color="blue")
                 if len(self.cached_factorizations) >= self.max_cached_factorizations:
                     self.cached_factorizations.pop(list(self.cached_factorizations.keys())[0])
                     self.logger.debug(f'Evicted matrix factorization for {dt=:.6f} from cache')
                 self.cached_factorizations[dt] = self.spectral.linalg.factorized(A)
                 self.logger.debug(f'Cached matrix factorization for {dt=:.6f}')
                 self.work_counters['factorizations']()
-                nvtx.end_range(rng)
 
-            rng = nvtx.start_range(message="invert factorized matrix", color="blue")
             _sol_hat = self.cached_factorizations[dt](rhs_hat)
-            nvtx.end_range(rng)
             self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
 
         elif self.solver_type.lower() == 'direct':
