@@ -137,6 +137,22 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, ScalingConfig):
     tasks_time = 3
 
 
+class RayleighBenardDedalusComparison(CPUConfig, ScalingConfig):
+    base_resolution = 256
+    config = 'RBC_Tibo'
+    max_steps_space = 6
+    tasks_time = 4
+
+
+class RayleighBenardDedalusComparisonGPU(GPUConfig, ScalingConfig):
+    base_resolution_weak = 256
+    base_resolution = 256
+    config = 'RBC_Tibo'
+    max_steps_space = 4
+    max_steps_space_weak = 4
+    tasks_time = 4
+
+
 def plot_scalings(strong, problem, kwargs):  # pragma: no cover
     fig, ax = plt.subplots()
     if problem == 'GS':
@@ -165,6 +181,19 @@ def plot_scalings(strong, problem, kwargs):  # pragma: no cover
             RayleighBenardSpaceScalingCPU(space_time_parallel=True),
             RayleighBenardSpaceScalingGPU(space_time_parallel=False),
             RayleighBenardSpaceScalingGPU(space_time_parallel=True),
+        ]
+    elif problem == 'RBC_dedalus':
+        plottings_params = [
+            {'plot_ideal': strong, 'marker': 'x', 'label': 'CPU'},
+            {'marker': '>', 'label': 'CPU space time parallel'},
+            {'marker': '^', 'label': 'GPU'},
+            {'marker': 'o', 'label': 'GPU space time parallel'},
+        ]
+        configs = [
+            RayleighBenardDedalusComparison(space_time_parallel=False),
+            RayleighBenardDedalusComparison(space_time_parallel=True),
+            RayleighBenardDedalusComparisonGPU(space_time_parallel=False),
+            RayleighBenardDedalusComparisonGPU(space_time_parallel=True),
         ]
 
     else:
@@ -200,6 +229,11 @@ if __name__ == '__main__':
             configClass = RayleighBenardSpaceScalingCPU
         else:
             configClass = RayleighBenardSpaceScalingGPU
+    elif args.problem == 'RBC_dedalus':
+        if args.XPU == 'CPU':
+            configClass = RayleighBenardDedalusComparison
+        else:
+            configClass = RayleighBenardDedalusComparisonGPU
     else:
         raise NotImplementedError(f'Don\'t know problem {args.problem!r}')
 
