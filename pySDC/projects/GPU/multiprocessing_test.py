@@ -24,16 +24,23 @@ class MySuperLU:
         self.U = U
         self.perm_r = perm_r
         self.perm_c = perm_c
+        self.Pl = sp.csc_matrix((np.ones(self.shape[0]), (np.arange(self.shape[0]), self.perm_c)))
+        self.Pr = sp.csc_matrix((np.ones(self.shape[0]), (self.perm_r, np.arange(self.shape[0]))))
 
     def solve(self, b):
-        self.Pr = sp.csc_matrix((np.ones(self.shape[0]), (self.perm_r, np.arange(self.shape[0]))))
-        self.Pl = sp.csc_matrix((np.ones(self.shape[0]), (np.arange(self.shape[0]), self.perm_c)))
         y = spsolve_triangular(self.L, self.Pr @ b)
         z = spsolve_triangular(self.U, y, lower=False)
         return self.Pl @ z
 
     def __call__(self, b):
         return self.solve(b)
+
+    # def __reduce__(self):
+    #     t0 = perf_counter()
+    #     reduced = super().__reduce__()
+    #     t1 = perf_counter()
+    #     print(f'Needed {t1-t0}s for pickling')
+    #     return reduced
 
 
 def my_factorized(M):
@@ -86,6 +93,8 @@ def single_test(num_threads, nx=512, useMP=True):
     t0 = perf_counter()
     if pool:
         solvers = pool.map(my_factorized, M)
+        # _solvers = [pool.apply_async(my_factorized, args=(M[i],)) for i in range(num_threads)]
+        # solvers = [me.get() for me in _solvers]
     else:
         solvers = tuple(
             [
