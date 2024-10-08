@@ -1178,7 +1178,7 @@ class SpectralHelper:
     def put_BCs_in_rhs_hat(self, rhs_hat, zero_only=False):
         """
         Put the BCs in the right hand side in spectral space for solving.
-        This function needs no transforms.
+        This function needs no transforms and caches a mask for faster subsequent use.
 
         Args:
             rhs_hat: Right hand side in spectral space
@@ -1186,14 +1186,14 @@ class SpectralHelper:
         Returns:
             rhs in spectral space with BCs
         """
-        ndim = self.ndim
-
-        if hasattr(self, '_rhs_hat_zero_mask'):
-            rhs_hat[self._rhs_hat_zero_mask] = 0
-        else:
+        if not hasattr(self, '_rhs_hat_zero_mask'):
+            """
+            Generate a mask where we need to set values in the rhs in spectral space to zero, such that can replace them
+            by the boundary conditions. The mask is then cached.
+            """
             self._rhs_hat_zero_mask = self.xp.zeros(shape=rhs_hat.shape, dtype=bool)
 
-            for axis in range(ndim):
+            for axis in range(self.ndim):
                 for bc in self.full_BCs:
                     slices = (
                         [slice(0, self.init[0][i + 1]) for i in range(axis)]
@@ -1206,6 +1206,8 @@ class SpectralHelper:
                         if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
                             _slice[axis + 1] -= self.local_slice[axis].start
                             self._rhs_hat_zero_mask[(*_slice,)] = True
+
+        rhs_hat[self._rhs_hat_zero_mask] = 0
 
         if zero_only:
             return rhs_hat
