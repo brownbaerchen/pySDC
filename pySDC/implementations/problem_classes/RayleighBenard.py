@@ -200,10 +200,11 @@ class RayleighBenard(GenericSpectralLinear):
         else:
             f.impl[:] = self.itransform(f_impl_hat).real
 
+        # -------------------------------------------
         # treat convection explicitly with dealiasing
         if not hasattr(self, '_Dx_expanded'):
-            self._Dx_expanded = self._setup_operator({'u': {'u': Dx}, 'v': {'v':Dx}, 'T': {'T': Dx}, 'p': {}})
-            self._Dz_expanded = self._setup_operator({'u': {'u': Dz}, 'v': {'v':Dz}, 'T': {'T': Dz}, 'p': {}})
+            self._Dx_expanded = self._setup_operator({'u': {'u': Dx}, 'v': {'v': Dx}, 'T': {'T': Dx}, 'p': {}})
+            self._Dz_expanded = self._setup_operator({'u': {'u': Dz}, 'v': {'v': Dz}, 'T': {'T': Dz}, 'p': {}})
         Dx_u_hat = (self._Dx_expanded @ u_hat.flatten()).reshape(u_hat.shape)
         Dz_u_hat = (self._Dz_expanded @ u_hat.flatten()).reshape(u_hat.shape)
 
