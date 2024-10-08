@@ -29,6 +29,8 @@ def get_config(args):
         return RayleighBenard_Thibaut_HighRes(args)
     elif name == 'RBC_scaling':
         return RayleighBenard_scaling(args)
+    elif name == 'RBC_prof':
+        return RayleighBenard_profiling(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -445,7 +447,7 @@ class RayleighBenardDedalusComp(RayleighBenardRK):
 
 
 class RayleighBenard_scaling(RayleighBenardRegular):
-    Tend = 8
+    Tend = 13
 
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
@@ -467,3 +469,7 @@ class RayleighBenard_scaling(RayleighBenardRegular):
         params = super().get_controller_params(*args, **kwargs)
         params['hook_class'] = [LogWork]
         return params
+
+
+class RayleighBenard_profiling(RayleighBenard_scaling):
+    Tend = 3

@@ -12,13 +12,14 @@ def get_problem(nz, useGPU):
 
 def time_eval_f(prob):
     u = prob.u_exact(0)
+    prob.eval_f(u)
 
+    prob.comm.Barrier()
     t0 = time.perf_counter()
 
     prob.eval_f(u)
 
     prob.comm.Barrier()
-
     t1 = time.perf_counter()
 
     elapsed_time = t1 - t0
@@ -34,12 +35,12 @@ def time_solve_system(prob, use_cache=False):
     else:
         prob.solve_system(u, dt)
 
+    prob.comm.Barrier()
     t0 = time.perf_counter()
 
     prob.solve_system(u, dt)
 
     prob.comm.Barrier()
-
     t1 = time.perf_counter()
 
     elapsed_time = t1 - t0

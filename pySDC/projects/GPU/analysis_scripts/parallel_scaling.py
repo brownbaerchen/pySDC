@@ -145,22 +145,26 @@ def plot_scalings(strong, problem, kwargs):  # pragma: no cover
             {'plot_ideal': strong, 'marker': 'x', 'label': 'CPU'},
             {'marker': '>', 'label': 'CPU space time parallel'},
             {'marker': '^', 'label': 'GPU'},
+            {'marker': 'o', 'label': 'GPU space time parallel'},
         ]
         configs = [
             GrayScottSpaceScalingCPU(space_time_parallel=False),
             GrayScottSpaceScalingCPU(space_time_parallel=True),
             GrayScottSpaceScalingGPU(space_time_parallel=False),
+            GrayScottSpaceScalingGPU(space_time_parallel=True),
         ]
     elif problem == 'RBC':
         plottings_params = [
             {'plot_ideal': strong, 'marker': 'x', 'label': 'CPU'},
             {'marker': '>', 'label': 'CPU space time parallel'},
             {'marker': '^', 'label': 'GPU'},
+            {'marker': 'o', 'label': 'GPU space time parallel'},
         ]
         configs = [
             RayleighBenardSpaceScalingCPU(space_time_parallel=False),
             RayleighBenardSpaceScalingCPU(space_time_parallel=True),
             RayleighBenardSpaceScalingGPU(space_time_parallel=False),
+            RayleighBenardSpaceScalingGPU(space_time_parallel=True),
         ]
 
     else:
