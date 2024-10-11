@@ -13,6 +13,8 @@ def get_config(args):
         return RayleighBenard_k_adaptivity(args)
     elif name == 'RBC_dt_k':
         return RayleighBenard_dt_k_adaptivity(args)
+    elif name == 'RBC_dt_k_inc':
+        return RayleighBenard_dt_k_adaptivity_increment(args)
     elif name == 'RBC_HR':
         return RayleighBenardHighResolution(args)
     elif name == 'RBC_dt_HR':
@@ -31,6 +33,16 @@ def get_config(args):
         return RayleighBenard_scaling(args)
     elif name == 'RBC_prof':
         return RayleighBenard_profiling(args)
+    elif name == 'RBC_dt_00':
+        return RBC_dt_min_slope00(args)
+    elif name == 'RBC_dt_01':
+        return RBC_dt_min_slope01(args)
+    elif name == 'RBC_dt_02':
+        return RBC_dt_min_slope02(args)
+    elif name == 'RBC_dt_03':
+        return RBC_dt_min_slope03(args)
+    elif name == 'RBC_dt_10':
+        return RBC_dt_min_slope10(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -260,6 +272,20 @@ class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
         return controller_params
 
 
+class RayleighBenard_dt_k_adaptivity_increment(RayleighBenard_dt_k_adaptivity):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import SpaceAdaptivity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['restol'] = -1
+        desc['level_params']['e_tol'] = 1e-5
+        desc['problem_params']['nx'] //= 2
+        desc['problem_params']['nz'] //= 2
+
+        desc['convergence_controllers'].pop(SpaceAdaptivity)
+        return desc
+
+
 class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
@@ -267,7 +293,7 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
+        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.2}
         desc['convergence_controllers'].pop(CFLLimit)
         desc['level_params']['restol'] = -1
         desc['sweeper_params']['num_nodes'] = 3
@@ -473,3 +499,58 @@ class RayleighBenard_scaling(RayleighBenardRegular):
 
 class RayleighBenard_profiling(RayleighBenard_scaling):
     Tend = 3
+
+
+class RBC_dt_min_slope00(RayleighBenard_dt_adaptivity):
+    Tend = 16
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+
+        desc = super().get_description(*args, **kwargs)
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.0}
+        return desc
+
+
+class RBC_dt_min_slope01(RayleighBenard_dt_adaptivity):
+    Tend = 16
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+
+        desc = super().get_description(*args, **kwargs)
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.1}
+        return desc
+
+
+class RBC_dt_min_slope02(RayleighBenard_dt_adaptivity):
+    Tend = 16
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+
+        desc = super().get_description(*args, **kwargs)
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.15}
+        return desc
+
+
+class RBC_dt_min_slope03(RayleighBenard_dt_adaptivity):
+    Tend = 16
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+
+        desc = super().get_description(*args, **kwargs)
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.3}
+        return desc
+
+
+class RBC_dt_min_slope10(RayleighBenard_dt_adaptivity):
+    Tend = 16
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+
+        desc = super().get_description(*args, **kwargs)
+        desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 1.0}
+        return desc
