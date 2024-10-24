@@ -21,6 +21,7 @@ from pySDC.projects.Resilience.Lorenz import run_Lorenz
 from pySDC.projects.Resilience.Schroedinger import run_Schroedinger
 from pySDC.projects.Resilience.quench import run_quench
 from pySDC.projects.Resilience.AC import run_AC
+from pySDC.projects.Resilience.RBC import run_RBC
 
 from pySDC.projects.Resilience.strategies import BaseStrategy, AdaptivityStrategy, IterateStrategy, HotRodStrategy
 import logging
@@ -270,8 +271,10 @@ class FaultStats:
                 dat['bit'][i] = faults_run[0][1][4]
                 dat['target'][i] = faults_run[0][1][5]
                 dat['rank'][i] = faults_run[0][1][6]
+
             if crash:
                 print('Code crashed!')
+                dat['error'][i] = np.inf
                 continue
 
             # record the rest of the data
@@ -632,6 +635,8 @@ class FaultStats:
             prob_name = 'Quench'
         elif self.prob.__name__ == 'run_AC':
             prob_name = 'Allen-Cahn'
+        elif self.prob.__name__ == 'run_RBC':
+            prob_name = 'Rayleigh-Benard'
         else:
             raise NotImplementedError(f'Name not implemented for problem {self.prob}')
 
@@ -873,7 +878,7 @@ class FaultStats:
         args=None,
         strategies=None,
         name=None,
-        store=True,
+        store=False,
         ax=None,
         fig=None,
         plotting_args=None,
@@ -930,7 +935,7 @@ class FaultStats:
         return None
 
     def plot_recovery_thresholds(
-        self, strategies=None, thresh_range=None, ax=None, mask=None, **kwargs
+        self, strategies=None, thresh_range=None, ax=None, recoverable_only=False, **kwargs
     ):  # pragma: no cover
         '''
         Plot the recovery rate for a range of thresholds
@@ -939,7 +944,6 @@ class FaultStats:
             strategies (list): List of the strategies you want to plot, if None, all will be plotted
             thresh_range (list): thresholds for deciding whether to accept as recovered
             ax (Matplotlib.axes): Somewhere to plot
-            mask (Numpy.ndarray of shape (n)): The mask you want to know about
 
         Returns:
             None
@@ -958,16 +962,21 @@ class FaultStats:
             fault_free = self.load(strategy=strategy, faults=False)
             with_faults = self.load(strategy=strategy, faults=True)
 
+            if recoverable_only:
+                recoverable_mask = self.get_fixable_faults_only(strategy)
+            else:
+                recoverable_mask = self.get_mask()
+
             for thresh_idx in range(len(thresh_range)):
                 rec_mask = self.get_mask(
                     strategy=strategy,
                     key='error',
                     val=(thresh_range[thresh_idx] * fault_free['error'].mean()),
                     op='gt',
-                    old_mask=mask,
+                    old_mask=recoverable_mask,
                 )
                 rec_rates[strategy_idx][thresh_idx] = 1.0 - len(with_faults['error'][rec_mask]) / len(
-                    with_faults['error']
+                    with_faults['error'][recoverable_mask]
                 )
 
             ax.plot(
@@ -1565,6 +1574,10 @@ def parse_args():
                 kwargs['prob'] = run_Schroedinger
             elif sys.argv[i + 1] == 'run_quench':
                 kwargs['prob'] = run_quench
+            elif sys.argv[i + 1] == 'run_AC':
+                kwargs['prob'] = run_AC
+            elif sys.argv[i + 1] == 'run_RBC':
+                kwargs['prob'] = run_RBC
             else:
                 raise NotImplementedError
         elif 'num_procs' in sys.argv[i]:
@@ -1654,11 +1667,11 @@ def compare_adaptivity_modes():
 
 def main():
     kwargs = {
-        'prob': run_AC,
+        'prob': run_RBC,
         'num_procs': 1,
         'mode': 'default',
         'runs': 2000,
-        'reload': True,
+        'reload': False,
         **parse_args(),
     }
 
@@ -1682,7 +1695,7 @@ def main():
         stats_path='data/stats-jusuf',
         **kwargs,
     )
-    stats_analyser.run_stats_generation(runs=kwargs['runs'], step=12)
+    stats_analyser.run_stats_generation(runs=kwargs['runs'], step=25)
 
     if MPI.COMM_WORLD.rank > 0:  # make sure only one rank accesses the data
         return None

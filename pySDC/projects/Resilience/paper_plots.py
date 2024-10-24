@@ -9,6 +9,7 @@ from pySDC.projects.Resilience.fault_stats import (
     run_vdp,
     run_quench,
     run_AC,
+    run_RBC,
     RECOVERY_THRESH_ABS,
 )
 from pySDC.projects.Resilience.strategies import (
@@ -19,6 +20,7 @@ from pySDC.projects.Resilience.strategies import (
     DIRKStrategy,
     ERKStrategy,
     AdaptivityPolynomialError,
+    cmap,
 )
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
 from pySDC.helpers.stats_helper import get_sorted
@@ -187,21 +189,24 @@ def plot_recovery_rate_recoverable_only(stats_analyser, fig, ax, **kwargs):  # p
         )
 
 
-def compare_recovery_rate_problems(**kwargs):  # pragma: no cover
+def compare_recovery_rate_problems(target='resilience', **kwargs):  # pragma: no cover
     """
-    Compare the recovery rate for vdP, Lorenz and Schroedinger problems.
+    Compare the recovery rate for various problems.
     Only faults that can be recovered are shown.
 
     Returns:
         None
     """
-    stats = [
-        get_stats(run_vdp, **kwargs),
-        get_stats(run_quench, **kwargs),
-        get_stats(run_Schroedinger, **kwargs),
-        get_stats(run_AC, **kwargs),
-    ]
-    titles = ['Van der Pol', 'Quench', r'Schr\"odinger', 'Allen-Cahn']
+    if target == 'resilience':
+        problems = [run_Lorenz, run_Schroedinger, run_AC, run_RBC]
+        titles = ['Lorenz', r'Schr\"odinger', 'Allen-Cahn', 'Rayleigh-Benard']
+    elif target == 'thesis':
+        problems = [run_vdp, run_Lorenz, run_AC, run_RBC]  # TODO: swap in Gray-Scott
+        titles = ['Van der Pol', 'Lorenz', 'Allen-Cahn', 'Rayleigh-Benard']
+    else:
+        raise NotImplementedError()
+
+    stats = [get_stats(problem, **kwargs) for problem in problems]
 
     my_setup_mpl()
     fig, axs = plt.subplots(2, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.8), sharey=True)
@@ -388,6 +393,102 @@ def plot_fault_vdp(bit=0):  # pragma: no cover
     savefig(fig, f'fault_bit_{bit}')
 
 
+def plot_fault_Lorenz(bit=0):  # pragma: no cover
+    """
+    Make a plot showing the impact of a fault on the Lorenz attractor without any resilience.
+    The faults are inserted in the last iteration in the last node in x such that you can best see the impact.
+
+    Args:
+        bit (int): The bit that you want to flip
+
+    Returns:
+        None
+    """
+    from pySDC.projects.Resilience.fault_stats import (
+        FaultStats,
+        BaseStrategy,
+    )
+    from pySDC.projects.Resilience.hook import LogData
+
+    stats_analyser = FaultStats(
+        prob=run_Lorenz,
+        strategies=[BaseStrategy()],
+        faults=[False, True],
+        reload=True,
+        recovery_thresh=1.1,
+        num_procs=1,
+        mode='combination',
+    )
+
+    strategy = BaseStrategy()
+
+    my_setup_mpl()
+    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.8, 0.5))
+    colors = ['grey', strategy.color, 'magenta']
+    ls = ['--', '-']
+    markers = [None, strategy.marker]
+    do_faults = [False, True]
+    superscripts = ['*', '']
+    labels = ['x', 'x']
+
+    run = 19 + 20 * bit
+
+    for i in range(len(do_faults)):
+        stats, controller, Tend = stats_analyser.single_run(
+            strategy=BaseStrategy(),
+            run=run,
+            faults=do_faults[i],
+            hook_class=[LogData],
+        )
+        u = get_sorted(stats, type='u')
+        faults = get_sorted(stats, type='bitflip')
+        ax.plot(
+            [me[0] for me in u],
+            [me[1][0] for me in u],
+            ls=ls[i],
+            color=colors[i],
+            label=rf'${{{labels[i]}}}^{{{superscripts[i]}}}$',
+            marker=markers[i],
+            markevery=500,
+        )
+        for idx in range(len(faults)):
+            ax.axvline(faults[idx][0], color='black', label='Fault', ls=':')
+            print(
+                f'Fault at t={faults[idx][0]:.2e}, iter={faults[idx][1][1]}, node={faults[idx][1][2]}, space={faults[idx][1][3]}, bit={faults[idx][1][4]}'
+            )
+            ax.set_title(f'Fault in bit {faults[idx][1][4]}')
+
+    ax.legend(frameon=True, loc='lower left')
+    ax.set_xlabel(r'$t$')
+    savefig(fig, f'fault_bit_{bit}')
+
+
+def plot_Lorenz_solution():  # pragma: no cover
+    my_setup_mpl()
+
+    fig, axs = plt.subplots(1, 2, figsize=figsize_by_journal(JOURNAL, 1, 0.4), sharex=True)
+
+    strategy = BaseStrategy()
+    desc = strategy.get_custom_description(run_Lorenz, num_procs=1)
+    stats, controller, _ = run_Lorenz(custom_description=desc, Tend=strategy.get_Tend(run_Lorenz))
+
+    u = get_sorted(stats, recomputed=False, type='u')
+
+    axs[0].plot([me[1][0] for me in u], [me[1][2] for me in u])
+    axs[0].set_ylabel('$z$')
+    axs[0].set_xlabel('$x$')
+
+    axs[1].plot([me[1][0] for me in u], [me[1][1] for me in u])
+    axs[1].set_ylabel('$y$')
+    axs[1].set_xlabel('$x$')
+
+    for ax in axs:
+        ax.set_box_aspect(1.0)
+
+    path = 'data/paper/Lorenz_sol.pdf'
+    fig.savefig(path, bbox_inches='tight', transparent=True, dpi=200)
+
+
 def plot_quench_solution():  # pragma: no cover
     """
     Plot the solution of Quench problem over time
@@ -418,6 +519,42 @@ def plot_quench_solution():  # pragma: no cover
     ax.set_xlabel(r'$t$')
     ax.legend(frameon=False)
     savefig(fig, 'quench_sol')
+
+
+def plot_RBC_solution():  # pragma: no cover
+    """
+    Plot solution of Rayleigh-Benard convection
+    """
+    my_setup_mpl()
+
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    plt.rcParams['figure.constrained_layout.use'] = True
+    fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=figsize_by_journal(JOURNAL, 1.0, 0.45))
+    caxs = []
+    divider = make_axes_locatable(axs[0])
+    caxs += [divider.append_axes('right', size='3%', pad=0.03)]
+    divider2 = make_axes_locatable(axs[1])
+    caxs += [divider2.append_axes('right', size='3%', pad=0.03)]
+
+    from pySDC.projects.Resilience.RBC import RayleighBenard, PROBLEM_PARAMS
+
+    prob = RayleighBenard(**PROBLEM_PARAMS)
+
+    def _plot(t, ax, cax):
+        u_hat = prob.u_exact(t)
+        u = prob.itransform(u_hat)
+        im = ax.pcolormesh(prob.X, prob.Z, u[prob.index('T')], rasterized=True, cmap='plasma')
+        fig.colorbar(im, cax, label=f'$T(t={{{t}}})$')
+
+    _plot(0, axs[0], caxs[0])
+    _plot(21, axs[1], caxs[1])
+
+    axs[1].set_xlabel('$x$')
+    axs[0].set_ylabel('$z$')
+    axs[1].set_ylabel('$z$')
+
+    savefig(fig, 'RBC_sol', tight_layout=False)
 
 
 def plot_Schroedinger_solution():  # pragma: no cover
@@ -546,6 +683,12 @@ def work_precision():  # pragma: no cover
     all_problems(**{**all_params, 'work_key': 'param'}, mode='compare_strategies')
 
 
+def plot_recovery_rate_per_acceptance_threshold(problem):  # pragma no cover
+    stats_analyser = get_stats(problem)
+
+    stats_analyser.plot_recovery_thresholds(thresh_range=np.linspace(0.5, 1.5, 1000), recoverable_only=True)
+
+
 def make_plots_for_TIME_X_website():  # pragma: no cover
     global JOURNAL, BASE_PATH
     JOURNAL = 'JSC_beamer'
@@ -596,10 +739,14 @@ def make_plots_for_adaptivity_paper():  # pragma: no cover
 
 
 def make_plots_for_resilience_paper():  # pragma: no cover
-    plot_recovery_rate(get_stats(run_vdp))
-    plot_fault_vdp(0)
-    plot_fault_vdp(13)
-    compare_recovery_rate_problems(num_procs=1, strategy_type='SDC')
+    plot_Lorenz_solution()
+    plot_fault_Lorenz(0)
+    plot_fault_Lorenz(20)
+    plot_RBC_solution()
+    compare_recovery_rate_problems(target='resilience', num_procs=1, strategy_type='SDC')
+    # plot_recovery_rate(get_stats(run_Lorenz))
+    # plot_recovery_rate_per_acceptance_threshold(run_Lorenz)
+    plt.show()
 
 
 def make_plots_for_notes():  # pragma: no cover
@@ -614,8 +761,37 @@ def make_plots_for_notes():  # pragma: no cover
     analyse_resilience(run_quench, format='png')
 
 
+def make_plots_for_thesis():  # pragma: no cover
+    global JOURNAL
+    JOURNAL = 'TUHH_thesis'
+
+    plot_RBC_solution()
+    # plot_vdp_solution()
+
+    # plot_adaptivity_stuff()
+    compare_recovery_rate_problems(target='thesis', num_procs=1, strategy_type='SDC')
+
+
 if __name__ == "__main__":
-    # make_plots_for_notes()
-    # make_plots_for_SIAM_CSE23()
-    # make_plots_for_TIME_X_website()
-    make_plots_for_adaptivity_paper()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '--target', choices=['adaptivity', 'resilience', 'thesis', 'notes', 'SIAM_CSE23', 'TIME_X_website'], type=str
+    )
+    args = parser.parse_args()
+
+    if args.target == 'adaptivity':
+        make_plots_for_adaptivity_paper()
+    elif args.target == 'resilience':
+        make_plots_for_resilience_paper()
+    elif args.target == 'thesis':
+        make_plots_for_thesis()
+    elif args.target == 'notes':
+        make_plots_for_notes()
+    elif args.target == 'SIAM_CSE23':
+        make_plots_for_SIAM_CSE23()
+    elif args.target == 'TIME_X_website':
+        make_plots_for_TIME_X_website()
+    else:
+        raise NotImplementedError(f'Don\'t know how to make plots for target {args.target}')
