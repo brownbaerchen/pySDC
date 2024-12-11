@@ -121,7 +121,40 @@ def test_PIC(node_type, quad_type, M):
     assert np.all(QDelta == 0), "not a null matrix"
 
 
+@pytest.mark.base
+@pytest.mark.parametrize("M", num_nodes)
+@pytest.mark.parametrize("k", num_nodes)
+def test_MIN_SR_FLEX(M, k):
+    if k > M:
+        return None
+
+    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+    from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
+
+    description = {}
+    description['level_params'] = {'dt': 1.0, 'restol': -1}
+    description['sweeper_params'] = {'num_nodes': M, 'QI': 'MIN-SR-FLEX', 'quad_type': 'RADAU-RIGHT'}
+    description['step_params'] = {
+        'maxiter': k,
+    }
+    description['sweeper_class'] = generic_implicit
+    description['problem_class'] = testequation0d
+    description['problem_params'] = {'lambdas': [[-1]]}
+
+    controller_params = {}
+    controller = controller_nonMPI(1, controller_params, description)
+    u0 = controller.MS[0].levels[0].prob.u_exact(0)
+
+    QI_before = controller.MS[0].levels[0].sweep.QI.copy()
+    controller.run(u0=u0, Tend=1, t0=0)
+    QI_after = controller.MS[0].levels[0].sweep.QI.copy()
+
+    assert np.allclose([QI_before[i, i] / QI_after[i, i] for i in range(1, M + 1)], k)
+
+
 if __name__ == '__main__':
+    test_MIN_SR_FLEX(2, 2)
     test_MIN_SR('LEGENDRE', 'RADAU-RIGHT', 4)
     test_MIN_SR('EQUID', 'LOBATTO', 5)
 

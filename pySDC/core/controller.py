@@ -62,6 +62,10 @@ class Controller(object):
             self.logger.warning('all_to_done and use_iteration_estimator set, will ignore all_to_done')
 
         self.base_convergence_controllers = [CheckConvergence]
+        if description['sweeper_params'].get('QI', None) in ['MIN-SR-FLEX']:
+            from pySDC.implementations.convergence_controller_classes.update_preconditioner import UpdatePreconditioner
+
+            self.base_convergence_controllers += [UpdatePreconditioner]
         self.setup_convergence_controllers(description)
 
     @staticmethod
