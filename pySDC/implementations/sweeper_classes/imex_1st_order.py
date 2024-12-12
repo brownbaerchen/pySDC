@@ -27,12 +27,10 @@ class imex_1st_order(Sweeper):
         if 'QE' not in params:
             params['QE'] = 'EE'
 
-        # call parent's initialization routine
         super().__init__(params)
 
-        # IMEX integration matrices
-        self.QI = self.get_Qdelta_implicit(qd_type=self.params.QI)
-        self.QE = self.get_Qdelta_explicit(qd_type=self.params.QE)
+        self.add_preconditioner(label='QI', name=self.params.QI, implicit=True)
+        self.add_preconditioner(label='QE', name=self.params.QE, implicit=False)
 
     def integrate(self):
         """

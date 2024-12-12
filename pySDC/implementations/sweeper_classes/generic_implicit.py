@@ -20,11 +20,9 @@ class generic_implicit(Sweeper):
         if 'QI' not in params:
             params['QI'] = 'IE'
 
-        # call parent's initialization routine
         super().__init__(params)
 
-        # get QI matrix
-        self.QI = self.get_Qdelta_implicit(qd_type=self.params.QI)
+        self.add_preconditioner(label='QI', name=self.params.QI, implicit=True)
 
     def integrate(self):
         """
@@ -64,9 +62,6 @@ class generic_implicit(Sweeper):
 
         # get number of collocation nodes for easier access
         M = self.coll.num_nodes
-
-        # update the MIN-SR-FLEX preconditioner
-        self.updateVariableCoeffs(L.status.sweep)
 
         # gather all terms which are known already (e.g. from the previous iteration)
         # this corresponds to u0 + QF(u^k) - QdF(u^k) + tau

@@ -8,8 +8,9 @@ from pySDC.core.collocation import CollBase
 from pySDC.helpers.pysdc_helper import FrozenClass
 
 
-# short helper class to add params as attributes
 class _Pars(FrozenClass):
+    """short helper class to add params as attributes"""
+
     def __init__(self, pars):
         self.do_coll_update = False
         self.initial_guess = 'spread'  # default value (see also below)
@@ -20,6 +21,30 @@ class _Pars(FrozenClass):
                 setattr(self, k, v)
 
         self._freeze()
+
+
+class Preconditioner(object):
+    """
+    Short helper class for preconditioners
+
+    Attributes:
+        name (str): Name of the preconditioner, e.g. "LU"
+        label (str): Label of the preconditioner in the sweeper, e.g. "QI"
+        matrix (numpy.ndarray): Preconditioner matrix
+        k (int): Sweep number associated with the preconditioner
+    """
+
+    def __init__(self, name, label, matrix):
+        """
+        Args:
+            name (str): Name of the preconditioner, e.g. "LU"
+            label (str): Label of the preconditioner in the sweeper, e.g. "QI"
+            matrix (numpy.ndarray): Preconditioner matrix
+        """
+        self.name = name
+        self.label = label
+        self.matrix = matrix
+        self.k = 1
 
 
 class Sweeper(object):
@@ -85,6 +110,39 @@ class Sweeper(object):
         self.__level = None
 
         self.parallelizable = False
+        self.preconditioners = {}
+
+    def __getattr__(self, item):
+        if item in self.preconditioners.keys():
+            QD = self.preconditioners[item]
+
+            if QD.name == 'MIN-SR-FLEX' and QD.k != self.level.status.sweep:
+                QD.matrix = self.get_Qdelta_implicit(qd_type='MIN-SR-FLEX', k=self.level.status.sweep)
+                QD.k = self.level.status.sweep
+
+            return QD.matrix
+        else:
+            raise AttributeError(f'{type(self)} has not attribute {item!r}!')
+
+    def add_preconditioner(self, label, name, implicit=True):
+        """
+        Add a preconditioner to the sweeper. It is then accessed by `self.<label>`, which is facilitated via the
+        `__getattr__` method and allows automatic updating between sweeps.
+
+        Args:
+            label (str): Label of the preconditioner in the sweeper, e.g. "QI"
+            name (str): Name of the preconditioner, e.g. "LU"
+            import (bool): Whether the preconditioner is implicit or explicit
+
+        Returns:
+            None
+        """
+        if implicit:
+            matrix = self.get_Qdelta_implicit(name)
+        else:
+            matrix = self.get_Qdelta_explicit(name)
+
+        self.preconditioners[label] = Preconditioner(name=name, label=label, matrix=matrix)
 
     def setupGenerator(self, qd_type):
         coll = self.coll
@@ -263,15 +321,3 @@ class Sweeper(object):
     @property
     def rank(self):
         return 0
-
-    def updateVariableCoeffs(self, k):
-        """
-        Potentially update QDelta implicit coefficients if variable ...
-
-        Parameters
-        ----------
-        k : int
-            Index of the sweep (0 for initial sweep, 1 for the first one, ...).
-        """
-        if self.params.QI == 'MIN-SR-FLEX':
-            self.QI = self.get_Qdelta_implicit(qd_type="MIN-SR-FLEX", k=k)
