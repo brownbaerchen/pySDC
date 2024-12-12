@@ -70,12 +70,12 @@ def getParamsSDC(
         },
         # Step parameters
         "step_params": {
-            "maxiter": 1,
+            "maxiter": nSweeps,
         },
         # Level parameters
         "level_params": {
             "restol": -1,
-            "nsweeps": nSweeps,
+            "nsweeps": 1,
         },
     }
 
