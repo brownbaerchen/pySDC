@@ -69,7 +69,7 @@ def plot(
             local_slice_flat = slice(np.prod(_data['v'].shape) * procs, np.prod(_data['v'].shape) * (procs + 1))
             v['values'][local_slice_flat] = _data['v'].flatten()
 
-        sampled = Grid(pv.ImageData(dimensions=(n_samples,) * 3, spacing=(1 / n_samples,) * 3), '', [1.0, 1.0])
+        # sampled = Grid(pv.ImageData(dimensions=(n_samples,) * 3, spacing=(1 / n_samples,) * 3), '', [1.0, 1.0])
         zoomed = Grid(
             pv.ImageData(dimensions=(n_samples,) * 3, spacing=(zoom / n_samples,) * 3, origin=[0.8, 0.47, 0.03]),
             '_zoomed',
