@@ -909,9 +909,7 @@ def make_plots_for_thesis():  # pragma: no cover
 
     plot_factorizations_over_time(t0=0, Tend=50)
 
-    from pySDC.projects.Resilience.work_precision import (
-        all_problems,
-    )
+    from pySDC.projects.Resilience.work_precision import all_problems, single_problem
 
     all_params = {
         'record': False,
@@ -925,6 +923,7 @@ def make_plots_for_thesis():  # pragma: no cover
     for mode in ['compare_strategies', 'parallel_efficiency_dt_k', 'parallel_efficiency_dt', 'RK_comp']:
         all_problems(**all_params, mode=mode)
     all_problems(**{**all_params, 'work_key': 'param'}, mode='compare_strategies')
+    single_problem(**all_params, mode='RK_comp_high_order_RBC', problem=run_RBC)
 
     for tend in [500, 2000]:
         plot_GS_solution(tend=tend)
