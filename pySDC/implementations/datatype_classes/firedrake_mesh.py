@@ -59,3 +59,31 @@ class firedrake_mesh(object):
         """
 
         return fd.norm(self.functionspace, 'L2')
+
+
+class IMEX_firedrake_mesh(object):
+    def __init__(self, init, val=0.0):
+        if type(init) == type(self):
+            self.impl = firedrake_mesh(init.impl)
+            self.expl = firedrake_mesh(init.expl)
+        else:
+            self.impl = firedrake_mesh(init, val=val)
+            self.expl = firedrake_mesh(init, val=val)
+
+    def __add__(self, other):
+        me = IMEX_firedrake_mesh(self)
+        me.impl = self.impl + other.impl
+        me.expl = self.expl + other.expl
+        return me
+
+    def __sub__(self, other):
+        me = IMEX_firedrake_mesh(self)
+        me.impl = self.impl - other.impl
+        me.expl = self.expl - other.expl
+        return me
+
+    def __rmul__(self, other):
+        me = IMEX_firedrake_mesh(self)
+        me.impl = other * self.impl
+        me.expl = other * self.expl
+        return me

@@ -13,7 +13,7 @@ def test_addition(n=3, v1=1, v2=2):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow, I need this to get `.dat._numpy_data`.
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
     x = fd.SpatialCoordinate(mesh)
     ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
     a.assign(ic)
@@ -42,7 +42,7 @@ def test_subtraction(n=3, v1=1, v2=2):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow, I need this to get `.dat._numpy_data`.
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
     x = fd.SpatialCoordinate(mesh)
     ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
     a.assign(ic)
@@ -71,7 +71,7 @@ def test_right_multiplication(n=3, v1=1, v2=2):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow, I need this to get `.dat._numpy_data`.
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
     x = fd.SpatialCoordinate(mesh)
     ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
     a.assign(ic)
@@ -96,7 +96,7 @@ def test_norm(n=3, v1=-1):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow, I need this to get `.dat._numpy_data`.
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
     x = fd.SpatialCoordinate(mesh)
     ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
     a.assign(ic)
@@ -107,6 +107,106 @@ def test_norm(n=3, v1=-1):
 
     assert np.isclose(b, np.sqrt(2) * abs(v1)), f'{b=}, {v1=}'
     assert np.allclose(a.dat._numpy_data, v1)
+
+
+@pytest.mark.firedrake
+def test_addition_rhs(n=3, v1=1, v2=2):
+    from pySDC.implementations.datatype_classes.firedrake_mesh import IMEX_firedrake_mesh
+    import numpy as np
+    import firedrake as fd
+
+    mesh = fd.UnitSquareMesh(n, n)
+    V = fd.VectorFunctionSpace(mesh, "CG", 2)
+
+    a = IMEX_firedrake_mesh(V)
+    b = IMEX_firedrake_mesh(a)
+
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
+    x = fd.SpatialCoordinate(mesh)
+    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
+    a.impl.assign(ic)
+    b.impl.assign(ic)
+    a.expl.assign(ic)
+    b.expl.assign(ic)
+
+    a.impl.dat._numpy_data[:] = v1
+    a.expl.dat._numpy_data[:] = v1
+
+    b.impl.dat._numpy_data[:] = v2
+    b.expl.dat._numpy_data[:] = v2
+
+    c = a + b
+
+    assert np.allclose(c.impl.dat._numpy_data, v1 + v2)
+    assert np.allclose(c.expl.dat._numpy_data, v1 + v2)
+    assert np.allclose(a.impl.dat._numpy_data, v1)
+    assert np.allclose(b.impl.dat._numpy_data, v2)
+    assert np.allclose(a.expl.dat._numpy_data, v1)
+    assert np.allclose(b.expl.dat._numpy_data, v2)
+
+
+@pytest.mark.firedrake
+def test_subtraction_rhs(n=3, v1=1, v2=2):
+    from pySDC.implementations.datatype_classes.firedrake_mesh import IMEX_firedrake_mesh
+    import numpy as np
+    import firedrake as fd
+
+    mesh = fd.UnitSquareMesh(n, n)
+    V = fd.VectorFunctionSpace(mesh, "CG", 2)
+
+    a = IMEX_firedrake_mesh(V)
+    b = IMEX_firedrake_mesh(a)
+
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
+    x = fd.SpatialCoordinate(mesh)
+    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
+    a.impl.assign(ic)
+    b.impl.assign(ic)
+    a.expl.assign(ic)
+    b.expl.assign(ic)
+
+    a.impl.dat._numpy_data[:] = v1
+    a.expl.dat._numpy_data[:] = v1
+
+    b.impl.dat._numpy_data[:] = v2
+    b.expl.dat._numpy_data[:] = v2
+
+    c = a - b
+
+    assert np.allclose(c.impl.dat._numpy_data, v1 - v2)
+    assert np.allclose(c.expl.dat._numpy_data, v1 - v2)
+    assert np.allclose(a.impl.dat._numpy_data, v1)
+    assert np.allclose(b.impl.dat._numpy_data, v2)
+    assert np.allclose(a.expl.dat._numpy_data, v1)
+    assert np.allclose(b.expl.dat._numpy_data, v2)
+
+
+@pytest.mark.firedrake
+def test_rmul_rhs(n=3, v1=1, v2=2):
+    from pySDC.implementations.datatype_classes.firedrake_mesh import IMEX_firedrake_mesh
+    import numpy as np
+    import firedrake as fd
+
+    mesh = fd.UnitSquareMesh(n, n)
+    V = fd.VectorFunctionSpace(mesh, "CG", 2)
+
+    a = IMEX_firedrake_mesh(V)
+
+    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
+    x = fd.SpatialCoordinate(mesh)
+    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
+    a.impl.assign(ic)
+    a.expl.assign(ic)
+
+    a.impl.dat._numpy_data[:] = v1
+    a.expl.dat._numpy_data[:] = v1
+
+    b = v2 * a
+
+    assert np.allclose(a.impl.dat._numpy_data, v1)
+    assert np.allclose(b.impl.dat._numpy_data, v2 * v1)
+    assert np.allclose(a.expl.dat._numpy_data, v1)
+    assert np.allclose(b.expl.dat._numpy_data, v2 * v1)
 
 
 if __name__ == '__main__':
