@@ -52,7 +52,7 @@ def test_eval_f():
     get = P.eval_f(me, 0).impl
 
     error = abs(expect - get) / abs(expect)
-    assert error < 1e-4, error
+    assert error < 1e-8, error
 
 
 if __name__ == '__main__':
