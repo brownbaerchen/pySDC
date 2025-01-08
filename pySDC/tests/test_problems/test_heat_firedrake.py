@@ -2,6 +2,7 @@ import pytest
 
 
 @pytest.mark.parametrize('c', [0, 3.14])
+@pytest.mark.firedrake
 def test_solve_system(c):
     from pySDC.implementations.problem_classes.HeatFiredrake import firedrake_heat
     import numpy as np
@@ -35,6 +36,7 @@ def test_solve_system(c):
     assert error < 1e-8, error
 
 
+@pytest.mark.firedrake
 def test_eval_f():
     from pySDC.implementations.problem_classes.HeatFiredrake import firedrake_heat
     import numpy as np

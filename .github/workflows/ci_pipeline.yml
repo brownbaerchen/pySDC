@@ -166,6 +166,45 @@ jobs:
           path: |
             data_libpressio
             coverage_libpressio.dat
+
+  user_firedrake_tests:
+    runs-on: [self-hosted, Linux]
+    container:
+      image: firedrakeproject/firedrake-vanilla:latest
+      volumes:
+        - ${{ github.workspace }}:/pySDC
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cleanup
+        if: ${{ always() }}
+        run: |
+          cd ..
+          rm -rf build
+      - name: Install pySDC
+        run: |
+          . /home/firedrake/firedrake/bin/activate
+          export PYTHONPATH=$PYTHONPATH:/pySDC/
+          python -m pip install qmat
+      - name: run pytest
+        run: |
+          . /home/firedrake/firedrake/bin/activate
+          firedrake-clean
+          coverage run -m pytest --continue-on-collection-errors -v --durations=0 pySDC/tests -m firedrake
+        timeout-minutes: 120
+      - name: Make coverage report
+        run: |
+          . /home/firedrake/firedrake/bin/activate
+
+          mv data data_firedrake
+          coverage combine
+          mv .coverage coverage_firedrake.dat
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-artifacts-firedrake
+          path: |
+            data_firedrake
+            coverage_firedrake.dat
          
   user_monodomain_tests_linux:
     runs-on: ubuntu-latest
