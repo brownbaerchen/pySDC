@@ -171,6 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: firedrakeproject/firedrake-vanilla:latest
+      options: --user root
       volumes:
         - ${{ github.workspace }}:/pySDC
     defaults:
