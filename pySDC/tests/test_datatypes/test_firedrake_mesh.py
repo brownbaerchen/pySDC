@@ -210,4 +210,4 @@ def test_rmul_rhs(n=3, v1=1, v2=2):
 
 
 if __name__ == '__main__':
-    test_norm(1, -2)
+    test_addition()

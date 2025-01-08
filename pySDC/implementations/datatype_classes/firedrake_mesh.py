@@ -15,6 +15,10 @@ class firedrake_mesh(object):
     def __getattr__(self, key):
         return getattr(self.functionspace, key)
 
+    @property
+    def asnumpy(self):
+        return self.functionspace.dat._numpy_data
+
     def __add__(self, other):
         if isinstance(other, type(self)):
             me = firedrake_mesh(other)
