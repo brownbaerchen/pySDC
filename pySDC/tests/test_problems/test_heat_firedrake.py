@@ -4,12 +4,12 @@ import pytest
 @pytest.mark.parametrize('c', [0, 3.14])
 @pytest.mark.firedrake
 def test_solve_system(c):
-    from pySDC.implementations.problem_classes.HeatFiredrake import firedrake_heat
+    from pySDC.implementations.problem_classes.HeatFiredrake import Heat1DForcedFiredrake
     import numpy as np
     import firedrake as fd
 
     # test we get the initial conditions back when solving with zero step size
-    P = firedrake_heat(n=128, c=c)
+    P = Heat1DForcedFiredrake(n=128, c=c)
     u0 = P.u_exact(0)
     un = P.solve_system(u0, 0)
     assert abs(u0 - un) < 1e-8
@@ -38,11 +38,11 @@ def test_solve_system(c):
 
 @pytest.mark.firedrake
 def test_eval_f():
-    from pySDC.implementations.problem_classes.HeatFiredrake import firedrake_heat
+    from pySDC.implementations.problem_classes.HeatFiredrake import Heat1DForcedFiredrake
     import numpy as np
     import firedrake as fd
 
-    P = firedrake_heat(n=128)
+    P = Heat1DForcedFiredrake(n=128)
 
     me = P.u_init
     x = fd.SpatialCoordinate(P.mesh)

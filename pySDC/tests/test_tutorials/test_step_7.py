@@ -127,3 +127,10 @@ def test_D():
     from pySDC.tutorial.step_7.D_pySDC_with_PyTorch import train_at_collocation_nodes
 
     train_at_collocation_nodes()
+
+
+@pytest.mark.firedrake
+def test_E():
+    from pySDC.tutorial.step_7.E_pySDC_with_firedrake import runHeatFiredrake
+
+    runHeatFiredrake()

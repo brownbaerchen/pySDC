@@ -4,7 +4,49 @@ import firedrake as fd
 import numpy as np
 
 
-class firedrake_heat(Problem):
+class Heat1DForcedFiredrake(Problem):
+    r"""
+    Example implementing the forced one-dimensional heat equation with Dirichlet boundary conditions
+
+    .. math::
+        \frac{d u}{d t} = \nu \frac{d^2 u}{d x^2} + f
+
+    for :math:`x \in \Omega:=[0,1]`, where the forcing term :math:`f` is defined by
+
+    .. math::
+        f(x, t) = -\sin(\pi x) (\sin(t) - \nu \pi^2 \cos(t)).
+
+    For initial conditions with constant c
+
+    .. math::
+        u(x, 0) = \sin(\pi x) + c,
+
+    the exact solution is given by
+
+    .. math::
+        u(x, t) = \sin(\pi x)\cos(t) + c.
+
+    Here, the problem is discretized with finite elements using firedrake. Hence, the problem
+    is reformulated to the *weak formulation*
+
+    .. math:
+        \int_\Omega u_t v\,dx = - \nu \int_\Omega \nabla u \nabla v\,dx + \int_\Omega f v\,dx.
+
+    We invert the Laplacian implicitly and treat the forcing term explicitly.
+    The solvers for the arising variational problems are cached for multiple collocation nodes and step sizes.
+
+    Parameters
+    ----------
+    nvars : int, optional
+        Spatial resolution, i.e., numbers of degrees of freedom in space.
+    nu : float, optional
+        Diffusion coefficient :math:`\nu`.
+    c: float, optional
+        Constant for the Dirichlet boundary condition :math: `c`
+    LHS_cache_size : int, optional
+        Cache size for variational problem solvers
+    """
+
     dtype_u = firedrake_mesh
     dtype_f = IMEX_firedrake_mesh
 
@@ -24,6 +66,23 @@ class firedrake_heat(Problem):
         self.work_counters['rhs'] = WorkCounter()
 
     def eval_f(self, u, t):
+        """
+        Evaluate the right hand side.
+        The forcing term is simply interpolated to the grid.
+        The Laplacian is evaluated via a variational problem, where the mass matrix is inverted and homogeneous boundary conditions are applied.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Solution at which to evaluate
+        t : float
+            Time at which to evaluate
+
+        Returns
+        -------
+        f : dtype_f
+            The evaluated right hand side
+        """
         if not hasattr(self, '__solv_eval_f_implicit'):
             _u = u.functionspace
             v = fd.TestFunction(self.V)
@@ -50,6 +109,25 @@ class firedrake_heat(Problem):
         return me
 
     def solve_system(self, rhs, factor, *args, **kwargs):
+        r"""
+        Linear solver for :math:`(M - factor nu * Lap) u = rhs`.
+
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side for the nonlinear system.
+        factor : float
+            Abbrev. for the node-to-node stepsize (or any other factor required).
+        u0 : dtype_u
+            Initial guess for the iterative solver (not used here so far).
+        t : float
+            Current time.
+
+        Returns
+        -------
+        u : dtype_u
+            Solution.
+        """
 
         if factor not in self.solvers.keys():
             if len(self.solvers) >= self.LHS_cache_size:
@@ -79,6 +157,19 @@ class firedrake_heat(Problem):
         return me
 
     def u_exact(self, t):
+        r"""
+        Routine to compute the exact solution at time :math:`t`.
+
+        Parameters
+        ----------
+        t : float
+            Time of the exact solution.
+
+        Returns
+        -------
+        me : dtype_u
+            Exact solution.
+        """
         me = self.u_init
         x = fd.SpatialCoordinate(self.mesh)
         me.interpolate(np.cos(t) * fd.sin(np.pi * x[0]) + self.c)

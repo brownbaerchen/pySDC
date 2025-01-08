@@ -4,6 +4,13 @@ from pySDC.core.errors import DataError
 
 
 class firedrake_mesh(object):
+    """
+    Wrapper for firedrake function data.
+
+    Attributes:
+        functionspace (firedrake.Function): firedrake data
+    """
+
     def __init__(self, init, val=0.0):
         if fd.functionspaceimpl.WithGeometry in type(init).__mro__:
             self.functionspace = fd.Function(init)
@@ -17,6 +24,9 @@ class firedrake_mesh(object):
 
     @property
     def asnumpy(self):
+        """
+        Get a numpy array of the values associated with this data
+        """
         return self.functionspace.dat._numpy_data
 
     def __add__(self, other):
@@ -59,13 +69,21 @@ class firedrake_mesh(object):
         Overloading the abs operator for mesh types
 
         Returns:
-            float: absolute maximum of all mesh values
+            float: L2 norm
         """
 
         return fd.norm(self.functionspace, 'L2')
 
 
 class IMEX_firedrake_mesh(object):
+    """
+    Datatype for IMEX integration with firedrake data.
+
+    Attributes:
+        impl (firedrake_mesh): implicit part
+        expl (firedrake_mesh): explicit part
+    """
+
     def __init__(self, init, val=0.0):
         if type(init) == type(self):
             self.impl = firedrake_mesh(init.impl)
