@@ -177,12 +177,8 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
-      - uses: actions/checkout@v4
-      - name: Cleanup
-        if: ${{ always() }}
-        run: |
-          cd ..
-          rm -rf build
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
