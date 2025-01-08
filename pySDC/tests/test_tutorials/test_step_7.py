@@ -133,4 +133,4 @@ def test_D():
 def test_E():
     from pySDC.tutorial.step_7.E_pySDC_with_firedrake import runHeatFiredrake
 
-    runHeatFiredrake()
+    runHeatFiredrake(useMPIsweeper=False)

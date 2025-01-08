@@ -2,6 +2,7 @@ from pySDC.core.problem import Problem, WorkCounter
 from pySDC.implementations.datatype_classes.firedrake_mesh import firedrake_mesh, IMEX_firedrake_mesh
 import firedrake as fd
 import numpy as np
+from mpi4py import MPI
 
 
 class Heat1DForcedFiredrake(Problem):
@@ -45,17 +46,20 @@ class Heat1DForcedFiredrake(Problem):
         Constant for the Dirichlet boundary condition :math: `c`
     LHS_cache_size : int, optional
         Cache size for variational problem solvers
+    comm : MPI communicator, optional
+        Supply an MPI communicator for spatial parallelism
     """
 
     dtype_u = firedrake_mesh
     dtype_f = IMEX_firedrake_mesh
 
-    def __init__(self, n=30, nu=0.1, c=0.0, LHS_cache_size=12):
-        self.mesh = fd.UnitIntervalMesh(n)
+    def __init__(self, n=30, nu=0.1, c=0.0, LHS_cache_size=12, comm=None):
+        comm = MPI.COMM_WORLD if comm is None else comm
+        self.mesh = fd.UnitIntervalMesh(n, comm=comm)
         self.V = fd.FunctionSpace(self.mesh, "CG", 4)
 
         super().__init__(self.V)
-        self._makeAttributeAndRegister('n', 'nu', 'c', 'LHS_cache_size', localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister('n', 'nu', 'c', 'LHS_cache_size', 'comm', localVars=locals(), readOnly=True)
 
         self.solvers = {}
         self.rhs = {}
