@@ -1,0 +1,190 @@
+from pySDC.core.problem import Problem
+from pySDC.implementations.datatype_classes.firedrake_mesh import firedrake_mesh, IMEX_firedrake_mesh
+from gusto.core.labels import time_derivative, implicit, explicit, physics_label, mass_weighted, prognostic
+from firedrake.fml import replace_subject, replace_test_function, Term, all_terms, drop
+import firedrake as fd
+
+
+class GenericGusto(Problem):
+    dtype_u = firedrake_mesh
+    dtype_f = IMEX_firedrake_mesh
+    rhs_labels = []
+    lhs_labels = []
+
+    def __init__(self, equation, apply_bcs=True, imex=True, *active_labels):
+        """
+        Set up the time discretisation based on the equation.
+
+        Args:
+            equation (:class:`PrognosticEquation`): the model's equation.
+            apply_bcs (bool, optional): whether to apply the equation's boundary
+                conditions. Defaults to True.
+            *active_labels (:class:`Label`): labels indicating which terms of
+                the equation to include.
+        """
+        self.equation = equation
+        self.residual = equation.residual
+        self.field_name = equation.field_name
+        self.fs = equation.function_space
+        self.idx = None
+        self.nonlinear_solver_parameters = None
+        self.imex = imex
+
+        if len(active_labels) > 0:
+            self.residual = self.residual.label_map(
+                lambda t: any(t.has_label(time_derivative, *active_labels)), map_if_false=drop
+            )
+
+        self.evaluate_source = []
+        self.physics_names = []
+        for t in self.residual:
+            if t.has_label(physics_label):
+                physics_name = t.get(physics_label)
+                if t.labels[physics_name] not in self.physics_names:
+                    self.evaluate_source.append(t.labels[physics_name])
+                    self.physics_names.append(t.labels[physics_name])
+
+        # Check if there are any mass-weighted terms:
+        if len(self.residual.label_map(lambda t: t.has_label(mass_weighted), map_if_false=drop)) > 0:
+            for field in equation.field_names:
+
+                # Check if the mass term for this prognostic is mass-weighted
+                if (
+                    len(
+                        self.residual.label_map(
+                            (
+                                lambda t: t.get(prognostic) == field
+                                and t.has_label(time_derivative)
+                                and t.has_label(mass_weighted)
+                            ),
+                            map_if_false=drop,
+                        )
+                    )
+                    == 1
+                ):
+
+                    field_terms = self.residual.label_map(
+                        lambda t: t.get(prognostic) == field and not t.has_label(time_derivative), map_if_false=drop
+                    )
+
+                    # Check that the equation for this prognostic does not involve
+                    # both mass-weighted and non-mass-weighted terms; if so, a split
+                    # timestepper should be used instead.
+                    if len(field_terms.label_map(lambda t: t.has_label(mass_weighted), map_if_false=drop)) > 0:
+                        if len(field_terms.label_map(lambda t: not t.has_label(mass_weighted), map_if_false=drop)) > 0:
+                            raise ValueError(
+                                'Mass-weighted and non-mass-weighted terms are present in a '
+                                + f'timestepping equation for {field}. As these terms cannot '
+                                + 'be solved for simultaneously, a split timestepping method '
+                                + 'should be used instead.'
+                            )
+                        else:
+                            # Replace the terms with a mass_weighted label with the
+                            # mass_weighted form. It is important that the labels from
+                            # this new form are used.
+                            self.residual = self.residual.label_map(
+                                lambda t: t.get(prognostic) == field and t.has_label(mass_weighted),
+                                map_if_true=lambda t: t.get(mass_weighted),
+                            )
+        self.idx = None
+
+        # -------------------------------------------------------------------- #
+        # Make boundary conditions
+        # -------------------------------------------------------------------- #
+
+        if not apply_bcs:
+            self.bcs = None
+        else:
+            self.bcs = equation.bcs[equation.field_name]
+
+        # -------------------------------------------------------------------- #
+        # Setup caches
+        # -------------------------------------------------------------------- #
+
+        self.x_out = fd.Function(self.fs)
+        self.solvers = {}
+        self._u = fd.Function(self.fs)
+
+        super().__init__(self.fs)
+
+    def evaluate_terms_IMEX(self, u, label):
+        self._u.assign(u.functionspace)
+
+        if label not in self.solvers.keys():
+            residual = self.residual.label_map(
+                lambda t: t.has_label(label), map_if_true=replace_subject(self._u, old_idx=self.idx), map_if_false=drop
+            )
+            mass_form = self.residual.label_map(
+                lambda t: t.has_label(time_derivative),
+                map_if_true=replace_subject(self.x_out, old_idx=self.idx),
+                map_if_false=drop,
+            )
+
+            problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
+            solver_name = self.field_name + self.__class__.__name__
+            self.solvers[label] = fd.NonlinearVariationalSolver(
+                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+            )
+
+        self.solvers[label].solve()
+        return self.x_out
+
+    def evaluate_terms_fully_implicit(self, u):
+        self._u.assign(u.functionspace)
+
+        if 'fully_implicit' not in self.solvers.keys():
+            residual = self.residual.label_map(
+                lambda t: t.has_label(time_derivative),
+                map_if_false=replace_subject(self._u, old_idx=self.idx),
+                map_if_true=drop,
+            )
+            mass_form = self.residual.label_map(
+                lambda t: t.has_label(time_derivative),
+                map_if_true=replace_subject(self.x_out, old_idx=self.idx),
+                map_if_false=drop,
+            )
+
+            problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
+            solver_name = self.field_name + self.__class__.__name__
+            self.solvers['fully_implicit'] = fd.NonlinearVariationalSolver(
+                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+            )
+
+        self.solvers['fully_implicit'].solve()
+        return self.x_out
+
+    def eval_f(self, u, *args):
+        me = self.dtype_f(self.init)
+        if self.imex:
+            me.impl.assign(self.evaluate_terms_IMEX(u, implicit))
+            me.expl.assign(self.evaluate_terms_IMEX(u, explicit))
+        else:
+            me.impl.assign(self.evaluate_terms_fully_implicit(u))
+            me.expl.assign(0)
+        return me
+
+    def solve_system(self, rhs, factor, u0, *args):
+        self.x_out.assign(u0.functionspace)  # set initial guess
+        self._u.assign(rhs.functionspace)
+
+        mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
+
+        if factor not in self.solvers.keys():
+            if self.imex:
+                residual = mass_form.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
+                raise NotImplementedError
+            else:
+                residual = self.residual.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
+                residual = residual.label_map(
+                    lambda t: t.has_label(time_derivative), map_if_false=lambda t: fd.Constant(factor) * t
+                )
+                residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
+
+            problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
+            solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
+            self.solvers[factor] = fd.NonlinearVariationalSolver(
+                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+            )
+
+        self.solvers[factor].solve()
+        return self.dtype_u(self.x_out)

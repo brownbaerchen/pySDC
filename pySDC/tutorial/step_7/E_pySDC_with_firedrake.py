@@ -60,7 +60,7 @@ def runHeatFiredrake(useMPIsweeper):
     Run the example defined by the above parameters
     """
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-    from pySDC.helpers.stats_helper import get_sorted, get_list_of_types
+    from pySDC.helpers.stats_helper import get_sorted
 
     Tend = 1.0
     t0 = 0.0

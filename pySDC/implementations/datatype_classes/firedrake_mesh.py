@@ -12,7 +12,7 @@ class firedrake_mesh(object):
     """
 
     def __init__(self, init, val=0.0):
-        if fd.functionspaceimpl.WithGeometry in type(init).__mro__:
+        if fd.functionspaceimpl.WithGeometry in type(init).__mro__ or fd.Function in type(init).__mro__:
             self.functionspace = fd.Function(init)
         elif type(init) == firedrake_mesh:
             self.functionspace = init.functionspace.copy(deepcopy=True)
