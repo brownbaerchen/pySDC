@@ -173,33 +173,35 @@ jobs:
       image: firedrakeproject/firedrake-vanilla:latest
       options: --user root
       volumes:
-        - ${{ github.workspace }}:/pySDC
-        - ${{ github.workspace }}:/gusto
+        - ${{ github.workspace }}:/repositories
     defaults:
       run:
         shell: bash -l {0}
     steps:
       - name: Checkout pySDC
         uses: actions/checkout@v4
+        with: 
+          path: /repositories/pySDC
       - name: Checkout gusto
         uses: actions/checkout@v4
         with:
           repository: firedrakeproject/gusto
+          path: /repositories/gusto
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
-          export PYTHONPATH=$PYTHONPATH:/pySDC/
+          export PYTHONPATH=$PYTHONPATH:/repositories/pySDC/
           python -m pip install qmat
       - name: Install gusto
         run: |
           . /home/firedrake/firedrake/bin/activate
-          python -m pip install -e /gusto
+          python -m pip install -e /repositories/gusto
       - name: run pytest
         run: |
           . /home/firedrake/firedrake/bin/activate
-          ls /pySDC
           firedrake-clean
-          coverage run -m pytest --continue-on-collection-errors -v --durations=0 /pySDC/tests -m firedrake
+          coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m firedrake
+          ls /repositories
         timeout-minutes: 120
       - name: Make coverage report
         run: |
