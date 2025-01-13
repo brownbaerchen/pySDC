@@ -186,7 +186,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: firedrakeproject/gusto
-          path: ./gusto
+          path: ./gusto_repo
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
@@ -195,8 +195,7 @@ jobs:
       - name: Install gusto
         run: |
           . /home/firedrake/firedrake/bin/activate
-          python -m pip install -e /repositories/gusto
-          export PYTHONPATH=$PYTHONPATH:/repositories/gusto/
+          python -m pip install -e /repositories/gusto_repo
       - name: run pytest
         run: |
           . /home/firedrake/firedrake/bin/activate
