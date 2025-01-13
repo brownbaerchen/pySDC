@@ -193,7 +193,7 @@ jobs:
       - name: Install gusto
         run: |
           . /home/firedrake/firedrake/bin/activate
-          python -m pip install -e ${{ github.workspace }}/gusto
+          python -m pip install -e /gusto
       - name: run pytest
         run: |
           . /home/firedrake/firedrake/bin/activate
