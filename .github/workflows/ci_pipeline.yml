@@ -181,6 +181,9 @@ jobs:
     steps:
       - name: Checkout pySDC
         uses: actions/checkout@v4
+      - name: Checkout gusto
+        uses: actions/checkout@v4
+        repository: firedrakeproject/gusto
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
