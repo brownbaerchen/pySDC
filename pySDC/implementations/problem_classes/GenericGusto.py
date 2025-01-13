@@ -5,13 +5,54 @@ from firedrake.fml import replace_subject, replace_test_function, Term, all_term
 import firedrake as fd
 
 
+def setup_equation(equation, spatial_methods):
+    """
+    Sets up the spatial methods for an equation, by the setting the
+    forms used for transport/diffusion in the equation.
+
+    Args:
+        equation (:class:`PrognosticEquation`): the equation that the
+            transport method is to be applied to.
+        spatial_methods: list of spatial methods such as transport or diffusion schemes
+    """
+    from gusto.core.labels import transport, diffusion
+    import logging
+
+    # For now, we only have methods for transport and diffusion
+    for term_label in [transport, diffusion]:
+        # ---------------------------------------------------------------- #
+        # Check that appropriate methods have been provided
+        # ---------------------------------------------------------------- #
+        # Extract all terms corresponding to this type of term
+        residual = equation.residual.label_map(lambda t: t.has_label(term_label), map_if_false=drop)
+        variables = [t.get(prognostic) for t in residual.terms]
+        methods = list(filter(lambda t: t.term_label == term_label, spatial_methods))
+        method_variables = [method.variable for method in methods]
+        for variable in variables:
+            if variable not in method_variables:
+                message = (
+                    f'Variable {variable} has a {term_label.label} '
+                    + 'term but no method for this has been specified. '
+                    + 'Using default form for this term'
+                )
+                logging.getLogger('problem').warning(message)
+
+    # -------------------------------------------------------------------- #
+    # Check that appropriate methods have been provided
+    # -------------------------------------------------------------------- #
+    # Replace forms in equation
+    for method in spatial_methods:
+        method.replace_form(equation)
+    return equation
+
+
 class GenericGusto(Problem):
     dtype_u = firedrake_mesh
-    dtype_f = IMEX_firedrake_mesh
+    dtype_f = firedrake_mesh
     rhs_labels = []
     lhs_labels = []
 
-    def __init__(self, equation, apply_bcs=True, imex=True, *active_labels):
+    def __init__(self, equation, apply_bcs=True, nonlinear_solver_params=None, *active_labels):
         """
         Set up the time discretisation based on the equation.
 
@@ -27,8 +68,10 @@ class GenericGusto(Problem):
         self.field_name = equation.field_name
         self.fs = equation.function_space
         self.idx = None
-        self.nonlinear_solver_parameters = None
-        self.imex = imex
+        if nonlinear_solver_params is None:
+            # default solver parameters
+            nonlinear_solver_parameters = {'ksp_type': 'gmres', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
+        self.nonlinear_solver_parameters = nonlinear_solver_parameters
 
         if len(active_labels) > 0:
             self.residual = self.residual.label_map(
@@ -107,6 +150,59 @@ class GenericGusto(Problem):
 
         super().__init__(self.fs)
 
+    def eval_f(self, u, *args):
+        self._u.assign(u.functionspace)
+
+        if 'eval_rhs' not in self.solvers.keys():
+            residual = self.residual.label_map(
+                lambda t: t.has_label(time_derivative),
+                map_if_false=replace_subject(self._u, old_idx=self.idx),
+                map_if_true=drop,
+            )
+            mass_form = self.residual.label_map(
+                lambda t: t.has_label(time_derivative),
+                map_if_true=replace_subject(self.x_out, old_idx=self.idx),
+                map_if_false=drop,
+            )
+
+            problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
+            solver_name = self.field_name + self.__class__.__name__
+            self.solvers['eval_rhs'] = fd.NonlinearVariationalSolver(
+                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+            )
+
+        self.solvers['eval_rhs'].solve()
+
+        me = self.dtype_f(self.init)
+        me.assign(self.x_out)
+        return me
+
+    def solve_system(self, rhs, factor, u0, *args):
+        self.x_out.assign(u0.functionspace)  # set initial guess
+        self._u.assign(rhs.functionspace)
+
+        mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
+
+        if factor not in self.solvers.keys():
+            residual = self.residual.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
+            residual = residual.label_map(
+                lambda t: t.has_label(time_derivative), map_if_false=lambda t: fd.Constant(factor) * t
+            )
+            residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
+
+            problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
+            solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
+            self.solvers[factor] = fd.NonlinearVariationalSolver(
+                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+            )
+
+        self.solvers[factor].solve()
+        return self.dtype_u(self.x_out)
+
+
+class GenericGustoImex(GenericGusto):
+    dtype_f = IMEX_firedrake_mesh
+
     def evaluate_terms_IMEX(self, u, label):
         self._u.assign(u.functionspace)
 
@@ -129,30 +225,6 @@ class GenericGusto(Problem):
         self.solvers[label].solve()
         return self.x_out
 
-    def evaluate_terms_fully_implicit(self, u):
-        self._u.assign(u.functionspace)
-
-        if 'fully_implicit' not in self.solvers.keys():
-            residual = self.residual.label_map(
-                lambda t: t.has_label(time_derivative),
-                map_if_false=replace_subject(self._u, old_idx=self.idx),
-                map_if_true=drop,
-            )
-            mass_form = self.residual.label_map(
-                lambda t: t.has_label(time_derivative),
-                map_if_true=replace_subject(self.x_out, old_idx=self.idx),
-                map_if_false=drop,
-            )
-
-            problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
-            solver_name = self.field_name + self.__class__.__name__
-            self.solvers['fully_implicit'] = fd.NonlinearVariationalSolver(
-                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
-            )
-
-        self.solvers['fully_implicit'].solve()
-        return self.x_out
-
     def eval_f(self, u, *args):
         me = self.dtype_f(self.init)
         if self.imex:
@@ -170,15 +242,8 @@ class GenericGusto(Problem):
         mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
 
         if factor not in self.solvers.keys():
-            if self.imex:
-                residual = mass_form.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
-                raise NotImplementedError
-            else:
-                residual = self.residual.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
-                residual = residual.label_map(
-                    lambda t: t.has_label(time_derivative), map_if_false=lambda t: fd.Constant(factor) * t
-                )
-                residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
+            residual = mass_form.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
+            raise NotImplementedError
 
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
             solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
