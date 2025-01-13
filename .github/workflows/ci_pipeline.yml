@@ -181,12 +181,12 @@ jobs:
       - name: Checkout pySDC
         uses: actions/checkout@v4
         with: 
-          path: /repositories/pySDC
+          path: ./pySDC
       - name: Checkout gusto
         uses: actions/checkout@v4
         with:
           repository: firedrakeproject/gusto
-          path: /repositories/gusto
+          path: ./gusto
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
@@ -200,6 +200,7 @@ jobs:
         run: |
           . /home/firedrake/firedrake/bin/activate
           firedrake-clean
+          ls .
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m firedrake
           ls /repositories
         timeout-minutes: 120
