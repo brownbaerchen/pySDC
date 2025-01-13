@@ -183,12 +183,17 @@ jobs:
         uses: actions/checkout@v4
       - name: Checkout gusto
         uses: actions/checkout@v4
-        repository: firedrakeproject/gusto
+        with:
+          repository: firedrakeproject/gusto
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
           export PYTHONPATH=$PYTHONPATH:/pySDC/
           python -m pip install qmat
+      - name: Install gusto
+        run: |
+          . /home/firedrake/firedrake/bin/activate
+          python -m pip install -e ${{ github.workspace }}/gusto
       - name: run pytest
         run: |
           . /home/firedrake/firedrake/bin/activate
