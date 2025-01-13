@@ -196,13 +196,12 @@ jobs:
         run: |
           . /home/firedrake/firedrake/bin/activate
           python -m pip install -e /repositories/gusto
+          export PYTHONPATH=$PYTHONPATH:/repositories/gusto/
       - name: run pytest
         run: |
           . /home/firedrake/firedrake/bin/activate
           firedrake-clean
-          ls .
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m firedrake
-          ls /repositories
         timeout-minutes: 120
       - name: Make coverage report
         run: |
