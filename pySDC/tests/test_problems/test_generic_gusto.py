@@ -81,15 +81,16 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     r = sqrt(rsq)
     tpexpr = mountain_height * (1 - r / R0)
     eqns = ShallowWaterEquations(domain, parameters, fexpr=fexpr, topog_expr=tpexpr)
+    eqns_with_transport = ShallowWaterEquations(domain, parameters, fexpr=fexpr, topog_expr=tpexpr)
 
     transport_methods = [DGUpwind(eqns, "u"), DGUpwind(eqns, "D", advective_then_flux=True)]
     spatial_methods = None
 
     if use_transport_scheme:
-        eqns = setup_equation(eqns, transport_methods)
+        eqns_with_transport = setup_equation(eqns_with_transport, transport_methods)
         spatial_methods = transport_methods
 
-    problem = GenericGusto(eqns)
+    problem = GenericGusto(eqns_with_transport)
 
     # ------------------------------------------------------------------------ #
     # Initial conditions
@@ -104,7 +105,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     u0.project(uexpr)
     D0.interpolate(Dexpr)
 
-    return eqns, domain, spatial_methods, dt, u_start, u0, D0
+    return eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0
 
 
 @pytest.mark.firedrake
@@ -117,15 +118,21 @@ def test_generic_gusto(use_transport_scheme):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
+    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
 
     # ------------------------------------------------------------------------ #
     # Prepare different methods
     # ------------------------------------------------------------------------ #
 
-    problem = GenericGusto(eqns)
+    problem = GenericGusto(eqns_with_transport)
     stepper_backward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=1.0), spatial_methods)
     stepper_forward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=0.0), spatial_methods)
+    print(' ----- pySDC -----')
+    print(problem.residual.form.__str__())
+    print(' ----- Gusto -----')
+    print(stepper_backward.scheme.residual.form.__str__())
+    print(problem.residual.form.__str__() == stepper_backward.scheme.residual.form.__str__())
+    exit()
 
     # ------------------------------------------------------------------------ #
     # Run tests
@@ -209,7 +216,7 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
+    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
 
     # ------------------------------------------------------------------------ #
     # Setup pySDC
@@ -304,7 +311,7 @@ def test_pySDC_integrator(use_transport_scheme):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=900)
+    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=900)
     eqns.label_terms(lambda t: not t.has_label(time_derivative), implicit)
 
     # ------------------------------------------------------------------------ #
@@ -314,15 +321,13 @@ def test_pySDC_integrator(use_transport_scheme):
         'snes_type': 'newtonls',
         'ksp_type': 'preonly',
         'pc_type': 'lu',
-        # 'ksp_type': 'gmres',
-        # 'pc_type': 'bjacobi',
-        'sub_pc_type': 'ilu',
-        'ksp_rtol': 1e-12,
-        'snes_rtol': 1e-12,
+        'ksp_rtol': 1e-14,
+        'snes_rtol': 1e-14,
         'ksp_atol': 1e-30,
         'snes_atol': 1e-30,
         'ksp_divtol': 1e30,
         'snes_divtol': 1e30,
+        'snes_max_it': 999,
     }
 
     level_params = dict()
@@ -330,13 +335,13 @@ def test_pySDC_integrator(use_transport_scheme):
     level_params['residual_type'] = 'full_rel'
 
     step_params = dict()
-    step_params['maxiter'] = 1
+    step_params['maxiter'] = 3
 
     sweeper_params = dict()
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['node_type'] = 'LEGENDRE'
     sweeper_params['num_nodes'] = 2
-    sweeper_params['QI'] = 'MIN-SR-S'
+    sweeper_params['QI'] = 'IE'
     sweeper_params['QE'] = 'PIC'
     sweeper_params['initial_guess'] = 'copy'
 
@@ -362,7 +367,7 @@ def test_pySDC_integrator(use_transport_scheme):
     # ------------------------------------------------------------------------ #
 
     SDC_params = {
-        'base_scheme': BackwardEuler(domain),
+        'base_scheme': BackwardEuler(domain, solver_parameters=solver_parameters),
         'M': sweeper_params['num_nodes'],
         'maxk': step_params['maxiter'],
         'quad_type': sweeper_params['quad_type'],
@@ -373,6 +378,7 @@ def test_pySDC_integrator(use_transport_scheme):
         'initial_guess': 'copy',
         'nonlinear_solver_parameters': solver_parameters,
         'linear_solver_parameters': solver_parameters,
+        'final_update': False, 
     }
 
     # ------------------------------------------------------------------------ #
@@ -390,16 +396,14 @@ def test_pySDC_integrator(use_transport_scheme):
     # Run tests
     # ------------------------------------------------------------------------ #
 
+    assert np.allclose(stepper_gusto.scheme.nodes / dt, stepper_pySDC.scheme.sweeper.coll.nodes)
+    assert np.allclose(stepper_gusto.scheme.Q / dt, stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:])
+    assert np.allclose(stepper_gusto.scheme.Qdelta_imp / dt, stepper_pySDC.scheme.sweeper.QI[1:, 1:])
+
     def run(stepper, n_steps):
         stepper.fields("u").assign(u0)
         stepper.fields("D").assign(D0)
         stepper.run(t=0, tmax=n_steps * dt)
-
-        # uend = problem.dtype_u(problem.init)
-        # u, D = uend.subfunctions[:]
-        # u.assign(stepper_forward.fields('u'))
-        # D.assign(stepper_forward.fields('D'))
-        # return uend
 
     for stepper in [stepper_gusto, stepper_pySDC]:
         run(stepper, 3)
@@ -423,6 +427,7 @@ def test_pySDC_integrator(use_transport_scheme):
 
 
 if __name__ == '__main__':
-    # test_generic_gusto(False)
+    test_generic_gusto(True)
+    # test_pySDC_integrator_RK(True, 'RK4')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    test_pySDC_integrator(False)
+    # test_pySDC_integrator(False)

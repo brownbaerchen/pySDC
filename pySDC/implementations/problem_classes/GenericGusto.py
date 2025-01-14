@@ -52,7 +52,7 @@ class GenericGusto(Problem):
     rhs_labels = []
     lhs_labels = []
 
-    def __init__(self, equation, apply_bcs=True, nonlinear_solver_params=None, *active_labels):
+    def __init__(self, equation, apply_bcs=True, nonlinear_solver_parameters=None, *active_labels):
         """
         Set up the time discretisation based on the equation.
 
@@ -68,7 +68,7 @@ class GenericGusto(Problem):
         self.field_name = equation.field_name
         self.fs = equation.function_space
         self.idx = None
-        if nonlinear_solver_params is None:
+        if nonlinear_solver_parameters is None:
             # default solver parameters
             nonlinear_solver_parameters = {'ksp_type': 'gmres', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
         self.nonlinear_solver_parameters = nonlinear_solver_parameters
@@ -173,21 +173,23 @@ class GenericGusto(Problem):
 
         self.solvers['eval_rhs'].solve()
 
-        me = self.dtype_f(self.init)
-        me.assign(self.x_out)
-        return me
+        return self.dtype_f(self.x_out)
 
     def solve_system(self, rhs, factor, u0, *args):
         self.x_out.assign(u0.functionspace)  # set initial guess
         self._u.assign(rhs.functionspace)
 
-        mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
-
         if factor not in self.solvers.keys():
+            # setup left hand side (M - factor*f)(u)
+            # put in output variable 
             residual = self.residual.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
+            # multiply f by factor
             residual = residual.label_map(
                 lambda t: t.has_label(time_derivative), map_if_false=lambda t: fd.Constant(factor) * t
             )
+
+            # subtract right hand side
+            mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
             residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
 
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)

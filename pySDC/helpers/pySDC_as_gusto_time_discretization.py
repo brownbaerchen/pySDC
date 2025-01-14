@@ -27,6 +27,7 @@ class pySDC_integrator(TimeDiscretisation):
 
         self.controller = controller_nonMPI(1, description=description, controller_params=controller_params)
         self.P = self.controller.MS[0].levels[0].prob
+        self.sweeper = self.controller.MS[0].levels[0].sweep
         self.x0_pySDC = self.P.dtype_u(self.P.init)
 
         if not solver_parameters:
