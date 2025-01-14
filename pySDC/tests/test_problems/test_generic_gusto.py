@@ -1,6 +1,25 @@
 import pytest
 
 
+def get_gusto_stepper(eqns, method, spatial_methods):
+    from gusto import Timestepper, IO, OutputParameters, Sum, MeridionalComponent, RelativeVorticity, ZonalComponent
+    import numpy as np
+
+    # TODO: Can I get rid of the output here?
+
+    output = OutputParameters(
+        dirname=f'./tmp{np.random.randint(1e9)}',
+        dumplist_latlon=['D'],
+        dumpfreq=1000000000,
+        dump_vtus=True,
+        dump_nc=False,
+        dumplist=['D', 'topography'],
+    )
+    diagnostic_fields = [Sum('D', 'topography'), RelativeVorticity(), MeridionalComponent('u'), ZonalComponent('u')]
+    io = IO(method.domain, output, diagnostic_fields=diagnostic_fields)
+    return Timestepper(eqns, method, io, spatial_methods=spatial_methods)
+
+
 @pytest.mark.firedrake
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 def test_generic_gusto(use_transport_scheme):
@@ -21,8 +40,6 @@ def test_generic_gusto(use_transport_scheme):
         Domain,
         IO,
         OutputParameters,
-        SemiImplicitQuasiNewton,
-        SSPRK3,
         DGUpwind,
         ShallowWaterParameters,
         ShallowWaterEquations,
@@ -32,8 +49,6 @@ def test_generic_gusto(use_transport_scheme):
         ZonalComponent,
         MeridionalComponent,
         RelativeVorticity,
-        RungeKuttaFormulation,
-        SubcyclingOptions,
         ThetaMethod,
         Timestepper,
     )
@@ -106,25 +121,8 @@ def test_generic_gusto(use_transport_scheme):
     # Prepare gusto reference methods
     # ------------------------------------------------------------------------ #
 
-    # TODO: Can I get rid of the output here?
-
-    output = OutputParameters(
-        dirname=f'./tmp{np.random.randint(1e9)}', dumplist_latlon=['D'], dumpfreq=1000000000,
-        dump_vtus=True, dump_nc=False, dumplist=['D', 'topography']
-    )
-    diagnostic_fields = [Sum('D', 'topography'), RelativeVorticity(),
-                         MeridionalComponent('u'), ZonalComponent('u')]
-    io = IO(domain, output, diagnostic_fields=diagnostic_fields)
-    stepper_backward = Timestepper(eqns, ThetaMethod(domain, theta=1.), io, spatial_methods=spatial_methods)
-
-    output = OutputParameters(
-        dirname=f'./tmp{np.random.randint(1e9)}', dumplist_latlon=['D'], dumpfreq=1000000000,
-        dump_vtus=True, dump_nc=False, dumplist=['D', 'topography']
-    )
-    diagnostic_fields = [Sum('D', 'topography'), RelativeVorticity(),
-                         MeridionalComponent('u'), ZonalComponent('u')]
-    io = IO(domain, output, diagnostic_fields=diagnostic_fields)
-    stepper_forward = Timestepper(eqns, ThetaMethod(domain, theta=0.), io, spatial_methods=spatial_methods)
+    stepper_backward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=1.0), spatial_methods)
+    stepper_forward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=0.0), spatial_methods)
 
     # ------------------------------------------------------------------------ #
     # Run tests
@@ -153,7 +151,9 @@ def test_generic_gusto(use_transport_scheme):
     error = abs(un_forward - un_ref) / abs(un_ref)
     print(error, test_error)
 
-    assert error < np.finfo(float).eps * 1e2, f'Forward Euler does not match reference implementation! Got relative difference of {error}'
+    assert (
+        error < np.finfo(float).eps * 1e2
+    ), f'Forward Euler does not match reference implementation! Got relative difference of {error}'
 
     # test backward Euler step
     stepper_backward.fields("u").assign(u0)
@@ -166,7 +166,9 @@ def test_generic_gusto(use_transport_scheme):
     error = abs(un - un_ref) / abs(un_ref)
     print(error, test_error)
 
-    assert error < np.finfo(float).eps * 1e2, f'Backward Euler does not match reference implementation! Got relative difference of {error}'
+    assert (
+        error < np.finfo(float).eps * 1e2
+    ), f'Backward Euler does not match reference implementation! Got relative difference of {error}'
 
 
 if __name__ == '__main__':
