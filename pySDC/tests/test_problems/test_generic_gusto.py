@@ -81,16 +81,15 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     r = sqrt(rsq)
     tpexpr = mountain_height * (1 - r / R0)
     eqns = ShallowWaterEquations(domain, parameters, fexpr=fexpr, topog_expr=tpexpr)
-    eqns_with_transport = ShallowWaterEquations(domain, parameters, fexpr=fexpr, topog_expr=tpexpr)
 
-    transport_methods = [DGUpwind(eqns, "u"), DGUpwind(eqns, "D", advective_then_flux=True)]
+    transport_methods = [DGUpwind(eqns, "u"), DGUpwind(eqns, "D")]
     spatial_methods = None
 
     if use_transport_scheme:
-        eqns_with_transport = setup_equation(eqns_with_transport, transport_methods)
+        eqns = setup_equation(eqns, transport_methods)
         spatial_methods = transport_methods
 
-    problem = GenericGusto(eqns_with_transport)
+    problem = GenericGusto(eqns)
 
     # ------------------------------------------------------------------------ #
     # Initial conditions
@@ -105,7 +104,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     u0.project(uexpr)
     D0.interpolate(Dexpr)
 
-    return eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0
+    return eqns, domain, spatial_methods, dt, u_start, u0, D0
 
 
 @pytest.mark.firedrake
@@ -118,21 +117,15 @@ def test_generic_gusto(use_transport_scheme):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
+    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
 
     # ------------------------------------------------------------------------ #
     # Prepare different methods
     # ------------------------------------------------------------------------ #
 
-    problem = GenericGusto(eqns_with_transport)
+    problem = GenericGusto(eqns)
     stepper_backward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=1.0), spatial_methods)
     stepper_forward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=0.0), spatial_methods)
-    print(' ----- pySDC -----')
-    print(problem.residual.form.__str__())
-    print(' ----- Gusto -----')
-    print(stepper_backward.scheme.residual.form.__str__())
-    print(problem.residual.form.__str__() == stepper_backward.scheme.residual.form.__str__())
-    exit()
 
     # ------------------------------------------------------------------------ #
     # Run tests
@@ -147,7 +140,7 @@ def test_generic_gusto(use_transport_scheme):
     test_error = abs(u_start - un) / abs(u_start)
 
     assert error < 5e-2 * test_error
-    print(error)
+    print(error, test_error)
 
     # test forward Euler step
     stepper_forward.fields("u").assign(u0)
@@ -216,7 +209,7 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
+    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
 
     # ------------------------------------------------------------------------ #
     # Setup pySDC
@@ -311,7 +304,7 @@ def test_pySDC_integrator(use_transport_scheme):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, eqns_with_transport, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=900)
+    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=900)
     eqns.label_terms(lambda t: not t.has_label(time_derivative), implicit)
 
     # ------------------------------------------------------------------------ #
@@ -378,7 +371,7 @@ def test_pySDC_integrator(use_transport_scheme):
         'initial_guess': 'copy',
         'nonlinear_solver_parameters': solver_parameters,
         'linear_solver_parameters': solver_parameters,
-        'final_update': False, 
+        'final_update': False,
     }
 
     # ------------------------------------------------------------------------ #

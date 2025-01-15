@@ -1,11 +1,19 @@
 from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.firedrake_mesh import firedrake_mesh, IMEX_firedrake_mesh
-from gusto.core.labels import time_derivative, implicit, explicit, physics_label, mass_weighted, prognostic
-from firedrake.fml import replace_subject, replace_test_function, Term, all_terms, drop
+from gusto.core.labels import (
+    time_derivative,
+    implicit,
+    explicit,
+    physics_label,
+    mass_weighted,
+    prognostic,
+    transporting_velocity,
+)
+from firedrake.fml import replace_subject, replace_test_function, Term, all_terms, drop, LabelledForm
 import firedrake as fd
 
 
-def setup_equation(equation, spatial_methods):
+def setup_equation(equation, spatial_methods, transporting_vel='prognostic'):
     """
     Sets up the spatial methods for an equation, by the setting the
     forms used for transport/diffusion in the equation.
@@ -43,6 +51,47 @@ def setup_equation(equation, spatial_methods):
     # Replace forms in equation
     for method in spatial_methods:
         method.replace_form(equation)
+
+    equation = setup_transporting_velocity(equation, transporting_vel=transporting_vel)
+    return equation
+
+
+def setup_transporting_velocity(equation, transporting_vel='prognostic'):
+    """
+    Set up the time discretisation by replacing the transporting velocity
+    used by the appropriate one for this time loop.
+    """
+    from firedrake import split
+    import ufl
+
+    if transporting_vel == "prognostic":
+        # Use the prognostic wind variable as the transporting velocity
+        u_idx = equation.field_names.index('u')
+        uadv = split(equation.X)[u_idx]
+    else:
+        uadv = transporting_vel
+
+    equation.residual = equation.residual.label_map(
+        lambda t: t.has_label(transporting_velocity),
+        map_if_true=lambda t: Term(ufl.replace(t.form, {t.get(transporting_velocity): uadv}), t.labels),
+    )
+
+    equation.residual = transporting_velocity.update_value(equation.residual, uadv)
+
+    # Now also replace transporting velocity in the terms that are
+    # contained in labels
+    for idx, t in enumerate(equation.residual.terms):
+        if t.has_label(transporting_velocity):
+            for label in t.labels.keys():
+                if type(t.labels[label]) is LabelledForm:
+                    t.labels[label] = t.labels[label].label_map(
+                        lambda s: s.has_label(transporting_velocity),
+                        map_if_true=lambda s: Term(ufl.replace(s.form, {s.get(transporting_velocity): uadv}), s.labels),
+                    )
+
+                    equation.residual.terms[idx].labels[label] = transporting_velocity.update_value(
+                        t.labels[label], uadv
+                    )
     return equation
 
 
@@ -181,7 +230,7 @@ class GenericGusto(Problem):
 
         if factor not in self.solvers.keys():
             # setup left hand side (M - factor*f)(u)
-            # put in output variable 
+            # put in output variable
             residual = self.residual.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
             # multiply f by factor
             residual = residual.label_map(

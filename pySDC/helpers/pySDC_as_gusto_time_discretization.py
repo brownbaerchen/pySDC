@@ -2,7 +2,7 @@ from gusto.timestepping import BaseTimestepper
 from gusto.time_discretisation.time_discretisation import TimeDiscretisation, wrapper_apply
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
+from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
 
 
 class pySDC_integrator(TimeDiscretisation):
@@ -18,7 +18,10 @@ class pySDC_integrator(TimeDiscretisation):
         limiter=None,
         options=None,
         augmentation=None,
+        spatial_methods=None,
     ):
+        if spatial_methods is not None:
+            equation = setup_equation(equation)
 
         description['problem_class'] = GenericGusto
         description['solver_parameters'] = solver_parameters
