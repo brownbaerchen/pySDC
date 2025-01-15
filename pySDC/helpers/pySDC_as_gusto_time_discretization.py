@@ -21,7 +21,7 @@ class pySDC_integrator(TimeDiscretisation):
         spatial_methods=None,
     ):
         if spatial_methods is not None:
-            equation = setup_equation(equation)
+            equation = setup_equation(equation, spatial_methods=spatial_methods)
 
         description['problem_class'] = GenericGusto
         description['solver_parameters'] = solver_parameters

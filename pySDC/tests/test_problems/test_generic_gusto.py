@@ -255,7 +255,14 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     stepper_gusto = get_gusto_stepper(eqns, gusto_method(domain, solver_parameters=solver_parameters), spatial_methods)
     stepper_pySDC = get_gusto_stepper(
         eqns,
-        pySDC_integrator(eqns, description, controller_params, domain, solver_parameters=solver_parameters),
+        pySDC_integrator(
+            eqns,
+            description,
+            controller_params,
+            domain,
+            solver_parameters=solver_parameters,
+            spatial_methods=spatial_methods,
+        ),
         spatial_methods,
     )
 
@@ -420,7 +427,7 @@ def test_pySDC_integrator(use_transport_scheme):
 
 
 if __name__ == '__main__':
-    test_generic_gusto(True)
-    # test_pySDC_integrator_RK(True, 'RK4')
+    # test_generic_gusto(True)
+    test_pySDC_integrator_RK(True, 'RK4')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
     # test_pySDC_integrator(False)
