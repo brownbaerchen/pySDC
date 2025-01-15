@@ -391,7 +391,14 @@ def test_pySDC_integrator(use_transport_scheme):
     stepper_gusto = get_gusto_stepper(eqns, SDC(**SDC_params, domain=domain), spatial_methods)
     stepper_pySDC = get_gusto_stepper(
         eqns,
-        pySDC_integrator(eqns, description, controller_params, domain, solver_parameters=solver_parameters),
+        pySDC_integrator(
+            eqns,
+            description,
+            controller_params,
+            domain,
+            solver_parameters=solver_parameters,
+            spatial_methods=spatial_methods,
+        ),
         spatial_methods,
     )
 
@@ -433,4 +440,4 @@ if __name__ == '__main__':
     # test_generic_gusto(True)
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    test_pySDC_integrator(False)
+    test_pySDC_integrator(True)
