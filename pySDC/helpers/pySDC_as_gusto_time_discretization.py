@@ -25,7 +25,7 @@ class pySDC_integrator(TimeDiscretisation):
 
         description['problem_class'] = GenericGusto
         description['solver_parameters'] = solver_parameters
-        description['problem_params'] = {'equation': equation}
+        description['problem_params'] = {'equation': equation, 'solver_parameters': solver_parameters}
         description['level_params']['dt'] = float(domain.dt)
 
         self.controller = controller_nonMPI(1, description=description, controller_params=controller_params)

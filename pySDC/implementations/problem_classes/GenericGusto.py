@@ -101,7 +101,7 @@ class GenericGusto(Problem):
     rhs_labels = []
     lhs_labels = []
 
-    def __init__(self, equation, apply_bcs=True, nonlinear_solver_parameters=None, *active_labels):
+    def __init__(self, equation, apply_bcs=True, solver_parameters=None, *active_labels):
         """
         Set up the time discretisation based on the equation.
 
@@ -117,10 +117,10 @@ class GenericGusto(Problem):
         self.field_name = equation.field_name
         self.fs = equation.function_space
         self.idx = None
-        if nonlinear_solver_parameters is None:
+        if solver_parameters is None:
             # default solver parameters
-            nonlinear_solver_parameters = {'ksp_type': 'gmres', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
-        self.nonlinear_solver_parameters = nonlinear_solver_parameters
+            solver_parameters = {'ksp_type': 'gmres', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
+        self.solver_parameters = solver_parameters
 
         if len(active_labels) > 0:
             self.residual = self.residual.label_map(
@@ -217,7 +217,7 @@ class GenericGusto(Problem):
             problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
             solver_name = self.field_name + self.__class__.__name__
             self.solvers['eval_rhs'] = fd.NonlinearVariationalSolver(
-                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+                problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
 
         self.solvers['eval_rhs'].solve()
@@ -244,7 +244,7 @@ class GenericGusto(Problem):
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
             solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
             self.solvers[factor] = fd.NonlinearVariationalSolver(
-                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+                problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
 
         self.solvers[factor].solve()
@@ -270,7 +270,7 @@ class GenericGustoImex(GenericGusto):
             problem = fd.NonlinearVariationalProblem((mass_form + residual).form, self.x_out, bcs=self.bcs)
             solver_name = self.field_name + self.__class__.__name__
             self.solvers[label] = fd.NonlinearVariationalSolver(
-                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+                problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
 
         self.solvers[label].solve()
@@ -299,7 +299,7 @@ class GenericGustoImex(GenericGusto):
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
             solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
             self.solvers[factor] = fd.NonlinearVariationalSolver(
-                problem, solver_parameters=self.nonlinear_solver_parameters, options_prefix=solver_name
+                problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
 
         self.solvers[factor].solve()

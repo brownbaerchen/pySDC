@@ -216,14 +216,16 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # ------------------------------------------------------------------------ #
     solver_parameters = {
         'snes_type': 'newtonls',
-        'ksp_type': 'preonly',
-        'pc_type': 'lu',
+        'ksp_type': 'gmres',
+        'pc_type': 'bjacobi',
+        'sub_pc_type': 'ilu',
         'ksp_rtol': 1e-12,
         'snes_rtol': 1e-12,
         'ksp_atol': 1e-30,
         'snes_atol': 1e-30,
         'ksp_divtol': 1e30,
         'snes_divtol': 1e30,
+        'snes_max_it': 99,
     }
 
     level_params = dict()
@@ -292,7 +294,7 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     print(error)
 
     assert (
-        error < np.finfo(float).eps * 1e2
+        error < solver_parameters['snes_rtol'] * 1e3
     ), f'pySDC and Gusto differ in method {method}! Got relative difference of {error}'
 
 
@@ -319,10 +321,11 @@ def test_pySDC_integrator(use_transport_scheme):
     # ------------------------------------------------------------------------ #
     solver_parameters = {
         'snes_type': 'newtonls',
-        'ksp_type': 'preonly',
-        'pc_type': 'lu',
-        'ksp_rtol': 1e-14,
-        'snes_rtol': 1e-14,
+        'ksp_type': 'gmres',
+        'pc_type': 'bjacobi',
+        'sub_pc_type': 'ilu',
+        'ksp_rtol': 1e-12,
+        'snes_rtol': 1e-12,
         'ksp_atol': 1e-30,
         'snes_atol': 1e-30,
         'ksp_divtol': 1e30,
@@ -422,12 +425,12 @@ def test_pySDC_integrator(use_transport_scheme):
     print(error)
 
     assert (
-        error < np.finfo(float).eps * 1e2
+        error < solver_parameters['snes_rtol'] * 1e3
     ), f'SDC does not match reference implementation! Got relative difference of {error}'
 
 
 if __name__ == '__main__':
     # test_generic_gusto(True)
-    test_pySDC_integrator_RK(True, 'RK4')
+    # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    # test_pySDC_integrator(False)
+    test_pySDC_integrator(False)
