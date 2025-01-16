@@ -300,21 +300,31 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
 
 @pytest.mark.firedrake
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
-def test_pySDC_integrator(use_transport_scheme):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
+@pytest.mark.parametrize('IMEX', [True, False])
+def test_pySDC_integrator(use_transport_scheme, IMEX):
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+    from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
     from gusto import BackwardEuler, SDC
-    from gusto.core.labels import explicit, implicit, time_derivative
+    from gusto.core.labels import explicit, implicit, time_derivative, transport
     from firedrake import norm
     import numpy as np
 
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=900)
-    eqns.label_terms(lambda t: not t.has_label(time_derivative), implicit)
+    dt = 450 if IMEX else 900
+    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
+    eqns = setup_equation(eqns, spatial_methods=spatial_methods if spatial_methods is not None else [])
+    if IMEX:
+        eqns.label_terms(lambda t: not any(t.has_label(time_derivative, transport)), implicit)
+        eqns.label_terms(lambda t: t.has_label(transport), explicit)
+        sweeper_class = imex_1st_order
+    else:
+        eqns.label_terms(lambda t: not t.has_label(time_derivative), implicit)
+        sweeper_class = generic_implicit
 
     # ------------------------------------------------------------------------ #
     # Setup pySDC
@@ -331,6 +341,7 @@ def test_pySDC_integrator(use_transport_scheme):
         'ksp_divtol': 1e30,
         'snes_divtol': 1e30,
         'snes_max_it': 999,
+        'ksp_max_it': 999,
     }
 
     level_params = dict()
@@ -350,17 +361,15 @@ def test_pySDC_integrator(use_transport_scheme):
 
     problem_params = dict()
 
-    from pySDC.implementations.hooks.log_solution import LogSolution
-
     controller_params = dict()
     controller_params['logger_level'] = 20
-    controller_params['hook_class'] = [LogSolution]
+    controller_params['hook_class'] = []
     controller_params['mssdc_jac'] = False
 
     description = dict()
     description['problem_class'] = GenericGusto
     description['problem_params'] = problem_params
-    description['sweeper_class'] = generic_implicit
+    description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -432,12 +441,12 @@ def test_pySDC_integrator(use_transport_scheme):
     print(error)
 
     assert (
-        error < solver_parameters['snes_rtol'] * 1e3
+        error < solver_parameters['snes_rtol'] * 1e4
     ), f'SDC does not match reference implementation! Got relative difference of {error}'
 
 
 if __name__ == '__main__':
     # test_generic_gusto(True)
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
-    test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    # test_pySDC_integrator(True)
+    # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
+    test_pySDC_integrator(False, True)

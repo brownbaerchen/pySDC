@@ -265,12 +265,14 @@ class GenericGusto(Problem):
 class GenericGustoImex(GenericGusto):
     dtype_f = IMEX_firedrake_mesh
 
-    def evaluate_terms_IMEX(self, u, label):
+    def evaluate_individual_term(self, u, label):
         self._u.assign(u.functionspace)
 
         if label not in self.solvers.keys():
             residual = self.residual.label_map(
-                lambda t: t.has_label(label), map_if_true=replace_subject(self._u, old_idx=self.idx), map_if_false=drop
+                lambda t: t.has_label(label) and not t.has_label(time_derivative),
+                map_if_true=replace_subject(self._u, old_idx=self.idx),
+                map_if_false=drop,
             )
             mass_form = self.residual.label_map(
                 lambda t: t.has_label(time_derivative),
@@ -289,24 +291,33 @@ class GenericGustoImex(GenericGusto):
 
     def eval_f(self, u, *args):
         me = self.dtype_f(self.init)
-        if self.imex:
-            me.impl.assign(self.evaluate_terms_IMEX(u, implicit))
-            me.expl.assign(self.evaluate_terms_IMEX(u, explicit))
-        else:
-            me.impl.assign(self.evaluate_terms_fully_implicit(u))
-            me.expl.assign(0)
+        me.impl.assign(self.evaluate_individual_term(u, implicit))
+        me.expl.assign(self.evaluate_individual_term(u, explicit))
         return me
 
     def solve_system(self, rhs, factor, u0, *args):
         self.x_out.assign(u0.functionspace)  # set initial guess
         self._u.assign(rhs.functionspace)
 
-        mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
-
         if factor not in self.solvers.keys():
-            residual = mass_form.label_map(all_terms, map_if_true=replace_subject(self.x_out, old_idx=self.idx))
-            raise NotImplementedError
+            # setup left hand side (M - factor*f_I)(u)
+            # put in output variable
+            residual = self.residual.label_map(
+                lambda t: t.has_label(time_derivative) or t.has_label(implicit),
+                map_if_true=replace_subject(self.x_out, old_idx=self.idx),
+                map_if_false=drop,
+            )
+            # multiply f_I by factor
+            residual = residual.label_map(
+                lambda t: t.has_label(implicit) and not t.has_label(time_derivative),
+                map_if_true=lambda t: fd.Constant(factor) * t,
+            )
 
+            # subtract right hand side
+            mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
+            residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
+
+            # construct solver
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
             solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
             self.solvers[factor] = fd.NonlinearVariationalSolver(
