@@ -307,6 +307,7 @@ class Adaptivity(AdaptivityBase):
         """
         defaults = {
             "embedded_error_flavor": 'standard',
+            "rel_error": False,
         }
         return {**defaults, **super().setup(controller, params, description, **kwargs)}
 
@@ -328,6 +329,9 @@ class Adaptivity(AdaptivityBase):
         controller.add_convergence_controller(
             EstimateEmbeddedError.get_implementation(self.params.embedded_error_flavor, self.params.useMPI),
             description=description,
+            params={
+                'rel_error': self.params.rel_error,
+            },
         )
 
         # load contraction factor estimator if necessary
