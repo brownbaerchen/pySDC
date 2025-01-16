@@ -65,7 +65,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     # ------------------------------------------------------------------------ #
 
     # Domain
-    ncells_per_edge = 16
+    ncells_per_edge = 12
     mesh = GeneralIcosahedralSphereMesh(radius, ncells_per_edge, degree=2)
     domain = Domain(mesh, dt, 'BDM', element_order)
     x, y, z = SpatialCoordinate(mesh)
@@ -439,5 +439,5 @@ def test_pySDC_integrator(use_transport_scheme):
 if __name__ == '__main__':
     # test_generic_gusto(True)
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
-    # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    test_pySDC_integrator(True)
+    test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
+    # test_pySDC_integrator(True)

@@ -1,4 +1,4 @@
-from pySDC.core.problem import Problem
+from pySDC.core.problem import Problem, WorkCounter
 from pySDC.implementations.datatype_classes.firedrake_mesh import firedrake_mesh, IMEX_firedrake_mesh
 from gusto.core.labels import (
     time_derivative,
@@ -198,6 +198,10 @@ class GenericGusto(Problem):
         self._u = fd.Function(self.fs)
 
         super().__init__(self.fs)
+        self.work_counters['rhs'] = WorkCounter()
+        self.work_counters['ksp'] = WorkCounter()
+        self.work_counters['solver_setup'] = WorkCounter()
+        self.work_counters['solver'] = WorkCounter()
 
     def eval_f(self, u, *args):
         self._u.assign(u.functionspace)
@@ -219,8 +223,10 @@ class GenericGusto(Problem):
             self.solvers['eval_rhs'] = fd.NonlinearVariationalSolver(
                 problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
+            self.work_counters['solver_setup']()
 
         self.solvers['eval_rhs'].solve()
+        self.work_counters['rhs']()
 
         return self.dtype_f(self.x_out)
 
@@ -241,13 +247,18 @@ class GenericGusto(Problem):
             mass_form = self.residual.label_map(lambda t: t.has_label(time_derivative), map_if_false=drop)
             residual -= mass_form.label_map(all_terms, map_if_true=replace_subject(self._u, old_idx=self.idx))
 
+            # construct solver
             problem = fd.NonlinearVariationalProblem(residual.form, self.x_out, bcs=self.bcs)
             solver_name = f'{self.field_name}-{self.__class__.__name__}-{factor}'
             self.solvers[factor] = fd.NonlinearVariationalSolver(
                 problem, solver_parameters=self.solver_parameters, options_prefix=solver_name
             )
+            self.work_counters['solver_setup']()
 
         self.solvers[factor].solve()
+
+        self.work_counters['ksp'].niter += self.solvers[factor].snes.getLinearSolveIterations()
+        self.work_counters['solver']()
         return self.dtype_u(self.x_out)
 
 

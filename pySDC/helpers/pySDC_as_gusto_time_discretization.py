@@ -19,6 +19,7 @@ class pySDC_integrator(TimeDiscretisation):
         options=None,
         augmentation=None,
         spatial_methods=None,
+        t0=0,
     ):
         if spatial_methods is not None:
             equation = setup_equation(equation, spatial_methods=spatial_methods)
@@ -32,6 +33,8 @@ class pySDC_integrator(TimeDiscretisation):
         self.P = self.controller.MS[0].levels[0].prob
         self.sweeper = self.controller.MS[0].levels[0].sweep
         self.x0_pySDC = self.P.dtype_u(self.P.init)
+        self.t = 0
+        self.stats = {}
 
         if not solver_parameters:
             # default solver parameters
@@ -59,5 +62,7 @@ class pySDC_integrator(TimeDiscretisation):
         assert self.controller.MS[0].levels[0].params.dt == float(
             self.dt
         ), 'Step sizes have diverged between pySDC and Gusto'
-        uend, _ = self.controller.run(u0=self.x0_pySDC, t0=0, Tend=float(self.dt))
+        uend, _stats = self.controller.run(u0=self.x0_pySDC, t0=self.t, Tend=self.t + float(self.dt))
+        self.t += float(self.dt)
+        self.stats = {**self.stats, **_stats}
         x_out.assign(uend.functionspace)
