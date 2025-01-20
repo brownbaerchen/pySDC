@@ -842,6 +842,7 @@ class AdaptivityPolynomialError(AdaptivityForConvergedCollocationProblems):
         defaults = {
             'control_order': -50,
             'problem_mesh_type': 'numpyesque',
+            'rel_error': False,
             **super().setup(controller, params, description, **kwargs),
             **params,
         }
