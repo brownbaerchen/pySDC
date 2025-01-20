@@ -61,9 +61,10 @@ class Heat1DForcedFiredrake(Problem):
         super().__init__(self.V)
         self._makeAttributeAndRegister('n', 'nu', 'c', 'LHS_cache_size', 'comm', localVars=locals(), readOnly=True)
 
+        # prepare caches and IO variables for solvers
         self.solvers = {}
-        self.rhs = {}
-        self.tmp = fd.Function(self.V)
+        self.tmp_in = fd.Function(self.V)
+        self.tmp_out = fd.Function(self.V)
 
         self.work_counters['solver_setup'] = WorkCounter()
         self.work_counters['solves'] = WorkCounter()
@@ -88,22 +89,23 @@ class Heat1DForcedFiredrake(Problem):
             The evaluated right hand side
         """
         if not hasattr(self, '__solv_eval_f_implicit'):
-            _u = u.functionspace
             v = fd.TestFunction(self.V)
             u_trial = fd.TrialFunction(self.V)
 
             a = u_trial * v * fd.dx
-            L_impl = -fd.inner(self.nu * fd.nabla_grad(_u), fd.nabla_grad(v)) * fd.dx
+            L_impl = -fd.inner(self.nu * fd.nabla_grad(self.tmp_in), fd.nabla_grad(v)) * fd.dx
 
             bcs = [fd.bcs.DirichletBC(self.V, fd.Constant(0), area) for area in [1, 2]]
 
-            prob = fd.LinearVariationalProblem(a, L_impl, self.tmp, bcs=bcs)
+            prob = fd.LinearVariationalProblem(a, L_impl, self.tmp_out, bcs=bcs)
             self.__solv_eval_f_implicit = fd.LinearVariationalSolver(prob)
+
+        self.tmp_in.assign(u.functionspace)
 
         self.__solv_eval_f_implicit.solve()
 
         me = self.dtype_f(self.init)
-        me.impl.assign(self.tmp)
+        me.impl.assign(self.tmp_out)
 
         x = fd.SpatialCoordinate(self.mesh)
         me.expl.interpolate(-(np.sin(t) - self.nu * np.pi**2 * np.cos(t)) * fd.sin(np.pi * x[0]))
@@ -135,28 +137,26 @@ class Heat1DForcedFiredrake(Problem):
 
         if factor not in self.solvers.keys():
             if len(self.solvers) >= self.LHS_cache_size:
-                self.rhs.pop(list(self.solvers.keys())[0])
                 self.solvers.pop(list(self.solvers.keys())[0])
-
-            self.rhs[factor] = fd.Function(self.V)
 
             u = fd.TrialFunction(self.V)
             v = fd.TestFunction(self.V)
 
             a = u * v * fd.dx + fd.Constant(factor) * fd.inner(self.nu * fd.nabla_grad(u), fd.nabla_grad(v)) * fd.dx
-            L = fd.inner(self.rhs[factor], v) * fd.dx
+            L = fd.inner(self.tmp_in, v) * fd.dx
 
             bcs = [fd.bcs.DirichletBC(self.V, fd.Constant(self.c), area) for area in [1, 2]]
 
-            prob = fd.LinearVariationalProblem(a, L, self.tmp, bcs=bcs)
+            prob = fd.LinearVariationalProblem(a, L, self.tmp_out, bcs=bcs)
             self.solvers[factor] = fd.LinearVariationalSolver(prob)
 
             self.work_counters['solver_setup']()
 
-        self.rhs[factor].assign(rhs.functionspace)
+        self.tmp_in.assign(rhs.functionspace)
+        self.tmp_out.assign(rhs.functionspace)
         self.solvers[factor].solve()
         me = self.dtype_u(self.init)
-        me.assign(self.tmp)
+        me.assign(self.tmp_out)
         self.work_counters['solves']()
         return me
 
