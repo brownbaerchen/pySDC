@@ -1,3 +1,7 @@
+"""
+Simple example running a forced heat equation in Firedrake
+"""
+
 import numpy as np
 from mpi4py import MPI
 

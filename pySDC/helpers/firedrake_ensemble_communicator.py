@@ -5,10 +5,10 @@ import numpy as np
 
 class FiredrakeEnsembleCommunicator:
     """
-    Ensemble communicator for performing multiple similar distributed simulations with firedrake, see https://www.firedrakeproject.org/firedrake/parallelism.html
+    Ensemble communicator for performing multiple similar distributed simulations with Firedrake, see https://www.firedrakeproject.org/firedrake/parallelism.html
     This is intended to do space-time parallelism in pySDC.
     This class wraps the time communicator. All requests that are not overloaded are passed to the time communicator. For instance, `ensemble.rank` will return the rank in the time communicator.
-    Some operations are overloaded to use the interface of the MPI communicator but handles with the ensemble communicator instead.
+    Some operations are overloaded to use the interface of the MPI communicator but handles communication with the ensemble communicator instead.
     """
 
     def __init__(self, comm, space_size):
@@ -34,12 +34,18 @@ class FiredrakeEnsembleCommunicator:
         return getattr(self.time_comm, name)
 
     def Reduce(self, sendbuf, recvbuf, op=MPI.SUM, root=0):
-        assert op == MPI.SUM
-        self.ensemble.reduce(sendbuf, recvbuf, root=root)
+        if type(sendbuf) in [np.ndarray]:
+            self.ensemble.ensemble_comm.Reduce(sendbuf, recvbuf, op, root)
+        else:
+            assert op == MPI.SUM
+            self.ensemble.reduce(sendbuf, recvbuf, root=root)
 
     def Allreduce(self, sendbuf, recvbuf, op=MPI.SUM):
-        assert op == MPI.SUM
-        self.ensemble.allreduce(sendbuf, recvbuf)
+        if type(sendbuf) in [np.ndarray]:
+            self.ensemble.ensemble_comm.Allreduce(sendbuf, recvbuf, op)
+        else:
+            assert op == MPI.SUM
+            self.ensemble.allreduce(sendbuf, recvbuf)
 
     def Bcast(self, buf, root=0):
         if type(buf) in [np.ndarray]:
