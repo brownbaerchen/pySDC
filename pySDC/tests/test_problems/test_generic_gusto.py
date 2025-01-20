@@ -447,6 +447,6 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
 
 if __name__ == '__main__':
     # test_generic_gusto(True)
-    # test_pySDC_integrator_RK(True, 'BackwardEuler')
+    test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    test_pySDC_integrator(False, True)
+    # test_pySDC_integrator(False, True)

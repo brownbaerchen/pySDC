@@ -1,5 +1,6 @@
 from mpi4py import MPI
 import firedrake as fd
+import numpy as np
 
 
 class FiredrakeEnsembleCommunicator:
@@ -36,8 +37,15 @@ class FiredrakeEnsembleCommunicator:
         assert op == MPI.SUM
         self.ensemble.reduce(sendbuf, recvbuf, root=root)
 
+    def Allreduce(self, sendbuf, recvbuf, op=MPI.SUM):
+        assert op == MPI.SUM
+        self.ensemble.allreduce(sendbuf, recvbuf)
+
     def Bcast(self, buf, root=0):
-        self.ensemble.bcast(buf, root=root)
+        if type(buf) in [np.ndarray]:
+            self.ensemble.ensemble_comm.Bcast(buf, root)
+        else:
+            self.ensemble.bcast(buf, root=root)
 
 
 def get_ensemble(comm, space_size):
