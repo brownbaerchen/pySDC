@@ -447,7 +447,8 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
 
 @pytest.mark.firedrake
 @pytest.mark.parametrize('IMEX', [True, False])
-def test_pySDC_integrator_with_adaptivity(IMEX):
+@pytest.mark.parametrize('dt', [50, 500])
+def test_pySDC_integrator_with_adaptivity(IMEX, dt):
     from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
@@ -468,7 +469,6 @@ def test_pySDC_integrator_with_adaptivity(IMEX):
     # ------------------------------------------------------------------------ #
     use_transport_scheme = True
 
-    dt = 50
     eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
     eqns = setup_equation(eqns, spatial_methods=spatial_methods if spatial_methods is not None else [])
     if IMEX:
@@ -593,15 +593,15 @@ def test_pySDC_integrator_with_adaptivity(IMEX):
         # update step size
         stepper_gusto.dt = Constant(_dt[1])
 
-        stepper_gusto.scheme.Q *= float(_dt[1]/old_dt)
-        stepper_gusto.scheme.Qdelta_imp *= float(_dt[1]/old_dt)
-        stepper_gusto.scheme.Qdelta_exp *= float(_dt[1]/old_dt)
-        stepper_gusto.scheme.nodes *= float(_dt[1]/old_dt)
+        stepper_gusto.scheme.Q *= float(_dt[1] / old_dt)
+        stepper_gusto.scheme.Qdelta_imp *= float(_dt[1] / old_dt)
+        stepper_gusto.scheme.Qdelta_exp *= float(_dt[1] / old_dt)
+        stepper_gusto.scheme.nodes *= float(_dt[1] / old_dt)
 
-        old_dt = _dt[1] * 1.
+        old_dt = _dt[1] * 1.0
 
         # run
-        stepper_gusto.run(t=_dt[0], tmax = _dt[0] + _dt[1])
+        stepper_gusto.run(t=_dt[0], tmax=_dt[0] + _dt[1])
 
     assert np.isclose(float(stepper_pySDC.t), float(stepper_gusto.t))
 
@@ -619,14 +619,14 @@ def test_pySDC_integrator_with_adaptivity(IMEX):
     )
 
     # compute round-off error: Warning: It's large!
-    roundoff_Q = np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:]*_dt[1]))
+    roundoff_Q = np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:] * _dt[1]))
     roundoff = roundoff_Q * max(norm(stepper_gusto.fields(comp)) for comp in ['u', 'D'])
 
     print(error, roundoff)
 
     assert (
         error < roundoff * 1e2
-        ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}, while round-off error is roughly {roundoff:.2e}'
+    ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}, while round-off error is roughly {roundoff:.2e}'
 
 
 if __name__ == '__main__':
@@ -634,4 +634,4 @@ if __name__ == '__main__':
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
     # test_pySDC_integrator(False, True)
-    test_pySDC_integrator_with_adaptivity(True)
+    test_pySDC_integrator_with_adaptivity(True, 500)
