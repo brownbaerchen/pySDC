@@ -3,12 +3,13 @@ import pytest
 
 def get_gusto_stepper(eqns, method, spatial_methods):
     from gusto import Timestepper, IO, OutputParameters, Sum, MeridionalComponent, RelativeVorticity, ZonalComponent
-    import numpy as np
+    import sys
 
-    # TODO: Can I get rid of the output here?
+    if '--running-tests' not in sys.argv:
+        sys.argv.append('--running-tests')
 
     output = OutputParameters(
-        dirname=f'./tmp{np.random.randint(1e9)}',
+        dirname='./tmp',
         dumplist_latlon=['D'],
         dumpfreq=1000000000,
         dump_vtus=True,
@@ -619,13 +620,13 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
     )
 
     # compute round-off error: Warning: It's large!
-    roundoff_Q = np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:] * _dt[1]))
+    roundoff_Q = max([np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:] * _dt[1])), np.finfo(float).eps*1e2])
     roundoff = roundoff_Q * max(norm(stepper_gusto.fields(comp)) for comp in ['u', 'D'])
 
     print(error, roundoff)
 
     assert (
-        error < roundoff * 1e2
+        error < roundoff * 1e1
     ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}, while round-off error is roughly {roundoff:.2e}'
 
 
@@ -634,4 +635,4 @@ if __name__ == '__main__':
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
     # test_pySDC_integrator(False, True)
-    test_pySDC_integrator_with_adaptivity(True, 500)
+    test_pySDC_integrator_with_adaptivity(False, 500)
