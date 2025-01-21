@@ -235,7 +235,8 @@ class EstimatePolynomialErrorFiredrake(EstimatePolynomialError):
 
     def get_interpolated_solution(self, L):
         """
-        Get the interpolated solution for numpy or cupy data types
+        Get the interpolated solution for Firedrake data types
+        We are not 100% sure that you don't need to invert the mass matrix here, but should be fine.
 
         Args:
             u_vec (array): Vector of solutions
