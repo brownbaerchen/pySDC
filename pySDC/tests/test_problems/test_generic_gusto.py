@@ -2,7 +2,7 @@ import pytest
 
 
 def get_gusto_stepper(eqns, method, spatial_methods):
-    from gusto import Timestepper, IO, OutputParameters, Sum, MeridionalComponent, RelativeVorticity, ZonalComponent
+    from gusto import Timestepper, IO, OutputParameters, Sum, MeridionalComponent, RelativeVorticity, ZonalComponent, PrescribedTransport
     import sys
 
     if '--running-tests' not in sys.argv:
@@ -18,7 +18,88 @@ def get_gusto_stepper(eqns, method, spatial_methods):
     )
     diagnostic_fields = [Sum('D', 'topography'), RelativeVorticity(), MeridionalComponent('u'), ZonalComponent('u')]
     io = IO(method.domain, output, diagnostic_fields=diagnostic_fields)
-    return Timestepper(eqns, method, io, spatial_methods=spatial_methods)
+    return PrescribedTransport(eqns, method, io, False, transport_method=spatial_methods)
+    # return Timestepper(eqns, method, io, spatial_methods=spatial_methods)
+
+def tracer_setup(tmpdir='./tmp', degree=1, small_dt=False):
+    from firedrake import (IcosahedralSphereMesh, PeriodicIntervalMesh,
+                           ExtrudedMesh, SpatialCoordinate, as_vector,
+                       sqrt, exp, pi)
+    from gusto import OutputParameters, Domain, IO
+    from collections import namedtuple
+
+    opts = ('domain', 'tmax', 'io', 'f_init', 'f_end', 'degree',
+            'uexpr', 'umax', 'radius', 'tol')
+    TracerSetup = namedtuple('TracerSetup', opts)
+    TracerSetup.__new__.__defaults__ = (None,)*len(opts)
+
+
+    radius = 1
+    mesh = IcosahedralSphereMesh(radius=radius,
+                                 refinement_level=3,
+                                 degree=1)
+    x = SpatialCoordinate(mesh)
+
+    # Parameters chosen so that dt != 1
+    # Gaussian is translated from (lon=pi/2, lat=0) to (lon=0, lat=0)
+    # to demonstrate that transport is working correctly
+    if small_dt:
+        dt = pi/3. * 0.005
+    else:
+        dt = pi/3. * 0.02
+
+    output = OutputParameters(dirname=str(tmpdir), dumpfreq=15)
+    domain = Domain(mesh, dt, family="BDM", degree=degree)
+    io = IO(domain, output)
+
+    umax = 1.0
+    uexpr = as_vector([- umax * x[1] / radius, umax * x[0] / radius, 0.0])
+
+    tmax = pi/2
+    f_init = exp(-x[2]**2 - x[0]**2)
+    f_end = exp(-x[2]**2 - x[1]**2)
+
+    tol = 0.05
+
+    return TracerSetup(domain, tmax, io, f_init, f_end, degree,
+                       uexpr, umax, radius, tol)
+
+
+@pytest.fixture
+def gusto_tracer_setup():
+    return tracer_setup()
+
+def get_gusto_advection_setup(use_transport_scheme, setup):
+    from gusto import ContinuityEquation, AdvectionEquation, split_continuity_form, DGUpwind
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
+
+    domain = setup.domain
+    V = domain.spaces("DG")
+
+    eqn = ContinuityEquation(domain, V, "f")
+    eqn = split_continuity_form(eqn)
+
+    transport_methods = [DGUpwind(eqn, 'f')]
+    spatial_methods = None
+
+    if use_transport_scheme:
+        eqn = setup_equation(eqn, transport_methods, transporting_vel=eqn.prescribed_fields('u'))
+        spatial_methods = transport_methods
+
+    problem = GenericGusto(eqn)
+
+    # Initial conditions
+    # u_start = problem.dtype_u(problem.init)
+    # u0, f0 = u_start.subfunctions[:]
+    # f0.interpolate(setup.f_init)
+    # u0.project(setup.uexpr)
+    # u_start.project(setup.uexpr)
+
+    return eqn, domain, spatial_methods, setup
+
+    timestepper.fields("f").interpolate(setup.f_init)
+    timestepper.fields("u").project(setup.uexpr)
+    assert run(timestepper, setup.tmax, setup.f_end) < setup.tol
 
 
 def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
@@ -87,7 +168,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     spatial_methods = None
 
     if use_transport_scheme:
-        eqns = setup_equation(eqns, transport_methods)
+        eqns = setup_equation(eqns, transport_methods, transporting_vel=eqn.prescribed_fields('u'))
         spatial_methods = transport_methods
 
     problem = GenericGusto(eqns)
@@ -178,7 +259,7 @@ def test_generic_gusto(use_transport_scheme):
 @pytest.mark.firedrake
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 @pytest.mark.parametrize('method', ['RK4', 'ImplicitMidpoint', 'BackwardEuler'])
-def test_pySDC_integrator_RK(use_transport_scheme, method):
+def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
     from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.Runge_Kutta import ImplicitMidpointMethod
@@ -210,7 +291,9 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
+    #eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
+    eqns, domain, spatial_methods, setup = get_gusto_advection_setup(True, setup)
+    dt = domain.dt
 
     # ------------------------------------------------------------------------ #
     # Setup pySDC
@@ -274,8 +357,10 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # ------------------------------------------------------------------------ #
 
     def run(stepper, n_steps):
-        stepper.fields("u").assign(u0)
-        stepper.fields("D").assign(D0)
+        # stepper.fields("u").assign(u0)
+        # stepper.fields("D").assign(D0)
+        stepper.fields("f").interpolate(setup.f_init)
+        stepper.fields("u").project(setup.uexpr)
         stepper.run(t=0, tmax=n_steps * dt)
 
     for stepper in [stepper_gusto, stepper_pySDC]:
@@ -631,6 +716,10 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
 
 
 if __name__ == '__main__':
+    setup = tracer_setup()
+    eqns = get_gusto_advection_setup(True, setup)
+    test_pySDC_integrator_RK(False, 'RK4', setup)
+    exit()
     # test_generic_gusto(True)
     # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')

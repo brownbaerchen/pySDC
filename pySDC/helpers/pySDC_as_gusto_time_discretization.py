@@ -42,7 +42,7 @@ class pySDC_integrator(TimeDiscretisation):
         t0=0,
     ):
         if spatial_methods is not None:
-            equation = setup_equation(equation, spatial_methods=spatial_methods)
+            equation = setup_equation(equation, spatial_methods=spatial_methods, transporting_vel=equation.prescribed_fields('u'))
 
         # Check if any terms are explicit
         IMEX = any(t.has_label(explicit) for t in equation.residual)
