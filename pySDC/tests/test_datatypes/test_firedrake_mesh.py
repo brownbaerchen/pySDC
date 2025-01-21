@@ -13,15 +13,8 @@ def test_addition(n=3, v1=1, v2=2):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.assign(ic)
-    b.assign(ic)
-
-    a.dat._numpy_data[:] = v1
-
-    b.dat._numpy_data[:] = v2
+    a.assign(v1)
+    b.assign(v2)
 
     c = a + b
 
@@ -39,18 +32,10 @@ def test_subtraction(n=3, v1=1, v2=2):
     mesh = fd.UnitSquareMesh(n, n)
     V = fd.VectorFunctionSpace(mesh, "CG", 2)
 
-    a = firedrake_mesh(V)
-    b = firedrake_mesh(a)
-
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.assign(ic)
-    b.assign(ic)
-
-    a.dat._numpy_data[:] = v1
-
-    b.dat._numpy_data[:] = v2
+    a = firedrake_mesh(V, val=v1)
+    _b = fd.Function(V)
+    _b.assign(v2)
+    b = firedrake_mesh(_b)
 
     c = a - b
 
@@ -71,12 +56,7 @@ def test_right_multiplication(n=3, v1=1, v2=2):
     a = firedrake_mesh(V)
     b = firedrake_mesh(a)
 
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.assign(ic)
-
-    a.dat._numpy_data[:] = v1
+    a.assign(v1)
 
     b = v2 * a
 
@@ -93,15 +73,8 @@ def test_norm(n=3, v1=-1):
     mesh = fd.UnitSquareMesh(n, n)
     V = fd.VectorFunctionSpace(mesh, "CG", 1)
 
-    a = firedrake_mesh(V)
+    a = firedrake_mesh(V, val=v1)
     b = firedrake_mesh(a)
-
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.assign(ic)
-
-    a.dat._numpy_data[:] = v1
 
     b = abs(a)
 
@@ -118,22 +91,8 @@ def test_addition_rhs(n=3, v1=1, v2=2):
     mesh = fd.UnitSquareMesh(n, n)
     V = fd.VectorFunctionSpace(mesh, "CG", 2)
 
-    a = IMEX_firedrake_mesh(V)
-    b = IMEX_firedrake_mesh(a)
-
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.impl.assign(ic)
-    b.impl.assign(ic)
-    a.expl.assign(ic)
-    b.expl.assign(ic)
-
-    a.impl.dat._numpy_data[:] = v1
-    a.expl.dat._numpy_data[:] = v1
-
-    b.impl.dat._numpy_data[:] = v2
-    b.expl.dat._numpy_data[:] = v2
+    a = IMEX_firedrake_mesh(V, val=v1)
+    b = IMEX_firedrake_mesh(V, val=v2)
 
     c = a + b
 
@@ -154,22 +113,8 @@ def test_subtraction_rhs(n=3, v1=1, v2=2):
     mesh = fd.UnitSquareMesh(n, n)
     V = fd.VectorFunctionSpace(mesh, "CG", 2)
 
-    a = IMEX_firedrake_mesh(V)
-    b = IMEX_firedrake_mesh(a)
-
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.impl.assign(ic)
-    b.impl.assign(ic)
-    a.expl.assign(ic)
-    b.expl.assign(ic)
-
-    a.impl.dat._numpy_data[:] = v1
-    a.expl.dat._numpy_data[:] = v1
-
-    b.impl.dat._numpy_data[:] = v2
-    b.expl.dat._numpy_data[:] = v2
+    a = IMEX_firedrake_mesh(V, val=v1)
+    b = IMEX_firedrake_mesh(V, val=v2)
 
     c = a - b
 
@@ -190,16 +135,7 @@ def test_rmul_rhs(n=3, v1=1, v2=2):
     mesh = fd.UnitSquareMesh(n, n)
     V = fd.VectorFunctionSpace(mesh, "CG", 2)
 
-    a = IMEX_firedrake_mesh(V)
-
-    # TODO: get rid of this, but somehow I need this to get `.dat._numpy_data`.
-    x = fd.SpatialCoordinate(mesh)
-    ic = fd.project(fd.as_vector([fd.sin(fd.pi * x[0]), 0]), V)
-    a.impl.assign(ic)
-    a.expl.assign(ic)
-
-    a.impl.dat._numpy_data[:] = v1
-    a.expl.dat._numpy_data[:] = v1
+    a = IMEX_firedrake_mesh(V, val=v1)
 
     b = v2 * a
 
