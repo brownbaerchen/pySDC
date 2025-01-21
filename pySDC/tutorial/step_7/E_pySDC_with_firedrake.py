@@ -1,5 +1,11 @@
 """
-Simple example running a forced heat equation in Firedrake
+Simple example running a forced heat equation in Firedrake.
+
+The function `setup` generates the description and controller_params dictionaries needed to run SDC with diagonal preconditioner.
+This proceeds very similar to earlier tutorials. The interesting part of this tutorial is rather in the problem class.
+See `pySDC/implementations/problem_classes/HeatFiredrake` for an easy example of how to use Firedrake within pySDC.
+
+Run in serial using simply `python E_pySDC_with_Firedrake.py` or with parallel diagonal SDC with `mpiexec -np 3 python E_pySDC_with_Firedrake.py`.
 """
 
 import numpy as np
@@ -106,4 +112,4 @@ def runHeatFiredrake(useMPIsweeper):
 
 
 if __name__ == "__main__":
-    runHeatFiredrake(MPI.COMM_WORLD.size > 1)
+    runHeatFiredrake(useMPIsweeper=MPI.COMM_WORLD.size > 1)

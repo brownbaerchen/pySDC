@@ -200,6 +200,7 @@ jobs:
         run: |
           . /home/firedrake/firedrake/bin/activate
           firedrake-clean
+          cd ./pySDC
           coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m firedrake
         timeout-minutes: 120
       - name: Make coverage report

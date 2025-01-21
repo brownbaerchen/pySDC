@@ -54,10 +54,23 @@ class Heat1DForcedFiredrake(Problem):
     dtype_f = IMEX_firedrake_mesh
 
     def __init__(self, n=30, nu=0.1, c=0.0, LHS_cache_size=12, comm=None):
+        """
+        Initialization
+
+        Args:
+            n (int): Number of degrees of freedom
+            nu (float): Diffusion parameter
+            c (float): Boundary condition constant
+            LHS_cache_size (int): Size of the cache for solvers
+            comm (mpi4pi.Intracomm): MPI communicator for spatial parallelism
+        """
         comm = MPI.COMM_WORLD if comm is None else comm
+
+        # prepare Firedrake mesh and function space
         self.mesh = fd.UnitIntervalMesh(n, comm=comm)
         self.V = fd.FunctionSpace(self.mesh, "CG", 4)
 
+        # prepare pySDC problem class infrastructure by passing the function space to super init
         super().__init__(self.V)
         self._makeAttributeAndRegister('n', 'nu', 'c', 'LHS_cache_size', 'comm', localVars=locals(), readOnly=True)
 
@@ -66,6 +79,7 @@ class Heat1DForcedFiredrake(Problem):
         self.tmp_in = fd.Function(self.V)
         self.tmp_out = fd.Function(self.V)
 
+        # prepare work counters
         self.work_counters['solver_setup'] = WorkCounter()
         self.work_counters['solves'] = WorkCounter()
         self.work_counters['rhs'] = WorkCounter()
@@ -75,6 +89,7 @@ class Heat1DForcedFiredrake(Problem):
         Evaluate the right hand side.
         The forcing term is simply interpolated to the grid.
         The Laplacian is evaluated via a variational problem, where the mass matrix is inverted and homogeneous boundary conditions are applied.
+        Note that we cache the solver to obtain much better performance.
 
         Parameters
         ----------
@@ -88,6 +103,7 @@ class Heat1DForcedFiredrake(Problem):
         f : dtype_f
             The evaluated right hand side
         """
+        # construct and cache a solver for the implicit part of the right hand side evaluation
         if not hasattr(self, '__solv_eval_f_implicit'):
             v = fd.TestFunction(self.V)
             u_trial = fd.TrialFunction(self.V)
@@ -100,13 +116,19 @@ class Heat1DForcedFiredrake(Problem):
             prob = fd.LinearVariationalProblem(a, L_impl, self.tmp_out, bcs=bcs)
             self.__solv_eval_f_implicit = fd.LinearVariationalSolver(prob)
 
+        # copy the solution we want to evaluate at into the input buffer
         self.tmp_in.assign(u.functionspace)
 
+        # perform the solve using the cached solver
         self.__solv_eval_f_implicit.solve()
 
         me = self.dtype_f(self.init)
+
+        # copy the result of the solver from the output buffer to the variable this function returns
         me.impl.assign(self.tmp_out)
 
+        # evaluate explicit part.
+        # Because it does not depend on the current solution, we can simply interpolate the expression
         x = fd.SpatialCoordinate(self.mesh)
         me.expl.interpolate(-(np.sin(t) - self.nu * np.pi**2 * np.cos(t)) * fd.sin(np.pi * x[0]))
 
@@ -135,7 +157,10 @@ class Heat1DForcedFiredrake(Problem):
             Solution.
         """
 
+        # construct and cache a solver for the current factor (preconditioner entry times step size)
         if factor not in self.solvers.keys():
+
+            # check if we need to evict something from the cache
             if len(self.solvers) >= self.LHS_cache_size:
                 self.solvers.pop(list(self.solvers.keys())[0])
 
@@ -152,11 +177,17 @@ class Heat1DForcedFiredrake(Problem):
 
             self.work_counters['solver_setup']()
 
+        # copy solver rhs to the input buffer. Copying also to the output buffer uses it as initial guess
         self.tmp_in.assign(rhs.functionspace)
         self.tmp_out.assign(rhs.functionspace)
+
+        # call the cached solver
         self.solvers[factor].solve()
+
+        # copy from output buffer to return variable
         me = self.dtype_u(self.init)
         me.assign(self.tmp_out)
+
         self.work_counters['solves']()
         return me
 
