@@ -193,7 +193,7 @@ jobs:
       - name: Install pySDC
         run: |
           . /home/firedrake/firedrake/bin/activate
-          export PYTHONPATH=$PYTHONPATH:/repositories/pySDC/
+          python -m pip install --no-deps -e /repositories/pySDC
           python -m pip install qmat
       - name: Install gusto
         run: |
