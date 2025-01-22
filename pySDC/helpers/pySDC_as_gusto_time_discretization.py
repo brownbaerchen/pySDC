@@ -44,33 +44,6 @@ class pySDC_integrator(TimeDiscretisation):
         if spatial_methods is not None:
             equation = setup_equation(equation, spatial_methods=spatial_methods)
 
-        # Check if any terms are explicit
-        IMEX = any(t.has_label(explicit) for t in equation.residual)
-        if IMEX:
-            description['problem_class'] = GenericGustoImex
-        else:
-            description['problem_class'] = GenericGusto
-
-        description['solver_parameters'] = solver_parameters
-        description['problem_params'] = {'equation': equation, 'solver_parameters': solver_parameters}
-        description['level_params']['dt'] = float(domain.dt)
-
-        hook_class = controller_params.get('hook_class', [])
-        if not type(hook_class) == list:
-            hook_class = [hook_class]
-        hook_class.append(LogTime)
-        controller_params['hook_class'] = hook_class
-
-        self.controller = controller_nonMPI(1, description=description, controller_params=controller_params)
-        self.P = self.level.prob
-        self.sweeper = self.level.sweep
-        self.x0_pySDC = self.P.dtype_u(self.P.init)
-        self.t = 0
-        self.stats = {}
-
-        if not solver_parameters:
-            # default solver parameters
-            solver_parameters = {'ksp_type': 'gmres', 'pc_type': 'bjacobi', 'sub_pc_type': 'ilu'}
         super().__init__(
             domain=domain,
             field_name=field_name,
@@ -81,11 +54,37 @@ class pySDC_integrator(TimeDiscretisation):
             augmentation=augmentation,
         )
 
+        # Check if any terms are explicit
+        IMEX = any(t.has_label(explicit) for t in equation.residual)
+        if IMEX:
+            description['problem_class'] = GenericGustoImex
+        else:
+            description['problem_class'] = GenericGusto
+
+        description['problem_params'] = {'equation': equation, 'solver_parameters': self.solver_parameters}
+        description['level_params']['dt'] = float(domain.dt)
+
+        # this is required for step size adaptivity
+        hook_class = controller_params.get('hook_class', [])
+        if not type(hook_class) == list:
+            hook_class = [hook_class]
+        hook_class.append(LogTime)
+        controller_params['hook_class'] = hook_class
+
+        # prepare controller and variables
+        self.controller = controller_nonMPI(1, description=description, controller_params=controller_params)
+        self.P = self.level.prob
+        self.sweeper = self.level.sweep
+        self.x0_pySDC = self.P.dtype_u(self.P.init)
+        self.t = 0
+        self.stats = {}
+
         self.timestepper = None
         self.dt_next = None
 
     @property
     def level(self):
+        """Get the finest pySDC level"""
         return self.controller.MS[0].levels[0]
 
     @wrapper_apply

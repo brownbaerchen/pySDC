@@ -87,7 +87,6 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
     spatial_methods = None
 
     if use_transport_scheme:
-        eqns = setup_equation(eqns, transport_methods)
         spatial_methods = transport_methods
 
     problem = GenericGusto(eqns)
@@ -111,7 +110,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
 @pytest.mark.firedrake
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 def test_generic_gusto(use_transport_scheme):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
     from gusto import ThetaMethod
     import numpy as np
 
@@ -119,6 +118,8 @@ def test_generic_gusto(use_transport_scheme):
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
     eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
+    if spatial_methods is not None:
+        eqns = setup_equation(eqns, spatial_methods)
 
     # ------------------------------------------------------------------------ #
     # Prepare different methods
@@ -620,7 +621,12 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
     )
 
     # compute round-off error: Warning: It's large!
-    roundoff_Q = max([np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:] * _dt[1])), np.finfo(float).eps*1e2])
+    roundoff_Q = max(
+        [
+            np.max(np.abs(stepper_gusto.scheme.Q - stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:] * _dt[1])),
+            np.finfo(float).eps * 1e2,
+        ]
+    )
     roundoff = roundoff_Q * max(norm(stepper_gusto.fields(comp)) for comp in ['u', 'D'])
 
     print(error, roundoff)
@@ -632,7 +638,7 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
 
 if __name__ == '__main__':
     # test_generic_gusto(True)
-    # test_pySDC_integrator_RK(True, 'BackwardEuler')
+    test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
     # test_pySDC_integrator(False, True)
-    test_pySDC_integrator_with_adaptivity(False, 500)
+    # test_pySDC_integrator_with_adaptivity(False, 500)
