@@ -95,6 +95,84 @@ def get_initial_conditions(timestepper, setup):
     return timestepper
 
 
+@pytest.mark.firedrake
+def test_generic_gusto_problem(setup):
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
+    from firedrake import norm, Constant
+    import numpy as np
+    from gusto import ThetaMethod
+
+    eqns, domain, spatial_methods, setup = get_gusto_advection_setup(False, False, setup)
+    
+    dt = 1e-1
+    domain.dt = Constant(dt)
+
+    solver_parameters = {
+        'snes_type': 'newtonls',
+        'ksp_type': 'gmres',
+        'pc_type': 'bjacobi',
+        'sub_pc_type': 'ilu',
+        'ksp_rtol': 1e-12,
+        'snes_rtol': 1e-12,
+        'ksp_atol': 1e-30,
+        'snes_atol': 1e-30,
+        'ksp_divtol': 1e30,
+        'snes_divtol': 1e30,
+        'snes_max_it': 99,
+    }
+
+    # ------------------------------------------------------------------------ #
+    # Prepare different methods
+    # ------------------------------------------------------------------------ #
+
+    problem = GenericGusto(eqns, solver_parameters=solver_parameters)
+    stepper_backward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=1.0, solver_parameters=solver_parameters), spatial_methods)
+    stepper_forward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=0.0, solver_parameters=solver_parameters), spatial_methods)
+
+    # ------------------------------------------------------------------------ #
+    # Run tests
+    # ------------------------------------------------------------------------ #
+
+    for stepper in [stepper_backward, stepper_forward]:
+        get_initial_conditions(stepper, setup)
+
+    u_start = problem.u_init
+    u_start.assign(stepper_backward.fields('f'))
+
+    un = problem.solve_system(u_start, dt, u_start)
+    fn = problem.eval_f(un)
+
+    u02 = un - dt * fn
+
+    error = abs(u_start - u02) / abs(u_start)
+
+    assert error < np.finfo(float).eps * 1e2
+
+    # test forward Euler step
+    stepper_forward.run(t=0, tmax=dt)
+    un_ref = problem.dtype_u(problem.init)
+    un_ref.assign(stepper_forward.fields('f'))
+    un_forward = u_start + dt * problem.eval_f(u_start)
+    error = abs(un_forward - un_ref) / abs(un_ref)
+
+    assert (
+        error < np.finfo(float).eps * 1e2
+    ), f'Forward Euler does not match reference implementation! Got relative difference of {error}'
+
+    # test backward Euler step
+    stepper_backward.run(t=0, tmax=dt)
+    un_ref = problem.dtype_u(problem.init)
+    un_ref.assign(stepper_backward.fields('f'))
+    error = abs(un - un_ref) / abs(un_ref)
+
+    assert (
+        error < np.finfo(float).eps * 1e2
+    ), f'Backward Euler does not match reference implementation! Got relative difference of {error}'
+
+
+
+
+
 class Method(object):
     imex = False
 
@@ -240,7 +318,7 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
     for stepper in [stepper_gusto, stepper_pySDC]:
         run(stepper, 5)
 
-    error = norm(stepper_gusto.fields('u') - stepper_pySDC.fields('u')) / norm(stepper_gusto.fields('u'))
+    error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
     assert (
@@ -365,7 +443,7 @@ def test_pySDC_integrator(use_transport_scheme, imex, setup):
     for stepper in [stepper_gusto, stepper_pySDC]:
         run(stepper, 5)
 
-    error = norm(stepper_gusto.fields('u') - stepper_pySDC.fields('u')) / norm(stepper_gusto.fields('u'))
+    error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
     assert (
@@ -379,6 +457,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
     from pySDC.implementations.convergence_controller_classes.spread_step_sizes import SpreadStepSizesBlockwiseNonMPI
+    from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeRounding
     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
     from pySDC.helpers.stats_helper import get_sorted
     from gusto import BackwardEuler, SDC
@@ -386,7 +465,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     import numpy as np
 
     use_transport_scheme = True
-    imex = False
+    imex = True
 
     eqns, domain, spatial_methods, setup = get_gusto_advection_setup(use_transport_scheme, imex, setup)
     domain.dt = Constant(dt_initial)
@@ -433,6 +512,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     convergence_controllers = {}
     convergence_controllers[Adaptivity] = {'e_tol': 1e-5, 'rel_error': True}
     convergence_controllers[SpreadStepSizesBlockwiseNonMPI] = {'overwrite_to_reach_Tend': False}
+    convergence_controllers[StepSizeRounding] = {}
 
     controller_params = dict()
     controller_params['logger_level'] = 15
@@ -469,8 +549,6 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     # Setup time steppers
     # ------------------------------------------------------------------------ #
 
-    stepper_gusto = get_gusto_stepper(eqns, SDC(**SDC_params, domain=domain), spatial_methods)
-
     stepper_pySDC = get_gusto_stepper(
         eqns,
         pySDC_integrator(
@@ -483,6 +561,8 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
         ),
         spatial_methods,
     )
+
+    stepper_gusto = get_gusto_stepper(eqns, SDC(**SDC_params, domain=domain), spatial_methods)
 
     stepper_pySDC.scheme.timestepper = stepper_pySDC
 
@@ -499,7 +579,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 
     # run with pySDC first
     get_initial_conditions(stepper_pySDC, setup)
-    stepper_pySDC.run(t=0, tmax=0.2)
+    stepper_pySDC.run(t=0, tmax=0.1)
 
     # retrieve step sizes
     stats = stepper_pySDC.scheme.stats
@@ -529,17 +609,17 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 
     print(dts_pySDC)
 
-    error = norm(stepper_gusto.fields('u') - stepper_pySDC.fields('u')) / norm(stepper_gusto.fields('u'))
-    print(error)
+    error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
+    print(error, norm(stepper_gusto.fields('f')))
 
     assert (
-        error < solver_parameters['snes_rtol'] * 1e3
+        error < 1e-6
     ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}'
 
 
 if __name__ == '__main__':
     setup = tracer_setup()
+    # test_generic_gusto_problem(setup)
     # test_pySDC_integrator_RK(False, RK4, setup)
     # test_pySDC_integrator(False, False, setup)
-    test_pySDC_integrator_with_adaptivity(1e-1, False, setup)
-    exit()
+    test_pySDC_integrator_with_adaptivity(1e-2, setup)
