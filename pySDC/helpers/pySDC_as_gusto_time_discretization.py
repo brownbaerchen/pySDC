@@ -39,6 +39,7 @@ class pySDC_integrator(TimeDiscretisation):
         options=None,
         augmentation=None,
         t0=0,
+        imex=False,
     ):
 
         self._residual = None
@@ -57,13 +58,14 @@ class pySDC_integrator(TimeDiscretisation):
         self.controller_params = controller_params
         self.timestepper = None
         self.dt_next = None
+        self.imex = imex
 
     def setup(self, equation, apply_bcs=True, *active_labels):
         super().setup(equation, apply_bcs, *active_labels)
 
         # Check if any terms are explicit
-        IMEX = any(t.has_label(explicit) for t in equation.residual)
-        if IMEX:
+        imex = any(t.has_label(explicit) for t in equation.residual) or self.imex
+        if imex:
             self.description['problem_class'] = GenericGustoImex
         else:
             self.description['problem_class'] = GenericGusto
