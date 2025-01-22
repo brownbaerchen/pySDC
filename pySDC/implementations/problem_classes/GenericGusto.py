@@ -108,6 +108,7 @@ class GenericGusto(Problem):
         solver_parameters=None,
         stop_at_divergence=False,
         LHS_cache_size=12,
+        residual=None,
         *active_labels,
     ):
         """
@@ -123,7 +124,7 @@ class GenericGusto(Problem):
         # TODO: documentation of __init__
 
         self.equation = equation
-        self.residual = equation.residual
+        self.residual = equation.residual if residual is None else residual
         self.field_name = equation.field_name
         self.fs = equation.function_space
         self.idx = None
@@ -147,10 +148,6 @@ class GenericGusto(Problem):
         self.work_counters['ksp'] = WorkCounter()
         self.work_counters['solver_setup'] = WorkCounter()
         self.work_counters['solver'] = WorkCounter()
-
-    # @property
-    # def residual(self):
-    #     return self.equation.residual
 
     @property
     def bcs(self):

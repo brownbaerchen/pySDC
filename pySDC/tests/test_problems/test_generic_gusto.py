@@ -264,7 +264,6 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
             controller_params,
             domain,
             solver_parameters=solver_parameters,
-            spatial_methods=spatial_methods,
         ),
         spatial_methods,
     )
@@ -408,7 +407,6 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
             controller_params,
             domain,
             solver_parameters=solver_parameters,
-            spatial_methods=spatial_methods,
         ),
         spatial_methods,
     )
@@ -567,7 +565,6 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
             controller_params,
             domain,
             solver_parameters=solver_parameters,
-            spatial_methods=spatial_methods,
         ),
         spatial_methods,
     )

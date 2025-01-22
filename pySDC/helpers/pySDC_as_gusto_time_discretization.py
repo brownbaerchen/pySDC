@@ -38,11 +38,10 @@ class pySDC_integrator(TimeDiscretisation):
         limiter=None,
         options=None,
         augmentation=None,
-        spatial_methods=None,
         t0=0,
     ):
-        if spatial_methods is not None:
-            equation = setup_equation(equation, spatial_methods=spatial_methods)
+
+        self._residual = None
 
         super().__init__(
             domain=domain,
@@ -54,33 +53,56 @@ class pySDC_integrator(TimeDiscretisation):
             augmentation=augmentation,
         )
 
+        self.description = description
+        self.controller_params = controller_params
+        self.timestepper = None
+        self.dt_next = None
+
+    def setup(self, equation, apply_bcs=True, *active_labels):
+        super().setup(equation, apply_bcs, *active_labels)
+
         # Check if any terms are explicit
         IMEX = any(t.has_label(explicit) for t in equation.residual)
         if IMEX:
-            description['problem_class'] = GenericGustoImex
+            self.description['problem_class'] = GenericGustoImex
         else:
-            description['problem_class'] = GenericGusto
+            self.description['problem_class'] = GenericGusto
 
-        description['problem_params'] = {'equation': equation, 'solver_parameters': self.solver_parameters}
-        description['level_params']['dt'] = float(domain.dt)
+        self.description['problem_params'] = {
+            'equation': equation,
+            'solver_parameters': self.solver_parameters,
+            'residual': self._residual,
+        }
+        self.description['level_params']['dt'] = float(self.domain.dt)
 
         # this is required for step size adaptivity
-        hook_class = controller_params.get('hook_class', [])
+        hook_class = self.controller_params.get('hook_class', [])
         if not type(hook_class) == list:
             hook_class = [hook_class]
         hook_class.append(LogTime)
-        controller_params['hook_class'] = hook_class
+        self.controller_params['hook_class'] = hook_class
 
         # prepare controller and variables
-        self.controller = controller_nonMPI(1, description=description, controller_params=controller_params)
-        self.P = self.level.prob
+        self.controller = controller_nonMPI(1, description=self.description, controller_params=self.controller_params)
+        self.prob = self.level.prob
         self.sweeper = self.level.sweep
-        self.x0_pySDC = self.P.dtype_u(self.P.init)
+        self.x0_pySDC = self.prob.dtype_u(self.prob.init)
         self.t = 0
         self.stats = {}
 
-        self.timestepper = None
-        self.dt_next = None
+    @property
+    def residual(self):
+        if hasattr(self, 'prob'):
+            return self.prob.residual
+        else:
+            return self._residual
+
+    @residual.setter
+    def residual(self, value):
+        if hasattr(self, 'prob'):
+            self.prob.residual = value
+        else:
+            self._residual = value
 
     @property
     def level(self):
