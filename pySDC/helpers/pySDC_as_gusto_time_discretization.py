@@ -26,6 +26,13 @@ class LogTime(Hooks):
 
 
 class pySDC_integrator(TimeDiscretisation):
+    """
+    This class can be entered into Gusto as a time discretization scheme and will solve steps using pySDC.
+    It will construct a pySDC controller can be used by itself and will be used within the time step when called from
+    Gusto. Access the controller via `pySDC_integrator.controller`. This class also has `pySDC_integrator.stats`,
+    which gathers all of the pySDC stats recorded in the hooks during every time step when used within Gusto.
+    """
+
     def __init__(
         self,
         equation,
@@ -41,6 +48,32 @@ class pySDC_integrator(TimeDiscretisation):
         t0=0,
         imex=False,
     ):
+        """
+        Initialization
+
+        Args:
+            equation (:class:`PrognosticEquation`): the prognostic equation.
+            description (dict): pySDC description
+            controller_params (dict): pySDC controller params
+            domain (:class:`Domain`): the model's domain object, containing the
+                mesh and the compatible function spaces.
+            field_name (str, optional): name of the field to be evolved.
+                Defaults to None.
+            subcycling_options(:class:`SubcyclingOptions`, optional): an object
+                containing options for subcycling the time discretisation.
+                Defaults to None.
+            solver_parameters (dict, optional): dictionary of parameters to
+                pass to the underlying solver. Defaults to None.
+            limiter (:class:`Limiter` object, optional): a limiter to apply to
+                the evolving field to enforce monotonicity. Defaults to None.
+            options (:class:`AdvectionOptions`, optional): an object containing
+                options to either be passed to the spatial discretisation, or
+                to control the "wrapper" methods, such as Embedded DG or a
+                recovery method. Defaults to None.
+            augmentation (:class:`Augmentation`): allows the equation solved in
+                this time discretisation to be augmented, for instances with
+                extra terms of another auxiliary variable. Defaults to None.
+        """
 
         self._residual = None
 
@@ -143,5 +176,6 @@ class pySDC_integrator(TimeDiscretisation):
 
         self.dt = self.level.params.dt
 
+        # update stats and output
         self.stats = {**self.stats, **_stats}
         x_out.assign(uend.functionspace)

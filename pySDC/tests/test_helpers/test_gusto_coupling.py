@@ -103,7 +103,7 @@ def test_generic_gusto_problem(setup):
     from gusto import ThetaMethod
 
     eqns, domain, spatial_methods, setup = get_gusto_advection_setup(False, False, setup)
-    
+
     dt = 1e-1
     domain.dt = Constant(dt)
 
@@ -126,8 +126,12 @@ def test_generic_gusto_problem(setup):
     # ------------------------------------------------------------------------ #
 
     problem = GenericGusto(eqns, solver_parameters=solver_parameters)
-    stepper_backward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=1.0, solver_parameters=solver_parameters), spatial_methods)
-    stepper_forward = get_gusto_stepper(eqns, ThetaMethod(domain, theta=0.0, solver_parameters=solver_parameters), spatial_methods)
+    stepper_backward = get_gusto_stepper(
+        eqns, ThetaMethod(domain, theta=1.0, solver_parameters=solver_parameters), spatial_methods
+    )
+    stepper_forward = get_gusto_stepper(
+        eqns, ThetaMethod(domain, theta=0.0, solver_parameters=solver_parameters), spatial_methods
+    )
 
     # ------------------------------------------------------------------------ #
     # Run tests
@@ -168,9 +172,6 @@ def test_generic_gusto_problem(setup):
     assert (
         error < np.finfo(float).eps * 1e2
     ), f'Backward Euler does not match reference implementation! Got relative difference of {error}'
-
-
-
 
 
 class Method(object):
