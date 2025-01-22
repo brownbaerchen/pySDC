@@ -180,7 +180,6 @@ def test_generic_gusto(use_transport_scheme):
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 @pytest.mark.parametrize('method', ['RK4', 'ImplicitMidpoint', 'BackwardEuler'])
 def test_pySDC_integrator_RK(use_transport_scheme, method):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.Runge_Kutta import ImplicitMidpointMethod
     from pySDC.implementations.sweeper_classes.Runge_Kutta import RK4 as RK4_pySDC
@@ -368,7 +367,6 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
     controller_params['mssdc_jac'] = False
 
     description = dict()
-    description['problem_class'] = GenericGusto
     description['problem_params'] = problem_params
     description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
@@ -449,7 +447,7 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
 @pytest.mark.parametrize('IMEX', [True, False])
 @pytest.mark.parametrize('dt', [50, 500])
 def test_pySDC_integrator_with_adaptivity(IMEX, dt):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
+    from pySDC.implementations.problem_classes.GenericGusto import setup_equation
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
@@ -525,7 +523,6 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
     controller_params['mssdc_jac'] = False
 
     description = dict()
-    description['problem_class'] = GenericGusto
     description['problem_params'] = problem_params
     description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
