@@ -66,6 +66,7 @@ def setup():
 
 def get_gusto_advection_setup(use_transport_scheme, imex, setup):
     from gusto import ContinuityEquation, AdvectionEquation, split_continuity_form, DGUpwind
+    from gusto.core.labels import time_derivative, transport, implicit, explicit
 
     domain = setup.domain
     V = domain.spaces("DG")
@@ -80,10 +81,10 @@ def get_gusto_advection_setup(use_transport_scheme, imex, setup):
         spatial_methods = transport_methods
 
     if imex:
-        from gusto.core.labels import time_derivative, transport, implicit, explicit
-
         eqn.label_terms(lambda t: not any(t.has_label(time_derivative, transport)), implicit)
         eqn.label_terms(lambda t: t.has_label(transport), explicit)
+    else:
+        eqn.label_terms(lambda t: not t.has_label(time_derivative), implicit)
 
     return eqn, domain, spatial_methods, setup
 
@@ -155,12 +156,8 @@ class BackwardEuler(Method):
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 @pytest.mark.parametrize('method', [RK4, ImplicitMidpoint, BackwardEuler])
 def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
-    from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
-    from pySDC.implementations.sweeper_classes.Runge_Kutta import ImplicitMidpointMethod
-    from pySDC.implementations.sweeper_classes.Runge_Kutta import RK4 as RK4_pySDC
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
-    from gusto import ImplicitMidpoint, RK4
     from firedrake import norm
     import numpy as np
 
@@ -251,153 +248,131 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
     ), f'pySDC and Gusto differ in method {method}! Got relative difference of {error}'
 
 
-# @pytest.mark.firedrake
-# @pytest.mark.parametrize('use_transport_scheme', [True, False])
-# @pytest.mark.parametrize('IMEX', [True, False])
-# def test_pySDC_integrator(use_transport_scheme, IMEX):
-#     from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
-#     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
-#     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
-#     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-#     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
-#     from gusto import BackwardEuler, SDC
-#     from gusto.core.labels import explicit, implicit, time_derivative, transport
-#     from firedrake import norm
-#     import numpy as np
-#
-#     # ------------------------------------------------------------------------ #
-#     # Get shallow water setup
-#     # ------------------------------------------------------------------------ #
-#     dt = 450 if IMEX else 900
-#     eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
-#     eqns = setup_equation(eqns, spatial_methods=spatial_methods if spatial_methods is not None else [])
-#     if IMEX:
-#         eqns.label_terms(lambda t: not any(t.has_label(time_derivative, transport)), implicit)
-#         eqns.label_terms(lambda t: t.has_label(transport), explicit)
-#         sweeper_class = imex_1st_order
-#     else:
-#         eqns.label_terms(lambda t: not t.has_label(time_derivative), implicit)
-#         sweeper_class = generic_implicit
-#
-#     # ------------------------------------------------------------------------ #
-#     # Setup pySDC
-#     # ------------------------------------------------------------------------ #
-#     solver_parameters = {
-#         'snes_type': 'newtonls',
-#         'ksp_type': 'gmres',
-#         'pc_type': 'bjacobi',
-#         'sub_pc_type': 'ilu',
-#         'ksp_rtol': 1e-12,
-#         'snes_rtol': 1e-12,
-#         'ksp_atol': 1e-30,
-#         'snes_atol': 1e-30,
-#         'ksp_divtol': 1e30,
-#         'snes_divtol': 1e30,
-#         'snes_max_it': 999,
-#         'ksp_max_it': 999,
-#     }
-#
-#     level_params = dict()
-#     level_params['restol'] = -1
-#     level_params['residual_type'] = 'full_rel'
-#
-#     step_params = dict()
-#     step_params['maxiter'] = 3
-#
-#     sweeper_params = dict()
-#     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-#     sweeper_params['node_type'] = 'LEGENDRE'
-#     sweeper_params['num_nodes'] = 2
-#     sweeper_params['QI'] = 'IE'
-#     sweeper_params['QE'] = 'PIC'
-#     sweeper_params['initial_guess'] = 'copy'
-#
-#     problem_params = dict()
-#
-#     controller_params = dict()
-#     controller_params['logger_level'] = 20
-#     controller_params['hook_class'] = []
-#     controller_params['mssdc_jac'] = False
-#
-#     description = dict()
-#     description['problem_class'] = GenericGusto
-#     description['problem_params'] = problem_params
-#     description['sweeper_class'] = sweeper_class
-#     description['sweeper_params'] = sweeper_params
-#     description['level_params'] = level_params
-#     description['step_params'] = step_params
-#
-#     # ------------------------------------------------------------------------ #
-#     # Setup SDC in gusto
-#     # ------------------------------------------------------------------------ #
-#
-#     SDC_params = {
-#         'base_scheme': BackwardEuler(domain, solver_parameters=solver_parameters),
-#         'M': sweeper_params['num_nodes'],
-#         'maxk': step_params['maxiter'],
-#         'quad_type': sweeper_params['quad_type'],
-#         'node_type': sweeper_params['node_type'],
-#         'qdelta_imp': sweeper_params['QI'],
-#         'qdelta_exp': sweeper_params['QE'],
-#         'formulation': 'Z2N',
-#         'initial_guess': 'copy',
-#         'nonlinear_solver_parameters': solver_parameters,
-#         'linear_solver_parameters': solver_parameters,
-#         'final_update': False,
-#     }
-#
-#     # ------------------------------------------------------------------------ #
-#     # Setup time steppers
-#     # ------------------------------------------------------------------------ #
-#
-#     stepper_gusto = get_gusto_stepper(eqns, SDC(**SDC_params, domain=domain), spatial_methods)
-#     stepper_pySDC = get_gusto_stepper(
-#         eqns,
-#         pySDC_integrator(
-#             eqns,
-#             description,
-#             controller_params,
-#             domain,
-#             solver_parameters=solver_parameters,
-#             spatial_methods=spatial_methods,
-#         ),
-#         spatial_methods,
-#     )
-#
-#     # ------------------------------------------------------------------------ #
-#     # Run tests
-#     # ------------------------------------------------------------------------ #
-#
-#     assert np.allclose(stepper_gusto.scheme.nodes / dt, stepper_pySDC.scheme.sweeper.coll.nodes)
-#     assert np.allclose(stepper_gusto.scheme.Q / dt, stepper_pySDC.scheme.sweeper.coll.Qmat[1:, 1:])
-#     assert np.allclose(stepper_gusto.scheme.Qdelta_imp / dt, stepper_pySDC.scheme.sweeper.QI[1:, 1:])
-#
-#     def run(stepper, n_steps):
-#         stepper.fields("u").assign(u0)
-#         stepper.fields("D").assign(D0)
-#         stepper.run(t=0, tmax=n_steps * dt)
-#
-#     for stepper in [stepper_gusto, stepper_pySDC]:
-#         run(stepper, 10)
-#
-#     print(
-#         norm(stepper_gusto.fields('u') - u0) / norm(stepper_gusto.fields('u')),
-#         norm(stepper_pySDC.fields('u') - u0) / norm(stepper_gusto.fields('u')),
-#     )
-#
-#     error = max(
-#         [
-#             norm(stepper_gusto.fields(comp) - stepper_pySDC.fields(comp)) / norm(stepper_gusto.fields(comp))
-#             for comp in ['u', 'D']
-#         ]
-#     )
-#     print(error)
-#
-#     assert (
-#         error < solver_parameters['snes_rtol'] * 1e4
-#     ), f'SDC does not match reference implementation! Got relative difference of {error}'
-#
-#
+@pytest.mark.firedrake
+@pytest.mark.parametrize('use_transport_scheme', [True, False])
+@pytest.mark.parametrize('imex', [True, False])
+def test_pySDC_integrator(use_transport_scheme, imex, setup):
+    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+    from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
+    from gusto import BackwardEuler, SDC
+    from firedrake import norm
+    import numpy as np
+
+    eqns, domain, spatial_methods, setup = get_gusto_advection_setup(use_transport_scheme, imex, setup)
+
+    solver_parameters = {
+        'snes_type': 'newtonls',
+        'ksp_type': 'gmres',
+        'pc_type': 'bjacobi',
+        'sub_pc_type': 'ilu',
+        'ksp_rtol': 1e-12,
+        'snes_rtol': 1e-12,
+        'ksp_atol': 1e-30,
+        'snes_atol': 1e-30,
+        'ksp_divtol': 1e30,
+        'snes_divtol': 1e30,
+        'snes_max_it': 99,
+    }
+
+    # ------------------------------------------------------------------------ #
+    # Setup pySDC
+    # ------------------------------------------------------------------------ #
+    if imex:
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_cls
+    else:
+        from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_cls
+
+    level_params = dict()
+    level_params['restol'] = -1
+    level_params['residual_type'] = 'full_rel'
+
+    step_params = dict()
+    step_params['maxiter'] = 3
+
+    sweeper_params = dict()
+    sweeper_params['quad_type'] = 'RADAU-RIGHT'
+    sweeper_params['node_type'] = 'LEGENDRE'
+    sweeper_params['num_nodes'] = 2
+    sweeper_params['QI'] = 'IE'
+    sweeper_params['QE'] = 'PIC'
+    sweeper_params['initial_guess'] = 'copy'
+
+    problem_params = dict()
+
+    controller_params = dict()
+    controller_params['logger_level'] = 20
+    controller_params['mssdc_jac'] = False
+
+    description = dict()
+    description['problem_params'] = problem_params
+    description['sweeper_class'] = sweeper_cls
+    description['sweeper_params'] = sweeper_params
+    description['level_params'] = level_params
+    description['step_params'] = step_params
+
+    # ------------------------------------------------------------------------ #
+    # Setup SDC in gusto
+    # ------------------------------------------------------------------------ #
+
+    SDC_params = {
+        'base_scheme': BackwardEuler(domain, solver_parameters=solver_parameters),
+        'M': sweeper_params['num_nodes'],
+        'maxk': step_params['maxiter'],
+        'quad_type': sweeper_params['quad_type'],
+        'node_type': sweeper_params['node_type'],
+        'qdelta_imp': sweeper_params['QI'],
+        'qdelta_exp': sweeper_params['QE'],
+        'formulation': 'Z2N',
+        'initial_guess': 'copy',
+        'nonlinear_solver_parameters': solver_parameters,
+        'linear_solver_parameters': solver_parameters,
+        'final_update': False,
+    }
+
+    # ------------------------------------------------------------------------ #
+    # Setup time steppers
+    # ------------------------------------------------------------------------ #
+
+    stepper_gusto = get_gusto_stepper(eqns, SDC(**SDC_params, domain=domain), spatial_methods)
+
+    stepper_pySDC = get_gusto_stepper(
+        eqns,
+        pySDC_integrator(
+            eqns,
+            description,
+            controller_params,
+            domain,
+            solver_parameters=solver_parameters,
+            imex=imex,
+        ),
+        spatial_methods,
+    )
+
+    # ------------------------------------------------------------------------ #
+    # Initial conditions
+    # ------------------------------------------------------------------------ #
+
+    for stepper in [stepper_gusto, stepper_pySDC]:
+        get_initial_conditions(stepper, setup)
+
+    # ------------------------------------------------------------------------ #
+    # Run tests
+    # ------------------------------------------------------------------------ #
+
+    def run(stepper, n_steps):
+        stepper.run(t=0, tmax=n_steps * float(domain.dt))
+
+    for stepper in [stepper_gusto, stepper_pySDC]:
+        run(stepper, 5)
+
+    error = norm(stepper_gusto.fields('u') - stepper_pySDC.fields('u')) / norm(stepper_gusto.fields('u'))
+    print(error)
+
+    assert (
+        error < solver_parameters['snes_rtol'] * 1e3
+    ), f'pySDC and Gusto differ in SDC! Got relative difference of {error}'
+
+
 # @pytest.mark.firedrake
 # @pytest.mark.parametrize('IMEX', [True, False])
 # @pytest.mark.parametrize('dt', [50, 500])
@@ -584,10 +559,6 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
 
 if __name__ == '__main__':
     setup = tracer_setup()
-    test_pySDC_integrator_RK(False, RK4, setup)
+    # test_pySDC_integrator_RK(False, RK4, setup)
+    test_pySDC_integrator(False, False, setup)
     exit()
-    # test_generic_gusto(True)
-    # test_pySDC_integrator_RK(True, 'BackwardEuler')
-    # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    # test_pySDC_integrator(False, True)
-    # test_pySDC_integrator_with_adaptivity(False, 500)
