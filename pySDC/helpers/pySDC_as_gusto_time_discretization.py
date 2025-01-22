@@ -5,7 +5,7 @@ from gusto.time_discretisation.time_discretisation import TimeDiscretisation, wr
 from gusto.core.labels import implicit, explicit
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, GenericGustoImex, setup_equation
+from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, GenericGustoImex
 from pySDC.core.hooks import Hooks
 from pySDC.helpers.stats_helper import get_sorted
 

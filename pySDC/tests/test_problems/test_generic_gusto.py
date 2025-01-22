@@ -29,7 +29,7 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
 
     The example here uses the icosahedral sphere mesh and degree 1 spaces.
     """
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
 
     from firedrake import SpatialCoordinate, as_vector, pi, sqrt, min_value
     from gusto import (
@@ -108,18 +108,15 @@ def get_gusto_SWE_setup(use_transport_scheme, dt=4000):
 
 
 @pytest.mark.firedrake
-@pytest.mark.parametrize('use_transport_scheme', [True, False])
-def test_generic_gusto(use_transport_scheme):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
+def test_generic_gusto():
+    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto
     from gusto import ThetaMethod
     import numpy as np
 
     # ------------------------------------------------------------------------ #
     # Get shallow water setup
     # ------------------------------------------------------------------------ #
-    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme)
-    if spatial_methods is not None:
-        eqns = setup_equation(eqns, spatial_methods)
+    eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme=False)
 
     # ------------------------------------------------------------------------ #
     # Prepare different methods
@@ -302,7 +299,6 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
 @pytest.mark.parametrize('use_transport_scheme', [True, False])
 @pytest.mark.parametrize('IMEX', [True, False])
 def test_pySDC_integrator(use_transport_scheme, IMEX):
-    from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, setup_equation
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
@@ -317,7 +313,6 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
     # ------------------------------------------------------------------------ #
     dt = 450 if IMEX else 900
     eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
-    eqns = setup_equation(eqns, spatial_methods=spatial_methods if spatial_methods is not None else [])
     if IMEX:
         eqns.label_terms(lambda t: not any(t.has_label(time_derivative, transport)), implicit)
         eqns.label_terms(lambda t: t.has_label(transport), explicit)
@@ -447,7 +442,6 @@ def test_pySDC_integrator(use_transport_scheme, IMEX):
 @pytest.mark.parametrize('IMEX', [True, False])
 @pytest.mark.parametrize('dt', [50, 500])
 def test_pySDC_integrator_with_adaptivity(IMEX, dt):
-    from pySDC.implementations.problem_classes.GenericGusto import setup_equation
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
     from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
@@ -468,7 +462,6 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
     use_transport_scheme = True
 
     eqns, domain, spatial_methods, dt, u_start, u0, D0 = get_gusto_SWE_setup(use_transport_scheme, dt=dt)
-    eqns = setup_equation(eqns, spatial_methods=spatial_methods if spatial_methods is not None else [])
     if IMEX:
         eqns.label_terms(lambda t: not any(t.has_label(time_derivative, transport)), implicit)
         eqns.label_terms(lambda t: t.has_label(transport), explicit)
@@ -632,7 +625,7 @@ def test_pySDC_integrator_with_adaptivity(IMEX, dt):
 
 if __name__ == '__main__':
     # test_generic_gusto(True)
-    test_pySDC_integrator_RK(True, 'BackwardEuler')
+    # test_pySDC_integrator_RK(True, 'BackwardEuler')
     # test_pySDC_integrator_RK(False, 'ImplicitMidpoint')
-    # test_pySDC_integrator(False, True)
-    # test_pySDC_integrator_with_adaptivity(False, 500)
+    # test_pySDC_integrator(True, True)
+    test_pySDC_integrator_with_adaptivity(True, 500)
