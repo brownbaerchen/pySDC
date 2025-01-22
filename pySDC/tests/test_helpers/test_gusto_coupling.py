@@ -261,7 +261,6 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
 
     level_params = dict()
     level_params['restol'] = -1
-    level_params['residual_type'] = 'full_rel'
 
     step_params = dict()
     step_params['maxiter'] = 1
@@ -362,7 +361,6 @@ def test_pySDC_integrator(use_transport_scheme, imex, setup):
 
     level_params = dict()
     level_params['restol'] = -1
-    level_params['residual_type'] = 'full_rel'
 
     step_params = dict()
     step_params['maxiter'] = 3
@@ -494,7 +492,6 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 
     level_params = dict()
     level_params['restol'] = -1
-    level_params['residual_type'] = 'full_rel'
 
     step_params = dict()
     step_params['maxiter'] = 3
@@ -595,10 +592,10 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
         # update step size
         stepper_gusto.dt = Constant(_dt[1])
 
-        stepper_gusto.scheme.Q *= float(_dt[1] / old_dt)
-        stepper_gusto.scheme.Qdelta_imp *= float(_dt[1] / old_dt)
-        stepper_gusto.scheme.Qdelta_exp *= float(_dt[1] / old_dt)
-        stepper_gusto.scheme.nodes *= float(_dt[1] / old_dt)
+        stepper_gusto.scheme.Q *= _dt[1] / old_dt
+        stepper_gusto.scheme.Qdelta_imp *= _dt[1] / old_dt
+        stepper_gusto.scheme.Qdelta_exp *= _dt[1] / old_dt
+        stepper_gusto.scheme.nodes *= _dt[1] / old_dt
 
         old_dt = _dt[1] * 1.0
 
