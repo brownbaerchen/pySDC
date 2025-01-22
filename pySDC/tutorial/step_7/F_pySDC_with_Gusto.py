@@ -1,11 +1,24 @@
 """
-Example for running pySDC together with Gusto. This test runs a shallow water
-equation and may take a considerable amount of time.
-Test Case 5 (flow over a mountain) of Williamson et al, 1992:
+Example for running pySDC together with Gusto. This test runs a shallow water equation and may take a considerable
+amount of time. After you have run it, move on to step F_2, which includes a plotting script.
+
+This is Test Case 5 (flow over a mountain) of Williamson et al, 1992:
 ``A standard test set for numerical approximations to the shallow water
 equations in spherical geometry'', JCP.
 
-The example here uses the icosahedral sphere mesh and degree 1 spaces.
+This script is adapted from the Gusto examples.
+
+The pySDC coupling works by setting up pySDC as a time integrator within Gusto.
+To this end, you need to construct a pySDC description and controller parameters as usual and pass them when
+constructing the pySDC time discretization.
+
+After passing this to a Gusto timestepper, you have two choices:
+    - Access the `.scheme.controller` variable of the timestepper, which is the pySDC controller and use pySDC for
+      running
+    - Use the Gusto timestepper for running
+You may wonder why it is necessary to construct a Gusto timestepper if you don't want to use it. The reason is the
+setup of spatial methods, such as upwinding. These are passed to the Gusto timestepper and modify the residual of the
+equations during its instantiation. Once the residual is modified, we can choose whether to continue in Gusto or pySDC.
 """
 
 import firedrake as fd
@@ -35,11 +48,11 @@ from gusto import (
 
 williamson_5_defaults = {
     'ncells_per_edge': 12,  # number of cells per icosahedron edge
-    'dt': 1800.0,
+    'dt': 900.0,
     'tmax': 50.0 * 24.0 * 60.0 * 60.0,  # 50 days
     'dumpfreq': 10,  # output every <dumpfreq> steps
     'dirname': 'williamson_5',  # results will go into ./results/<dirname>
-    'time_parallelism': 0,  # use parallel diagonal SDC or not
+    'time_parallelism': False,  # use parallel diagonal SDC or not
     'QI': 'MIN-SR-S',  # implicit preconditioner
     'M': '3',  # number of collocation nodes
     'kmax': '5',  # use fixed number of iteration up to this value
@@ -71,7 +84,7 @@ def williamson_5(
         tmax (float): Time to integrate to
         dumpfreq (int): Output every <dumpfreq> time steps
         dirname (str): Output will go into ./results/<dirname>
-        time_parallelism (int): 1 for parallel SDC, 0 for serial
+        time_parallelism (bool): True for parallel SDC, False for serial
         M (int): Number of collocation nodes
         kmax (int): Max number of SDC iterations
         use_pySDC (bool): Use pySDC as Gusto time integrator or Gusto SDC implementation
@@ -150,7 +163,7 @@ def williamson_5(
     transport_methods = [DGUpwind(eqns, "u"), DGUpwind(eqns, "D")]
 
     # ------------------------------------------------------------------------ #
-    # Setup pySDC
+    # pySDC parameters: description and controller parameters
     # ------------------------------------------------------------------------ #
 
     level_params = dict()
@@ -180,6 +193,7 @@ def williamson_5(
         )
 
         convergence_controllers[Adaptivity] = {'e_tol': 1e-6, 'rel_error': True, 'dt_max': 1e4}
+        # this is needed because the coupling runs on the controller level and this will almost always overwrite
         convergence_controllers[SpreadStepSizesBlockwiseNonMPI] = {'overwrite_to_reach_Tend': False}
 
     controller_params = dict()
@@ -214,7 +228,7 @@ def williamson_5(
     }
 
     # ------------------------------------------------------------------------ #
-    # Setup SDC in gusto
+    # Set Gusto SDC parameters to match the pySDC ones
     # ------------------------------------------------------------------------ #
 
     SDC_params = {
@@ -245,7 +259,8 @@ def williamson_5(
 
     stepper = Timestepper(eqns, method, io, spatial_methods=transport_methods)
 
-    if use_pySDC:
+    if use_pySDC and use_adaptivity:
+        # we have to do this for adaptive time stepping, because it is a bit of a mess
         method.timestepper = stepper
 
     # ------------------------------------------------------------------------ #
@@ -300,10 +315,29 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         '--time_parallelism',
-        help="Whether to use parallel diagonal SDC or not. Set 1 or 0.",
-        type=int,
+        help="Whether to use parallel diagonal SDC or not.",
+        type=str,
         default=williamson_5_defaults['time_parallelism'],
     )
+    parser.add_argument('--kmax', help='SDC iteration count', type=int, default=williamson_5_defaults['kmax'])
+    parser.add_argument('-M', help='SDC node count', type=int, default=williamson_5_defaults['M'])
+    parser.add_argument(
+        '--use_pySDC',
+        help='whether to use pySDC or Gusto SDC implementation',
+        type=str,
+        default=williamson_5_defaults['use_pySDC'],
+    )
+    parser.add_argument(
+        '--use_adaptivity',
+        help='whether to use adaptive step size selection',
+        type=str,
+        default=williamson_5_defaults['use_adaptivity'],
+    )
+    parser.add_argument('--QI', help='Implicit preconditioner', type=str, default=williamson_5_defaults['QI'])
     args, unknown = parser.parse_known_args()
 
-    williamson_5(**vars(args))
+    options = vars(args)
+    for key in ['use_pySDC', 'use_adaptivity', 'time_parallelism']:
+        options[key] = options[key] not in ['False', 0, False, 'false']
+
+    williamson_5(**options)
