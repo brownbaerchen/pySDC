@@ -133,73 +133,6 @@ class GenericGusto(Problem):
         self.solver_parameters = solver_parameters
         self.stop_at_divergence = stop_at_divergence
 
-        if len(active_labels) > 0:
-            self.residual = self.residual.label_map(
-                lambda t: any(t.has_label(time_derivative, *active_labels)), map_if_false=drop
-            )
-
-        self.evaluate_source = []
-        self.physics_names = []
-        for t in self.residual:
-            if t.has_label(physics_label):
-                physics_name = t.get(physics_label)
-                if t.labels[physics_name] not in self.physics_names:
-                    self.evaluate_source.append(t.labels[physics_name])
-                    self.physics_names.append(t.labels[physics_name])
-
-        # Check if there are any mass-weighted terms:
-        if len(self.residual.label_map(lambda t: t.has_label(mass_weighted), map_if_false=drop)) > 0:
-            for field in equation.field_names:
-
-                # Check if the mass term for this prognostic is mass-weighted
-                if (
-                    len(
-                        self.residual.label_map(
-                            (
-                                lambda t: t.get(prognostic) == field
-                                and t.has_label(time_derivative)
-                                and t.has_label(mass_weighted)
-                            ),
-                            map_if_false=drop,
-                        )
-                    )
-                    == 1
-                ):
-
-                    field_terms = self.residual.label_map(
-                        lambda t: t.get(prognostic) == field and not t.has_label(time_derivative), map_if_false=drop
-                    )
-
-                    # Check that the equation for this prognostic does not involve
-                    # both mass-weighted and non-mass-weighted terms; if so, a split
-                    # timestepper should be used instead.
-                    if len(field_terms.label_map(lambda t: t.has_label(mass_weighted), map_if_false=drop)) > 0:
-                        if len(field_terms.label_map(lambda t: not t.has_label(mass_weighted), map_if_false=drop)) > 0:
-                            raise ValueError(
-                                'Mass-weighted and non-mass-weighted terms are present in a '
-                                + f'timestepping equation for {field}. As these terms cannot '
-                                + 'be solved for simultaneously, a split timestepping method '
-                                + 'should be used instead.'
-                            )
-                        else:
-                            # Replace the terms with a mass_weighted label with the
-                            # mass_weighted form. It is important that the labels from
-                            # this new form are used.
-                            self.residual = self.residual.label_map(
-                                lambda t: t.get(prognostic) == field and t.has_label(mass_weighted),
-                                map_if_true=lambda t: t.get(mass_weighted),
-                            )
-        self.idx = None
-
-        # -------------------------------------------------------------------- #
-        # Make boundary conditions
-        # -------------------------------------------------------------------- #
-
-        if not apply_bcs:
-            self.bcs = None
-        else:
-            self.bcs = equation.bcs[equation.field_name]
-
         # -------------------------------------------------------------------- #
         # Setup caches
         # -------------------------------------------------------------------- #
@@ -209,11 +142,22 @@ class GenericGusto(Problem):
         self._u = fd.Function(self.fs)
 
         super().__init__(self.fs)
-        self._makeAttributeAndRegister('LHS_cache_size', localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister('LHS_cache_size', 'apply_bcs', localVars=locals(), readOnly=True)
         self.work_counters['rhs'] = WorkCounter()
         self.work_counters['ksp'] = WorkCounter()
         self.work_counters['solver_setup'] = WorkCounter()
         self.work_counters['solver'] = WorkCounter()
+
+    # @property
+    # def residual(self):
+    #     return self.equation.residual
+
+    @property
+    def bcs(self):
+        if not self.apply_bcs:
+            return None
+        else:
+            return self.equation.bcs[self.equation.field_name]
 
     def invert_mass_matrix(self, rhs):
         self._u.assign(rhs.functionspace)

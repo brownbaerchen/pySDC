@@ -256,7 +256,6 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
     # Setup time steppers
     # ------------------------------------------------------------------------ #
 
-    stepper_gusto = get_gusto_stepper(eqns, gusto_method(domain, solver_parameters=solver_parameters), spatial_methods)
     stepper_pySDC = get_gusto_stepper(
         eqns,
         pySDC_integrator(
@@ -269,6 +268,7 @@ def test_pySDC_integrator_RK(use_transport_scheme, method):
         ),
         spatial_methods,
     )
+    stepper_gusto = get_gusto_stepper(eqns, gusto_method(domain, solver_parameters=solver_parameters), spatial_methods)
 
     # ------------------------------------------------------------------------ #
     # Run tests
