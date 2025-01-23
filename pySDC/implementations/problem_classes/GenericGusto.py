@@ -11,6 +11,16 @@ import numpy as np
 
 
 class GenericGusto(Problem):
+    """
+    Set up solvers based on the equation. Keep in mind that you probably want to use the pySDC-Gusto coupling via
+    the `pySDC_integrator` class in the helpers in order to get spatial methods rather than interfacing with this
+    class directly.
+
+    Gusto equations work by a residual, which is minimized in nonlinear solvers to obtain the right hand side
+    evaluation or the solution to (IMEX) Euler steps. You control what you solve for by manipulating labeled parts
+    of the residual.
+    """
+
     dtype_u = firedrake_mesh
     dtype_f = firedrake_mesh
     rhs_n_labels = 1
@@ -26,7 +36,7 @@ class GenericGusto(Problem):
         *active_labels,
     ):
         """
-        Set up the time discretisation based on the equation.
+        Initialisation
 
         Args:
             equation (:class:`PrognosticEquation`): the model's equation.
