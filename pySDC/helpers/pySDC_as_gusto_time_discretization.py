@@ -1,8 +1,7 @@
 import firedrake as fd
 
-from gusto.timestepping import BaseTimestepper
 from gusto.time_discretisation.time_discretisation import TimeDiscretisation, wrapper_apply
-from gusto.core.labels import implicit, explicit
+from gusto.core.labels import explicit
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.problem_classes.GenericGusto import GenericGusto, GenericGustoImex
@@ -11,6 +10,10 @@ from pySDC.helpers.stats_helper import get_sorted
 
 
 class LogTime(Hooks):
+    """
+    Utility hook for knowing how far we got when using adaptive step size selection.
+    """
+
     def post_step(self, step, level_number):
         L = step.levels[level_number]
         self.add_to_stats(
@@ -28,8 +31,8 @@ class LogTime(Hooks):
 class pySDC_integrator(TimeDiscretisation):
     """
     This class can be entered into Gusto as a time discretization scheme and will solve steps using pySDC.
-    It will construct a pySDC controller can be used by itself and will be used within the time step when called from
-    Gusto. Access the controller via `pySDC_integrator.controller`. This class also has `pySDC_integrator.stats`,
+    It will construct a pySDC controller which can be used by itself and will be used within the time step when called
+    from Gusto. Access the controller via `pySDC_integrator.controller`. This class also has `pySDC_integrator.stats`,
     which gathers all of the pySDC stats recorded in the hooks during every time step when used within Gusto.
     """
 
@@ -110,7 +113,7 @@ class pySDC_integrator(TimeDiscretisation):
         }
         self.description['level_params']['dt'] = float(self.domain.dt)
 
-        # this is required for step size adaptivity
+        # add utility hook required for step size adaptivity
         hook_class = self.controller_params.get('hook_class', [])
         if not type(hook_class) == list:
             hook_class = [hook_class]
@@ -127,6 +130,7 @@ class pySDC_integrator(TimeDiscretisation):
 
     @property
     def residual(self):
+        """Make sure the pySDC problem residual and this residual are the same"""
         if hasattr(self, 'prob'):
             return self.prob.residual
         else:
@@ -134,6 +138,7 @@ class pySDC_integrator(TimeDiscretisation):
 
     @residual.setter
     def residual(self, value):
+        """Make sure the pySDC problem residual and this residual are the same"""
         if hasattr(self, 'prob'):
             self.prob.residual = value
         else:
@@ -147,7 +152,7 @@ class pySDC_integrator(TimeDiscretisation):
     @wrapper_apply
     def apply(self, x_out, x_in):
         """
-        Apply the time discretisation to advance one whole time step.
+        Apply the time discretization to advance one whole time step.
 
         Args:
             x_out (:class:`Function`): the output field to be computed.
@@ -171,6 +176,8 @@ class pySDC_integrator(TimeDiscretisation):
 
         self.t = get_sorted(_stats, type='_time', recomputed=False)[-1][1]
 
+        # update time of the Gusto stepper.
+        # After this step, the Gusto stepper updates its time again to arrive at the correct time
         if self.timestepper is not None:
             self.timestepper.t = fd.Constant(self.t - self.dt)
 
