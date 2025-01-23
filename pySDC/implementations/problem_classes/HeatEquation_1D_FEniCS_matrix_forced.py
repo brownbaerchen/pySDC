@@ -1,6 +1,5 @@
 import logging
 
-
 import dolfin as df
 import numpy as np
 

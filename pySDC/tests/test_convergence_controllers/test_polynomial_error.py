@@ -1,7 +1,7 @@
 import pytest
 
 
-def get_controller(dt, num_nodes, quad_type, useMPI, useGPU):
+def get_controller(dt, num_nodes, quad_type, useMPI, useGPU, rel_error):
     """
     Get a controller prepared for polynomial test equation
 
@@ -64,7 +64,7 @@ def get_controller(dt, num_nodes, quad_type, useMPI, useGPU):
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
-    description['convergence_controllers'] = {EstimatePolynomialError: {}}
+    description['convergence_controllers'] = {EstimatePolynomialError: {'rel_error': rel_error}}
 
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
     return controller
@@ -177,13 +177,15 @@ def check_order(dts, **kwargs):
 @pytest.mark.base
 @pytest.mark.parametrize('num_nodes', [2, 3, 4, 5])
 @pytest.mark.parametrize('quad_type', ['RADAU-RIGHT', 'GAUSS'])
-def test_interpolation_error(num_nodes, quad_type):
+@pytest.mark.parametrize('rel_error', [True, False])
+def test_interpolation_error(num_nodes, quad_type, rel_error):
     import numpy as np
 
     kwargs = {
         'num_nodes': num_nodes,
         'quad_type': quad_type,
         'useMPI': False,
+        'rel_error': rel_error,
     }
     steps = np.logspace(-1, -4, 20)
     check_order(steps, **kwargs)
@@ -200,6 +202,7 @@ def test_interpolation_error_GPU(num_nodes, quad_type):
         'quad_type': quad_type,
         'useMPI': False,
         'useGPU': True,
+        'rel_error': False,
     }
     steps = np.logspace(-1, -4, 20)
     check_order(steps, **kwargs)
@@ -309,7 +312,8 @@ if __name__ == "__main__":
         kwargs = {
             'num_nodes': int(sys.argv[1]),
             'quad_type': sys.argv[2],
+            'rel_error': False,
         }
         check_order(steps, useMPI=True, **kwargs)
     else:
-        check_order(steps, useMPI=False, num_nodes=3, quad_type='RADAU-RIGHT')
+        check_order(steps, useMPI=False, num_nodes=3, quad_type='RADAU-RIGHT', rel_error=False)
