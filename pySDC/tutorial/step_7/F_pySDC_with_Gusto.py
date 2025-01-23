@@ -19,6 +19,9 @@ After passing this to a Gusto timestepper, you have two choices:
 You may wonder why it is necessary to construct a Gusto timestepper if you don't want to use it. The reason is the
 setup of spatial methods, such as upwinding. These are passed to the Gusto timestepper and modify the residual of the
 equations during its instantiation. Once the residual is modified, we can choose whether to continue in Gusto or pySDC.
+
+This script supports space-time parallelism, as well as running the Gusto SDC implementation or the pySDC-Gusto coupling.
+Please run with `--help` to learn how to configure this script.
 """
 
 import firedrake as fd
@@ -192,7 +195,7 @@ def williamson_5(
             SpreadStepSizesBlockwiseNonMPI,
         )
 
-        convergence_controllers[Adaptivity] = {'e_tol': 1e-7, 'rel_error': True, 'dt_max': 1e4, 'dt_rel_min_slope': 0.5}
+        convergence_controllers[Adaptivity] = {'e_tol': 1e-6, 'rel_error': True, 'dt_max': 1e4, 'dt_rel_min_slope': 0.5}
         # this is needed because the coupling runs on the controller level and this will almost always overwrite
         convergence_controllers[SpreadStepSizesBlockwiseNonMPI] = {'overwrite_to_reach_Tend': False}
 
