@@ -614,7 +614,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     print(error, norm(stepper_gusto.fields('f')))
 
     assert (
-            error < np.finfo(float).eps * 1e2
+        error < np.finfo(float).eps * 1e2
     ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}'
 
 
