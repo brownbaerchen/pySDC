@@ -192,7 +192,7 @@ def williamson_5(
             SpreadStepSizesBlockwiseNonMPI,
         )
 
-        convergence_controllers[Adaptivity] = {'e_tol': 1e-6, 'rel_error': True, 'dt_max': 1e4}
+        convergence_controllers[Adaptivity] = {'e_tol': 1e-7, 'rel_error': True, 'dt_max': 1e4, 'dt_rel_min_slope': 0.5}
         # this is needed because the coupling runs on the controller level and this will almost always overwrite
         convergence_controllers[SpreadStepSizesBlockwiseNonMPI] = {'overwrite_to_reach_Tend': False}
 
