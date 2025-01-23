@@ -603,6 +603,9 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
         # run
         stepper_gusto.run(t=_dt[0], tmax=_dt[0] + _dt[1])
 
+        # clear solver cache with old step size
+        del stepper_gusto.scheme.solvers
+
     assert np.isclose(float(stepper_pySDC.t), float(stepper_gusto.t))
 
     print(dts_pySDC)
@@ -611,7 +614,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     print(error, norm(stepper_gusto.fields('f')))
 
     assert (
-        error < 1e-6
+            error < np.finfo(float).eps * 1e2
     ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}'
 
 
@@ -620,4 +623,4 @@ if __name__ == '__main__':
     # test_generic_gusto_problem(setup)
     # test_pySDC_integrator_RK(False, RK4, setup)
     # test_pySDC_integrator(False, False, setup)
-    test_pySDC_integrator_with_adaptivity(1e-2, setup)
+    test_pySDC_integrator_with_adaptivity(1e-3, setup)
