@@ -130,10 +130,11 @@ def test_D():
 
 
 @pytest.mark.firedrake
-def test_E():
+@pytest.mark.parametrize('ML', [True, False])
+def test_E(ML):
     from pySDC.tutorial.step_7.E_pySDC_with_Firedrake import runHeatFiredrake
 
-    runHeatFiredrake(useMPIsweeper=False)
+    runHeatFiredrake(useMPIsweeper=False, ML=ML)
 
 
 @pytest.mark.firedrake
@@ -142,7 +143,7 @@ def test_E_MPI():
     my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
     cwd = '.'
     num_procs = 3
-    cmd = f'mpiexec -np {num_procs} python pySDC/tutorial/step_7/E_pySDC_with_Firedrake.py'.split()
+    cmd = f'mpiexec -np {num_procs} python pySDC/tutorial/step_7/E_pySDC_with_Firedrake.py --useMPIsweeper'.split()
 
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
     p.wait()

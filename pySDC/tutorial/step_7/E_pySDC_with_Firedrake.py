@@ -5,7 +5,15 @@ The function `setup` generates the description and controller_params dictionarie
 This proceeds very similar to earlier tutorials. The interesting part of this tutorial is rather in the problem class.
 See `pySDC/implementations/problem_classes/HeatFiredrake` for an easy example of how to use Firedrake within pySDC.
 
-Run in serial using simply `python E_pySDC_with_Firedrake.py` or with parallel diagonal SDC with `mpiexec -np 3 python E_pySDC_with_Firedrake.py`.
+The script allows to run in three different ways. Use
+ - `python E_pySDC_with_Firedrake.py` for single-level serial SDC
+ - `mpiexec -np 3 E_pySDC_with_Firedrake --useMPIsweeper` for single-level MPI-parallel diagonal SDC
+ - `python E_pySDC_with_Firedrake --ML` for three-level serial SDC
+
+You should notice that speedup of MPI parallelisation is quite good and that, while multi-level SDC reduces the number
+of SDC iterations quite a bit, it does not reduce time to solution in this case. This is partly due to more solvers being
+constructed when using coarse levels. Also, we do not claim to have found the best parameters, though. This is just an
+example to demonstrate how to use it.
 """
 
 import numpy as np
@@ -48,7 +56,6 @@ def setup(useMPIsweeper):
     problem_params['nu'] = 0.1
     problem_params['n'] = 128
     problem_params['c'] = 1.0
-    problem_params['order'] = [4, 1]
     problem_params['comm'] = ensemble.space_comm
 
     controller_params = dict()
@@ -90,14 +97,17 @@ def setup_ML():
 
     sweeper_params = dict()
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = [3, 1]
-    sweeper_params['QI'] = 'LU'
+    sweeper_params['num_nodes'] = 3
+    sweeper_params['QI'] = 'MIN-SR-S'
     sweeper_params['QE'] = 'PIC'
 
     problem_params = dict()
     problem_params['nu'] = 0.1
-    problem_params['n'] = [128, 32]
+    problem_params['n'] = [128, 32, 4]
     problem_params['c'] = 1.0
+
+    base_transfer_params = dict()
+    base_transfer_params['finter'] = True
 
     controller_params = dict()
     controller_params['logger_level'] = 15 if MPI.COMM_WORLD.rank == 0 else 30
@@ -111,6 +121,7 @@ def setup_ML():
     description['level_params'] = level_params
     description['step_params'] = step_params
     description['space_transfer_class'] = MeshToMeshFiredrake
+    description['base_transfer_params'] = base_transfer_params
 
     return description, controller_params
 
@@ -154,18 +165,39 @@ def runHeatFiredrake(useMPIsweeper=False, ML=False):
 
     time_rank = description["sweeper_params"]["comm"].rank if useMPIsweeper else 0
     print(
-        f'Finished with error {error[0][1]:.2e}. Used {tot_iter} SDC iterations, with {tot_solver_setup} solver setups, {tot_solves} solves and {tot_rhs} right hand side evaluations on time task {time_rank}.'
+        f'Finished with error {error[0][1]:.2e}. Used {tot_iter} SDC iterations, with {tot_solver_setup} solver setups, {tot_solves} solves and {tot_rhs} right hand side evaluations on the finest level of time task {time_rank}.'
     )
 
     # do tests that we got the same as last time
     n_nodes = 1 if useMPIsweeper else description['sweeper_params']['num_nodes']
     assert error[0][1] < 2e-8
-    assert tot_iter == 29
+    assert tot_iter == 10 if ML else 29
     assert tot_solver_setup == n_nodes
     assert tot_solves == n_nodes * tot_iter
     assert tot_rhs == n_nodes * tot_iter + (n_nodes + 1) * len(niter)
 
 
 if __name__ == "__main__":
-    # runHeatFiredrake(useMPIsweeper=MPI.COMM_WORLD.size > 1)
-    runHeatFiredrake(ML=True)
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument(
+        '--ML',
+        help='Whether you want to run multi-level',
+        default=False,
+        required=False,
+        action='store_const',
+        const=True,
+    )
+    parser.add_argument(
+        '--useMPIsweeper',
+        help='Whether you want to use MPI parallel diagonal SDC',
+        default=False,
+        required=False,
+        action='store_const',
+        const=True,
+    )
+
+    args = parser.parse_args()
+
+    runHeatFiredrake(**vars(args))
