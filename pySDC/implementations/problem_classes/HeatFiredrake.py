@@ -191,6 +191,10 @@ class Heat1DForcedFiredrake(Problem):
         self.work_counters['solves']()
         return me
 
+    @fd.utils.cached_property
+    def x(self):
+        return fd.SpatialCoordinate(self.mesh)
+
     def u_exact(self, t):
         r"""
         Routine to compute the exact solution at time :math:`t`.
@@ -206,6 +210,5 @@ class Heat1DForcedFiredrake(Problem):
             Exact solution.
         """
         me = self.u_init
-        x = fd.SpatialCoordinate(self.mesh)
-        me.interpolate(np.cos(t) * fd.sin(np.pi * x[0]) + self.c)
+        me.interpolate(np.cos(t) * fd.sin(np.pi * self.x[0]) + self.c)
         return me
