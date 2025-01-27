@@ -212,6 +212,7 @@ jobs:
 
           cd ./pySDC
           mv data ../data_firedrake
+          coverage debug data
           coverage combine
           mv .coverage ../coverage_firedrake.dat
       - name: Upload artifacts
