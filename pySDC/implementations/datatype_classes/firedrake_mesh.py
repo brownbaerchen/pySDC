@@ -77,6 +77,48 @@ class firedrake_mesh(object):
 
         return fd.norm(self.functionspace, 'L2')
 
+    def isend(self, dest=None, tag=None, comm=None):
+        """
+        Routine for sending data forward in time (non-blocking)
+
+        Args:
+            dest (int): target rank
+            tag (int): communication tag
+            comm: communicator
+
+        Returns:
+            request handle
+        """
+        return comm.Isend(self.functionspace, dest=dest, tag=tag)
+
+    def irecv(self, source=None, tag=None, comm=None):
+        """
+        Routine for receiving in time
+
+        Args:
+            source (int): source rank
+            tag (int): communication tag
+            comm: communicator
+
+        Returns:
+            None
+        """
+        return comm.Irecv(self.functionspace, source=source, tag=tag)
+
+    def bcast(self, root=None, comm=None):
+        """
+        Routine for broadcasting values
+
+        Args:
+            root (int): process with value to broadcast
+            comm: communicator
+
+        Returns:
+            broadcasted values
+        """
+        comm.Bcast(self.functionspace, root=root)
+        return self
+
 
 class IMEX_firedrake_mesh(object):
     """

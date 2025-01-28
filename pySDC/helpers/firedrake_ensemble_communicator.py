@@ -53,6 +53,12 @@ class FiredrakeEnsembleCommunicator:
         else:
             self.ensemble.bcast(buf, root=root)
 
+    def Irecv(self, buf, source, tag):
+        return self.ensemble.irecv(buf, source, tag=tag)[0]
+
+    def Isend(self, buf, dest, tag):
+        return self.ensemble.isend(buf, dest, tag=tag)[0]
+
 
 def get_ensemble(comm, space_size):
     return fd.Ensemble(comm, space_size)
