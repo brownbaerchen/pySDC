@@ -1,6 +1,7 @@
 import firedrake as fd
 
 from pySDC.core.errors import DataError
+from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
 
 
 class firedrake_mesh(object):
@@ -89,6 +90,9 @@ class firedrake_mesh(object):
         Returns:
             request handle
         """
+        assert (
+            type(comm) == FiredrakeEnsembleCommunicator
+        ), f'Need to give a FiredrakeEnsembleCommunicator here, not {type(comm)}'
         return comm.Isend(self.functionspace, dest=dest, tag=tag)
 
     def irecv(self, source=None, tag=None, comm=None):
@@ -103,6 +107,9 @@ class firedrake_mesh(object):
         Returns:
             None
         """
+        assert (
+            type(comm) == FiredrakeEnsembleCommunicator
+        ), f'Need to give a FiredrakeEnsembleCommunicator here, not {type(comm)}'
         return comm.Irecv(self.functionspace, source=source, tag=tag)
 
     def bcast(self, root=None, comm=None):
@@ -116,6 +123,9 @@ class firedrake_mesh(object):
         Returns:
             broadcasted values
         """
+        assert (
+            type(comm) == FiredrakeEnsembleCommunicator
+        ), f'Need to give a FiredrakeEnsembleCommunicator here, not {type(comm)}'
         comm.Bcast(self.functionspace, root=root)
         return self
 
