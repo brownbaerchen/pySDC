@@ -55,13 +55,14 @@ williamson_5_defaults = {
     'tmax': 50.0 * 24.0 * 60.0 * 60.0,  # 50 days
     'dumpfreq': 10,  # output every <dumpfreq> steps
     'dirname': 'williamson_5',  # results will go into ./results/<dirname>
-    'time_parallelism': False,  # use parallel diagonal SDC or not
+    'diagonal_SDC': False,  # use parallel diagonal SDC or not
     'QI': 'MIN-SR-S',  # implicit preconditioner
     'M': '3',  # number of collocation nodes
     'kmax': '5',  # use fixed number of iteration up to this value
     'use_pySDC': True,  # whether to use pySDC for time integration
     'use_adaptivity': True,  # whether to use adaptive step size selection
     'Nlevels': 1,  # number of levels in SDC
+    'Nsteps': 1,  # number of steps in block Gauss-Seidel SDC
     'logger_level': 15,  # pySDC logger level
 }
 
@@ -72,13 +73,14 @@ def williamson_5(
     tmax=williamson_5_defaults['tmax'],
     dumpfreq=williamson_5_defaults['dumpfreq'],
     dirname=williamson_5_defaults['dirname'],
-    time_parallelism=williamson_5_defaults['time_parallelism'],
+    diagonal_SDC=williamson_5_defaults['diagonal_SDC'],
     QI=williamson_5_defaults['QI'],
     M=williamson_5_defaults['M'],
     kmax=williamson_5_defaults['kmax'],
     use_pySDC=williamson_5_defaults['use_pySDC'],
     use_adaptivity=williamson_5_defaults['use_adaptivity'],
     Nlevels=williamson_5_defaults['Nlevels'],
+    Nsteps=williamson_5_defaults['Nsteps'],
     logger_level=williamson_5_defaults['logger_level'],
     mesh=None,
     _ML_is_setup=True,
@@ -92,7 +94,7 @@ def williamson_5(
         tmax (float): Time to integrate to
         dumpfreq (int): Output every <dumpfreq> time steps
         dirname (str): Output will go into ./results/<dirname>
-        time_parallelism (bool): True for parallel SDC, False for serial
+        diagonal_SDC (bool): True for parallel SDC, False for serial
         M (int): Number of collocation nodes
         kmax (int): Max number of SDC iterations
         use_pySDC (bool): Use pySDC as Gusto time integrator or Gusto SDC implementation
@@ -103,7 +105,7 @@ def williamson_5(
         raise NotImplementedError('Adaptive step size selection not yet implemented in Gusto')
     if not use_pySDC and Nlevels > 1:
         raise NotImplementedError('Multi-level SDC not yet implemented in Gusto')
-    if time_parallelism and Nlevels > 1:
+    if diagonal_SDC and Nlevels > 1:
         raise NotImplementedError('Multi-level SDC does not work with MPI parallel sweeper yet')
 
     # ------------------------------------------------------------------------ #
@@ -130,11 +132,23 @@ def williamson_5(
     # ------------------------------------------------------------------------ #
 
     # parallelism
-    if time_parallelism:
+    useMPIController = False
+    controller_comm = None
+    if diagonal_SDC:
         ensemble_comm = FiredrakeEnsembleCommunicator(fd.COMM_WORLD, fd.COMM_WORLD.size // M)
         space_comm = ensemble_comm.space_comm
         from pySDC.implementations.sweeper_classes.generic_implicit_MPI import generic_implicit_MPI as sweeper_class
 
+        if ensemble_comm.time_comm.rank > 0:
+            dirname = f'{dirname}-{ensemble_comm.time_comm.rank}'
+
+    elif Nsteps > 1 and fd.COMM_WORLD.size >= Nsteps:
+        useMPIController = True
+        from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
+
+        ensemble_comm = FiredrakeEnsembleCommunicator(fd.COMM_WORLD, fd.COMM_WORLD.size // Nsteps)
+        space_comm = ensemble_comm.space_comm
+        controller_comm = ensemble_comm
         if ensemble_comm.time_comm.rank > 0:
             dirname = f'{dirname}-{ensemble_comm.time_comm.rank}'
     else:
@@ -214,7 +228,10 @@ def williamson_5(
         convergence_controllers[SpreadStepSizesBlockwiseNonMPI] = {'overwrite_to_reach_Tend': False}
 
     controller_params = dict()
-    controller_params['logger_level'] = logger_level if fd.COMM_WORLD.rank == 0 else 30
+    if controller_comm is not None:
+        controller_params['logger_level'] = logger_level if space_comm.rank == 0 else 30
+    else:
+        controller_params['logger_level'] = logger_level if fd.COMM_WORLD.rank == 0 else 30
     controller_params['mssdc_jac'] = False
 
     description = dict()
@@ -272,7 +289,15 @@ def williamson_5(
     # ------------------------------------------------------------------------ #
 
     if use_pySDC:
-        method = pySDC_integrator(description, controller_params, domain=domain, solver_parameters=solver_parameters)
+        method = pySDC_integrator(
+            description,
+            controller_params,
+            domain=domain,
+            solver_parameters=solver_parameters,
+            n_steps=Nsteps,
+            useMPIController=useMPIController,
+            controller_communicator=controller_comm,
+        )
     else:
         method = SDC(**SDC_params, domain=domain)
 
@@ -300,7 +325,7 @@ def williamson_5(
                 tmax=tmax,
                 dumpfreq=dumpfreq,
                 dirname=f'{dirname}_unused_{i}',
-                time_parallelism=time_parallelism,
+                diagonal_SDC=diagonal_SDC,
                 QI=QI,
                 M=M,
                 kmax=kmax,
@@ -315,7 +340,15 @@ def williamson_5(
         # update description and setup pySDC again with the discretizations from different steppers
         description['problem_params']['residual'] = [me.scheme.residual for me in steppers]
         description['problem_params']['equation'] = [me.scheme.equation for me in steppers]
-        method = pySDC_integrator(description, controller_params, domain=domain, solver_parameters=solver_parameters)
+        method = pySDC_integrator(
+            description,
+            controller_params,
+            domain=domain,
+            solver_parameters=solver_parameters,
+            n_steps=Nsteps,
+            useMPIController=useMPIController,
+            controller_communicator=controller_comm,
+        )
         stepper = Timestepper(eqns, method, io, spatial_methods=transport_methods)
 
     # ------------------------------------------------------------------------ #
@@ -373,10 +406,10 @@ if __name__ == "__main__":
         '--dirname', help="The name of the directory to write to.", type=str, default=williamson_5_defaults['dirname']
     )
     parser.add_argument(
-        '--time_parallelism',
+        '--diagonal_SDC',
         help="Whether to use parallel diagonal SDC or not.",
         type=str,
-        default=williamson_5_defaults['time_parallelism'],
+        default=williamson_5_defaults['diagonal_SDC'],
     )
     parser.add_argument('--kmax', help='SDC iteration count', type=int, default=williamson_5_defaults['kmax'])
     parser.add_argument('-M', help='SDC node count', type=int, default=williamson_5_defaults['M'])
@@ -399,10 +432,16 @@ if __name__ == "__main__":
         type=int,
         default=williamson_5_defaults['Nlevels'],
     )
+    parser.add_argument(
+        '--Nsteps',
+        help="Number of parallel SDC steps.",
+        type=int,
+        default=williamson_5_defaults['Nsteps'],
+    )
     args, unknown = parser.parse_known_args()
 
     options = vars(args)
-    for key in ['use_pySDC', 'use_adaptivity', 'time_parallelism']:
+    for key in ['use_pySDC', 'use_adaptivity', 'diagonal_SDC']:
         options[key] = options[key] not in ['False', 0, False, 'false']
 
     williamson_5(**options)
