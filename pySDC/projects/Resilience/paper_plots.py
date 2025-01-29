@@ -961,15 +961,15 @@ def make_plots_for_TUHH_seminar():  # pragma: no cover
         all_problems(**all_params, mode=mode)
     all_problems(**{**all_params, 'work_key': 'param'}, mode='compare_strategies')
 
-    # plot_GS_solution()
-    # for setup in ['resilience_thesis', 'work_precision']:
-    #     plot_RBC_solution(setup)
-    # for setup in ['resilience', 'adaptivity']:
-    #     plot_vdp_solution(setup=setup)
+    plot_GS_solution()
+    for setup in ['resilience_thesis', 'work_precision']:
+        plot_RBC_solution(setup)
+    for setup in ['resilience', 'adaptivity']:
+        plot_vdp_solution(setup=setup)
 
-    # plot_adaptivity_stuff()
+    plot_adaptivity_stuff()
 
-    # plot_fault_Lorenz(20, target='talk')
+    plot_fault_Lorenz(20, target='talk')
     compare_recovery_rate_problems(target='talk', num_procs=1, strategy_type='SDC')
     plot_recovery_rate_per_acceptance_threshold(run_Lorenz, target='talk')
     plot_recovery_rate_detailed_Lorenz(target='talk')

@@ -54,8 +54,9 @@ def u_exact(self, t, u_init=None, t_init=None, recompute=False, _t0=None):
     return data
 
 
-grayscott_imex_diffusion._u_exact = grayscott_imex_diffusion.u_exact
-grayscott_imex_diffusion.u_exact = u_exact
+if not hasattr(grayscott_imex_diffusion, '_u_exact'):
+    grayscott_imex_diffusion._u_exact = grayscott_imex_diffusion.u_exact
+    grayscott_imex_diffusion.u_exact = u_exact
 
 
 def run_GS(

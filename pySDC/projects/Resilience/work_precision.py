@@ -297,7 +297,6 @@ def record_work_precision(
                 exponents = [-3, -2, -1, 0, 0.2, 0.8, 1][::-1]
         if problem.__name__ == 'run_RBC':
             exponents = [1, 0, -0.5, -1, -2]
-            # exponents = [3, 2, 1, 0]
         if problem.__name__ == 'run_GS':
             exponents = [-2, -1, 0, 1, 2, 3][::-1]
         if problem.__name__ == 'run_Lorenz':
