@@ -53,7 +53,7 @@ class Heat1DForcedFiredrake(Problem):
     dtype_u = firedrake_mesh
     dtype_f = IMEX_firedrake_mesh
 
-    def __init__(self, n=30, nu=0.1, c=0.0, order=4, LHS_cache_size=12, comm=None):
+    def __init__(self, n=30, nu=0.1, c=0.0, order=4, LHS_cache_size=12, mesh=None, comm=None):
         """
         Initialization
 
@@ -63,12 +63,13 @@ class Heat1DForcedFiredrake(Problem):
             c (float): Boundary condition constant
             order (int): Order of finite elements
             LHS_cache_size (int): Size of the cache for solvers
-            comm (mpi4pi.Intracomm): MPI communicator for spatial parallelism
+            mesh (Firedrake mesh, optional): Give a custom mesh, for instance from a hierarchy
+            comm (mpi4pi.Intracomm, optional): MPI communicator for spatial parallelism
         """
         comm = MPI.COMM_WORLD if comm is None else comm
 
         # prepare Firedrake mesh and function space
-        self.mesh = fd.UnitIntervalMesh(n, comm=comm)
+        self.mesh = fd.UnitIntervalMesh(n, comm=comm) if mesh is None else mesh
         self.V = fd.FunctionSpace(self.mesh, "CG", order)
 
         # prepare pySDC problem class infrastructure by passing the function space to super init
