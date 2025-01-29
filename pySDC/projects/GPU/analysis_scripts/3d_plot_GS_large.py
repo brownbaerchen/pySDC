@@ -43,7 +43,7 @@ def plot(
     plot_resolution=2048,
     n_samples=1024,
     zoom=1e-2,
-):
+):  # pragma: no cover
     comm = MPI.COMM_WORLD
 
     space_range = tqdm(space_range)
@@ -101,7 +101,7 @@ def plot(
             print(f'Saved {path}', flush=True)
 
 
-def video(view=None):
+def video(view=None):  # pragma: no cover
     path = f'simulation_plots/GS_large_%06d{view}.png'
     path_target = f'videos/GS_large{view}.mp4'
 
