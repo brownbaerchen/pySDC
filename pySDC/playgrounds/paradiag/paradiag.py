@@ -5,9 +5,9 @@ from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
 # setup parameters
-L = 1
-M = 1
-N = 1
+L = 4
+M = 3
+N = 2
 alpha = 1e-4
 restol = 1e-7
 dt = 0.1
@@ -103,18 +103,16 @@ n_iter = 0
 res = residual(sol_paradiag)
 
 while res > restol:
-    x = np.fft.ifft(
+    x = np.fft.fft(
         (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape),
         axis=0,
         norm='ortho',
     )
     y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
-    sol_paradiag = (J @ np.fft.fft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
+    sol_paradiag = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
+
     res = residual(sol_paradiag)
     n_iter += 1
 print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag, sol_direct)
 assert np.allclose(n_iter, n_iter_serial)
-
-
-# breakpoint()
