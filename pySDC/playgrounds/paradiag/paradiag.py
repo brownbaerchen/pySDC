@@ -129,23 +129,25 @@ n_iter = 0
 res = residual(sol_paradiag)
 
 while res > restol:
+    # weighted FFT in time
+    # TODO: replace big matrices C and C_alpha by step local matrices
     x = np.fft.fft(
         (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape),
         axis=0,
         norm='ortho',
     )
 
+    # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
     for l in range(L):
-        # C_local = (I_MN - dt * sp.kron(Q @ sp.linalg.inv(G[l]), prob.A)).tocsc()
-        # z = sp.linalg.spsolve(C_local, x[l].flatten())
-        # y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z).reshape(x[l].shape)
 
         # diagonalize QG^-1 matrix
         w, S = np.linalg.eig(Q @ sp.linalg.inv(G[l]).toarray())
         S_inv = np.linalg.inv(S)
         assert np.allclose(S @ np.diag(w) @ S_inv, Q @ sp.linalg.inv(G[l]).toarray())
 
+        # perform local solves of on the collocation nodes in parallel
+        # TODO: can I replace the solves here with multiplications by the inverse which I already know?
         x1 = sp.linalg.spsolve(sp.kron(S, I_N).tocsc(), x[l].flatten()).reshape(x[l].shape)
         x2 = np.empty_like(x1)
         for m in range(M):
@@ -153,6 +155,7 @@ while res > restol:
         z = sp.linalg.spsolve(sp.kron(S_inv, I_N).tocsc(), x2.flatten()).reshape(x2.shape)
         y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
+    # inverse FFT in time
     sol_paradiag = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
 
     res = residual(sol_paradiag)
