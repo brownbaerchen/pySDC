@@ -5,7 +5,7 @@ from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
 # setup parameters
-L = 1
+L = 2
 M = 1
 N = 1
 alpha = 1e-4
@@ -67,12 +67,13 @@ E_alpha = sp.diags(
 ).tolil()
 E_alpha[0, -1] = -alpha
 
-D_alpha = sp.diags(alpha ** (np.arange(L) / L) * np.fft.fft(E_alpha[:, 0].toarray().flatten()))
+gamma = alpha ** (-np.arange(L) / L)
+D_alpha = sp.diags(np.fft.fft(gamma * E_alpha[:, 0].toarray().flatten(), norm='backward'))
 C_alpha = (sp.kron(E_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 C_alpha_diag = (sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 
-J = sp.kron(sp.diags([alpha ** (-l / L) for l in range(L)]), I_MN)
-J_inv = sp.kron(sp.diags([1 / alpha ** (-l / L) for l in range(L)]), I_MN)
+J = sp.kron(sp.diags(gamma), I_MN)
+J_inv = sp.kron(sp.diags(1 / gamma), I_MN)
 
 
 def residual(_u):
@@ -103,12 +104,16 @@ res = residual(sol_paradiag)
 
 while res > restol:
     x = np.fft.ifft(
-        (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape), axis=0
+        (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape),
+        axis=0,
+        norm='ortho',
     )
     y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
-    sol_paradiag = (J @ np.fft.fft(y, axis=0).flatten()).reshape(y.shape)
+    sol_paradiag = (J @ np.fft.fft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
     res = residual(sol_paradiag)
     n_iter += 1
+    print(n_iter, res)
+    # breakpoint()
 print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag, sol_direct)
 
