@@ -67,7 +67,7 @@ E_alpha = sp.diags(
 ).tolil()
 E_alpha[0, -1] = -alpha
 
-D_alpha = sp.diags([alpha ** (1 / L) * np.exp(-2 * np.pi * 1j * l / L) for l in range(L)])
+D_alpha = sp.diags(alpha ** (np.arange(L) / L) * np.fft.fft(E_alpha[:, 0].toarray().flatten()))
 C_alpha = (sp.kron(E_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 C_alpha_diag = (sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 
@@ -101,7 +101,6 @@ n_iter = 0
 
 res = residual(sol_paradiag)
 
-print(sol_paradiag)
 while res > restol:
     x = np.fft.ifft(
         (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape), axis=0
@@ -110,12 +109,8 @@ while res > restol:
     sol_paradiag = (J @ np.fft.fft(y, axis=0).flatten()).reshape(y.shape)
     res = residual(sol_paradiag)
     n_iter += 1
-    print(sol_paradiag)
-    print(res)
-    breakpoint()
-
-# print(D_alpha.toarray())
 print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
+assert np.allclose(sol_paradiag, sol_direct)
 
 
-breakpoint()
+# breakpoint()
