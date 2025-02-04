@@ -5,7 +5,7 @@ from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
 # setup parameters
-L = 2
+L = 1
 M = 1
 N = 1
 alpha = 1e-4
@@ -68,7 +68,7 @@ E_alpha = sp.diags(
 E_alpha[0, -1] = -alpha
 
 gamma = alpha ** (-np.arange(L) / L)
-D_alpha = sp.diags(np.fft.fft(gamma * E_alpha[:, 0].toarray().flatten(), norm='backward'))
+D_alpha = sp.diags(np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward'))
 C_alpha = (sp.kron(E_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 C_alpha_diag = (sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 
@@ -112,10 +112,9 @@ while res > restol:
     sol_paradiag = (J @ np.fft.fft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
     res = residual(sol_paradiag)
     n_iter += 1
-    print(n_iter, res)
-    # breakpoint()
 print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag, sol_direct)
+assert np.allclose(n_iter, n_iter_serial)
 
 
 # breakpoint()
