@@ -8,7 +8,7 @@ from pySDC.implementations.sweeper_classes.generic_implicit import generic_impli
 L = 1
 M = 1
 N = 1
-alpha = 1  # e-4
+alpha = 1e-4
 restol = 1e-7
 dt = 0.1
 
@@ -37,13 +37,13 @@ E = sp.diags(
     * (L - 1),
     offsets=-1,
 )
-H_M = sp.eye(M).tocsc() * 0
+H_M = sp.eye(M).tolil() * 0
 H_M[:, -1] = 1
 
 C_coll = I_MN - dt * sp.kron(sweep.coll.Qmat[1:, 1:], prob.A)
 H = sp.kron(H_M, I_N)
 
-C = sp.kron(I_L, C_coll) + sp.kron(E, H)
+C = (sp.kron(I_L, C_coll) + sp.kron(E, H)).tocsc()
 
 # solve composite collocation problem sequentially with forward substitution
 sol_seq = u.copy()
@@ -64,24 +64,40 @@ E_alpha = sp.diags(
     ]
     * (L - 1),
     offsets=-1,
-).tocsc()
+).tolil()
 E_alpha[0, -1] = -alpha
 
 D_alpha = sp.diags([alpha ** (1 / L) * np.exp(-2 * np.pi * 1j * l / L) for l in range(L)])
-C_alpha = sp.kron(E_alpha, H) + sp.kron(I_L, C_coll)
-C_alpha_diag = sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)
+C_alpha = (sp.kron(E_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
+C_alpha_diag = (sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 
 J = sp.kron(sp.diags([alpha ** (-l / L) for l in range(L)]), I_MN)
 J_inv = sp.kron(sp.diags([1 / alpha ** (-l / L) for l in range(L)]), I_MN)
-
-# ParaDiag
-sol_paradiag = u.copy()
-u0 = u.copy()
 
 
 def residual(_u):
     return np.linalg.norm(C @ _u.flatten() - u.flatten(), np.inf)
 
+
+# ParaDiag without diagonalization and FFTs
+sol_paradiag_serial = u.copy()
+u0 = u.copy()
+res_serial = residual(sol_paradiag_serial)
+n_iter_serial = 0
+
+while res_serial > restol:
+    sol_paradiag_serial = sp.linalg.spsolve(
+        C_alpha, (C_alpha - C) @ sol_paradiag_serial.flatten() + u0.flatten()
+    ).reshape(sol_paradiag_serial.shape)
+    res_serial = residual(sol_paradiag_serial)
+    n_iter_serial += 1
+print(f'Needed {n_iter_serial} iterations in serial paradiag, stopped at residual {res_serial:.2e}')
+assert np.allclose(sol_paradiag_serial, sol_direct)
+
+# ParaDiag
+sol_paradiag = u.copy()
+u0 = u.copy()
+n_iter = 0
 
 res = residual(sol_paradiag)
 
@@ -93,11 +109,13 @@ while res > restol:
     y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
     sol_paradiag = (J @ np.fft.fft(y, axis=0).flatten()).reshape(y.shape)
     res = residual(sol_paradiag)
+    n_iter += 1
     print(sol_paradiag)
     print(res)
     breakpoint()
 
 # print(D_alpha.toarray())
+print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
 
 
 breakpoint()
