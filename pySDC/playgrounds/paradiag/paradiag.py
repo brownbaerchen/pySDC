@@ -29,6 +29,7 @@ u[0, :, :] = 1.0
 I_L = sp.eye(L)
 I_MN = sp.eye((M) * N)
 I_N = sp.eye(N)
+I_M = sp.eye(M)
 
 E = sp.diags(
     [
@@ -40,7 +41,8 @@ E = sp.diags(
 H_M = sp.eye(M).tolil() * 0
 H_M[:, -1] = 1
 
-C_coll = I_MN - dt * sp.kron(sweep.coll.Qmat[1:, 1:], prob.A)
+Q = sweep.coll.Qmat[1:, 1:]
+C_coll = I_MN - dt * sp.kron(Q, prob.A)
 H = sp.kron(H_M, I_N)
 
 C = (sp.kron(I_L, C_coll) + sp.kron(E, H)).tocsc()
@@ -96,6 +98,30 @@ print(f'Needed {n_iter_serial} iterations in serial paradiag, stopped at residua
 assert np.allclose(sol_paradiag_serial, sol_direct)
 
 # ParaDiag
+sol_paradiag_Kron = u.copy()
+u0 = u.copy()
+n_iter_Kron = 0
+
+res = residual(sol_paradiag_Kron)
+
+while res > restol:
+    x = np.fft.fft(
+        (J_inv @ ((C_alpha - C) @ sol_paradiag_Kron.flatten() + u0.flatten())).reshape(sol_paradiag_Kron.shape),
+        axis=0,
+        norm='ortho',
+    )
+    y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
+    sol_paradiag_Kron = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
+
+    res = residual(sol_paradiag_Kron)
+    n_iter_Kron += 1
+print(f'Needed {n_iter_Kron} iterations in parallel paradiag, stopped at residual {res:.2e}')
+assert np.allclose(sol_paradiag_Kron, sol_direct)
+assert np.allclose(n_iter_Kron, n_iter_serial)
+
+
+# ParaDiag with local solves
+G = [(D_alpha.tocsc()[l, l] * H_M + I_M).tocsc() for l in range(L)]
 sol_paradiag = u.copy()
 u0 = u.copy()
 n_iter = 0
@@ -108,11 +134,17 @@ while res > restol:
         axis=0,
         norm='ortho',
     )
-    y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
+
+    y = np.empty_like(x)
+    for l in range(L):
+        C_local = (I_MN - dt * sp.kron(Q @ sp.linalg.inv(G[l]), prob.A)).tocsc()
+        z = sp.linalg.spsolve(C_local, x[l].flatten())
+        y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z).reshape(x[l].shape)
+
     sol_paradiag = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
 
     res = residual(sol_paradiag)
     n_iter += 1
-print(f'Needed {n_iter} iterations in parallel paradiag, stopped at residual {res:.2e}')
+print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag, sol_direct)
 assert np.allclose(n_iter, n_iter_serial)
