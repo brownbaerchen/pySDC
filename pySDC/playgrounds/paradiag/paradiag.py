@@ -137,9 +137,21 @@ while res > restol:
 
     y = np.empty_like(x)
     for l in range(L):
-        C_local = (I_MN - dt * sp.kron(Q @ sp.linalg.inv(G[l]), prob.A)).tocsc()
-        z = sp.linalg.spsolve(C_local, x[l].flatten())
-        y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z).reshape(x[l].shape)
+        # C_local = (I_MN - dt * sp.kron(Q @ sp.linalg.inv(G[l]), prob.A)).tocsc()
+        # z = sp.linalg.spsolve(C_local, x[l].flatten())
+        # y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z).reshape(x[l].shape)
+
+        # diagonalize QG^-1 matrix
+        w, S = np.linalg.eig(Q @ sp.linalg.inv(G[l]).toarray())
+        S_inv = np.linalg.inv(S)
+        assert np.allclose(S @ np.diag(w) @ S_inv, Q @ sp.linalg.inv(G[l]).toarray())
+
+        x1 = sp.linalg.spsolve(sp.kron(S, I_N).tocsc(), x[l].flatten()).reshape(x[l].shape)
+        x2 = np.empty_like(x1)
+        for m in range(M):
+            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=x1[m], t=0)
+        z = sp.linalg.spsolve(sp.kron(S_inv, I_N).tocsc(), x2.flatten()).reshape(x2.shape)
+        y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
     sol_paradiag = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
 
