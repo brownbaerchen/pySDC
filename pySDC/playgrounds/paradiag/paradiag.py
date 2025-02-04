@@ -147,12 +147,11 @@ while res > restol:
         assert np.allclose(S @ np.diag(w) @ S_inv, Q @ sp.linalg.inv(G[l]).toarray())
 
         # perform local solves of on the collocation nodes in parallel
-        # TODO: can I replace the solves here with multiplications by the inverse which I already know?
-        x1 = sp.linalg.spsolve(sp.kron(S, I_N).tocsc(), x[l].flatten()).reshape(x[l].shape)
+        x1 = (sp.kron(S_inv, I_N) @ x[l].flatten()).reshape(x[l].shape)
         x2 = np.empty_like(x1)
         for m in range(M):
             x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=x1[m], t=0)
-        z = sp.linalg.spsolve(sp.kron(S_inv, I_N).tocsc(), x2.flatten()).reshape(x2.shape)
+        z = (sp.kron(S, I_N) @ x2.flatten()).reshape(x2.shape)
         y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
     # inverse FFT in time
