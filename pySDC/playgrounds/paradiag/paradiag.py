@@ -129,13 +129,20 @@ n_iter = 0
 res = residual(sol_paradiag)
 
 while res > restol:
+    # prepare local RHS to be transformed
+    Hu = np.empty_like(sol_paradiag)
+    for l in range(L):
+        Hu[l] = H_M @ sol_paradiag[l]
+
+    # assemble right hand side from LxL matrices and local rhs
+    rhs = np.zeros_like(sol_paradiag)
+    for l in range(L):
+        for k in range(L):
+            rhs[l] += (E_alpha - E).tolil()[l, k] * Hu[k]
+    rhs += u0
+
     # weighted FFT in time
-    # TODO: replace big matrices C and C_alpha by step local matrices
-    x = np.fft.fft(
-        (J_inv @ ((C_alpha - C) @ sol_paradiag.flatten() + u0.flatten())).reshape(sol_paradiag.shape),
-        axis=0,
-        norm='ortho',
-    )
+    x = np.fft.fft((J_inv @ rhs.flatten()).reshape(rhs.shape), axis=0)
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -155,7 +162,7 @@ while res > restol:
         y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
     # inverse FFT in time
-    sol_paradiag = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
+    sol_paradiag = (J @ np.fft.ifft(y, axis=0).flatten()).reshape(y.shape)
 
     res = residual(sol_paradiag)
     n_iter += 1
