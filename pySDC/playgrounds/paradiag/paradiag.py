@@ -76,6 +76,8 @@ C_alpha_diag = (sp.kron(D_alpha, H) + sp.kron(I_L, C_coll)).tocsc()
 
 J = sp.kron(sp.diags(gamma), I_MN)
 J_inv = sp.kron(sp.diags(1 / gamma), I_MN)
+J_L = sp.diags(gamma)
+J_L_inv = sp.diags(1 / gamma)
 
 
 def residual(_u):
@@ -128,6 +130,15 @@ n_iter = 0
 
 res = residual(sol_paradiag)
 
+
+def mat_vec(mat, vec):
+    res = np.zeros_like(vec)
+    for l in range(vec.shape[0]):
+        for k in range(vec.shape[0]):
+            res[l] += mat[l, k] * vec[k]
+    return res
+
+
 while res > restol:
     # prepare local RHS to be transformed
     Hu = np.empty_like(sol_paradiag)
@@ -135,14 +146,11 @@ while res > restol:
         Hu[l] = H_M @ sol_paradiag[l]
 
     # assemble right hand side from LxL matrices and local rhs
-    rhs = np.zeros_like(sol_paradiag)
-    for l in range(L):
-        for k in range(L):
-            rhs[l] += (E_alpha - E).tolil()[l, k] * Hu[k]
+    rhs = mat_vec((E_alpha - E).tolil(), Hu)
     rhs += u0
 
     # weighted FFT in time
-    x = np.fft.fft((J_inv @ rhs.flatten()).reshape(rhs.shape), axis=0)
+    x = np.fft.fft(mat_vec(J_L_inv.toarray(), rhs), axis=0)
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -162,7 +170,7 @@ while res > restol:
         y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
     # inverse FFT in time
-    sol_paradiag = (J @ np.fft.ifft(y, axis=0).flatten()).reshape(y.shape)
+    sol_paradiag = mat_vec(J_L.toarray(), np.fft.ifft(y, axis=0))
 
     res = residual(sol_paradiag)
     n_iter += 1
