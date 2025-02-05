@@ -161,11 +161,14 @@ while res > restol:
         S_inv = np.linalg.inv(S)
         assert np.allclose(S @ np.diag(w) @ S_inv, Q @ sp.linalg.inv(G[l]).toarray())
 
-        # perform local solves of on the collocation nodes in parallel
+        # broadcast average solution to construct average Jacobian
+        _u0 = np.mean(sol_paradiag, axis=0)
+
+        # perform local solves on the collocation nodes in parallel
         x1 = S_inv @ x[l]
         x2 = np.empty_like(x1)
         for m in range(M):
-            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=x1[m], t=0)
+            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=_u0[m], t=0)
         z = S @ x2
         y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
 
