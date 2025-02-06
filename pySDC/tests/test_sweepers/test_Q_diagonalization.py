@@ -48,6 +48,9 @@ def get_composite_collocation_problem(L, M, N):
 @pytest.mark.parametrize('M', [1, 3])
 @pytest.mark.parametrize('N', [1, 2])
 def test_direct_solve(M, N):
+    """
+    Test that the diagonalization has the same result as a direct solve of the collocation problem
+    """
     import numpy as np
     import scipy.sparse as sp
 

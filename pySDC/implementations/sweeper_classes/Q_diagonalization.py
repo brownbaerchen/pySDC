@@ -40,6 +40,16 @@ class QDiagonalization(Sweeper):
         return w, S, S_inv
 
     def mat_vec(self, mat, vec):
+        """
+        Compute matrix-vector multiplication. Vector can be list.
+
+        Args:
+            mat: Matrix
+            vec: Vector
+
+        Returns:
+            list: mat @ vec
+        """
         assert mat.shape[1] == len(vec)
         result = []
         for m in range(mat.shape[0]):
@@ -65,7 +75,7 @@ class QDiagonalization(Sweeper):
         if L.tau[0] is not None:
             raise NotImplementedError('This sweeper does not work with multi-level SDC yet')
 
-        # perform local solves on the collocation nodes in parallel
+        # perform local solves on the collocation nodes, can be parallelized!
         x1 = self.mat_vec(self.S_inv, self.level.u[1:])
         x2 = []
         for m in range(M):
