@@ -1,8 +1,8 @@
-from pySDC.core.sweeper import Sweeper
+from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 import numpy as np
 
 
-class QDiagonalization(Sweeper):
+class QDiagonalization(generic_implicit):
     """
     Sweeper solving the collocation problem directly via diagonalization of Q
     """
@@ -79,41 +79,16 @@ class QDiagonalization(Sweeper):
         x1 = self.mat_vec(self.S_inv, self.level.u[1:])
         x2 = []
         for m in range(M):
-            x2.append(P.solve_system(rhs=x1[m], factor=self.w[m] * L.dt, u0=x1[m], t=L.time))
+            x2.append(
+                P.solve_system(rhs=x1[m], factor=self.w[m] * L.dt, u0=x1[m], t=L.time + L.dt * self.coll.nodes[m])
+            )
         z = self.mat_vec(self.S, x2)
         y = self.mat_vec(self.params.G_inv, z)
 
         for m in range(M):
             L.u[m + 1] = y[m]
+            L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         L.status.updated = True
-
-        return None
-
-    def compute_end_point(self):
-        """
-        Compute u at the right point of the interval
-
-        The value uend computed here is a full evaluation of the Picard formulation unless do_full_update==False
-
-        Returns:
-            None
-        """
-
-        L = self.level
-        P = L.prob
-
-        # check if Mth node is equal to right point and do_coll_update is false, perform a simple copy
-        if self.coll.right_is_node and not self.params.do_coll_update:
-            # a copy is sufficient
-            L.uend = P.dtype_u(L.u[-1])
-        else:
-            # start with u0 and add integral over the full interval (using coll.weights)
-            L.uend = P.dtype_u(L.u[0])
-            for m in range(self.coll.num_nodes):
-                L.uend += L.dt * self.coll.weights[m] * L.f[m + 1]
-            # add up tau correction of the full interval (last entry)
-            if L.tau[-1] is not None:
-                L.uend += L.tau[-1]
 
         return None

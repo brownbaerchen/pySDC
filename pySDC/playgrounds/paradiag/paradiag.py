@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
+from pySDC.helpers.ParaDiagHelper import get_fft_matrix
 
 from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
@@ -106,23 +107,7 @@ def residual(_u, u0):
     return np.linalg.norm(res)
 
 
-def get_fft_matrix(size):
-    idx_1d = np.arange(size, dtype=complex)
-    i1, i2 = np.meshgrid(idx_1d, idx_1d)
-
-    fft = np.exp(-2 * np.pi * 1j * i1 * i2 / L) / 2
-    return fft
-
-
 fft_mat = get_fft_matrix(L)
-
-data = np.sin(np.arange(L))
-fft1 = fft_mat @ data
-fft2 = np.fft.fft(data, norm='ortho')
-ifft1 = np.conjugate(fft_mat) @ data
-ifft2 = np.fft.ifft(data, norm='ortho')
-assert np.allclose(fft1, fft2)
-assert np.allclose(ifft1, ifft2)
 
 
 # ParaDiag without diagonalization and FFTs

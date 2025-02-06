@@ -58,12 +58,14 @@ def test_direct_solve(M, N):
 
     controller.MS[0].levels[0].status.unlocked = True
     level = controller.MS[0].levels[0]
+    level.status.time = 0
     sweep = level.sweep
 
     # initial conditions
     for m in range(M + 1):
         level.u[m] = prob.u_init
         level.u[m][:] = 1
+        level.f[m] = prob.eval_f(level.u[m], 0)
 
     sweep.update_nodes()
 
@@ -78,6 +80,10 @@ def test_direct_solve(M, N):
 
     for m in range(M):
         assert np.allclose(u[m], level.u[m + 1])
+
+    integral = sweep.integrate()
+    residual = [abs(level.u[m + 1] - integral[m] - level.u[0]) for m in range(M)]
+    assert np.allclose(residual, 0), 'residual is non-zero'
 
 
 if __name__ == '__main__':
