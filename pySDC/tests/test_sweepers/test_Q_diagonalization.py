@@ -195,6 +195,7 @@ def test_ParaDiag(L, M, N, alpha):
 
         # inverse FFT in time
         sol_paradiag = mat_vec(weighted_iFFT, y)
+        mat_vec_step_level(weighted_iFFT, controller)
 
         res = residual(sol_paradiag, u0)
         n_iter += 1
@@ -203,6 +204,25 @@ def test_ParaDiag(L, M, N, alpha):
     print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
 
 
+def mat_vec_step_level(mat, controller):
+    # TODO: clean up
+    res = [
+        None,
+    ] * mat.shape[0]
+    level = controller.MS[0].levels[0]
+    M = level.sweep.params.num_nodes
+
+    for i in range(mat.shape[0]):
+        res[i] = [level.prob.u_init for _ in range(M + 1)]
+        for j in range(mat.shape[1]):
+            for m in range(M + 1):
+                res[i][m] += mat[i, j] * controller.MS[j].levels[0].u[m]
+
+    for i in range(mat.shape[0]):
+        for m in range(M + 1):
+            controller.MS[i].levels[0].u[m] = res[i][m]
+
+
 if __name__ == '__main__':
     # test_direct_solve(3, 2)
-    test_ParaDiag(1, 2, 1, 1e-4)
+    test_ParaDiag(2, 2, 1, 1e-4)
