@@ -8,7 +8,7 @@ def get_composite_collocation_problem(L, M, N):
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
 
     level_params = {}
-    level_params['dt'] = 1e-3
+    level_params['dt'] = 1e-1
     level_params['restol'] = -1
 
     sweeper_params = {}
@@ -86,6 +86,123 @@ def test_direct_solve(M, N):
     assert np.allclose(residual, 0), 'residual is non-zero'
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('L', [1, 4])
+@pytest.mark.parametrize('M', [2, 3])
+@pytest.mark.parametrize('N', [1, 2])
+@pytest.mark.parametrize('alpha', [1e-4, 1e-2])
+def test_ParaDiag(L, M, N, alpha):
+    import numpy as np
+    import scipy.sparse as sp
+    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
+    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
+    from pySDC.helpers.ParaDiagHelper import (
+        get_FFT_matrix,
+        get_E_matrix,
+        get_weighted_FFT_matrix,
+        get_weighted_iFFT_matrix,
+    )
+
+    controller, prob = get_composite_collocation_problem(L, M, N)
+    level = controller.MS[0].levels[0]
+    sweep = level.sweep
+
+    restol = 1e-7
+    dt = level.params.dt
+
+    # setup infrastructure
+    u = np.zeros((L, M, N))
+
+    I_M = sp.eye(M)
+
+    E = get_E_matrix(L, 0)
+    E_alpha = get_E_matrix(L, alpha)
+    H_M = sweep.get_H_matrix()
+
+    Q = sweep.coll.Qmat[1:, 1:]
+
+    gamma = alpha ** (-np.arange(L) / L)
+    diags = np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward')
+    G = [(diags[l] * H_M + I_M).tocsc() for l in range(L)]
+    G_inv = [sp.linalg.inv(_G).toarray() for _G in G]
+
+    # get the G_inv matrices into the sweepers
+    for l in range(L):
+        w, S, S_inv = sweep.computeDiagonalization(sweep.coll.Qmat[1:, 1:] @ G_inv[l])
+        controller.MS[l].levels[0].sweep.w = w
+        controller.MS[l].levels[0].sweep.S = S
+        controller.MS[l].levels[0].sweep.S_inv = S_inv
+        controller.MS[l].levels[0].sweep.params.G_inv = G_inv[l]
+
+    weighted_FFT = get_weighted_FFT_matrix(L, alpha)
+    weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)
+
+    def mat_vec(mat, vec):
+        res = np.zeros_like(vec).astype(complex)
+        for l in range(mat.shape[0]):
+            for k in range(mat.shape[1]):
+                res[l] += mat[l, k] * vec[k]
+        return res
+
+    def residual(_u, u0):
+        res = []
+        for l in range(_u.shape[0]):
+            f_evals = np.array([prob.eval_f(_u[l, k], 0) for k in range(_u.shape[1])])
+            Qf = mat_vec(Q, f_evals)
+
+            _res = [_u[l][k] - dt * Qf[k] for k in range(_u.shape[1])]
+            for k in range(_u.shape[1]):
+                if l == 0:
+                    _res[k] -= u0[0][k]
+                else:
+                    _res[k] -= _u[l - 1][k]
+            res.append(np.max(_res))
+
+        return np.linalg.norm(res)
+
+    sol_paradiag = u.copy()
+    u0 = u.copy()
+    u0[0] = 1
+    n_iter = 0
+
+    res = residual(sol_paradiag, u0)
+
+    while res > restol:
+        # prepare local RHS to be transformed
+        Hu = np.empty_like(sol_paradiag)
+        for l in range(L):
+            Hu[l] = H_M @ sol_paradiag[l]
+
+        # assemble right hand side from LxL matrices and local rhs
+        rhs = mat_vec((E_alpha - E).tolil(), Hu)
+        rhs += u0
+
+        # weighted FFT in time
+        x = mat_vec(weighted_FFT, rhs)
+
+        # perform local solves of "collocation problems" on the steps in parallel
+        y = np.empty_like(x)
+        for l in range(L):
+            controller.MS[l].levels[0].u[0] = x[l][0]
+            for m in range(M):
+                controller.MS[l].levels[0].u[m + 1] = x[l][m]
+                controller.MS[l].levels[0].status.time = l * dt
+
+            controller.MS[l].levels[0].sweep.update_nodes()
+
+            for m in range(M):
+                y[l, m, ...] = controller.MS[l].levels[0].u[m + 1]
+
+        # inverse FFT in time
+        sol_paradiag = mat_vec(weighted_iFFT, y)
+
+        res = residual(sol_paradiag, u0)
+        n_iter += 1
+        maxiter = 10
+        assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
+    print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
+
+
 if __name__ == '__main__':
-    test_direct_solve(3, 2)
-    # test_ParaDiag(1, 1, 1, 1e-4)
+    # test_direct_solve(3, 2)
+    test_ParaDiag(1, 2, 1, 1e-4)

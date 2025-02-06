@@ -5,9 +5,9 @@ import pytest
 @pytest.mark.parametrize('N', [4, 69])
 def test_get_FFT_matrix(N):
     import numpy as np
-    from pySDC.helpers.ParaDiagHelper import get_fft_matrix
+    from pySDC.helpers.ParaDiagHelper import get_FFT_matrix
 
-    fft_mat = get_fft_matrix(N)
+    fft_mat = get_FFT_matrix(N)
 
     data = np.random.random(N)
 

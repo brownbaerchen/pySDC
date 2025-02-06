@@ -1,5 +1,6 @@
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 import numpy as np
+import scipy.sparse as sp
 
 
 class QDiagonalization(generic_implicit):
@@ -70,8 +71,6 @@ class QDiagonalization(generic_implicit):
         P = L.prob
         M = self.coll.num_nodes
 
-        # only if the level has been touched before
-        assert L.status.unlocked
         if L.tau[0] is not None:
             raise NotImplementedError('This sweeper does not work with multi-level SDC yet')
 
@@ -85,6 +84,7 @@ class QDiagonalization(generic_implicit):
         z = self.mat_vec(self.S, x2)
         y = self.mat_vec(self.params.G_inv, z)
 
+        # update solution and evaluate right hand side
         for m in range(M):
             L.u[m + 1] = y[m]
             L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
@@ -92,3 +92,15 @@ class QDiagonalization(generic_implicit):
         L.status.updated = True
 
         return None
+
+    def get_H_matrix(self):
+        """
+        Get sparse matrix for computing the collocation update
+        """
+        H = sp.eye(self.params.num_nodes).tolil() * 0
+        if self.coll.right_is_node and not self.params.do_coll_update:
+            H[:, -1] = 1
+        else:
+            raise NotImplementedError
+
+        return H
