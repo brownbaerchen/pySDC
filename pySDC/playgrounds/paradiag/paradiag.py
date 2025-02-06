@@ -81,7 +81,7 @@ J_L_inv = sp.diags(1 / gamma)
 
 
 def mat_vec(mat, vec):
-    res = np.zeros_like(vec)
+    res = np.zeros_like(vec).astype(complex)
     for l in range(vec.shape[0]):
         for k in range(vec.shape[0]):
             res[l] += mat[l, k] * vec[k]
@@ -103,6 +103,25 @@ def residual(_u, u0):
         res.append(np.max(_res))
 
     return np.linalg.norm(res)
+
+
+def get_fft_matrix(size):
+    idx_1d = np.arange(size, dtype=complex)
+    i1, i2 = np.meshgrid(idx_1d, idx_1d)
+
+    fft = np.exp(-2 * np.pi * 1j * i1 * i2 / L) / 2
+    return fft
+
+
+fft_mat = get_fft_matrix(L)
+
+data = np.sin(np.arange(L))
+fft1 = fft_mat @ data
+fft2 = np.fft.fft(data, norm='ortho')
+ifft1 = np.conjugate(fft_mat) @ data
+ifft2 = np.fft.ifft(data, norm='ortho')
+assert np.allclose(fft1, fft2)
+assert np.allclose(ifft1, ifft2)
 
 
 # ParaDiag without diagonalization and FFTs
@@ -163,7 +182,7 @@ while res > restol:
     rhs += u0
 
     # weighted FFT in time
-    x = np.fft.fft(mat_vec(J_L_inv.toarray(), rhs), axis=0)
+    x = mat_vec(fft_mat, mat_vec(J_L_inv.toarray(), rhs))
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -186,7 +205,7 @@ while res > restol:
         y[l, ...] = sp.linalg.spsolve(G[l], z)
 
     # inverse FFT in time
-    sol_paradiag = mat_vec(J_L.toarray(), np.fft.ifft(y, axis=0))
+    sol_paradiag = mat_vec(J_L.toarray(), mat_vec(np.conjugate(fft_mat), y))
 
     res = residual(sol_paradiag, u0)
     n_iter += 1
