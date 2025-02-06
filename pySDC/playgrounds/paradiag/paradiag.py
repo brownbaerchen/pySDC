@@ -3,6 +3,7 @@ import scipy.sparse as sp
 
 from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
+from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
 
 # setup parameters
 L = 4
@@ -164,9 +165,11 @@ assert np.allclose(n_iter_Kron, n_iter_serial)
 
 # ParaDiag with local solves
 G = [(D_alpha.tocsc()[l, l] * H_M + I_M).tocsc() for l in range(L)]
+G_inv = [sp.linalg.inv(_G).toarray() for _G in G]
 sol_paradiag = u.copy()
 u0 = u.copy()
 n_iter = 0
+sweepers = [QDiagonalization(params={**sweeper_params, 'G_inv': _G_inv}) for _G_inv in G_inv]
 
 res = residual(sol_paradiag, u0)
 
@@ -189,20 +192,15 @@ while res > restol:
     for l in range(L):
 
         # diagonalize QG^-1 matrix
-        w, S = np.linalg.eig(Q @ sp.linalg.inv(G[l]).toarray())
-        S_inv = np.linalg.inv(S)
-        assert np.allclose(S @ np.diag(w) @ S_inv, Q @ sp.linalg.inv(G[l]).toarray())
-
-        # broadcast average solution to construct average Jacobian
-        _u0 = np.mean(sol_paradiag, axis=0)
+        w, S, S_inv = sweepers[l].w, sweepers[l].S, sweepers[l].S_inv
 
         # perform local solves on the collocation nodes in parallel
         x1 = S_inv @ x[l]
         x2 = np.empty_like(x1)
         for m in range(M):
-            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=_u0[m], t=0)
+            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=x1[m], t=0)
         z = S @ x2
-        y[l, ...] = sp.linalg.spsolve(G[l], z)
+        y[l, ...] = G_inv[l] @ z
 
     # inverse FFT in time
     sol_paradiag = mat_vec(J_L.toarray(), mat_vec(np.conjugate(fft_mat), y))
