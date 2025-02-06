@@ -191,3 +191,7 @@ class vanderpol(Problem):
             raise ProblemError('Newton did not converge after %i iterations, error is %s' % (n, res))
 
         return u
+
+    def evaluate_jacobian(self, u0, u):
+        g = np.array([[0, 1], [-1 - 2 * self.mu * u0[1] * u0[0], self.mu * (1 - u0[0] ** 2)]])
+        return g @ u

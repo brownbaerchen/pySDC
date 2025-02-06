@@ -80,21 +80,42 @@ J_L = sp.diags(gamma)
 J_L_inv = sp.diags(1 / gamma)
 
 
-def residual(_u):
-    return np.linalg.norm(C @ _u.flatten() - u.flatten(), np.inf)
+def mat_vec(mat, vec):
+    res = np.zeros_like(vec)
+    for l in range(vec.shape[0]):
+        for k in range(vec.shape[0]):
+            res[l] += mat[l, k] * vec[k]
+    return res
+
+
+def residual(_u, u0):
+    res = []
+    for l in range(_u.shape[0]):
+        f_evals = np.array([prob.eval_f(_u[l, k], 0) for k in range(_u.shape[1])])
+        Qf = mat_vec(Q, f_evals)
+
+        _res = [_u[l][k] - dt * Qf[k] for k in range(_u.shape[1])]
+        for k in range(_u.shape[1]):
+            if l == 0:
+                _res[k] -= u0[0][k]
+            else:
+                _res[k] -= _u[l - 1][k]
+        res.append(np.max(_res))
+
+    return np.linalg.norm(res)
 
 
 # ParaDiag without diagonalization and FFTs
 sol_paradiag_serial = u.copy()
 u0 = u.copy()
-res_serial = residual(sol_paradiag_serial)
+res_serial = residual(sol_paradiag_serial, u0)
 n_iter_serial = 0
 
 while res_serial > restol:
     sol_paradiag_serial = sp.linalg.spsolve(
         C_alpha, (C_alpha - C) @ sol_paradiag_serial.flatten() + u0.flatten()
     ).reshape(sol_paradiag_serial.shape)
-    res_serial = residual(sol_paradiag_serial)
+    res_serial = residual(sol_paradiag_serial, u0)
     n_iter_serial += 1
 print(f'Needed {n_iter_serial} iterations in serial paradiag, stopped at residual {res_serial:.2e}')
 assert np.allclose(sol_paradiag_serial, sol_direct)
@@ -104,7 +125,7 @@ sol_paradiag_Kron = u.copy()
 u0 = u.copy()
 n_iter_Kron = 0
 
-res = residual(sol_paradiag_Kron)
+res = residual(sol_paradiag_Kron, u0)
 
 while res > restol:
     x = np.fft.fft(
@@ -115,7 +136,7 @@ while res > restol:
     y = sp.linalg.spsolve(C_alpha_diag, x.flatten()).reshape(x.shape)
     sol_paradiag_Kron = (J @ np.fft.ifft(y, axis=0, norm='ortho').flatten()).reshape(y.shape)
 
-    res = residual(sol_paradiag_Kron)
+    res = residual(sol_paradiag_Kron, u0)
     n_iter_Kron += 1
 print(f'Needed {n_iter_Kron} iterations in parallel paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag_Kron, sol_direct)
@@ -128,15 +149,7 @@ sol_paradiag = u.copy()
 u0 = u.copy()
 n_iter = 0
 
-res = residual(sol_paradiag)
-
-
-def mat_vec(mat, vec):
-    res = np.zeros_like(vec)
-    for l in range(vec.shape[0]):
-        for k in range(vec.shape[0]):
-            res[l] += mat[l, k] * vec[k]
-    return res
+res = residual(sol_paradiag, u0)
 
 
 while res > restol:
@@ -170,12 +183,12 @@ while res > restol:
         for m in range(M):
             x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=_u0[m], t=0)
         z = S @ x2
-        y[l, :] = sp.linalg.spsolve(sp.kron(G[l], I_N).tocsc(), z.flatten()).reshape(x[l].shape)
+        y[l, ...] = sp.linalg.spsolve(G[l], z)
 
     # inverse FFT in time
     sol_paradiag = mat_vec(J_L.toarray(), np.fft.ifft(y, axis=0))
 
-    res = residual(sol_paradiag)
+    res = residual(sol_paradiag, u0)
     n_iter += 1
 print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
 assert np.allclose(sol_paradiag, sol_direct)
