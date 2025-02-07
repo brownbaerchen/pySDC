@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from pySDC.helpers.ParaDiagHelper import get_fft_matrix
+from pySDC.helpers.ParaDiagHelper import get_FFT_matrix
 
 from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
@@ -107,7 +107,7 @@ def residual(_u, u0):
     return np.linalg.norm(res)
 
 
-fft_mat = get_fft_matrix(L)
+fft_mat = get_FFT_matrix(L)
 
 
 # ParaDiag without diagonalization and FFTs
@@ -171,6 +171,7 @@ while res > restol:
 
     # weighted FFT in time
     x = mat_vec(fft_mat, mat_vec(J_L_inv.toarray(), rhs))
+    print(x)
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)

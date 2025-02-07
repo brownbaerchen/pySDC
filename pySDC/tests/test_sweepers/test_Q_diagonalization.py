@@ -64,8 +64,8 @@ def test_direct_solve(M, N):
     # initial conditions
     for m in range(M + 1):
         level.u[m] = prob.u_init
-        level.u[m][:] = 1
         level.f[m] = prob.eval_f(level.u[m], 0)
+    level.u[0][:] = 1
 
     sweep.update_nodes()
 
@@ -75,15 +75,13 @@ def test_direct_solve(M, N):
     C_coll = I_MN - level.dt * sp.kron(Q, prob.A)
 
     u0 = np.ones(shape=(M, N))
-    u0[0] = 1
     u = sp.linalg.spsolve(C_coll, u0.flatten()).reshape(u0.shape)
 
     for m in range(M):
         assert np.allclose(u[m], level.u[m + 1])
 
-    integral = sweep.integrate()
-    residual = [abs(level.u[m + 1] - integral[m] - level.u[0]) for m in range(M)]
-    assert np.allclose(residual, 0), 'residual is non-zero'
+    sweep.compute_residual()
+    assert np.isclose(level.status.residual, 0), 'residual is non-zero'
 
 
 @pytest.mark.base
@@ -160,14 +158,51 @@ def test_ParaDiag(L, M, N, alpha):
 
         return np.linalg.norm(res)
 
+    def residual_controller(controller):
+        residuals = []
+        for l in range(L):
+            level = controller.MS[l].levels[0]
+            level.sweep.compute_residual()
+            residuals.append(level.status.residual)
+        return max(residuals)
+
     sol_paradiag = u.copy()
     u0 = u.copy()
     u0[0] = 1
-    n_iter = 0
 
+    # setup initial conditions
+    u0_loc = prob.u_init
+    u0_loc[:] = 1
+
+    for l in range(L):
+        for m in range(M + 1):
+            controller.MS[l].levels[0].u[m] = prob.u_init
+            controller.MS[l].levels[0].f[m] = prob.f_init
+    controller.MS[0].levels[0].u[0][:] = u0_loc[:]
+
+    # do ParaDiag iterations
     res = residual(sol_paradiag, u0)
-
+    # res = residual_controller(controller)
+    n_iter = 0
     while res > restol:
+        # compute solution at the end of the interval and update time (do in parallel)
+        for l in range(L):
+            controller.MS[l].levels[0].sweep.compute_end_point()
+            controller.MS[l].levels[0].status.time = l * dt
+
+        # communicate initial conditions for next iteration (MPI ptp communication)
+        for l in range(L):
+            if l == 0:
+                controller.MS[l].levels[0].u[0] = prob.dtype_u(u0_loc + alpha * controller.MS[l - 1].levels[0].uend)
+                for m in range(M):
+                    controller.MS[l].levels[0].u[m + 1] = prob.dtype_u(prob.init, val=0)
+            # else:
+            #     controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l-1].levels[0].uend)
+        print(res, [me.levels[0].u for me in controller.MS])
+
+        # weighted FFT in time
+        mat_vec_step_level(weighted_FFT, controller)
+
         # prepare local RHS to be transformed
         Hu = np.empty_like(sol_paradiag)
         for l in range(L):
@@ -179,15 +214,12 @@ def test_ParaDiag(L, M, N, alpha):
 
         # weighted FFT in time
         x = mat_vec(weighted_FFT, rhs)
+        # breakpoint()
 
         # perform local solves of "collocation problems" on the steps in parallel
         y = np.empty_like(x)
         for l in range(L):
             controller.MS[l].levels[0].u[0] = x[l][0]
-            for m in range(M):
-                controller.MS[l].levels[0].u[m + 1] = x[l][m]
-                controller.MS[l].levels[0].status.time = l * dt
-
             controller.MS[l].levels[0].sweep.update_nodes()
 
             for m in range(M):
@@ -198,10 +230,13 @@ def test_ParaDiag(L, M, N, alpha):
         mat_vec_step_level(weighted_iFFT, controller)
 
         res = residual(sol_paradiag, u0)
+        # res = residual_controller(controller)
         n_iter += 1
         maxiter = 10
+        # print(res, [me.levels[0].u for me in controller.MS])
+        # breakpoint()
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
-    print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
+    print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
 
 
 def mat_vec_step_level(mat, controller):
@@ -218,11 +253,12 @@ def mat_vec_step_level(mat, controller):
             for m in range(M + 1):
                 res[i][m] += mat[i, j] * controller.MS[j].levels[0].u[m]
 
+    # breakpoint()
     for i in range(mat.shape[0]):
         for m in range(M + 1):
             controller.MS[i].levels[0].u[m] = res[i][m]
 
 
 if __name__ == '__main__':
-    # test_direct_solve(3, 2)
-    test_ParaDiag(2, 2, 1, 1e-4)
+    test_direct_solve(2, 1)
+    test_ParaDiag(1, 2, 1, 1e-4)

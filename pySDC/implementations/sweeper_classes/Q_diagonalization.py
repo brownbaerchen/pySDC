@@ -75,7 +75,7 @@ class QDiagonalization(generic_implicit):
             raise NotImplementedError('This sweeper does not work with multi-level SDC yet')
 
         # perform local solves on the collocation nodes, can be parallelized!
-        x1 = self.mat_vec(self.S_inv, self.level.u[1:])
+        x1 = self.mat_vec(self.S_inv, [self.level.u[0] for _ in range(M)])
         x2 = []
         for m in range(M):
             x2.append(
@@ -90,13 +90,13 @@ class QDiagonalization(generic_implicit):
             L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         L.status.updated = True
-
         return None
 
     def get_H_matrix(self):
         """
         Get sparse matrix for computing the collocation update
         """
+        # TODO: Remove this function. I don't think it's needed
         H = sp.eye(self.params.num_nodes).tolil() * 0
         if self.coll.right_is_node and not self.params.do_coll_update:
             H[:, -1] = 1
