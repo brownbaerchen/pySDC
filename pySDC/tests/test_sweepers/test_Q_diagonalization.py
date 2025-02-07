@@ -102,39 +102,11 @@ def test_ParaDiag(L, M, N, alpha):
     restol = 1e-7
     dt = level.params.dt
 
-    controller.setup_ParaDiag(description, alpha)
-
-    def residual(controller, u0):
-        # store initial conditions on the steps because we need to put them back in the end
-        _u0 = [me.levels[0].u[0] for me in controller.MS]
-
-        # communicate initial conditions for computing the residual with MPI p2p
-        controller.MS[0].levels[0].u[0] = prob.dtype_u(u0)
-        for l in range(L):
-            controller.MS[l].levels[0].sweep.compute_end_point()
-            if l > 0:
-                controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l - 1].levels[0].uend)
-
-            # reevaluate f after FFT
-            controller.MS[l].levels[0].sweep.eval_f_at_all_nodes()
-
-        # compute residuals of local collocation problems (do in parallel)
-        residuals = []
-        for l in range(L):
-            level = controller.MS[l].levels[0]
-            level.sweep.compute_residual()
-            residuals.append(level.status.residual)
-
-        # put back initial conditions to continue with ParaDiag
-        for l in range(L):
-            controller.MS[l].levels[0].u[0] = _u0[l]
-
-        # compute global residual via MPI Reduce
-        return max(residuals)
-
     # setup initial conditions
     u0 = prob.u_init
     u0[:] = 1
+
+    controller.setup_ParaDiag(description, alpha, u0)
 
     # initialize solution, right hand side variables and time
     for l in range(L):
@@ -169,7 +141,7 @@ def test_ParaDiag(L, M, N, alpha):
         controller.iFFT_in_time()
 
         # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
-        res = residual(controller, u0)
+        res = controller.ParaDiag_block_residual()
         n_iter += 1
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')

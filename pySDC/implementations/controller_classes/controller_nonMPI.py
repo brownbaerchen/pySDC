@@ -684,17 +684,19 @@ class controller_nonMPI(Controller):
         """
         raise ControllerError('Unknown stage, got %s' % local_MS_running[0].status.stage)  # TODO
 
-    def setup_ParaDiag(self, description, alpha):
+    def setup_ParaDiag(self, description, alpha, u0):
         """
         Setup the sweepers for ParaDiag.
 
         Args:
             description (dict): Description for pySDC run
             alpha (float): Alpha parameter for ParaDiag
+            u0: Initial conditions for the whole block
         """
         from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
 
         self.ParaDiag_alpha = alpha
+        self.ParaDiag_block_u0 = u0
 
         L = len(self.MS)
 
@@ -761,3 +763,40 @@ class controller_nonMPI(Controller):
             self.__iFFT_matrix = get_weighted_iFFT_matrix(len(self.MS), self.ParaDiag_alpha)
 
         self.__apply_matrix(self.__iFFT_matrix)
+
+    def ParaDiag_block_residual(self):
+        """
+        Compute the residual of the composite collocation problem in ParaDiag
+
+        Returns:
+            float: Residual
+        """
+        prob = self.MS[0].levels[0].prob
+        L = len(self.MS)
+
+        # store initial conditions on the steps because we need to put them back in the end
+        _u0 = [me.levels[0].u[0] for me in self.MS]
+
+        # communicate initial conditions for computing the residual with p2p
+        self.MS[0].levels[0].u[0] = prob.dtype_u(self.ParaDiag_block_u0)
+        for l in range(L):
+            self.MS[l].levels[0].sweep.compute_end_point()
+            if l > 0:
+                self.MS[l].levels[0].u[0] = prob.dtype_u(self.MS[l - 1].levels[0].uend)
+
+            # reevaluate f after FFT
+            self.MS[l].levels[0].sweep.eval_f_at_all_nodes()
+
+        # compute residuals of local collocation problems (can do in parallel)
+        residuals = []
+        for l in range(L):
+            level = self.MS[l].levels[0]
+            level.sweep.compute_residual()
+            residuals.append(level.status.residual)
+
+        # put back initial conditions to continue with ParaDiag
+        for l in range(L):
+            self.MS[l].levels[0].u[0] = _u0[l]
+
+        # compute global residual via "Reduce"
+        return max(residuals)
