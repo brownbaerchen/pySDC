@@ -113,7 +113,7 @@ def test_ParaDiag(L, M, N, alpha):
 
     I_M = sp.eye(M)
 
-    E = get_E_matrix(L, 0)
+    # E = get_E_matrix(L, 0)
     E_alpha = get_E_matrix(L, alpha)
     H_M = sweep.get_H_matrix()
 
@@ -166,7 +166,7 @@ def test_ParaDiag(L, M, N, alpha):
             residuals.append(level.status.residual)
         return max(residuals)
 
-    sol_paradiag = u.copy()
+    sol_paradiag = u.copy().astype(complex)
     u0 = u.copy()
     u0[0] = 1
 
@@ -193,33 +193,33 @@ def test_ParaDiag(L, M, N, alpha):
         # communicate initial conditions for next iteration (MPI ptp communication)
         for l in range(L):
             if l == 0:
-                controller.MS[l].levels[0].u[0] = prob.dtype_u(u0_loc + alpha * controller.MS[l - 1].levels[0].uend)
+                controller.MS[l].levels[0].u[0] = prob.dtype_u(u0_loc - alpha * controller.MS[l - 1].levels[0].uend)
                 for m in range(M):
                     controller.MS[l].levels[0].u[m + 1] = prob.dtype_u(prob.init, val=0)
             # else:
             #     controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l-1].levels[0].uend)
-        print(res, [me.levels[0].u for me in controller.MS])
+        # print(res, [me.levels[0].u for me in controller.MS])
 
         # weighted FFT in time
         mat_vec_step_level(weighted_FFT, controller)
 
-        # prepare local RHS to be transformed
-        Hu = np.empty_like(sol_paradiag)
-        for l in range(L):
-            Hu[l] = H_M @ sol_paradiag[l]
+        # # prepare local RHS to be transformed
+        # Hu = np.empty_like(sol_paradiag)
+        # for l in range(L):
+        #     Hu[l] = H_M @ sol_paradiag[l]
 
-        # assemble right hand side from LxL matrices and local rhs
-        rhs = mat_vec((E_alpha - E).tolil(), Hu)
-        rhs += u0
+        # # assemble right hand side from LxL matrices and local rhs
+        # rhs = mat_vec((E_alpha - E).tolil(), Hu)
+        # rhs += u0
 
         # weighted FFT in time
-        x = mat_vec(weighted_FFT, rhs)
+        # x = mat_vec(weighted_FFT, rhs)
         # breakpoint()
 
         # perform local solves of "collocation problems" on the steps in parallel
-        y = np.empty_like(x)
+        y = np.empty_like(sol_paradiag)
         for l in range(L):
-            controller.MS[l].levels[0].u[0] = x[l][0]
+            # controller.MS[l].levels[0].u[0] = x[l][0]
             controller.MS[l].levels[0].sweep.update_nodes()
 
             for m in range(M):
@@ -261,4 +261,4 @@ def mat_vec_step_level(mat, controller):
 
 if __name__ == '__main__':
     test_direct_solve(2, 1)
-    test_ParaDiag(1, 2, 1, 1e-4)
+    test_ParaDiag(2, 2, 1, 1e-4)
