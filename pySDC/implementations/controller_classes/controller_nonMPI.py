@@ -733,3 +733,31 @@ class controller_nonMPI(Controller):
         for i in range(mat.shape[0]):
             for m in range(M + 1):
                 self.MS[i].levels[0].u[m] = res[i][m]
+
+    def FFT_in_time(self):
+        """
+        Compute weighted forward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
+        """
+        if not hasattr(self, 'ParaDiag_alpha'):
+            raise Exception('Controller not setup for ParaDiag yet!')
+
+        if not hasattr(self, '__FFT_matrix'):
+            from pySDC.helpers.ParaDiagHelper import get_weighted_FFT_matrix
+
+            self.__FFT_matrix = get_weighted_FFT_matrix(len(self.MS), self.ParaDiag_alpha)
+
+        self.__apply_matrix(self.__FFT_matrix)
+
+    def iFFT_in_time(self):
+        """
+        Compute weighted backward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
+        """
+        if not hasattr(self, 'ParaDiag_alpha'):
+            raise Exception('Controller not setup for ParaDiag yet!')
+
+        if not hasattr(self, '__iFFT_matrix'):
+            from pySDC.helpers.ParaDiagHelper import get_weighted_iFFT_matrix
+
+            self.__iFFT_matrix = get_weighted_iFFT_matrix(len(self.MS), self.ParaDiag_alpha)
+
+        self.__apply_matrix(self.__iFFT_matrix)

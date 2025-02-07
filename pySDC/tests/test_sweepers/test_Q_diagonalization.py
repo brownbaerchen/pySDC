@@ -95,11 +95,6 @@ def test_ParaDiag(L, M, N, alpha):
     import scipy.sparse as sp
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
-    from pySDC.helpers.ParaDiagHelper import (
-        get_FFT_matrix,
-        get_weighted_FFT_matrix,
-        get_weighted_iFFT_matrix,
-    )
 
     controller, prob, description = get_composite_collocation_problem(L, M, N)
     level = controller.MS[0].levels[0]
@@ -108,9 +103,6 @@ def test_ParaDiag(L, M, N, alpha):
     dt = level.params.dt
 
     controller.setup_ParaDiag(description, alpha)
-
-    weighted_FFT = get_weighted_FFT_matrix(L, alpha)
-    weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)
 
     def residual(controller, u0):
         # store initial conditions on the steps because we need to put them back in the end
@@ -167,25 +159,20 @@ def test_ParaDiag(L, M, N, alpha):
         controller.MS[0].levels[0].u[0] = prob.dtype_u(u0 - alpha * controller.MS[-1].levels[0].uend)
 
         # weighted FFT in time (implement with MPI Reduce, not-parallel)
-        mat_vec_step_level(weighted_FFT, controller)
+        controller.FFT_in_time()
 
         # perform local solves of "collocation problems" on the steps (do in parallel)
         for l in range(L):
             controller.MS[l].levels[0].sweep.update_nodes()
 
         # inverse FFT in time (implement with MPI Reduce, not-parallel)
-        mat_vec_step_level(weighted_iFFT, controller)
+        controller.iFFT_in_time()
 
         # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
         res = residual(controller, u0)
         n_iter += 1
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
-
-
-def mat_vec_step_level(mat, controller):
-
-    controller._controller_nonMPI__apply_matrix(mat)
 
 
 if __name__ == '__main__':
