@@ -105,7 +105,6 @@ def test_ParaDiag(L, M, N, alpha):
 
     controller, prob, description = get_composite_collocation_problem(L, M, N)
     level = controller.MS[0].levels[0]
-    sweep = level.sweep
 
     restol = 1e-7
     dt = level.params.dt
@@ -113,11 +112,7 @@ def test_ParaDiag(L, M, N, alpha):
     # get the G_inv matrices into the sweepers
     for l in range(L):
         G_inv = get_G_inv_matrix(l, L, M, alpha, description['sweeper_params'])
-        w, S, S_inv = sweep.computeDiagonalization(sweep.coll.Qmat[1:, 1:] @ G_inv)
-        controller.MS[l].levels[0].sweep.w = w
-        controller.MS[l].levels[0].sweep.S = S
-        controller.MS[l].levels[0].sweep.S_inv = S_inv
-        controller.MS[l].levels[0].sweep.params.G_inv = G_inv
+        controller.MS[l].levels[0].sweep.set_G_inv(G_inv)
 
     weighted_FFT = get_weighted_FFT_matrix(L, alpha)
     weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)

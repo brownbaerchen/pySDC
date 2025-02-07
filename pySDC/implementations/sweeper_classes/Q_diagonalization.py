@@ -22,6 +22,10 @@ class QDiagonalization(generic_implicit):
 
         super().__init__(params)
 
+        self.set_G_inv(self.params.G_inv)
+
+    def set_G_inv(self, G_inv):
+        self.params.G_inv = G_inv
         self.w, self.S, self.S_inv = self.computeDiagonalization(A=self.coll.Qmat[1:, 1:] @ self.params.G_inv)
 
     @staticmethod
