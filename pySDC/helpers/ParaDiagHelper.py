@@ -97,3 +97,31 @@ def get_weighted_iFFT_matrix(N, alpha):
         Dense weighted FFT matrix
     """
     return get_J_matrix(N, alpha) @ np.conjugate(get_FFT_matrix(N))
+
+
+def get_H_matrix(N, sweeper_params):
+    """
+    Get sparse matrix for computing the collocation update. Requires not to do a collocation update!
+
+    Args:
+        N (int): Number of collocation nodes
+        sweeper_params (dict): Parameters for the sweeper
+
+    Returns:
+        Sparse matrix for collocation update
+    """
+    assert sweeper_params['quad_type'] == 'RADAU-RIGHT'
+    H = sp.eye(N).tolil() * 0
+    H[:, -1] = 1
+    return H
+
+
+def get_G_inv_matrix(l, L, M, alpha, sweeper_params):
+    I_M = sp.eye(M)
+    E_alpha = get_E_matrix(L, alpha)
+    H = get_H_matrix(M, sweeper_params)
+
+    gamma = alpha ** (-np.arange(L) / L)
+    diags = np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward')
+    G = (diags[l] * H + I_M).tocsc()
+    return sp.linalg.inv(G).toarray()

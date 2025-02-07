@@ -42,7 +42,7 @@ def get_composite_collocation_problem(L, M, N):
     controller = controller_nonMPI(**controller_args, num_procs=L)
     P = controller.MS[0].levels[0].prob
 
-    return controller, P
+    return controller, P, description
 
 
 @pytest.mark.base
@@ -55,7 +55,7 @@ def test_direct_solve(M, N):
     import numpy as np
     import scipy.sparse as sp
 
-    controller, prob = get_composite_collocation_problem(1, M, N)
+    controller, prob, _ = get_composite_collocation_problem(1, M, N)
 
     controller.MS[0].levels[0].status.unlocked = True
     level = controller.MS[0].levels[0]
@@ -100,32 +100,24 @@ def test_ParaDiag(L, M, N, alpha):
         get_E_matrix,
         get_weighted_FFT_matrix,
         get_weighted_iFFT_matrix,
+        get_G_inv_matrix,
     )
 
-    controller, prob = get_composite_collocation_problem(L, M, N)
+    controller, prob, description = get_composite_collocation_problem(L, M, N)
     level = controller.MS[0].levels[0]
     sweep = level.sweep
 
     restol = 1e-7
     dt = level.params.dt
 
-    # setup infrastructure
-    I_M = sp.eye(M)
-    E_alpha = get_E_matrix(L, alpha)
-    H_M = sweep.get_H_matrix()
-
-    gamma = alpha ** (-np.arange(L) / L)
-    diags = np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward')
-    G = [(diags[l] * H_M + I_M).tocsc() for l in range(L)]
-    G_inv = [sp.linalg.inv(_G).toarray() for _G in G]
-
     # get the G_inv matrices into the sweepers
     for l in range(L):
-        w, S, S_inv = sweep.computeDiagonalization(sweep.coll.Qmat[1:, 1:] @ G_inv[l])
+        G_inv = get_G_inv_matrix(l, L, M, alpha, description['sweeper_params'])
+        w, S, S_inv = sweep.computeDiagonalization(sweep.coll.Qmat[1:, 1:] @ G_inv)
         controller.MS[l].levels[0].sweep.w = w
         controller.MS[l].levels[0].sweep.S = S
         controller.MS[l].levels[0].sweep.S_inv = S_inv
-        controller.MS[l].levels[0].sweep.params.G_inv = G_inv[l]
+        controller.MS[l].levels[0].sweep.params.G_inv = G_inv
 
     weighted_FFT = get_weighted_FFT_matrix(L, alpha)
     weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)

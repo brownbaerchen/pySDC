@@ -29,7 +29,6 @@ class controller_nonMPI(Controller):
         if 'predict' in controller_params:
             raise ControllerError('predict flag is ignored, use predict_type instead')
 
-        # call parent's initialization routine
         super().__init__(controller_params, description, useMPI=False)
 
         self.MS = [stepclass.Step(description)]
