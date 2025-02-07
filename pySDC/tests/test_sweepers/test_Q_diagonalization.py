@@ -131,63 +131,72 @@ def test_ParaDiag(L, M, N, alpha):
     weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)
 
     def residual(controller, u0):
-        # communicate initial conditions for computing the residual
+        # store initial conditions on the steps because we need to put them back in the end
         _u0 = [me.levels[0].u[0] for me in controller.MS]
+
+        # communicate initial conditions for computing the residual with MPI p2p
         controller.MS[0].levels[0].u[0] = prob.dtype_u(u0)
         for l in range(L):
             controller.MS[l].levels[0].sweep.compute_end_point()
             if l > 0:
                 controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l - 1].levels[0].uend)
 
+            # reevaluate f after FFT
             controller.MS[l].levels[0].sweep.eval_f_at_all_nodes()
 
+        # compute residuals of local collocation problems (do in parallel)
         residuals = []
         for l in range(L):
             level = controller.MS[l].levels[0]
             level.sweep.compute_residual()
             residuals.append(level.status.residual)
 
+        # put back initial conditions to continue with ParaDiag
         for l in range(L):
             controller.MS[l].levels[0].u[0] = _u0[l]
 
+        # compute global residual via MPI Reduce
         return max(residuals)
 
     # setup initial conditions
     u0 = prob.u_init
     u0[:] = 1
 
+    # initialize solution, right hand side variables and time
     for l in range(L):
+        controller.MS[l].levels[0].status.time = l * dt
         for m in range(M + 1):
             controller.MS[l].levels[0].u[m] = prob.u_init
             controller.MS[l].levels[0].f[m] = prob.f_init
+
     controller.MS[0].levels[0].u[0][:] = u0[:]
 
     # do ParaDiag iterations
     res = 1
     n_iter = 0
+    maxiter = 10
     while res > restol:
-        # compute solution at the end of the interval and update time (do in parallel)
+        # compute solution at the end of the interval (do in parallel)
         for l in range(L):
             controller.MS[l].levels[0].sweep.compute_end_point()
-            controller.MS[l].levels[0].status.time = l * dt
 
         # communicate initial conditions for next iteration (MPI ptp communication)
         # for linear problems, we only need to communicate the contribution due to the alpha perturbation
         controller.MS[0].levels[0].u[0] = prob.dtype_u(u0 - alpha * controller.MS[-1].levels[0].uend)
 
-        # weighted FFT in time
+        # weighted FFT in time (implement with MPI Reduce, not-parallel)
         mat_vec_step_level(weighted_FFT, controller)
 
-        # perform local solves of "collocation problems" on the steps in parallel
+        # perform local solves of "collocation problems" on the steps (do in parallel)
         for l in range(L):
             controller.MS[l].levels[0].sweep.update_nodes()
 
-        # inverse FFT in time
+        # inverse FFT in time (implement with MPI Reduce, not-parallel)
         mat_vec_step_level(weighted_iFFT, controller)
 
+        # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
         res = residual(controller, u0)
         n_iter += 1
-        maxiter = 10
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
 
