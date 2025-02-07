@@ -684,7 +684,7 @@ class controller_nonMPI(Controller):
         """
         raise ControllerError('Unknown stage, got %s' % local_MS_running[0].status.stage)  # TODO
 
-    def setup_ParaDiag(self, description, alpha, u0):
+    def setup_ParaDiag(self, description, alpha, u0, linear=True):
         """
         Setup the sweepers for ParaDiag.
 
@@ -692,11 +692,13 @@ class controller_nonMPI(Controller):
             description (dict): Description for pySDC run
             alpha (float): Alpha parameter for ParaDiag
             u0: Initial conditions for the whole block
+            linear (bool): Whether the implicit part of the problem is linear or non-linear
         """
         from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
 
         self.ParaDiag_alpha = alpha
         self.ParaDiag_block_u0 = u0
+        self.ParaDiag_linear = linear
 
         L = len(self.MS)
 
@@ -800,3 +802,21 @@ class controller_nonMPI(Controller):
 
         # compute global residual via "Reduce"
         return max(residuals)
+
+    def ParaDiag_communication(self):
+        """
+        Communicate the solution to the last step back to the first step as required in ParaDiag
+        """
+        # TODO: add hooks like in other communication functions in the controller
+
+        L = len(self.MS)
+        # compute solution at the end of the interval (can do in parallel)
+        for l in range(L):
+            self.MS[l].levels[0].sweep.compute_end_point()
+
+        # communicate initial conditions for next iteration (MPI ptp communication)
+        if self.ParaDiag_linear:
+            # for linear problems, we only need to communicate the contribution due to the alpha perturbation
+            self.MS[0].levels[0].u[0] = self.ParaDiag_block_u0 - self.ParaDiag_alpha * self.MS[-1].levels[0].uend
+        else:
+            raise NotImplementedError('Communication for nonlinear ParaDiag is not yet implemented')

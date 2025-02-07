@@ -122,13 +122,7 @@ def test_ParaDiag(L, M, N, alpha):
     n_iter = 0
     maxiter = 10
     while res > restol:
-        # compute solution at the end of the interval (do in parallel)
-        for l in range(L):
-            controller.MS[l].levels[0].sweep.compute_end_point()
-
-        # communicate initial conditions for next iteration (MPI ptp communication)
-        # for linear problems, we only need to communicate the contribution due to the alpha perturbation
-        controller.MS[0].levels[0].u[0] = prob.dtype_u(u0 - alpha * controller.MS[-1].levels[0].uend)
+        controller.ParaDiag_communication()
 
         # weighted FFT in time (implement with MPI Reduce, not-parallel)
         controller.FFT_in_time()
