@@ -15,6 +15,7 @@ def get_composite_collocation_problem(L, M, N):
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = M
     sweeper_params['initial_guess'] = 'copy'
+    sweeper_params['update_f_evals'] = True
 
     step_params = {}
     step_params['maxiter'] = 1
@@ -110,7 +111,6 @@ def test_ParaDiag(L, M, N, alpha):
 
     # setup infrastructure
     I_M = sp.eye(M)
-
     E_alpha = get_E_matrix(L, alpha)
     H_M = sweep.get_H_matrix()
 

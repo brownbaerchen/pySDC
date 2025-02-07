@@ -17,6 +17,8 @@ class QDiagonalization(generic_implicit):
         """
         if 'G_inv' not in params.keys():
             params['G_inv'] = np.eye(params['num_nodes'])
+        if 'update_f_evals' not in params.keys():
+            params['update_f_evals'] = False
 
         super().__init__(params)
 
@@ -87,7 +89,8 @@ class QDiagonalization(generic_implicit):
         # update solution and evaluate right hand side
         for m in range(M):
             L.u[m + 1] = y[m]
-            L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
+            if self.params.update_f_evals:
+                L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         L.status.updated = True
         return None
@@ -102,7 +105,6 @@ class QDiagonalization(generic_implicit):
         """
         Get sparse matrix for computing the collocation update
         """
-        # TODO: Remove this function. I don't think it's needed
         H = sp.eye(self.params.num_nodes).tolil() * 0
         if self.coll.right_is_node and not self.params.do_coll_update:
             H[:, -1] = 1
