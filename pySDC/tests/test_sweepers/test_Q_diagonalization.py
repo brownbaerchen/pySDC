@@ -97,10 +97,8 @@ def test_ParaDiag(L, M, N, alpha):
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
     from pySDC.helpers.ParaDiagHelper import (
         get_FFT_matrix,
-        get_E_matrix,
         get_weighted_FFT_matrix,
         get_weighted_iFFT_matrix,
-        get_G_inv_matrix,
     )
 
     controller, prob, description = get_composite_collocation_problem(L, M, N)
@@ -186,22 +184,8 @@ def test_ParaDiag(L, M, N, alpha):
 
 
 def mat_vec_step_level(mat, controller):
-    # TODO: clean up
-    res = [
-        None,
-    ] * mat.shape[0]
-    level = controller.MS[0].levels[0]
-    M = level.sweep.params.num_nodes
 
-    for i in range(mat.shape[0]):
-        res[i] = [level.prob.u_init for _ in range(M + 1)]
-        for j in range(mat.shape[1]):
-            for m in range(M + 1):
-                res[i][m] += mat[i, j] * controller.MS[j].levels[0].u[m]
-
-    for i in range(mat.shape[0]):
-        for m in range(M + 1):
-            controller.MS[i].levels[0].u[m] = res[i][m]
+    controller._controller_nonMPI__apply_matrix(mat)
 
 
 if __name__ == '__main__':

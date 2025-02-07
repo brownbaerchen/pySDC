@@ -81,22 +81,6 @@ class controller_nonMPI(Controller):
             C.reset_buffers_nonMPI(self)
             C.setup_status_variables(self, MS=self.MS)
 
-    def setup_ParaDiag(self, description, alpha):
-        """
-        Setup the sweepers for ParaDiag.
-
-        Args:
-            description (dict): Description for pySDC run
-            alpha (float): Alpha parameter for ParaDiag
-        """
-        from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
-
-        L = len(self.MS)
-
-        for l in range(L):
-            G_inv = get_G_inv_matrix(l, L, alpha, description['sweeper_params'])
-            self.MS[l].levels[0].sweep.set_G_inv(G_inv)
-
     def run(self, u0, t0, Tend):
         """
         Main driver for running the serial version of SDC, MSSDC, MLSDC and PFASST (virtual parallelism)
@@ -699,3 +683,53 @@ class controller_nonMPI(Controller):
             local_MS_running (list): list of currently running steps
         """
         raise ControllerError('Unknown stage, got %s' % local_MS_running[0].status.stage)  # TODO
+
+    def setup_ParaDiag(self, description, alpha):
+        """
+        Setup the sweepers for ParaDiag.
+
+        Args:
+            description (dict): Description for pySDC run
+            alpha (float): Alpha parameter for ParaDiag
+        """
+        from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
+
+        self.ParaDiag_alpha = alpha
+
+        L = len(self.MS)
+
+        for l in range(L):
+            G_inv = get_G_inv_matrix(l, L, alpha, description['sweeper_params'])
+            self.MS[l].levels[0].sweep.set_G_inv(G_inv)
+
+    def __apply_matrix(self, mat):
+        """
+        Apply a matrix on the step level. Needs to be square. Puts the result back into the controller.
+
+        Args:
+            mat: square LxL matrix with L number of steps
+        """
+        L = len(self.MS)
+        assert np.allclose(mat.shape, L)
+        assert len(mat.shape) == 2
+
+        level = self.MS[0].levels[0]
+        M = level.sweep.params.num_nodes
+        prob = level.prob
+
+        # buffer for storing the result
+        res = [
+            None,
+        ] * L
+
+        # compute matrix-vector product
+        for i in range(mat.shape[0]):
+            res[i] = [prob.u_init for _ in range(M + 1)]
+            for j in range(mat.shape[1]):
+                for m in range(M + 1):
+                    res[i][m] += mat[i, j] * self.MS[j].levels[0].u[m]
+
+        # put the result in the "output"
+        for i in range(mat.shape[0]):
+            for m in range(M + 1):
+                self.MS[i].levels[0].u[m] = res[i][m]
