@@ -109,15 +109,10 @@ def test_ParaDiag(L, M, N, alpha):
     dt = level.params.dt
 
     # setup infrastructure
-    u = np.zeros((L, M, N))
-
     I_M = sp.eye(M)
 
-    # E = get_E_matrix(L, 0)
     E_alpha = get_E_matrix(L, alpha)
     H_M = sweep.get_H_matrix()
-
-    Q = sweep.coll.Qmat[1:, 1:]
 
     gamma = alpha ** (-np.arange(L) / L)
     diags = np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward')
@@ -135,54 +130,40 @@ def test_ParaDiag(L, M, N, alpha):
     weighted_FFT = get_weighted_FFT_matrix(L, alpha)
     weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)
 
-    def mat_vec(mat, vec):
-        res = np.zeros_like(vec).astype(complex)
-        for l in range(mat.shape[0]):
-            for k in range(mat.shape[1]):
-                res[l] += mat[l, k] * vec[k]
-        return res
+    def residual(controller, u0):
+        # communicate initial conditions for computing the residual
+        _u0 = [me.levels[0].u[0] for me in controller.MS]
+        controller.MS[0].levels[0].u[0] = prob.dtype_u(u0)
+        for l in range(L):
+            controller.MS[l].levels[0].sweep.compute_end_point()
+            if l > 0:
+                controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l - 1].levels[0].uend)
 
-    def residual(_u, u0):
-        res = []
-        for l in range(_u.shape[0]):
-            f_evals = np.array([prob.eval_f(_u[l, k], 0) for k in range(_u.shape[1])])
-            Qf = mat_vec(Q, f_evals)
+            controller.MS[l].levels[0].sweep.eval_f_at_all_nodes()
 
-            _res = [_u[l][k] - dt * Qf[k] for k in range(_u.shape[1])]
-            for k in range(_u.shape[1]):
-                if l == 0:
-                    _res[k] -= u0[0][k]
-                else:
-                    _res[k] -= _u[l - 1][k]
-            res.append(np.max(_res))
-
-        return np.linalg.norm(res)
-
-    def residual_controller(controller):
         residuals = []
         for l in range(L):
             level = controller.MS[l].levels[0]
             level.sweep.compute_residual()
             residuals.append(level.status.residual)
+
+        for l in range(L):
+            controller.MS[l].levels[0].u[0] = _u0[l]
+
         return max(residuals)
 
-    sol_paradiag = u.copy().astype(complex)
-    u0 = u.copy()
-    u0[0] = 1
-
     # setup initial conditions
-    u0_loc = prob.u_init
-    u0_loc[:] = 1
+    u0 = prob.u_init
+    u0[:] = 1
 
     for l in range(L):
         for m in range(M + 1):
             controller.MS[l].levels[0].u[m] = prob.u_init
             controller.MS[l].levels[0].f[m] = prob.f_init
-    controller.MS[0].levels[0].u[0][:] = u0_loc[:]
+    controller.MS[0].levels[0].u[0][:] = u0[:]
 
     # do ParaDiag iterations
-    res = residual(sol_paradiag, u0)
-    # res = residual_controller(controller)
+    res = 1
     n_iter = 0
     while res > restol:
         # compute solution at the end of the interval and update time (do in parallel)
@@ -191,50 +172,22 @@ def test_ParaDiag(L, M, N, alpha):
             controller.MS[l].levels[0].status.time = l * dt
 
         # communicate initial conditions for next iteration (MPI ptp communication)
-        for l in range(L):
-            if l == 0:
-                controller.MS[l].levels[0].u[0] = prob.dtype_u(u0_loc - alpha * controller.MS[l - 1].levels[0].uend)
-                for m in range(M):
-                    controller.MS[l].levels[0].u[m + 1] = prob.dtype_u(prob.init, val=0)
-            # else:
-            #     controller.MS[l].levels[0].u[0] = prob.dtype_u(controller.MS[l-1].levels[0].uend)
-        # print(res, [me.levels[0].u for me in controller.MS])
+        # for linear problems, we only need to communicate the contribution due to the alpha perturbation
+        controller.MS[0].levels[0].u[0] = prob.dtype_u(u0 - alpha * controller.MS[-1].levels[0].uend)
 
         # weighted FFT in time
         mat_vec_step_level(weighted_FFT, controller)
 
-        # # prepare local RHS to be transformed
-        # Hu = np.empty_like(sol_paradiag)
-        # for l in range(L):
-        #     Hu[l] = H_M @ sol_paradiag[l]
-
-        # # assemble right hand side from LxL matrices and local rhs
-        # rhs = mat_vec((E_alpha - E).tolil(), Hu)
-        # rhs += u0
-
-        # weighted FFT in time
-        # x = mat_vec(weighted_FFT, rhs)
-        # breakpoint()
-
         # perform local solves of "collocation problems" on the steps in parallel
-        y = np.empty_like(sol_paradiag)
         for l in range(L):
-            # controller.MS[l].levels[0].u[0] = x[l][0]
             controller.MS[l].levels[0].sweep.update_nodes()
 
-            for m in range(M):
-                y[l, m, ...] = controller.MS[l].levels[0].u[m + 1]
-
         # inverse FFT in time
-        sol_paradiag = mat_vec(weighted_iFFT, y)
         mat_vec_step_level(weighted_iFFT, controller)
 
-        res = residual(sol_paradiag, u0)
-        # res = residual_controller(controller)
+        res = residual(controller, u0)
         n_iter += 1
         maxiter = 10
-        # print(res, [me.levels[0].u for me in controller.MS])
-        # breakpoint()
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
 
@@ -253,7 +206,6 @@ def mat_vec_step_level(mat, controller):
             for m in range(M + 1):
                 res[i][m] += mat[i, j] * controller.MS[j].levels[0].u[m]
 
-    # breakpoint()
     for i in range(mat.shape[0]):
         for m in range(M + 1):
             controller.MS[i].levels[0].u[m] = res[i][m]

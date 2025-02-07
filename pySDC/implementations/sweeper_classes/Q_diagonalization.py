@@ -92,6 +92,12 @@ class QDiagonalization(generic_implicit):
         L.status.updated = True
         return None
 
+    def eval_f_at_all_nodes(self):
+        L = self.level
+        P = self.level.prob
+        for m in range(self.coll.num_nodes):
+            L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
+
     def get_H_matrix(self):
         """
         Get sparse matrix for computing the collocation update
