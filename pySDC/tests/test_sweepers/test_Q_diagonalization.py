@@ -122,17 +122,7 @@ def test_ParaDiag(L, M, N, alpha):
     n_iter = 0
     maxiter = 10
     while res > restol:
-        controller.ParaDiag_communication()
-
-        # weighted FFT in time (implement with MPI Reduce, not-parallel)
-        controller.FFT_in_time()
-
-        # perform local solves of "collocation problems" on the steps (do in parallel)
-        for l in range(L):
-            controller.MS[l].levels[0].sweep.update_nodes()
-
-        # inverse FFT in time (implement with MPI Reduce, not-parallel)
-        controller.iFFT_in_time()
+        controller.it_ParaDiag()
 
         # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
         res = controller.ParaDiag_block_residual()

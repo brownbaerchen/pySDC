@@ -820,3 +820,18 @@ class controller_nonMPI(Controller):
             self.MS[0].levels[0].u[0] = self.ParaDiag_block_u0 - self.ParaDiag_alpha * self.MS[-1].levels[0].uend
         else:
             raise NotImplementedError('Communication for nonlinear ParaDiag is not yet implemented')
+
+    def it_ParaDiag(self):
+        # TODO: add hooks
+        self.ParaDiag_communication()
+
+        # weighted FFT in time (implement with MPI Reduce, not-parallel)
+        self.FFT_in_time()
+
+        # perform local solves of "collocation problems" on the steps (do in parallel)
+        for S in self.MS:
+            assert len(S.levels) == 1, 'Multi-level SDC not implemented in ParaDiag'
+            S.levels[0].sweep.update_nodes()
+
+        # inverse FFT in time (implement with MPI Reduce, not-parallel)
+        self.iFFT_in_time()
