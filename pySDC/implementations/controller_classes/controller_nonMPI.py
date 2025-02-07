@@ -81,6 +81,22 @@ class controller_nonMPI(Controller):
             C.reset_buffers_nonMPI(self)
             C.setup_status_variables(self, MS=self.MS)
 
+    def setup_ParaDiag(self, description, alpha):
+        """
+        Setup the sweepers for ParaDiag.
+
+        Args:
+            description (dict): Description for pySDC run
+            alpha (float): Alpha parameter for ParaDiag
+        """
+        from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
+
+        L = len(self.MS)
+
+        for l in range(L):
+            G_inv = get_G_inv_matrix(l, L, alpha, description['sweeper_params'])
+            self.MS[l].levels[0].sweep.set_G_inv(G_inv)
+
     def run(self, u0, t0, Tend):
         """
         Main driver for running the serial version of SDC, MSSDC, MLSDC and PFASST (virtual parallelism)

@@ -109,10 +109,7 @@ def test_ParaDiag(L, M, N, alpha):
     restol = 1e-7
     dt = level.params.dt
 
-    # get the G_inv matrices into the sweepers
-    for l in range(L):
-        G_inv = get_G_inv_matrix(l, L, M, alpha, description['sweeper_params'])
-        controller.MS[l].levels[0].sweep.set_G_inv(G_inv)
+    controller.setup_ParaDiag(description, alpha)
 
     weighted_FFT = get_weighted_FFT_matrix(L, alpha)
     weighted_iFFT = get_weighted_iFFT_matrix(L, alpha)

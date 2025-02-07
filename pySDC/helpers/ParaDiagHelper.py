@@ -116,7 +116,8 @@ def get_H_matrix(N, sweeper_params):
     return H
 
 
-def get_G_inv_matrix(l, L, M, alpha, sweeper_params):
+def get_G_inv_matrix(l, L, alpha, sweeper_params):
+    M = sweeper_params['num_nodes']
     I_M = sp.eye(M)
     E_alpha = get_E_matrix(L, alpha)
     H = get_H_matrix(M, sweeper_params)
