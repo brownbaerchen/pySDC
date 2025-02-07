@@ -1,10 +1,10 @@
 import pytest
 
 
-def get_composite_collocation_problem(L, M, N):
+def get_composite_collocation_problem(L, M, N, alpha=0, linear=True):
     import numpy as np
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
-    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+    from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
 
     level_params = {}
@@ -39,7 +39,7 @@ def get_composite_collocation_problem(L, M, N):
         'controller_params': controller_params,
         'description': description,
     }
-    controller = controller_nonMPI(**controller_args, num_procs=L)
+    controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L, alpha=alpha, linear=linear)
     P = controller.MS[0].levels[0].prob
 
     return controller, P, description
@@ -96,7 +96,7 @@ def test_ParaDiag(L, M, N, alpha):
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
 
-    controller, prob, description = get_composite_collocation_problem(L, M, N)
+    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha)
     level = controller.MS[0].levels[0]
 
     restol = 1e-7
@@ -105,8 +105,7 @@ def test_ParaDiag(L, M, N, alpha):
     # setup initial conditions
     u0 = prob.u_init
     u0[:] = 1
-
-    controller.setup_ParaDiag(description, alpha, u0)
+    controller.ParaDiag_block_u0 = u0
 
     # initialize solution, right hand side variables and time
     for l in range(L):

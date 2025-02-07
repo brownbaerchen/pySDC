@@ -125,4 +125,7 @@ def get_G_inv_matrix(l, L, alpha, sweeper_params):
     gamma = alpha ** (-np.arange(L) / L)
     diags = np.fft.fft(1 / gamma * E_alpha[:, 0].toarray().flatten(), norm='backward')
     G = (diags[l] * H + I_M).tocsc()
-    return sp.linalg.inv(G).toarray()
+    if M > 1:
+        return sp.linalg.inv(G).toarray()
+    else:
+        return 1 / G.toarray()

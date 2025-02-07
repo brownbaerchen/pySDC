@@ -341,3 +341,46 @@ class Controller(object):
         for hook in self.hooks:
             stats = {**stats, **hook.return_stats()}
         return stats
+
+
+class ParaDiagController(Controller):
+    def __init__(self, controller_params, description, n_steps, alpha, linear=True, useMPI=None):
+        """
+        Initialization routine for ParaDiag controllers
+
+        Args:
+           num_procs: number of parallel time steps (still serial, though), can be 1
+           controller_params: parameter set for the controller and the steps
+           description: all the parameters to set up the rest (levels, problems, transfer, ...)
+           n_steps (int): Number of parallel steps
+           alpha (float): alpha parameter for ParaDiag
+           linear (bool): Whether the implicit part of the problem is linear or not
+        """
+        super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
+
+        self.ParaDiag_alpha = alpha
+        self.ParaDiag_linear = linear
+        self.ParaDiag_block_u0 = None
+        self.n_steps = n_steps
+
+    def FFT_in_time(self):
+        """
+        Compute weighted forward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
+        """
+        if not hasattr(self, '__FFT_matrix'):
+            from pySDC.helpers.ParaDiagHelper import get_weighted_FFT_matrix
+
+            self.__FFT_matrix = get_weighted_FFT_matrix(self.n_steps, self.ParaDiag_alpha)
+
+        self.apply_matrix(self.__FFT_matrix)
+
+    def iFFT_in_time(self):
+        """
+        Compute weighted backward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
+        """
+        if not hasattr(self, '__iFFT_matrix'):
+            from pySDC.helpers.ParaDiagHelper import get_weighted_iFFT_matrix
+
+            self.__iFFT_matrix = get_weighted_iFFT_matrix(self.n_steps, self.ParaDiag_alpha)
+
+        self.apply_matrix(self.__iFFT_matrix)
