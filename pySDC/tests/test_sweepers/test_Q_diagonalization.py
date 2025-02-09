@@ -124,7 +124,7 @@ def test_ParaDiag(L, M, N, alpha):
         controller.it_ParaDiag()
 
         # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
-        res = controller.ParaDiag_block_residual()
+        res = controller.compute_ParaDiag_block_residual()
         n_iter += 1
         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')

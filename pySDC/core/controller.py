@@ -356,6 +356,7 @@ class ParaDiagController(Controller):
            alpha (float): alpha parameter for ParaDiag
            linear (bool): Whether the implicit part of the problem is linear or not
         """
+        # TODO: put ParaDiag parameters in controller params
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
 
         self.ParaDiag_alpha = alpha
