@@ -76,25 +76,27 @@ def mat_vec(mat, vec):
 
 
 def residual(_u, u0):
-    res = []
-    for l in range(_u.shape[0]):
-        f_evals = np.array([prob.eval_f(_u[l, k], 0) for k in range(_u.shape[1])])
+    res = _u * 0j
+    for l in range(L):
+        # build step local residual
+
+        # communicate initial conditions for each step
+        if l == 0:
+            res[l, ...] = u0[l, ...]
+        else:
+            res[l, ...] = _u[l - 1, -1, ...]
+
+        # evaluate and subtract integral over right hand side functions
+        f_evals = np.array([prob.eval_f(_u[l, m], 0) for m in range(M)])
         Qf = mat_vec(Q, f_evals)
+        res[l, ...] -= _u[l] - dt * Qf
 
-        _res = [_u[l][k] - dt * Qf[k] for k in range(_u.shape[1])]
-        for k in range(_u.shape[1]):
-            if l == 0:
-                _res[k] -= u0[0][k]
-            else:
-                _res[k] -= _u[l - 1][k]
-        res.append(np.max(_res))
-
-    return np.linalg.norm(res)
+    return res
 
 
 # ParaDiag with local solves
 G = [(D_alpha.tocsc()[l, l] * H_M + I_M).tocsc() for l in range(L)]
-sol_paradiag = u.copy()
+sol_paradiag = u.copy() * 0j
 u0 = u.copy()
 n_iter = 0
 
@@ -117,36 +119,18 @@ for l in range(L):
     S_inv.append(_S_inv)
 
 
-while res > restol:
-    # prepare local RHS to be transformed
-    Hu = np.empty_like(sol_paradiag)
-    for l in range(L):
-        Hu[l] = H_M @ sol_paradiag[l]
+while np.max(np.abs(res)) > restol:
+    # compute all-at-once residual
+    res = residual(sol_paradiag, u0)
 
     # broadcast average solution to construct average Jacobians (one for each collocation node)
-    _u_avg = np.zeros(shape=(M, N), dtype=complex)
-    for l in range(L):
-        _u_avg += S_inv[l] @ sol_paradiag[l] / L
+    _u_avg = np.mean(sol_paradiag, axis=0)
     u_avg = [prob.u_init for _ in range(M)]
     for i in range(M):
         u_avg[i][:] = _u_avg[i]
 
-    # compute contribution to RHS in non-linear problems
-    rhs_nonlin = np.empty_like(sol_paradiag)
-    for l in range(L):
-        f_evals = np.array([prob.eval_f(sol_paradiag[l, m], 0) for m in range(M)])
-        Qf = mat_vec(Q, f_evals)
-        J_evals = np.array([prob.evaluate_jacobian(u_avg[m], sol_paradiag[l, m]) for m in range(M)])
-        Qf_avg = mat_vec(Q, J_evals)
-        rhs_nonlin[l] = dt * (Qf - Qf_avg)
-
-    # assemble right hand side from LxL matrices and local rhs
-    rhs = mat_vec((E_alpha - E).tolil(), Hu)
-    rhs += rhs_nonlin
-    rhs += u0
-
     # weighted FFT in time
-    x = np.fft.fft(mat_vec(J_L_inv.toarray(), rhs), axis=0)
+    x = np.fft.fft(mat_vec(J_L_inv.toarray(), res), axis=0)
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -160,10 +144,10 @@ while res > restol:
         z = S[l] @ x2
         y[l, ...] = sp.linalg.spsolve(G[l], z)
 
-    # inverse FFT in time
-    sol_paradiag = mat_vec(J_L.toarray(), np.fft.ifft(y, axis=0))
+    # inverse FFT in time and increment
+    sol_paradiag += mat_vec(J_L.toarray(), np.fft.ifft(y, axis=0))
 
     res = residual(sol_paradiag, u0)
     n_iter += 1
-    print(n_iter, res)
+    print(n_iter, np.max(np.abs(res)))
 print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')

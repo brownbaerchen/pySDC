@@ -19,6 +19,11 @@ class QDiagonalization(generic_implicit):
             params['G_inv'] = np.eye(params['num_nodes'])
         if 'update_f_evals' not in params.keys():
             params['update_f_evals'] = False
+        if 'ignore_ic' not in params.keys():
+            params['ignore_ic'] = False
+
+        if not params.get('ignore_ic', False):
+            params['initial_guess'] = 'zero'
 
         super().__init__(params)
 
@@ -78,10 +83,13 @@ class QDiagonalization(generic_implicit):
         M = self.coll.num_nodes
 
         if L.tau[0] is not None:
-            raise NotImplementedError('This sweeper does not work with multi-level SDC yet')
+            raise NotImplementedError('This sweeper does not work with multi-level SDC')
 
         # perform local solves on the collocation nodes, can be parallelized!
-        x1 = self.mat_vec(self.S_inv, [self.level.u[0] for _ in range(M)])
+        if self.params.ignore_ic:
+            x1 = self.mat_vec(self.S_inv, [self.level.u[m + 1] for m in range(M)])
+        else:
+            x1 = self.mat_vec(self.S_inv, [self.level.u[0] for _ in range(M)])
         x2 = []
         for m in range(M):
             x2.append(

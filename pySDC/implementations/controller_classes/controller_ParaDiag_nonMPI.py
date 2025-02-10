@@ -81,7 +81,8 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             'IT_PARADIAG': self.it_ParaDiag,
         }
 
-        switcher.get(stage, self.default)(MS_running)
+        assert stage in switcher.keys(), f'Got unexpected stage {stage!r}'
+        switcher[stage](MS_running)
 
         return all(S.status.done for S in local_MS_active)
 
@@ -135,20 +136,67 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         else:
             raise NotImplementedError('Communication for nonlinear ParaDiag is not yet implemented')
 
-    def it_ParaDiag(self):
+    def swap_solution_for_all_at_once_residual(self, local_MS_running):
+        prob = self.MS[0].levels[0].prob
+
+        for S in local_MS_running:
+            # communicate initial conditions to the steps
+            S.levels[0].sweep.compute_end_point()
+            if S.status.first:
+                S.levels[0].u[0] = prob.dtype_u(self.ParaDiag_block_u0)
+            else:
+                S.levels[0].u[0] = S.prev.levels[0].uend
+
+            # compute integral over right hand side dt*Q*F(u)
+            S.levels[0].sweep.eval_f_at_all_nodes()
+            integral = S.levels[0].sweep.integrate()
+
+            # subtract integral and initial conditions to arrive at r = u - u0 = dt*Q*F
+            for m in range(S.levels[0].sweep.coll.num_nodes):
+                S.levels[0].u[m + 1] -= S.levels[0].u[0] + integral[m]
+
+        # put the residual at the end of the interval in the initial conditions
+        for S in local_MS_running:
+            # S.levels[0].sweep.compute_end_point()
+            # S.levels[0].u[0] = S.levels[0].uend
+            S.levels[0].u[0] = S.levels[0].u[-1]
+
+    def swap_increment_for_solution(self, local_MS_running, prev_solution):
+        for S in local_MS_running:
+            for m in range(S.levels[0].sweep.coll.num_nodes + 1):
+                S.levels[0].u[m] = prev_solution[S.status.slot][m] - S.levels[0].u[m]
+            if S.status.first:
+                S.levels[0].u[0] = self.ParaDiag_block_u0
+
+    def it_ParaDiag(self, local_MS_running):
         # TODO: add hooks
-        self.ParaDiag_communication()
+        # TODO: add docs
+
+        # copy solution because we are are going to compute the increment and add the solution back in at the end
+        prev_solution = []
+        for S in local_MS_running:
+            prev_solution.append([me * 1.0 for me in S.levels[0].u])
+
+        # replace the values stored in the steps with minus the residuals in order to compute the increment
+        self.swap_solution_for_all_at_once_residual(local_MS_running)
 
         # weighted FFT in time (implement with MPI Reduce, not-parallel)
         self.FFT_in_time()
 
         # perform local solves of "collocation problems" on the steps (do in parallel)
-        for S in self.MS:
+        for S in local_MS_running:
             assert len(S.levels) == 1, 'Multi-level SDC not implemented in ParaDiag'
             S.levels[0].sweep.update_nodes()
 
         # inverse FFT in time (implement with MPI Reduce, not-parallel)
         self.iFFT_in_time()
+
+        # replace the values stored in the steps with the previous solution minus the increment
+        self.swap_increment_for_solution(local_MS_running, prev_solution)
+
+        # update stage
+        for S in local_MS_running:
+            S.status.stage = 'IT_CHECK'
 
     def compute_ParaDiag_block_residual(self):
         """
@@ -157,6 +205,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         Returns:
             float: Residual
         """
+        # raise Exception('Figure out how to communicate here!')
         prob = self.MS[0].levels[0].prob
         L = len(self.MS)
 
@@ -180,9 +229,9 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             level.sweep.compute_residual(stage='IT_CHECK')
             residuals.append(level.status.residual)
 
-        # put back initial conditions to continue with ParaDiag
-        for l in range(L):
-            self.MS[l].levels[0].u[0] = _u0[l]
+        # # put back initial conditions to continue with ParaDiag
+        # for l in range(L):
+        #     self.MS[l].levels[0].u[0] = _u0[l]
 
         # compute global residual via "Reduce"
         return max(residuals)
@@ -251,6 +300,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         """
 
         for S in local_MS_running:
+
             # first stage: spread values
             for hook in self.hooks:
                 hook.pre_step(step=S, level_number=0)
@@ -369,6 +419,8 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             u0: initial value to distribute across the steps
 
         """
+        self.ParaDiag_block_u0 = u0  # need this for computing residual
+
         for j in range(len(active_slots)):
             # get slot number
             p = active_slots[j]

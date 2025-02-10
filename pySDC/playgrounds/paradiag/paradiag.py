@@ -7,11 +7,11 @@ from pySDC.implementations.sweeper_classes.generic_implicit import generic_impli
 from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
 
 # setup parameters
-L = 4
-M = 3
-N = 2
+L = 1
+M = 2
+N = 1
 alpha = 1e-4
-restol = 1e-7
+restol = 1e-10
 dt = 0.1
 
 sweeper_params = {
@@ -171,7 +171,6 @@ while res > restol:
 
     # weighted FFT in time
     x = mat_vec(fft_mat, mat_vec(J_L_inv.toarray(), rhs))
-    print(x)
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -194,5 +193,70 @@ while res > restol:
     res = residual(sol_paradiag, u0)
     n_iter += 1
 print(f'Needed {n_iter} iterations in parallel and local paradiag, stopped at residual {res:.2e}')
+assert np.allclose(sol_paradiag, sol_direct)
+assert np.allclose(n_iter, n_iter_serial)
+
+# ParaDiag with local solves and increment formulation
+
+
+def residual_expanded(_u, u0):
+    res = _u * 0j
+    for l in range(L):
+        # build step local residual
+
+        # communicate initial conditions for each step
+        if l == 0:
+            res[l, ...] = u0[l, ...]
+        else:
+            res[l, ...] = _u[l - 1, -1, ...]
+
+        # evaluate and subtract integral over right hand side functions
+        f_evals = np.array([prob.eval_f(_u[l, m], 0) for m in range(M)])
+        Qf = mat_vec(Q, f_evals)
+        for m in range(M):
+            # res[l, m, ...] -= (_u[l] - dt * Qf)[-1]
+            res[l, m, ...] -= (_u[l] - dt * Qf)[m]
+            # res[l, m, ...] -= np.mean((_u[l] - dt * Qf), axis=0)
+
+    return res
+
+
+sol_paradiag = u.copy().astype(complex)
+res = residual_expanded(sol_paradiag, u0)
+n_iter = 0
+while np.max(np.abs(residual_expanded(sol_paradiag, u0))) > restol:
+    # get composite collocation problem residual
+    rhs = residual_expanded(sol_paradiag, u0)
+
+    # weighted FFT in time
+    x = mat_vec(fft_mat, mat_vec(J_L_inv.toarray(), rhs))
+
+    # perform local solves of "collocation problems" on the steps in parallel
+    y = np.empty_like(x)
+    for l in range(L):
+
+        # diagonalize QG^-1 matrix
+        w, S, S_inv = sweepers[l].w, sweepers[l].S, sweepers[l].S_inv
+
+        # perform local solves on the collocation nodes in parallel
+        x1 = S_inv @ x[l]
+        x2 = np.empty_like(x1)
+        for m in range(M):
+            x2[m, :] = prob.solve_system(rhs=x1[m], factor=w[m] * dt, u0=x1[m], t=0)
+        z = S @ x2
+        y[l, ...] = G_inv[l] @ z
+
+    # inverse FFT in time
+    delta = mat_vec(J_L.toarray(), mat_vec(np.conjugate(fft_mat), y))
+    sol_paradiag += delta
+    print('new', sol_paradiag)
+    print(residual_expanded(sol_paradiag, u0))
+    breakpoint()
+
+    res = np.max(np.abs(residual_expanded(sol_paradiag, u0)))
+    n_iter += 1
+print(
+    f'Needed {n_iter} iterations in parallel and local paradiag with increment formulation, stopped at residual {res:.2e}'
+)
 assert np.allclose(sol_paradiag, sol_direct)
 assert np.allclose(n_iter, n_iter_serial)

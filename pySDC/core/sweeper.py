@@ -163,7 +163,6 @@ class Sweeper(object):
                 L.f[m] = P.dtype_f(init=P.init, val=self.rng.rand(1)[0])
             else:
                 raise ParameterError(f'initial_guess option {self.params.initial_guess} not implemented')
-
         # indicate that this level is now ready for sweeps
         L.status.unlocked = True
         L.status.updated = True

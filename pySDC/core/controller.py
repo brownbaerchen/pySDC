@@ -357,6 +357,9 @@ class ParaDiagController(Controller):
            linear (bool): Whether the implicit part of the problem is linear or not
         """
         # TODO: put ParaDiag parameters in controller params
+        if controller_params.get('all_to_done', False):
+            raise NotImplementedError('ParaDiag only implemented with option `all_to_done=True`')
+        controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
 
         self.ParaDiag_alpha = alpha
