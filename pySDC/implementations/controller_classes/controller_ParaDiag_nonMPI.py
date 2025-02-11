@@ -125,10 +125,17 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             # TODO: add communication hooks
             # communicate initial conditions to the steps
             S.levels[0].sweep.compute_end_point()
+
+            for hook in self.hooks:
+                hook.pre_comm(step=S, level_number=0)
+
             if S.status.first:
                 S.levels[0].u[0] = prob.dtype_u(self.ParaDiag_block_u0)
             else:
                 S.levels[0].u[0] = S.prev.levels[0].uend
+
+            for hook in self.hooks:
+                hook.post_comm(step=S, level_number=0, add_to_stats=True)
 
             residual = S.levels[0].sweep.get_residual()
             S.levels[0].status.residual = max(abs(me) for me in residual)
@@ -148,6 +155,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
     def it_ParaDiag(self, local_MS_running):
         # TODO: add hooks
         # TODO: add docs
+        # TODO: Because I am computing the residual at the beginning of the ParaDiag iteration, I am always making one extra iteration when setting a residual tolerance
 
         for S in local_MS_running:
             for hook in self.hooks:
