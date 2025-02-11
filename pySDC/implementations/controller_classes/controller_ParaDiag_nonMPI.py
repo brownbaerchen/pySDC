@@ -131,6 +131,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
                 S.levels[0].u[0] = S.prev.levels[0].uend
 
             residual = S.levels[0].sweep.get_residual()
+            S.levels[0].status.residual = max(abs(me) for me in residual)
 
             # put residual in the solution variables
             for m in range(S.levels[0].sweep.coll.num_nodes):
@@ -182,44 +183,6 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         for S in local_MS_running:
             S.status.stage = 'IT_CHECK'
 
-    def compute_ParaDiag_block_residual(self):
-        """
-        Compute the residual of the composite collocation problem in ParaDiag
-
-        Returns:
-            float: Residual
-        """
-        # raise Exception('Figure out how to communicate here!')
-        prob = self.MS[0].levels[0].prob
-        L = len(self.MS)
-
-        # store initial conditions on the steps because we need to put them back in the end
-        _u0 = [me.levels[0].u[0] for me in self.MS]
-
-        # communicate initial conditions for computing the residual with p2p
-        self.MS[0].levels[0].u[0] = prob.dtype_u(self.ParaDiag_block_u0)
-        for l in range(L):
-            self.MS[l].levels[0].sweep.compute_end_point()
-            if l > 0:
-                self.MS[l].levels[0].u[0] = prob.dtype_u(self.MS[l - 1].levels[0].uend)
-
-            # reevaluate f after FFT
-            self.MS[l].levels[0].sweep.eval_f_at_all_nodes()
-
-        # compute residuals of local collocation problems (can do in parallel)
-        residuals = []
-        for l in range(L):
-            level = self.MS[l].levels[0]
-            level.sweep.compute_residual(stage='IT_CHECK')
-            residuals.append(level.status.residual)
-
-        # # put back initial conditions to continue with ParaDiag
-        # for l in range(L):
-        #     self.MS[l].levels[0].u[0] = _u0[l]
-
-        # compute global residual via "Reduce"
-        return max(residuals)
-
     def it_check(self, local_MS_running):
         """
         Key routine to check for convergence/termination
@@ -227,8 +190,6 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         Args:
             local_MS_running (list): list of currently running steps
         """
-
-        self.compute_ParaDiag_block_residual()
 
         for S in local_MS_running:
             if S.status.iter > 0:
@@ -291,6 +252,9 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
             # call predictor from sweeper
             S.levels[0].sweep.predict()
+
+            # compute the residual
+            S.levels[0].sweep.compute_residual()
 
             # update stage
             S.status.stage = 'IT_CHECK'

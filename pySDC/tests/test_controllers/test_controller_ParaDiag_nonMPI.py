@@ -126,7 +126,7 @@ def test_ParaDiag_order(L, M, N, alpha):
 
     errors = []
     if M == 3:
-        dts = [2 ** (-x) for x in range(4, 8)]
+        dts = [2 ** (-x) for x in range(6, 10)]
     elif M == 2:
         dts = [2 ** (-x) for x in range(5, 9)]
     else:
