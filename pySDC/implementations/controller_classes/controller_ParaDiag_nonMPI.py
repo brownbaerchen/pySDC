@@ -17,7 +17,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
     """
 
-    def __init__(self, num_procs, controller_params, description, alpha):
+    def __init__(self, num_procs, controller_params, description):
         """
         Initialization routine for ParaDiag controller
 
@@ -25,14 +25,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
            num_procs: number of parallel time steps (still serial, though), can be 1
            controller_params: parameter set for the controller and the steps
            description: all the parameters to set up the rest (levels, problems, transfer, ...)
-           alpha (float): alpha parameter for ParaDiag
         """
-        super().__init__(controller_params, description, alpha=alpha, useMPI=False, n_steps=num_procs)
+        super().__init__(controller_params, description, useMPI=False, n_steps=num_procs)
 
         self.MS = []
 
         for l in range(num_procs):
-            G_inv = get_G_inv_matrix(l, num_procs, alpha, description['sweeper_params'])
+            G_inv = get_G_inv_matrix(l, num_procs, self.params.alpha, description['sweeper_params'])
             description['sweeper_params']['G_inv'] = G_inv
 
             self.MS.append(stepclass.Step(description))

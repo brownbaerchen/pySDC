@@ -344,7 +344,7 @@ class Controller(object):
 
 
 class ParaDiagController(Controller):
-    def __init__(self, controller_params, description, n_steps, alpha, useMPI=None):
+    def __init__(self, controller_params, description, n_steps, useMPI=None):
         """
         Initialization routine for ParaDiag controllers
 
@@ -358,10 +358,13 @@ class ParaDiagController(Controller):
         # TODO: where should I put alpha? When I want to adapt it, maybe it shouldn't be in the controller?
         if controller_params.get('all_to_done', False):
             raise NotImplementedError('ParaDiag only implemented with option `all_to_done=True`')
+        if 'alpha' not in controller_params.keys():
+            from pySDC.core.errors import ParameterError
+
+            raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
 
-        self.ParaDiag_alpha = alpha
         self.ParaDiag_block_u0 = None
         self.n_steps = n_steps
 
@@ -375,7 +378,7 @@ class ParaDiagController(Controller):
         if not hasattr(self, '__FFT_matrix'):
             from pySDC.helpers.ParaDiagHelper import get_weighted_FFT_matrix
 
-            self.__FFT_matrix = get_weighted_FFT_matrix(self.n_steps, self.ParaDiag_alpha)
+            self.__FFT_matrix = get_weighted_FFT_matrix(self.n_steps, self.params.alpha)
 
         self.apply_matrix(self.__FFT_matrix)
 
@@ -386,6 +389,6 @@ class ParaDiagController(Controller):
         if not hasattr(self, '__iFFT_matrix'):
             from pySDC.helpers.ParaDiagHelper import get_weighted_iFFT_matrix
 
-            self.__iFFT_matrix = get_weighted_iFFT_matrix(self.n_steps, self.ParaDiag_alpha)
+            self.__iFFT_matrix = get_weighted_iFFT_matrix(self.n_steps, self.params.alpha)
 
         self.apply_matrix(self.__iFFT_matrix)

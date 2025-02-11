@@ -41,6 +41,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
     controller_params['logger_level'] = 15
     controller_params['hook_class'] = [LogGlobalErrorPostRun, LogGlobalErrorPostStep]
     controller_params['mssdc_jac'] = False
+    controller_params['alpha'] = alpha
 
     description = {}
     description['problem_class'] = problem_class
@@ -54,7 +55,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
         'controller_params': controller_params,
         'description': description,
     }
-    controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L, alpha=alpha)
+    controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L)
     P = controller.MS[0].levels[0].prob
 
     for prob in [S.levels[0].prob for S in controller.MS]:
