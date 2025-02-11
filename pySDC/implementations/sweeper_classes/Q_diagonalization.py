@@ -6,6 +6,13 @@ import scipy.sparse as sp
 class QDiagonalization(generic_implicit):
     """
     Sweeper solving the collocation problem directly via diagonalization of Q
+
+    Note that the initial conditions for the collocation problem are generally stored in node zero in pySDC. However,
+    this sweeper is intended for ParaDiag, where a node-local residual is needed as a right hand side for this sweeper
+    rather than a step local one. Therefore, this sweeper has an option `ignore_ic`. If true, the value in node zero
+    will only be used in computing the step-local residual, but not in the solves. If false, the values on the nodes
+    will be ignored in the solves and the node-zero value will be used as initial conditions. When using this as a time-
+    parallel algorithm outside ParaDiag, you should set this parameter to false, as is the default.
     """
 
     def __init__(self, params):
@@ -21,9 +28,6 @@ class QDiagonalization(generic_implicit):
             params['update_f_evals'] = False
         if 'ignore_ic' not in params.keys():
             params['ignore_ic'] = False
-
-        if not params.get('ignore_ic', False):
-            params['initial_guess'] = 'zero'
 
         super().__init__(params)
 

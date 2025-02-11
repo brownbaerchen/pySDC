@@ -48,7 +48,8 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
 @pytest.mark.base
 @pytest.mark.parametrize('M', [1, 3])
 @pytest.mark.parametrize('N', [1, 2])
-def test_direct_solve(M, N):
+@pytest.mark.parametrize('ignore_ic', [True, False])
+def test_direct_solve(M, N, ignore_ic):
     """
     Test that the diagonalization has the same result as a direct solve of the collocation problem
     """
@@ -61,12 +62,16 @@ def test_direct_solve(M, N):
     level = controller.MS[0].levels[0]
     level.status.time = 0
     sweep = level.sweep
+    sweep.params.ignore_ic = ignore_ic
 
     # initial conditions
     for m in range(M + 1):
         level.u[m] = prob.u_init
         level.f[m] = prob.eval_f(level.u[m], 0)
-    level.u[0][:] = 1
+        level.u[m][:] = 1
+
+    if ignore_ic:
+        level.u[0][:] = None
 
     sweep.update_nodes()
 
@@ -81,8 +86,9 @@ def test_direct_solve(M, N):
     for m in range(M):
         assert np.allclose(u[m], level.u[m + 1])
 
-    sweep.compute_residual()
-    assert np.isclose(level.status.residual, 0), 'residual is non-zero'
+    if not ignore_ic:
+        sweep.compute_residual()
+        assert np.isclose(level.status.residual, 0), 'residual is non-zero'
 
 
 # @pytest.mark.base
@@ -131,5 +137,5 @@ def test_direct_solve(M, N):
 
 
 if __name__ == '__main__':
-    test_direct_solve(2, 1)
+    test_direct_solve(2, 1, True)
     # test_ParaDiag(2, 2, 1, 1e-4)
