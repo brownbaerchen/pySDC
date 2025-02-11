@@ -15,6 +15,15 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
         from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
 
         problem_params = {'lambdas': -1.0 * np.ones(shape=(N)), 'u0': 1}
+    elif problem == 'Dahlquist_IMEX':
+        from pySDC.implementations.problem_classes.TestEquation_0D import test_equation_IMEX as problem_class
+        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+
+        problem_params = {
+            'lambdas_implicit': -1.0 * np.ones(shape=(N)),
+            'lambdas_explicit': -1.0e-1 * np.ones(shape=(N)),
+            'u0': 1.0,
+        }
     elif problem == 'heat':
         from pySDC.implementations.problem_classes.HeatEquation_ND_FD import heatNd_forced as problem_class
         from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
@@ -69,13 +78,15 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
 @pytest.mark.parametrize('M', [2, 3])
 @pytest.mark.parametrize('N', [2])
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
-def test_ParaDiag_convergence(L, M, N, alpha):
+@pytest.mark.parametrize('IMEX', [True, False])
+def test_ParaDiag_convergence(L, M, N, alpha, IMEX):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
     from pySDC.helpers.stats_helper import get_sorted
 
-    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha)
+    problem = 'Dahlquist_IMEX' if IMEX else 'Dahlquist'
+    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, problem=problem)
     level = controller.MS[0].levels[0]
 
     # setup initial conditions
@@ -160,5 +171,6 @@ def test_ParaDiag_order(L, M, N, alpha):
 
 
 if __name__ == '__main__':
-    test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
+    test_ParaDiag_convergence(4, 3, 1, 1e-4, True)
+    # test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
     # test_ParaDiag_order(3, 3, 1, 1e-4)
