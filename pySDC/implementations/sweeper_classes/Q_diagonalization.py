@@ -1,4 +1,5 @@
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
+from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 import numpy as np
 import scipy.sparse as sp
 
@@ -116,3 +117,21 @@ class QDiagonalization(generic_implicit):
         P = self.level.prob
         for m in range(self.coll.num_nodes):
             L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
+
+    def get_residual(self):
+        self.eval_f_at_all_nodes()
+
+        # start with integral dt*Q*F
+        residual = self.integrate()
+
+        # subtract integral and initial conditions to arrive at r = u - u0 - dt*Q*F
+        # subtract u and add u0 to arrive at r = dt*Q*F - u + u0
+        for m in range(self.coll.num_nodes):
+            residual[m] -= self.level.u[m + 1]
+            residual[m] += self.level.u[0]
+
+        return residual
+
+
+class QDiagonalizationIMEX(QDiagonalization):
+    integrate = imex_1st_order.integrate

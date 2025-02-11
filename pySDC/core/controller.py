@@ -368,6 +368,9 @@ class ParaDiagController(Controller):
     def FFT_in_time(self):
         """
         Compute weighted forward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
+
+        Note: The implementation via matrix-vector multiplication may be inefficient and less stable compared to an FFT
+              with transposes!
         """
         if not hasattr(self, '__FFT_matrix'):
             from pySDC.helpers.ParaDiagHelper import get_weighted_FFT_matrix

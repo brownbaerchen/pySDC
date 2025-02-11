@@ -130,26 +130,17 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             else:
                 S.levels[0].u[0] = S.prev.levels[0].uend
 
-            # compute integral over right hand side dt*Q*F(u)
-            S.levels[0].sweep.eval_f_at_all_nodes()
-            integral = S.levels[0].sweep.integrate()
+            residual = S.levels[0].sweep.get_residual()
 
-            # subtract integral and initial conditions to arrive at r = u - u0 = dt*Q*F
+            # put residual in the solution variables
             for m in range(S.levels[0].sweep.coll.num_nodes):
-                S.levels[0].u[m + 1] -= S.levels[0].u[0] + integral[m]
-
-        # put the residual at the end of the interval in the initial conditions
-        for S in local_MS_running:
-            # TODO: clean this up
-            # S.levels[0].sweep.compute_end_point()
-            # S.levels[0].u[0] = S.levels[0].uend
-            S.levels[0].u[0] = S.levels[0].u[-1]
+                S.levels[0].u[m + 1] = residual[m]
 
     def swap_increment_for_solution(self, local_MS_running, prev_solution):
         # TODO: add docs
         for S in local_MS_running:
             for m in range(S.levels[0].sweep.coll.num_nodes + 1):
-                S.levels[0].u[m] = prev_solution[S.status.slot][m] - S.levels[0].u[m]
+                S.levels[0].u[m] = prev_solution[S.status.slot][m] + S.levels[0].u[m]
             if S.status.first:
                 S.levels[0].u[0] = self.ParaDiag_block_u0
 
@@ -157,12 +148,16 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         # TODO: add hooks
         # TODO: add docs
 
+        for S in local_MS_running:
+            for hook in self.hooks:
+                hook.pre_sweep(step=S, level_number=0)
+
         # copy solution because we are are going to compute the increment and add the solution back in at the end
         prev_solution = []
         for S in local_MS_running:
             prev_solution.append([me * 1.0 for me in S.levels[0].u])
 
-        # replace the values stored in the steps with minus the residuals in order to compute the increment
+        # replace the values stored in the steps with the residuals in order to compute the increment
         self.swap_solution_for_all_at_once_residual(local_MS_running)
 
         # weighted FFT in time (implement with MPI Reduce, not-parallel)
@@ -176,8 +171,12 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         # inverse FFT in time (implement with MPI Reduce, not-parallel)
         self.iFFT_in_time()
 
-        # replace the values stored in the steps with the previous solution minus the increment
+        # replace the values stored in the steps with the previous solution plus the increment
         self.swap_increment_for_solution(local_MS_running, prev_solution)
+
+        for S in local_MS_running:
+            for hook in self.hooks:
+                hook.post_sweep(step=S, level_number=0)
 
         # update stage
         for S in local_MS_running:

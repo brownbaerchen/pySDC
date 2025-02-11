@@ -5,7 +5,11 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
     import numpy as np
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
     from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
-    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
+
+    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
+    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+
+    problem_params = {'lambdas': -1.0 * np.ones(shape=(N)), 'u0': 1}
 
     level_params = {}
     level_params['dt'] = 1e-1
@@ -20,17 +24,15 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
     step_params = {}
     step_params['maxiter'] = 1
 
-    problem_params = {'lambdas': -1.0 * np.ones(shape=(N))}
-
     controller_params = {}
     controller_params['logger_level'] = 30
     controller_params['hook_class'] = []
     controller_params['mssdc_jac'] = False
 
     description = {}
-    description['problem_class'] = testequation0d
+    description['problem_class'] = problem_class
     description['problem_params'] = problem_params
-    description['sweeper_class'] = QDiagonalization
+    description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -42,12 +44,15 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
     controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L, alpha=alpha)
     P = controller.MS[0].levels[0].prob
 
+    for prob in [S.levels[0].prob for S in controller.MS]:
+        prob.init = tuple([*prob.init[:2]] + [np.dtype('complex128')])
+
     return controller, P, description
 
 
 @pytest.mark.base
 @pytest.mark.parametrize('M', [1, 3])
-@pytest.mark.parametrize('N', [1, 2])
+@pytest.mark.parametrize('N', [2, 4])
 @pytest.mark.parametrize('ignore_ic', [True, False])
 def test_direct_solve(M, N, ignore_ic):
     """
@@ -66,9 +71,8 @@ def test_direct_solve(M, N, ignore_ic):
 
     # initial conditions
     for m in range(M + 1):
-        level.u[m] = prob.u_init
+        level.u[m] = prob.u_exact(0)
         level.f[m] = prob.eval_f(level.u[m], 0)
-        level.u[m][:] = 1
 
     if ignore_ic:
         level.u[0][:] = None
@@ -80,7 +84,9 @@ def test_direct_solve(M, N, ignore_ic):
     Q = sweep.coll.Qmat[1:, 1:]
     C_coll = I_MN - level.dt * sp.kron(Q, prob.A)
 
-    u0 = np.ones(shape=(M, N))
+    u0 = np.zeros(shape=(M, N), dtype=complex)
+    for m in range(M):
+        u0[m, ...] = prob.u_exact(0)
     u = sp.linalg.spsolve(C_coll, u0.flatten()).reshape(u0.shape)
 
     for m in range(M):
@@ -137,5 +143,5 @@ def test_direct_solve(M, N, ignore_ic):
 
 
 if __name__ == '__main__':
-    test_direct_solve(2, 1, True)
+    test_direct_solve(3, 4, False)
     # test_ParaDiag(2, 2, 1, 1e-4)

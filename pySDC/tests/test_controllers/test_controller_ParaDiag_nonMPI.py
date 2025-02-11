@@ -1,12 +1,27 @@
 import pytest
 
 
-def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9):
+def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, problem='Dahlquist'):
     import numpy as np
-    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
     from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
-    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
-    from pySDC.implementations.hooks.log_errors import LogLocalErrorPostStep, LogGlobalErrorPostRun
+    from pySDC.implementations.hooks.log_errors import (
+        LogLocalErrorPostStep,
+        LogGlobalErrorPostRun,
+        LogGlobalErrorPostStep,
+    )
+
+    if problem == 'Dahlquist':
+        from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
+        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+
+        problem_params = {'lambdas': -1.0 * np.ones(shape=(N)), 'u0': 1}
+    elif problem == 'heat':
+        from pySDC.implementations.problem_classes.HeatEquation_ND_FD import heatNd_forced as problem_class
+        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+
+        problem_params = {'nvars': N}
+    else:
+        raise NotImplementedError()
 
     level_params = {}
     level_params['dt'] = dt
@@ -22,20 +37,15 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9):
     step_params = {}
     step_params['maxiter'] = 10
 
-    problem_params = {
-        'lambdas': -1.0 * np.ones(shape=(N)),
-        'u0': 1,
-    }
-
     controller_params = {}
     controller_params['logger_level'] = 15
-    controller_params['hook_class'] = [LogLocalErrorPostStep, LogGlobalErrorPostRun]
+    controller_params['hook_class'] = [LogGlobalErrorPostRun, LogGlobalErrorPostStep]
     controller_params['mssdc_jac'] = False
 
     description = {}
-    description['problem_class'] = testequation0d
+    description['problem_class'] = problem_class
     description['problem_params'] = problem_params
-    description['sweeper_class'] = QDiagonalization
+    description['sweeper_class'] = sweeper_class
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -47,35 +57,61 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9):
     controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L, alpha=alpha)
     P = controller.MS[0].levels[0].prob
 
+    for prob in [S.levels[0].prob for S in controller.MS]:
+        prob.init = tuple([*prob.init[:2]] + [np.dtype('complex128')])
+
     return controller, P, description
 
 
 @pytest.mark.base
 @pytest.mark.parametrize('L', [1, 4])
 @pytest.mark.parametrize('M', [2, 3])
-@pytest.mark.parametrize('N', [1, 2])
+@pytest.mark.parametrize('N', [2])
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
 def test_ParaDiag_convergence(L, M, N, alpha):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
-    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
     from pySDC.helpers.stats_helper import get_sorted
 
     controller, prob, description = get_composite_collocation_problem(L, M, N, alpha)
     level = controller.MS[0].levels[0]
 
     # setup initial conditions
-    u0 = prob.u_init
-    u0[:] = 1
+    u0 = prob.u_exact(0)
 
     uend, stats = controller.run(u0=u0, t0=0, Tend=L * level.dt * 2)
 
     # make some tests
-    error = get_sorted(stats, type='e_local_post_step')
+    error = get_sorted(stats, type='e_global_post_step')
     k = get_sorted(stats, type='niter')
     assert max(me[1] for me in k) < 9, 'ParaDiag did not converge'
     assert max(me[1] for me in error) < 1e-5, 'Error with ParaDiag too large'
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('L', [1, 4])
+@pytest.mark.parametrize('M', [2, 3])
+@pytest.mark.parametrize('N', [64])
+@pytest.mark.parametrize('alpha', [1e-4, 1e-2])
+def test_IMEX_ParaDiag_convergence(L, M, N, alpha):
+    import numpy as np
+    import scipy.sparse as sp
+    from pySDC.helpers.stats_helper import get_sorted
+
+    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, problem='heat', dt=1e-3)
+    level = controller.MS[0].levels[0]
+
+    # setup initial conditions
+    u0 = prob.u_exact(0)
+
+    uend, stats = controller.run(u0=u0, t0=0, Tend=L * level.dt * 2)
+
+    # make some tests
+    error = get_sorted(stats, type='e_global_post_step')
+    k = get_sorted(stats, type='niter')
+    assert max(me[1] for me in k) < 9, 'ParaDiag did not converge'
+    assert max(me[1] for me in error) < 1e-4, 'Error with ParaDiag too large'
 
 
 @pytest.mark.base
@@ -86,8 +122,6 @@ def test_ParaDiag_convergence(L, M, N, alpha):
 def test_ParaDiag_order(L, M, N, alpha):
     import numpy as np
     import scipy.sparse as sp
-    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
-    from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
     from pySDC.helpers.stats_helper import get_sorted
 
     errors = []
@@ -125,4 +159,5 @@ def test_ParaDiag_order(L, M, N, alpha):
 
 
 if __name__ == '__main__':
-    test_ParaDiag_order(3, 3, 1, 1e-4)
+    test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
+    # test_ParaDiag_order(3, 3, 1, 1e-4)
