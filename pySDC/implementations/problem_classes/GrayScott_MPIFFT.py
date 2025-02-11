@@ -81,7 +81,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         num_blobs=1,
         **kwargs,
     ):
-        super().__init__(dtype='d', alpha=1.0, x0=-L / 2.0, L=L, **kwargs)
+        super().__init__(dtype='D', alpha=1.0, x0=-L / 2.0, L=L, **kwargs)
 
         # prepare the array with two components
         shape = (2,) + (self.init[0])
@@ -89,7 +89,7 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         self.iV = 1
         self.ncomp = 2  # needed for transfer class
 
-        self.init = (shape, self.comm, self.xp.dtype('complex') if self.spectral else self.xp.dtype('float'))
+        self.init = (shape, self.comm, self.xp.dtype('complex') if self.spectral else self.xp.dtype('complex'))
 
         self._makeAttributeAndRegister(
             'Du',

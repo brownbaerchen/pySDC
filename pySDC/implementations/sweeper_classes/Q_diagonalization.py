@@ -97,9 +97,7 @@ class QDiagonalization(generic_implicit):
             x1 = self.mat_vec(self.S_inv, [self.level.u[0] for _ in range(M)])
         x2 = []
         for m in range(M):
-            x2.append(
-                P.solve_system(rhs=x1[m], factor=self.w[m] * L.dt, u0=x1[m], t=L.time + L.dt * self.coll.nodes[m])
-            )
+            x2.append(P.solve_system(x1[m], self.w[m] * L.dt, u0=x1[m], t=L.time + L.dt * self.coll.nodes[m]))
         z = self.mat_vec(self.S, x2)
         y = self.mat_vec(self.params.G_inv, z)
 
