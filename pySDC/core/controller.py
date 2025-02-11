@@ -344,7 +344,7 @@ class Controller(object):
 
 
 class ParaDiagController(Controller):
-    def __init__(self, controller_params, description, n_steps, alpha, linear=True, useMPI=None):
+    def __init__(self, controller_params, description, n_steps, alpha, useMPI=None):
         """
         Initialization routine for ParaDiag controllers
 
@@ -354,16 +354,14 @@ class ParaDiagController(Controller):
            description: all the parameters to set up the rest (levels, problems, transfer, ...)
            n_steps (int): Number of parallel steps
            alpha (float): alpha parameter for ParaDiag
-           linear (bool): Whether the implicit part of the problem is linear or not
         """
-        # TODO: put ParaDiag parameters in controller params
+        # TODO: where should I put alpha? When I want to adapt it, maybe it shouldn't be in the controller?
         if controller_params.get('all_to_done', False):
             raise NotImplementedError('ParaDiag only implemented with option `all_to_done=True`')
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
 
         self.ParaDiag_alpha = alpha
-        self.ParaDiag_linear = linear
         self.ParaDiag_block_u0 = None
         self.n_steps = n_steps
 

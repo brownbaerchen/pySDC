@@ -17,7 +17,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
     """
 
-    def __init__(self, num_procs, controller_params, description, alpha, linear=True):
+    def __init__(self, num_procs, controller_params, description, alpha):
         """
         Initialization routine for ParaDiag controller
 
@@ -26,9 +26,8 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
            controller_params: parameter set for the controller and the steps
            description: all the parameters to set up the rest (levels, problems, transfer, ...)
            alpha (float): alpha parameter for ParaDiag
-           linear (bool): Whether the implicit part of the problem is linear or not
         """
-        super().__init__(controller_params, description, alpha=alpha, linear=linear, useMPI=False, n_steps=num_procs)
+        super().__init__(controller_params, description, alpha=alpha, useMPI=False, n_steps=num_procs)
 
         self.MS = []
 
@@ -118,28 +117,12 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             for m in range(M + 1):
                 self.MS[i].levels[0].u[m] = res[i][m]
 
-    def ParaDiag_communication(self):
-        """
-        Communicate the solution to the last step back to the first step as required in ParaDiag
-        """
-        # TODO: add hooks like in other communication functions in the controller
-
-        L = len(self.MS)
-        # compute solution at the end of the interval (can do in parallel)
-        for l in range(L):
-            self.MS[l].levels[0].sweep.compute_end_point()
-
-        # communicate initial conditions for next iteration (MPI ptp communication)
-        if self.ParaDiag_linear:
-            # for linear problems, we only need to communicate the contribution due to the alpha perturbation
-            self.MS[0].levels[0].u[0] = self.ParaDiag_block_u0 - self.ParaDiag_alpha * self.MS[-1].levels[0].uend
-        else:
-            raise NotImplementedError('Communication for nonlinear ParaDiag is not yet implemented')
-
     def swap_solution_for_all_at_once_residual(self, local_MS_running):
+        # TODO: add docs
         prob = self.MS[0].levels[0].prob
 
         for S in local_MS_running:
+            # TODO: add communication hooks
             # communicate initial conditions to the steps
             S.levels[0].sweep.compute_end_point()
             if S.status.first:
@@ -157,11 +140,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
         # put the residual at the end of the interval in the initial conditions
         for S in local_MS_running:
+            # TODO: clean this up
             # S.levels[0].sweep.compute_end_point()
             # S.levels[0].u[0] = S.levels[0].uend
             S.levels[0].u[0] = S.levels[0].u[-1]
 
     def swap_increment_for_solution(self, local_MS_running, prev_solution):
+        # TODO: add docs
         for S in local_MS_running:
             for m in range(S.levels[0].sweep.coll.num_nodes + 1):
                 S.levels[0].u[m] = prev_solution[S.status.slot][m] - S.levels[0].u[m]
