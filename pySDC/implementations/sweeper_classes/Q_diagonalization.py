@@ -26,7 +26,7 @@ class QDiagonalization(generic_implicit):
         if 'G_inv' not in params.keys():
             params['G_inv'] = np.eye(params['num_nodes'])
         if 'update_f_evals' not in params.keys():
-            params['update_f_evals'] = False
+            params['update_f_evals'] = True
         if 'ignore_ic' not in params.keys():
             params['ignore_ic'] = False
 

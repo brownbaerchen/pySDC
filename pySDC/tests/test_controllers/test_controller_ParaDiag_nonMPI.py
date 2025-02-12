@@ -40,8 +40,6 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
     sweeper_params['num_nodes'] = M
     sweeper_params['initial_guess'] = 'spread'
-    sweeper_params['ignore_ic'] = True
-    sweeper_params['update_f_evals'] = True
 
     step_params = {}
     step_params['maxiter'] = 10

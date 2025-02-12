@@ -358,12 +358,23 @@ class ParaDiagController(Controller):
            alpha (float): alpha parameter for ParaDiag
         """
         # TODO: where should I put alpha? When I want to adapt it, maybe it shouldn't be in the controller?
+        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
+
+        if QDiagonalization in description['sweeper_class'].__mro__:
+            description['sweeper_params']['ignore_ic'] = True
+            description['sweeper_params']['update_f_evals'] = False
+        else:
+            logging.getLogger('controller').warning(
+                f'Warning: Your sweeper class {description["sweeper_class"]} is not derived from {QDiagonalization}. You probably want to use another sweeper class.'
+            )
+
         if controller_params.get('all_to_done', False):
             raise NotImplementedError('ParaDiag only implemented with option `all_to_done=True`')
         if 'alpha' not in controller_params.keys():
             from pySDC.core.errors import ParameterError
 
             raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
+
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
         self.base_convergence_controllers += [StoreUOld]
