@@ -132,4 +132,8 @@ class QDiagonalization(generic_implicit):
 
 
 class QDiagonalizationIMEX(QDiagonalization):
+    """
+    Use as sweeper class for ParaDiag with IMEX splitting. Note that it will not work with SDC.
+    """
+
     integrate = imex_1st_order.integrate
