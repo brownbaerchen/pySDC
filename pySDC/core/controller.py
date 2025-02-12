@@ -374,6 +374,7 @@ class ParaDiagController(Controller):
             from pySDC.core.errors import ParameterError
 
             raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
+        controller_params['average_jacobian'] = controller_params.get('average_jacobian', False)
 
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)

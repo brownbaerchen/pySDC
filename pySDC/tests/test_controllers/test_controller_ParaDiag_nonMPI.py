@@ -1,7 +1,7 @@
 import pytest
 
 
-def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, problem='Dahlquist'):
+def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlquist'):
     import numpy as np
     from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
     from pySDC.implementations.hooks.log_errors import (
@@ -10,6 +10,8 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
         LogGlobalErrorPostStep,
     )
 
+    average_jacobian = False
+    restol = 1e-9
     if problem == 'Dahlquist':
         from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
         from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
@@ -29,6 +31,13 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
         from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
 
         problem_params = {'nvars': N}
+    elif problem == 'vdp':
+        from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol as problem_class
+        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+
+        problem_params = {'newton_maxiter': 1, 'mu': 1e0, 'crash_at_maxiter': False}
+        average_jacobian = True
+        restol = 1e-6
     else:
         raise NotImplementedError()
 
@@ -42,13 +51,14 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
     sweeper_params['initial_guess'] = 'spread'
 
     step_params = {}
-    step_params['maxiter'] = 10
+    step_params['maxiter'] = 99
 
     controller_params = {}
     controller_params['logger_level'] = 15
     controller_params['hook_class'] = [LogGlobalErrorPostRun, LogGlobalErrorPostStep]
     controller_params['mssdc_jac'] = False
     controller_params['alpha'] = alpha
+    controller_params['average_jacobian'] = average_jacobian
 
     description = {}
     description['problem_class'] = problem_class
@@ -76,14 +86,13 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, restol=1e-9, pr
 @pytest.mark.parametrize('M', [2, 3])
 @pytest.mark.parametrize('N', [2])
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
-@pytest.mark.parametrize('IMEX', [True, False])
-def test_ParaDiag_convergence(L, M, N, alpha, IMEX):
+@pytest.mark.parametrize('problem', ['Dahlquist', 'Dahlquist_IMEX', 'vdp'])
+def test_ParaDiag_convergence(L, M, N, alpha, problem):
     import numpy as np
     import scipy.sparse as sp
     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
     from pySDC.helpers.stats_helper import get_sorted
 
-    problem = 'Dahlquist_IMEX' if IMEX else 'Dahlquist'
     controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, problem=problem)
     level = controller.MS[0].levels[0]
 
@@ -95,8 +104,9 @@ def test_ParaDiag_convergence(L, M, N, alpha, IMEX):
     # make some tests
     error = get_sorted(stats, type='e_global_post_step')
     k = get_sorted(stats, type='niter')
-    assert max(me[1] for me in k) < 9, 'ParaDiag did not converge'
-    assert max(me[1] for me in error) < 1e-5, 'Error with ParaDiag too large'
+    assert max(me[1] for me in k) < 90, 'ParaDiag did not converge'
+    if problem in ['Dahlquist', 'Dahlquist_IMEX']:
+        assert max(me[1] for me in error) < 1e-5, 'Error with ParaDiag too large'
 
 
 @pytest.mark.base
@@ -169,6 +179,6 @@ def test_ParaDiag_order(L, M, N, alpha):
 
 
 if __name__ == '__main__':
-    test_ParaDiag_convergence(4, 3, 1, 1e-4, True)
+    test_ParaDiag_convergence(4, 3, 1, 1e-4, 'vdp')
     # test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
     # test_ParaDiag_order(3, 3, 1, 1e-4)

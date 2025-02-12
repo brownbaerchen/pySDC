@@ -172,6 +172,23 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             if S.status.first:
                 S.levels[0].u[0] = self.ParaDiag_block_u0
 
+    def prepare_Jacobians(self, local_MS_running):
+        # get solutions for constructing average Jacobians
+        if self.params.average_jacobian:
+            level = local_MS_running[0].levels[0]
+            M = level.sweep.coll.num_nodes
+
+            u_avg = [level.prob.dtype_u(level.prob.init, val=0)] * M
+
+            # communicate average solution
+            for S in local_MS_running:
+                for m in range(M):
+                    u_avg[m] += S.levels[0].u[m + 1] / self.n_steps
+
+            # store the averaged solution in the steps
+            for S in local_MS_running:
+                S.levels[0].u_avg = u_avg
+
     def it_ParaDiag(self, local_MS_running):
         """
         Do a single ParaDiag iteration. Does the following steps
@@ -200,14 +217,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         # weighted FFT in time
         self.FFT_in_time()
 
+        # communicate average solution for setting up Jacobians for non-linear problems
+        self.prepare_Jacobians(local_MS_running)
+
         # perform local solves of "collocation problems" on the steps (do in parallel)
         for S in local_MS_running:
             assert len(S.levels) == 1, 'Multi-level SDC not implemented in ParaDiag'
-            for hook in self.hooks:
-                hook.pre_sweep(step=S, level_number=0)
             S.levels[0].sweep.update_nodes()
-            for hook in self.hooks:
-                hook.post_sweep(step=S, level_number=0)
 
         # inverse FFT in time
         self.iFFT_in_time()

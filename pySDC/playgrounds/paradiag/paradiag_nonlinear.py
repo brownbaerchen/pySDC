@@ -7,10 +7,10 @@ from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol
 
 # setup parameters
 L = 1
-M = 2
+M = 1
 N = 2
 alpha = 1e-4
-restol = 1e-7
+restol = 1e-5
 dt = 0.1
 
 sweeper_params = {
@@ -19,7 +19,7 @@ sweeper_params = {
 }
 
 # setup infrastructure
-prob = vanderpol(newton_maxiter=1, mu=1e-0, crash_at_maxiter=False)
+prob = vanderpol(newton_maxiter=1, mu=1e0, crash_at_maxiter=False)
 
 # make problem work on complex data
 prob.init = tuple([*prob.init[:2]] + [np.dtype('complex128')])
@@ -119,18 +119,16 @@ for l in range(L):
     S_inv.append(_S_inv)
 
 
+buf = prob.u_init
 while np.max(np.abs(res)) > restol:
     # compute all-at-once residual
     res = residual(sol_paradiag, u0)
 
-    # broadcast average solution to construct average Jacobians (one for each collocation node)
-    _u_avg = np.mean(sol_paradiag, axis=0)
-    u_avg = [prob.u_init for _ in range(M)]
-    for i in range(M):
-        u_avg[i][:] = _u_avg[i]
-
     # weighted FFT in time
     x = np.fft.fft(mat_vec(J_L_inv.toarray(), res), axis=0)
+    x_avg = np.mean(x, axis=0)
+    print(x_avg)
+    breakpoint()
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -140,7 +138,8 @@ while np.max(np.abs(res)) > restol:
         x1 = S_inv[l] @ x[l]
         x2 = np.empty_like(x1)
         for m in range(M):
-            x2[m, :] = prob.solve_system(x1[m], w[l][m] * dt, u0=u_avg[m], t=l * dt)
+            buf[:] = x_avg[m]
+            x2[m, :] = prob.solve_system(x1[m], w[l][m] * dt, u0=buf, t=l * dt)
         z = S[l] @ x2
         y[l, ...] = sp.linalg.spsolve(G[l], z)
 
@@ -150,4 +149,4 @@ while np.max(np.abs(res)) > restol:
     res = residual(sol_paradiag, u0)
     n_iter += 1
     print(n_iter, np.max(np.abs(res)))
-print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
+print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {np.max(np.abs(res)):.2e}')
