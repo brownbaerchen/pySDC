@@ -6,6 +6,7 @@ import numpy as np
 from pySDC.core.base_transfer import BaseTransfer
 from pySDC.helpers.pysdc_helper import FrozenClass
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
+from pySDC.implementations.convergence_controller_classes.store_uold import StoreUOld
 from pySDC.implementations.hooks.default_hook import DefaultHooks
 from pySDC.implementations.hooks.log_timings import CPUTimings
 
@@ -32,6 +33,8 @@ class Controller(object):
     """
     Base abstract controller class
     """
+
+    base_convergence_controllers = [CheckConvergence]
 
     def __init__(self, controller_params, description, useMPI=None):
         """
@@ -61,7 +64,6 @@ class Controller(object):
         if self.params.use_iteration_estimator and self.params.all_to_done:
             self.logger.warning('all_to_done and use_iteration_estimator set, will ignore all_to_done')
 
-        self.base_convergence_controllers = [CheckConvergence]
         self.setup_convergence_controllers(description)
 
     @staticmethod
@@ -344,6 +346,8 @@ class Controller(object):
 
 
 class ParaDiagController(Controller):
+    base_convergence_controllers = [CheckConvergence, StoreUOld]
+
     def __init__(self, controller_params, description, n_steps, useMPI=None):
         """
         Initialization routine for ParaDiag controllers

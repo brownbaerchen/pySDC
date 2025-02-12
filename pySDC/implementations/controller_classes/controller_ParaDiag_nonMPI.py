@@ -13,8 +13,13 @@ from pySDC.helpers.ParaDiagHelper import get_G_inv_matrix
 class controller_ParaDiag_nonMPI(ParaDiagController):
     """
 
-    ParaDiag controller, running serialized version
+    ParaDiag controller, running serialized version.
 
+    This controller uses the increment formulation. That is to say, we setup the residual of the all at once problem,
+    put it on the right hand side, invert the ParaDiag preconditioner on the left-hand side to compute the increment
+    and then add the increment onto the solution. For this reason, we need to replace the solution values in the steps
+    with the residual values before the solves and then put the solution plus increment back into the steps. This is a
+    bit counter to what you expect when you access the `u` variable in the levels, but it is mathematically advantageous.
     """
 
     def __init__(self, num_procs, controller_params, description):
@@ -117,12 +122,19 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
                 self.MS[i].levels[0].u[m] = res[i][m]
 
     def swap_solution_for_all_at_once_residual(self, local_MS_running):
-        # TODO: add docs
+        """
+        Replace the solution values in the steps with the all-at-once residual.
+
+        This requires to communicate the solutions at the end of the steps to be the initial conditions for the next
+        steps. Afterwards, the residual can be computed locally on the steps.
+
+        Args:
+            local_MS_running (list): list of currently running steps
+        """
         prob = self.MS[0].levels[0].prob
 
         for S in local_MS_running:
-            # TODO: add communication hooks
-            # communicate initial conditions to the steps
+            # communicate initial conditions
             S.levels[0].sweep.compute_end_point()
 
             for hook in self.hooks:
@@ -136,6 +148,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             for hook in self.hooks:
                 hook.post_comm(step=S, level_number=0, add_to_stats=True)
 
+            # compute residuals locally
             residual = S.levels[0].sweep.get_residual()
             S.levels[0].status.residual = max(abs(me) for me in residual)
 
@@ -143,16 +156,23 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             for m in range(S.levels[0].sweep.coll.num_nodes):
                 S.levels[0].u[m + 1] = residual[m]
 
-    def swap_increment_for_solution(self, local_MS_running, prev_solution):
-        # TODO: add docs
+    def swap_increment_for_solution(self, local_MS_running):
+        """
+        After inversion of the preconditioner, the values stored in the steps are the increment. This function adds the
+        solution after the previous iteration to arrive at the solution after the current iteration.
+        Note that we also need to put in the initial conditions back in the first step because they will be perturbed by
+        the circular preconditioner.
+
+        Args:
+            local_MS_running (list): list of currently running steps
+        """
         for S in local_MS_running:
             for m in range(S.levels[0].sweep.coll.num_nodes + 1):
-                S.levels[0].u[m] = prev_solution[S.status.slot][m] + S.levels[0].u[m]
+                S.levels[0].u[m] = S.levels[0].uold[m] + S.levels[0].u[m]
             if S.status.first:
                 S.levels[0].u[0] = self.ParaDiag_block_u0
 
     def it_ParaDiag(self, local_MS_running):
-        # TODO: add hooks
         # TODO: add docs
         # TODO: Because I am computing the residual at the beginning of the ParaDiag iteration, I am always making one extra iteration when setting a residual tolerance
 
@@ -160,27 +180,26 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             for hook in self.hooks:
                 hook.pre_sweep(step=S, level_number=0)
 
-        # copy solution because we are are going to compute the increment and add the solution back in at the end
-        prev_solution = []
-        for S in local_MS_running:
-            prev_solution.append([me * 1.0 for me in S.levels[0].u])
-
         # replace the values stored in the steps with the residuals in order to compute the increment
         self.swap_solution_for_all_at_once_residual(local_MS_running)
 
-        # weighted FFT in time (implement with MPI Reduce, not-parallel)
+        # weighted FFT in time
         self.FFT_in_time()
 
         # perform local solves of "collocation problems" on the steps (do in parallel)
         for S in local_MS_running:
             assert len(S.levels) == 1, 'Multi-level SDC not implemented in ParaDiag'
+            for hook in self.hooks:
+                hook.pre_sweep(step=S, level_number=0)
             S.levels[0].sweep.update_nodes()
+            for hook in self.hooks:
+                hook.post_sweep(step=S, level_number=0)
 
-        # inverse FFT in time (implement with MPI Reduce, not-parallel)
+        # inverse FFT in time
         self.iFFT_in_time()
 
         # replace the values stored in the steps with the previous solution plus the increment
-        self.swap_increment_for_solution(local_MS_running, prev_solution)
+        self.swap_increment_for_solution(local_MS_running)
 
         for S in local_MS_running:
             for hook in self.hooks:
