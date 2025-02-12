@@ -6,11 +6,11 @@ from pySDC.implementations.sweeper_classes.generic_implicit import generic_impli
 from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol
 
 # setup parameters
-L = 1
-M = 1
+L = 11
+M = 4
 N = 2
 alpha = 1e-4
-restol = 1e-5
+restol = 1e-8
 dt = 0.1
 
 sweeper_params = {
@@ -123,12 +123,10 @@ buf = prob.u_init
 while np.max(np.abs(res)) > restol:
     # compute all-at-once residual
     res = residual(sol_paradiag, u0)
+    res_avg = np.mean(res, axis=0)
 
     # weighted FFT in time
     x = np.fft.fft(mat_vec(J_L_inv.toarray(), res), axis=0)
-    x_avg = np.mean(x, axis=0)
-    print(x_avg)
-    breakpoint()
 
     # perform local solves of "collocation problems" on the steps in parallel
     y = np.empty_like(x)
@@ -138,7 +136,7 @@ while np.max(np.abs(res)) > restol:
         x1 = S_inv[l] @ x[l]
         x2 = np.empty_like(x1)
         for m in range(M):
-            buf[:] = x_avg[m]
+            buf[:] = res_avg[m]
             x2[m, :] = prob.solve_system(x1[m], w[l][m] * dt, u0=buf, t=l * dt)
         z = S[l] @ x2
         y[l, ...] = sp.linalg.spsolve(G[l], z)

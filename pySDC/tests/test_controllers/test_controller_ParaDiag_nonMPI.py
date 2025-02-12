@@ -11,7 +11,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
     )
 
     average_jacobian = False
-    restol = 1e-9
+    restol = 1e-8
     if problem == 'Dahlquist':
         from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
         from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
@@ -37,7 +37,6 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
 
         problem_params = {'newton_maxiter': 1, 'mu': 1e0, 'crash_at_maxiter': False}
         average_jacobian = True
-        restol = 1e-6
     else:
         raise NotImplementedError()
 
