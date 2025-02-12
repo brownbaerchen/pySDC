@@ -34,8 +34,6 @@ class Controller(object):
     Base abstract controller class
     """
 
-    base_convergence_controllers = [CheckConvergence]
-
     def __init__(self, controller_params, description, useMPI=None):
         """
         Initialization routine for the base controller
@@ -64,6 +62,7 @@ class Controller(object):
         if self.params.use_iteration_estimator and self.params.all_to_done:
             self.logger.warning('all_to_done and use_iteration_estimator set, will ignore all_to_done')
 
+        self.base_convergence_controllers = [CheckConvergence]
         self.setup_convergence_controllers(description)
 
     @staticmethod
@@ -346,7 +345,6 @@ class Controller(object):
 
 
 class ParaDiagController(Controller):
-    base_convergence_controllers = [CheckConvergence, StoreUOld]
 
     def __init__(self, controller_params, description, n_steps, useMPI=None):
         """
@@ -368,6 +366,7 @@ class ParaDiagController(Controller):
             raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
+        self.base_convergence_controllers += [StoreUOld]
 
         self.ParaDiag_block_u0 = None
         self.n_steps = n_steps
