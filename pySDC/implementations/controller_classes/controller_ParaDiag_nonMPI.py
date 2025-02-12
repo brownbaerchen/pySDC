@@ -173,8 +173,22 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
                 S.levels[0].u[0] = self.ParaDiag_block_u0
 
     def it_ParaDiag(self, local_MS_running):
-        # TODO: add docs
-        # TODO: Because I am computing the residual at the beginning of the ParaDiag iteration, I am always making one extra iteration when setting a residual tolerance
+        """
+        Do a single ParaDiag iteration. Does the following steps
+         - (1) Compute the residual of the all-at-once / composite collocation problem
+         - (2) Compute an FFT in time to diagonalize the preconditioner
+         - (3) Solve the collocation problems locally on the steps for the increment
+         - (4) Compute iFFT in time to go back to the original base
+         - (5) Update the solution by adding increment
+
+        Note that this is the only place where we compute the all-at-once residual because it requires communication and
+        swaps the solution values for the residuals. So after the residual tolerance is reached, one more ParaDiag
+        iteration will be done.
+
+        Args:
+            local_MS_running (list): list of currently running steps
+        """
+        # TODO: Remove extra ParaDiag iteration after reaching residual tolerance
 
         for S in local_MS_running:
             for hook in self.hooks:
