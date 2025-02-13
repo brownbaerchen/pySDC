@@ -48,7 +48,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
     for prob in [S.levels[0].prob for S in controller.MS]:
         prob.init = tuple([*prob.init[:2]] + [np.dtype('complex128')])
 
-    return controller, P, description
+    return controller, P
 
 
 @pytest.mark.base
@@ -62,7 +62,7 @@ def test_direct_solve(M, N, ignore_ic):
     import numpy as np
     import scipy.sparse as sp
 
-    controller, prob, _ = get_composite_collocation_problem(1, M, N)
+    controller, prob = get_composite_collocation_problem(1, M, N)
 
     controller.MS[0].levels[0].status.unlocked = True
     level = controller.MS[0].levels[0]

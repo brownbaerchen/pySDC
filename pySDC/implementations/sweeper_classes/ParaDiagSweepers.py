@@ -42,6 +42,9 @@ class QDiagonalization(generic_implicit):
         self.set_G_inv(self.params.G_inv)
 
     def set_G_inv(self, G_inv):
+        """
+        In ParaDiag, QG^{-1} is diagonalized. This function stores the G_inv matrix and computes and stores the diagonalization.
+        """
         self.params.G_inv = G_inv
         self.w, self.S, self.S_inv = self.computeDiagonalization(A=self.coll.Qmat[1:, 1:] @ self.params.G_inv)
 
@@ -127,12 +130,18 @@ class QDiagonalization(generic_implicit):
             L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
     def get_residual(self):
+        """
+        This function computes and returns the "spatially extended" residual, not the norm of the residual!
+
+        Returns:
+            pySDC.datatype: Spatially extended residual
+
+        """
         self.eval_f_at_all_nodes()
 
         # start with integral dt*Q*F
         residual = self.integrate()
 
-        # subtract integral and initial conditions to arrive at r = u - u0 - dt*Q*F
         # subtract u and add u0 to arrive at r = dt*Q*F - u + u0
         for m in range(self.coll.num_nodes):
             residual[m] -= self.level.u[m + 1]
