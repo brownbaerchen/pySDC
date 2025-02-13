@@ -173,6 +173,10 @@ def test_ParaDiag_vs_PFASST(L, M, N, problem):
     assert np.allclose(
         uendParaDiag, uendPFASST
     ), f'Got different solutions between single-level PFASST and ParaDiag with {problem=}'
+    # make sure we didn't trick ourselves with a bug in the test...
+    assert (
+        abs(uendParaDiag - uendPFASST) > 0
+    ), 'The solutions with PFASST and ParaDiag are unexpectedly exactly the same!'
 
 
 @pytest.mark.base
