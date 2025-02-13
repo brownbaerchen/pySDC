@@ -1,25 +1,39 @@
 import pytest
 
 
-def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlquist'):
+def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlquist', ParaDiag=True):
     import numpy as np
-    from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
     from pySDC.implementations.hooks.log_errors import (
-        LogLocalErrorPostStep,
         LogGlobalErrorPostRun,
         LogGlobalErrorPostStep,
     )
 
+    if ParaDiag:
+        from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import (
+            controller_ParaDiag_nonMPI as controller_class,
+        )
+    else:
+        from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI as controller_class
+
     average_jacobian = False
     restol = 1e-8
+
     if problem == 'Dahlquist':
         from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
-        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+
+        if ParaDiag:
+            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
         problem_params = {'lambdas': -1.0 * np.ones(shape=(N)), 'u0': 1}
     elif problem == 'Dahlquist_IMEX':
         from pySDC.implementations.problem_classes.TestEquation_0D import test_equation_IMEX as problem_class
-        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+
+        if ParaDiag:
+            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+        else:
+            from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
 
         problem_params = {
             'lambdas_implicit': -1.0 * np.ones(shape=(N)),
@@ -33,10 +47,16 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
         problem_params = {'nvars': N}
     elif problem == 'vdp':
         from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol as problem_class
-        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
 
-        problem_params = {'newton_maxiter': 1, 'mu': 1e0, 'crash_at_maxiter': False}
-        average_jacobian = True
+        if ParaDiag:
+            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+
+            problem_params = {'newton_maxiter': 1, 'mu': 1e0, 'crash_at_maxiter': False}
+            average_jacobian = True
+        else:
+            from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
+
+            problem_params = {'newton_maxiter': 99, 'mu': 1e0, 'crash_at_maxiter': True}
     else:
         raise NotImplementedError()
 
@@ -71,13 +91,13 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
         'controller_params': controller_params,
         'description': description,
     }
-    controller = controller_ParaDiag_nonMPI(**controller_args, num_procs=L)
+    controller = controller_class(**controller_args, num_procs=L)
     P = controller.MS[0].levels[0].prob
 
     for prob in [S.levels[0].prob for S in controller.MS]:
         prob.init = tuple([*prob.init[:2]] + [np.dtype('complex128')])
 
-    return controller, P, description
+    return controller, P
 
 
 @pytest.mark.base
@@ -87,12 +107,9 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
 @pytest.mark.parametrize('problem', ['Dahlquist', 'Dahlquist_IMEX', 'vdp'])
 def test_ParaDiag_convergence(L, M, N, alpha, problem):
-    import numpy as np
-    import scipy.sparse as sp
-    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
     from pySDC.helpers.stats_helper import get_sorted
 
-    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, problem=problem)
+    controller, prob = get_composite_collocation_problem(L, M, N, alpha, problem=problem)
     level = controller.MS[0].levels[0]
 
     # setup initial conditions
@@ -114,11 +131,9 @@ def test_ParaDiag_convergence(L, M, N, alpha, problem):
 @pytest.mark.parametrize('N', [64])
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
 def test_IMEX_ParaDiag_convergence(L, M, N, alpha):
-    import numpy as np
-    import scipy.sparse as sp
     from pySDC.helpers.stats_helper import get_sorted
 
-    controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, problem='heat', dt=1e-3)
+    controller, prob = get_composite_collocation_problem(L, M, N, alpha, problem='heat', dt=1e-3)
     level = controller.MS[0].levels[0]
 
     # setup initial conditions
@@ -134,18 +149,44 @@ def test_IMEX_ParaDiag_convergence(L, M, N, alpha):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('L', [1, 4])
+@pytest.mark.parametrize('M', [1, 2])
+@pytest.mark.parametrize('N', [2])
+@pytest.mark.parametrize('problem', ['Dahlquist', 'Dahlquist_IMEX', 'vdp'])
+def test_ParaDiag_vs_PFASST(L, M, N, problem):
+    import numpy as np
+
+    alpha = 1e-4
+
+    # setup the same composite collocation problem with different solvers
+    controllerParaDiag, prob = get_composite_collocation_problem(L, M, N, alpha, problem=problem, ParaDiag=True)
+    controllerPFASST, _ = get_composite_collocation_problem(L, M, N, alpha, problem=problem, ParaDiag=False)
+    level = controllerParaDiag.MS[0].levels[0]
+
+    # setup initial conditions
+    u0 = prob.u_exact(0)
+
+    # run the two different solvers for the composite collocation problem
+    uendParaDiag, _ = controllerParaDiag.run(u0=u0, t0=0, Tend=L * level.dt * 2)
+    uendPFASST, _ = controllerPFASST.run(u0=u0, t0=0, Tend=L * level.dt * 2)
+
+    assert np.allclose(
+        uendParaDiag, uendPFASST
+    ), f'Got different solutions between single-level PFASST and ParaDiag with {problem=}'
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('L', [4])
 @pytest.mark.parametrize('M', [2, 3])
 @pytest.mark.parametrize('N', [1])
 @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
 def test_ParaDiag_order(L, M, N, alpha):
     import numpy as np
-    import scipy.sparse as sp
     from pySDC.helpers.stats_helper import get_sorted
 
     errors = []
     if M == 3:
-        dts = [2 ** (-x) for x in range(6, 10)]
+        dts = [0.8 * 2 ** (-x) for x in range(7, 9)]
     elif M == 2:
         dts = [2 ** (-x) for x in range(5, 9)]
     else:
@@ -153,7 +194,7 @@ def test_ParaDiag_order(L, M, N, alpha):
     Tend = max(dts) * L * 2
 
     for dt in dts:
-        controller, prob, description = get_composite_collocation_problem(L, M, N, alpha, dt=dt)
+        controller, prob = get_composite_collocation_problem(L, M, N, alpha, dt=dt)
         level = controller.MS[0].levels[0]
 
         # setup initial conditions
@@ -178,6 +219,7 @@ def test_ParaDiag_order(L, M, N, alpha):
 
 
 if __name__ == '__main__':
-    test_ParaDiag_convergence(4, 3, 1, 1e-4, 'vdp')
+    test_ParaDiag_vs_PFASST(4, 3, 2, 'vdp')
+    # test_ParaDiag_convergence(4, 3, 1, 1e-4, 'vdp')
     # test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
     # test_ParaDiag_order(3, 3, 1, 1e-4)
