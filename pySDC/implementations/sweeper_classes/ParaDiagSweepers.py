@@ -1,3 +1,7 @@
+"""
+These sweepers are made for use with ParaDiag. They can be used to some degree with SDC as well, but unless you know what you are doing, you probably want another sweeper.
+"""
+
 from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 import numpy as np
@@ -6,7 +10,8 @@ import scipy.sparse as sp
 
 class QDiagonalization(generic_implicit):
     """
-    Sweeper solving the collocation problem directly via diagonalization of Q
+    Sweeper solving the collocation problem directly via diagonalization of Q. Mainly made for ParaDiag.
+    Can be reconfigured for use with SDC.
 
     Note that the initial conditions for the collocation problem are generally stored in node zero in pySDC. However,
     this sweeper is intended for ParaDiag, where a node-local residual is needed as a right hand side for this sweeper
@@ -14,6 +19,10 @@ class QDiagonalization(generic_implicit):
     will only be used in computing the step-local residual, but not in the solves. If false, the values on the nodes
     will be ignored in the solves and the node-zero value will be used as initial conditions. When using this as a time-
     parallel algorithm outside ParaDiag, you should set this parameter to false, which is not the default!
+
+    Similarly, in ParaDiag, the solution is in Fourier space right after the solve. It therefore makes little sense to
+    evaluate the right hand side directly after. By default, this is not done! Set `update_f_evals=True` in the
+    parameters if you want to use this sweeper in SDC.
     """
 
     def __init__(self, params):
