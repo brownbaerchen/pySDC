@@ -22,7 +22,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
         from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
 
         if ParaDiag:
-            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+            from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization as sweeper_class
         else:
             from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
@@ -31,7 +31,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
         from pySDC.implementations.problem_classes.TestEquation_0D import test_equation_IMEX as problem_class
 
         if ParaDiag:
-            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+            from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalizationIMEX as sweeper_class
         else:
             from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as sweeper_class
 
@@ -42,14 +42,14 @@ def get_composite_collocation_problem(L, M, N, alpha=0, dt=1e-1, problem='Dahlqu
         }
     elif problem == 'heat':
         from pySDC.implementations.problem_classes.HeatEquation_ND_FD import heatNd_forced as problem_class
-        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalizationIMEX as sweeper_class
+        from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalizationIMEX as sweeper_class
 
         problem_params = {'nvars': N}
     elif problem == 'vdp':
         from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol as problem_class
 
         if ParaDiag:
-            from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+            from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization as sweeper_class
 
             problem_params = {'newton_maxiter': 1, 'mu': 1e0, 'crash_at_maxiter': False}
             average_jacobian = True

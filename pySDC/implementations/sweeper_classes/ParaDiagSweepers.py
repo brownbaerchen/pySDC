@@ -13,7 +13,7 @@ class QDiagonalization(generic_implicit):
     rather than a step local one. Therefore, this sweeper has an option `ignore_ic`. If true, the value in node zero
     will only be used in computing the step-local residual, but not in the solves. If false, the values on the nodes
     will be ignored in the solves and the node-zero value will be used as initial conditions. When using this as a time-
-    parallel algorithm outside ParaDiag, you should set this parameter to false, as is the default.
+    parallel algorithm outside ParaDiag, you should set this parameter to false, which is not the default!
     """
 
     def __init__(self, params):
@@ -25,10 +25,8 @@ class QDiagonalization(generic_implicit):
         """
         if 'G_inv' not in params.keys():
             params['G_inv'] = np.eye(params['num_nodes'])
-        if 'update_f_evals' not in params.keys():
-            params['update_f_evals'] = True
-        if 'ignore_ic' not in params.keys():
-            params['ignore_ic'] = False
+        params['update_f_evals'] = params.get('update_f_evals', False)
+        params['ignore_ic'] = params.get('ignore_ic', True)
 
         super().__init__(params)
 
@@ -107,6 +105,7 @@ class QDiagonalization(generic_implicit):
         for m in range(M):
             L.u[m + 1] = y[m]
             if self.params.update_f_evals:
+                raise
                 L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         L.status.updated = True

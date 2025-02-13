@@ -358,7 +358,7 @@ class ParaDiagController(Controller):
            alpha (float): alpha parameter for ParaDiag
         """
         # TODO: where should I put alpha? When I want to adapt it, maybe it shouldn't be in the controller?
-        from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
+        from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization
 
         if QDiagonalization in description['sweeper_class'].__mro__:
             description['sweeper_params']['ignore_ic'] = True

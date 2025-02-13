@@ -7,7 +7,7 @@ def get_composite_collocation_problem(L, M, N, alpha=0):
     from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
 
     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d as problem_class
-    from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization as sweeper_class
+    from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization as sweeper_class
 
     problem_params = {'lambdas': -1.0 * np.ones(shape=(N)), 'u0': 1}
 
@@ -79,6 +79,7 @@ def test_direct_solve(M, N, ignore_ic):
         level.u[0][:] = None
 
     sweep.update_nodes()
+    sweep.eval_f_at_all_nodes()
 
     # solve directly
     I_MN = sp.eye((M) * N)
@@ -98,51 +99,5 @@ def test_direct_solve(M, N, ignore_ic):
         assert np.isclose(level.status.residual, 0), 'residual is non-zero'
 
 
-# @pytest.mark.base
-# @pytest.mark.parametrize('L', [1, 4])
-# @pytest.mark.parametrize('M', [2, 3])
-# @pytest.mark.parametrize('N', [1, 2])
-# @pytest.mark.parametrize('alpha', [1e-4, 1e-2])
-# def test_ParaDiag(L, M, N, alpha):
-#     import numpy as np
-#     import scipy.sparse as sp
-#     from pySDC.implementations.sweeper_classes.Q_diagonalization import QDiagonalization
-#     from pySDC.implementations.problem_classes.TestEquation_0D import testequation0d
-#
-#     controller, prob, description = get_composite_collocation_problem(L, M, N, alpha)
-#     level = controller.MS[0].levels[0]
-#
-#     restol = 1e-7
-#     dt = level.params.dt
-#
-#     # setup initial conditions
-#     u0 = prob.u_init
-#     u0[:] = 1
-#     controller.ParaDiag_block_u0 = u0
-#
-#     # initialize solution, right hand side variables and time
-#     for l in range(L):
-#         controller.MS[l].levels[0].status.time = l * dt
-#         for m in range(M + 1):
-#             controller.MS[l].levels[0].u[m] = prob.u_init
-#             controller.MS[l].levels[0].f[m] = prob.f_init
-#
-#     controller.MS[0].levels[0].u[0][:] = u0[:]
-#
-#     # do ParaDiag iterations
-#     res = 1
-#     n_iter = 0
-#     maxiter = 10
-#     while res > restol:
-#         controller.it_ParaDiag(controller.MS)
-#
-#         # compute composite collocation problem residual to determine convergence (requires MPI p2p and Reduce communication)
-#         res = controller.compute_ParaDiag_block_residual()
-#         n_iter += 1
-#         assert n_iter < maxiter, f'Did not converge within {maxiter} iterations! Residual: {res:.2e}'
-#     print(f'Needed {n_iter} ParaDiag iterations, stopped at residual {res:.2e}')
-
-
 if __name__ == '__main__':
-    test_direct_solve(3, 4, False)
-    # test_ParaDiag(2, 2, 1, 1e-4)
+    test_direct_solve(2, 1, False)
