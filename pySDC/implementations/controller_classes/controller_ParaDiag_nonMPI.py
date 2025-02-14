@@ -61,10 +61,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
         For the workflow of this controller, see https://arxiv.org/abs/2103.12571
 
-        This method changes self.MS directly by accessing active steps through local_MS_active. Nothing is returned.
+        This method changes self.MS directly by accessing active steps through local_MS_active.
 
         Args:
             local_MS_active (list): all active steps
+
+        Returns:
+            boot: Whether all steps are done
         """
 
         # if all stages are the same (or DONE), continue, otherwise abort
@@ -205,7 +208,6 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         Args:
             local_MS_running (list): list of currently running steps
         """
-        # TODO: Remove extra ParaDiag iteration after reaching residual tolerance
 
         for S in local_MS_running:
             for hook in self.hooks:
@@ -220,7 +222,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
         # weighted FFT in time
         self.FFT_in_time()
 
-        # perform local solves of "collocation problems" on the steps (do in parallel)
+        # perform local solves of "collocation problems" on the steps (can be done in parallel)
         for S in local_MS_running:
             assert len(S.levels) == 1, 'Multi-level SDC not implemented in ParaDiag'
             S.levels[0].sweep.update_nodes()
@@ -346,6 +348,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
         # determine which steps are still active (time < Tend)
         active = [time[p] < Tend - 10 * np.finfo(float).eps for p in slots]
+        if not all(active) and any(active):
+            self.logger.warning(
+                'Warning: This controller will solve past your desired end time until the end of its block!'
+            )
+            active = [
+                True,
+            ] * len(active)
 
         if not any(active):
             raise ControllerError('Nothing to do, check t0, dt and Tend.')

@@ -1,5 +1,8 @@
 """
 This script introduces ParaDiag for linear problems.
+It is recommended to view this code side by side with `Gaya's paper on ParaDiag with collocation methods
+<https://arxiv.org/abs/2103.12571>`_ as the code is close to the equations presented there but offers no explanations
+about them.
 """
 
 import numpy as np
