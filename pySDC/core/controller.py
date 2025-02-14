@@ -42,6 +42,7 @@ class Controller(object):
             controller_params (dict): parameter set for the controller and the steps
         """
         self.useMPI = useMPI
+        self.description = description
 
         # check if we have a hook on this list. If not, use default class.
         self.__hooks = []
@@ -374,7 +375,7 @@ class ParaDiagController(Controller):
             from pySDC.core.errors import ParameterError
 
             raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
-        controller_params['average_jacobian'] = controller_params.get('average_jacobian', False)
+        controller_params['average_jacobian'] = controller_params.get('average_jacobian', True)
 
         controller_params['all_to_done'] = True
         super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)

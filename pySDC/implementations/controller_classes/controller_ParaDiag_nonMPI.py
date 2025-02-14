@@ -397,6 +397,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
             # determine new set of active steps and compress slots accordingly
             active = [time[p] < Tend - 10 * np.finfo(float).eps for p in slots]
+            if not all(active) and any(active):
+                self.logger.warning(
+                    'Warning: This controller will solve past your desired end time until the end of its block!'
+                )
+                active = [
+                    True,
+                ] * len(active)
             active_slots = list(itertools.compress(slots, active))
 
             # restart active steps (reset all values and pass uend to u0)
@@ -442,6 +449,9 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
             # initialize step with u0
             self.MS[p].init_step(u0)
+
+            # setup G^{-1} for new number of active slots
+            # self.MS[j].levels[0].sweep.set_G_inv(get_G_inv_matrix(j, len(active_slots), self.params.alpha, self.description['sweeper_params']))
 
             # reset some values
             self.MS[p].status.done = False

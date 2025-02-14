@@ -165,10 +165,11 @@ def test_ParaDiag_vs_PFASST(L, M, N, problem):
 
     # setup initial conditions
     u0 = prob.u_exact(0)
+    Tend = L * 2 * level.dt
 
     # run the two different solvers for the composite collocation problem
-    uendParaDiag, _ = controllerParaDiag.run(u0=u0, t0=0, Tend=L * level.dt * 2)
-    uendPFASST, _ = controllerPFASST.run(u0=u0, t0=0, Tend=L * level.dt * 2)
+    uendParaDiag, _ = controllerParaDiag.run(u0=u0, t0=0, Tend=Tend)
+    uendPFASST, _ = controllerPFASST.run(u0=u0, t0=0, Tend=Tend)
 
     assert np.allclose(
         uendParaDiag, uendPFASST
@@ -223,7 +224,7 @@ def test_ParaDiag_order(L, M, N, alpha):
 
 
 if __name__ == '__main__':
-    test_ParaDiag_vs_PFASST(4, 3, 2, 'vdp')
+    test_ParaDiag_vs_PFASST(4, 3, 2, 'Dahlquist')
     # test_ParaDiag_convergence(4, 3, 1, 1e-4, 'vdp')
     # test_IMEX_ParaDiag_convergence(4, 3, 64, 1e-4)
     # test_ParaDiag_order(3, 3, 1, 1e-4)
