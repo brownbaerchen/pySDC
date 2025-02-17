@@ -253,9 +253,6 @@ def test_ParaDiag_convergence_rate(L, M, N, alpha):
     t_last = max([me[0] for me in get_sorted(stats, type='e_global_post_iteration')])
     errors = get_sorted(stats, type='e_global_post_iteration', sortby='iter', time=t_last)
     convergence_rates = [errors[i + 1][1] / errors[i][1] for i in range(len(errors) - 1)]
-    print(get_sorted(stats, type='e_global_post_iteration', sortby='iter'))
-    print(errors)
-    print(convergence_rates)
     convergence_rate = convergence_rates[0]
     convergence_bound = alpha / (1 - alpha)
 
