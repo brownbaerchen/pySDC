@@ -252,6 +252,8 @@ def test_ParaDiag_convergence_rate(L, M, N, alpha):
     # test that the convergence rate in the first iteration is sufficiently small.
     errors = get_sorted(stats, type='e_global_post_iteration', sortby='iter', time=(L - 1) * dt)
     convergence_rates = [errors[i + 1][1] / errors[i][1] for i in range(len(errors) - 1)]
+    print(errors)
+    print(convergence_rates)
     convergence_rate = convergence_rates[0]
     convergence_bound = alpha / (1 - alpha)
 
