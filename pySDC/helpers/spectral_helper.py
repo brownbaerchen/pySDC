@@ -1875,32 +1875,11 @@ class SpectralHelper:
         Returns:
             sparse differentiation matrix
         """
-        sp = self.sparse_lib
-        ndim = self.ndim
 
-        if ndim == 1:
-            D = self.axes[0].get_differentiation_matrix(**kwargs)
-        elif ndim == 2:
-            for axis in axes:
-                axis2 = (axis + 1) % ndim
-                D1D = self.axes[axis].get_differentiation_matrix(**kwargs)
-
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(D1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-                if axis == axes[0]:
-                    D = sp.kron(*mats)
-                else:
-                    D = D @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Differentiation matrix not implemented for {ndim} dimension!')
-
+        D = self.expand_matrix_ND(self.axes[axes[0]].get_differentiation_matrix(**kwargs), axes[0])
+        for axis in axes[1:]:
+            _D = self.axes[axis].get_differentiation_matrix(**kwargs)
+            D = D @ self.expand_matrix_ND(_D, axis)
         return D
 
     def get_integration_matrix(self, axes):
@@ -1913,32 +1892,11 @@ class SpectralHelper:
         Returns:
             sparse integration matrix
         """
-        sp = self.sparse_lib
-        ndim = len(self.axes)
 
-        if ndim == 1:
-            S = self.axes[0].get_integration_matrix()
-        elif ndim == 2:
-            for axis in axes:
-                axis2 = (axis + 1) % ndim
-                S1D = self.axes[axis].get_integration_matrix()
-
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(S1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-                if axis == axes[0]:
-                    S = sp.kron(*mats)
-                else:
-                    S = S @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Integration matrix not implemented for {ndim} dimension!')
-
+        S = self.expand_matrix_ND(self.axes[axes[0]].get_integration_matrix(), axes[0])
+        for axis in axes[1:]:
+            _S = self.axes[axis].get_integration_matrix()
+            S = S @ self.expand_matrix_ND(_S, axis)
         return S
 
     def get_Id(self):
@@ -1948,28 +1906,32 @@ class SpectralHelper:
         Returns:
             sparse identity matrix
         """
+        ndim = self.ndim
+
+        I = self.expand_matrix_ND(self.axes[0].get_Id(), 0)
+        for axis in range(1, ndim):
+            _I = self.axes[axis].get_Id()
+            I = I @ self.expand_matrix_ND(_I, axis)
+        return I
+
+    def expand_matrix_ND(self, matrix, aligned):
         sp = self.sparse_lib
         ndim = self.ndim
-        I = sp.eye(np.prod(self.init[0][1:]), dtype=complex)
 
         if ndim == 1:
-            I = self.axes[0].get_Id()
+            return matrix
         elif ndim == 2:
-            for axis in range(ndim):
-                axis2 = (axis + 1) % ndim
-                I1D = self.axes[axis].get_Id()
-
-                I1D2 = sp.eye(self.axes[axis2].N)
+            axes = np.delete(np.arange(ndim), aligned)
+            for axis in axes:
+                I1D = sp.eye(self.axes[axis].N)
 
                 mats = [None] * ndim
+                mats[aligned] = self.get_local_slice_of_1D_matrix(matrix, aligned)
                 mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D2, axis2)
 
-                I = I @ sp.kron(*mats)
+                return sp.kron(*mats)
         else:
-            raise NotImplementedError(f'Identity matrix not implemented for {ndim} dimension!')
-
-        return I
+            raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')
 
     def get_Dirichlet_recombination_matrix(self, axis=-1):
         """
@@ -1981,26 +1943,9 @@ class SpectralHelper:
         Returns:
             sparse matrix
         """
-        sp = self.sparse_lib
-        ndim = len(self.axes)
 
-        if ndim == 1:
-            C = self.axes[0].get_Dirichlet_recombination_matrix()
-        elif ndim == 2:
-            axis2 = (axis + 1) % ndim
-            C1D = self.axes[axis].get_Dirichlet_recombination_matrix()
-
-            I1D = self.axes[axis2].get_Id()
-
-            mats = [None] * ndim
-            mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
-            mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-            C = sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
-
-        return C
+        C1D = self.axes[axis].get_Dirichlet_recombination_matrix()
+        return self.expand_matrix_ND(C1D, axis)
 
     def get_basis_change_matrix(self, axes=None, **kwargs):
         """
@@ -2015,30 +1960,8 @@ class SpectralHelper:
         """
         axes = tuple(-i - 1 for i in range(self.ndim)) if axes is None else axes
 
-        sp = self.sparse_lib
-        ndim = len(self.axes)
-
-        if ndim == 1:
-            C = self.axes[0].get_basis_change_matrix(**kwargs)
-        elif ndim == 2:
-            for axis in axes:
-                axis2 = (axis + 1) % ndim
-                C1D = self.axes[axis].get_basis_change_matrix(**kwargs)
-
-                if len(axes) > 1:
-                    I1D = sp.eye(self.axes[axis2].N)
-                else:
-                    I1D = self.axes[axis2].get_Id()
-
-                mats = [None] * ndim
-                mats[axis] = self.get_local_slice_of_1D_matrix(C1D, axis)
-                mats[axis2] = self.get_local_slice_of_1D_matrix(I1D, axis2)
-
-                if axis == axes[0]:
-                    C = sp.kron(*mats)
-                else:
-                    C = C @ sp.kron(*mats)
-        else:
-            raise NotImplementedError(f'Basis change matrix not implemented for {ndim} dimension!')
-
+        C = self.expand_matrix_ND(self.axes[axes[0]].get_basis_change_matrix(**kwargs), axes[0])
+        for axis in axes[1:]:
+            _C = self.axes[axis].get_basis_change_matrix(**kwargs)
+            C = C @ self.expand_matrix_ND(_C, axis)
         return C
