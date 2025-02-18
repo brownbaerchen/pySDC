@@ -63,7 +63,7 @@ def get_description(problem='advection', mode='ParaDiag'):
         from pySDC.implementations.problem_classes.Van_der_Pol_implicit import vanderpol as problem_class
 
         # need to not raise an error when Newton has not converged because we do only one iteration
-        problem_params = {'newton_maxiter': newton_maxiter, 'crash_at_maxiter': False, 'mu': 1, 'newton_tol': 1e-9}
+        problem_params = {'newton_maxiter': newton_maxiter, 'crash_at_maxiter': False, 'mu': 1000, 'newton_tol': 1e-9}
 
     step_params = {}
     step_params['maxiter'] = 99
@@ -84,7 +84,7 @@ def get_controller_params(problem='advection', mode='ParaDiag'):
     from pySDC.implementations.hooks.log_work import LogWork, LogSDCIterations
 
     controller_params = {}
-    controller_params['logger_level'] = 30
+    controller_params['logger_level'] = 15
     controller_params['hook_class'] = [LogGlobalErrorPostRun, LogWork, LogSDCIterations]
 
     if mode == 'ParaDiag':
@@ -173,10 +173,69 @@ def compare_ParaDiag_and_PFASST(n_steps, problem):
     my_print()
 
 
+def combine_PFASST_and_ParaDiag(
+    n_steps=4,
+    problem='advection',
+):
+    from pySDC.implementations.controller_classes.controller_ParaDiag_nonMPI import controller_ParaDiag_nonMPI
+    from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+
+    num_procs = n_steps
+
+    description_PFASST = get_description(problem, 'PFASST')
+    description_PFASST['step_params']['maxiter'] = 1
+    controller_params_PFASST = get_controller_params(problem, 'PFASST')
+    controller_params_PFASST['logger_level'] = 30
+    controller_params_PFASST['all_to_done'] = True
+
+    description_PD = get_description(problem, 'ParaDiag')
+    controller_params_PD = get_controller_params(problem, 'ParaDiag')
+
+    # for desc in [description_PD, description_PFASST]:
+    #     desc['problem_params']['mu'] = 3
+
+    controller_PFASST = controller_nonMPI(
+        num_procs=num_procs, description=description_PFASST, controller_params=controller_params_PFASST
+    )
+    controller_params_PD['PFASST_controller'] = controller_PFASST
+    controller_PD = controller_ParaDiag_nonMPI(
+        num_procs=num_procs, description=description_PD, controller_params=controller_params_PD
+    )
+
+    for controller in [controller_PD, controller_PFASST]:
+        for S in controller.MS:
+            S.levels[0].prob.init = tuple([*S.levels[0].prob.init[:2]] + [np.dtype('complex128')])
+
+    P = controller_PD.MS[0].levels[0].prob
+
+    t0 = 0.0
+    uinit = P.u_exact(t0)
+
+    uend, stats = controller_PD.run(u0=uinit, t0=t0, Tend=n_steps * controller.MS[0].levels[0].dt)
+    # uend, stats, =controller_PFASST.run(u0=uinit, t0=t0, Tend=n_steps * controller.MS[0].levels[0].dt)
+
+    stats_pfasst = controller_PFASST.return_stats()
+
+    newton_PD = get_sorted(stats, type='work_newton')
+    newton_PFASST = get_sorted(stats_pfasst, type='work_newton')
+    total_newton = max(me[1] for me in newton_PD + newton_PFASST)
+
+    # make reference runs with
+    uend_PD_only, stats_PD_only = run_problem(n_steps=n_steps, problem=problem, mode='ParaDiag')
+    uend_PFASST_only, stats_PFASST_only = run_problem(n_steps=n_steps, problem=problem, mode='PFASST')
+    newton_PD_only = max(me[1] for me in get_sorted(stats_PD_only, type='work_newton'))
+    newton_PFASST_only = max(me[1] for me in get_sorted(stats_PFASST_only, type='work_newton'))
+    print(
+        f'Needed {total_newton} Newton iterations compared to {newton_PD_only} with only ParaDiag and {newton_PFASST_only} with only PFASST per step'
+    )
+    return uend, stats
+
+
 if __name__ == '__main__':
     out_file = open('data/step_9_C_out.txt', 'w')
     params = {
         'n_steps': 16,
     }
-    compare_ParaDiag_and_PFASST(**params, problem='advection')
-    compare_ParaDiag_and_PFASST(**params, problem='vdp')
+    combine_PFASST_and_ParaDiag(2, 'vdp')
+    # compare_ParaDiag_and_PFASST(**params, problem='advection')
+    # compare_ParaDiag_and_PFASST(**params, problem='vdp')

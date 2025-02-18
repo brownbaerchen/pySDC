@@ -261,6 +261,9 @@ def test_ParaDiag_convergence_rate(L, M, N, alpha):
     ), f'Convergence rate {convergence_rate} exceeds upper bound of {convergence_bound}!'
 
 
+# def test_MSSDC_ParaDiag_combination
+
+
 if __name__ == '__main__':
     test_ParaDiag_convergence_rate(4, 3, 1, 1e-4)
     # test_ParaDiag_vs_PFASST(4, 3, 2, 'Dahlquist')

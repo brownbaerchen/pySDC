@@ -55,6 +55,13 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             C.reset_buffers_nonMPI(self)
             C.setup_status_variables(self, MS=self.MS)
 
+        # if self.params.PFASST_controller is not None:
+        #     cont = self.params.PFASST_controller
+        #     for hook in cont.hooks:
+        #         for S in cont.MS:
+        #             hook.pre_run(step=S, level_number=0)
+        #             hook.pre_setup(step=S, level_number=0)
+
     def ParaDiag(self, local_MS_active):
         """
         Main function for ParaDiag
@@ -85,6 +92,7 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
             'SPREAD': self.spread,
             'IT_CHECK': self.it_check,
             'IT_PARADIAG': self.it_ParaDiag,
+            'IT_PFASST': self.it_PFASST,
         }
 
         assert stage in switcher.keys(), f'Got unexpected stage {stage!r}'
@@ -239,6 +247,58 @@ class controller_ParaDiag_nonMPI(ParaDiagController):
 
         # update stage
         for S in local_MS_running:
+            if self.params.PFASST_controller is not None:
+                S.status.stage = 'IT_PFASST'
+            else:
+                S.status.stage = 'IT_CHECK'
+
+    def it_PFASST(self, local_MS_running):
+        assert len(local_MS_running) == len(self.MS)
+        pfasst_cont = self.params.PFASST_controller
+
+        # copy the values in the PFASST controller
+        for S in local_MS_running:
+
+            pfasst_cont.MS[S.status.slot].reset_step()
+            pfasst_cont.MS[S.status.slot].init_step(S.levels[0].u[0])
+
+            for i in range(len(S.levels[0].u)):
+                pfasst_cont.MS[S.status.slot].levels[0].u[i] = S.levels[0].u[i]
+                pfasst_cont.MS[S.status.slot].levels[0].f[i] = S.levels[0].f[i]
+                pfasst_cont.MS[S.status.slot].levels[0].status.unlocked = True
+                pfasst_cont.MS[S.status.slot].levels[0].status.sweep = 0
+
+            pfasst_cont.MS[S.status.slot].status.stage = 'IT_CHECK'
+            pfasst_cont.MS[S.status.slot].status.slot = S.status.slot
+            pfasst_cont.MS[S.status.slot].prev = pfasst_cont.MS[S.prev.status.slot]
+            pfasst_cont.MS[S.status.slot].status.first = S.status.first
+            pfasst_cont.MS[S.status.slot].status.last = S.status.last
+
+            # reset some values
+            pfasst_cont.MS[S.status.slot].status.done = False
+            pfasst_cont.MS[S.status.slot].status.prev_done = False
+            pfasst_cont.MS[S.status.slot].status.iter = 0
+            pfasst_cont.MS[S.status.slot].status.force_done = False
+            pfasst_cont.MS[S.status.slot].status.time_size = S.status.time_size
+
+            pfasst_cont.MS[S.status.slot].levels[0].status.time = S.levels[0].time
+
+            for hook in pfasst_cont.hooks:
+                hook.pre_step(step=pfasst_cont.MS[S.status.slot], level_number=0)
+
+        # run PFASST to "convergence"
+        done = False
+        while not done:
+            done = pfasst_cont.pfasst(pfasst_cont.MS)
+
+        # copy values back to this controller
+        for S in local_MS_running:
+
+            for i in range(len(S.levels[0].u)):
+                S.levels[0].u[i] = pfasst_cont.MS[S.status.slot].levels[0].u[i]
+                S.levels[0].f[i] = pfasst_cont.MS[S.status.slot].levels[0].f[i]
+            S.levels[0].status.residual = pfasst_cont.MS[S.status.slot].levels[0].status.residual
+
             S.status.stage = 'IT_CHECK'
 
     def it_check(self, local_MS_running):
