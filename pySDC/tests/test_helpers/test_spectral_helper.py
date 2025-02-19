@@ -108,7 +108,7 @@ def test_differentiation_matrix2D(nx, ny, variant, axes, bx, by, useMPI=False, *
 @pytest.mark.parametrize('nz', [8])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-def test_identity_matrix2D(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
+def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -127,13 +127,14 @@ def test_identity_matrix2D(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
     helper.setup_fft()
 
     grid = helper.get_grid()
-    print([me.shape for me in grid])
-    print(nx, ny, nz)
     conv = helper.get_basis_change_matrix()
     I = helper.get_Id()
 
     u = helper.u_init
-    u[0, ...] = np.sin(grid[-1]) * grid[-2] ** 2 + grid[-2] ** 3 + np.cos(2 * grid[-1])
+    u[0, ...] = np.sin(grid[-2]) * grid[-1] ** 2 + grid[-1] ** 3 + np.cos(2 * grid[-2])
+
+    if ny > 0:
+        u[0, ...] += np.cos(grid[-3])
 
     u_hat = helper.transform(u, axes=(-2, -1))
     I_u_hat = (conv @ I @ u_hat.flatten()).reshape(u_hat.shape)
@@ -282,13 +283,13 @@ def _test_transform_dealias(
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('ny', [3, 8])
-# @pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('by', ['fft', 'cheby'])
-# @pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-# def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
-def test_transform(nx, ny, bx, by, axes, useMPI=False, **kwargs):
+def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
+    # def test_transform(nx, ny, bx, by, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -299,45 +300,46 @@ def test_transform(nx, ny, bx, by, axes, useMPI=False, **kwargs):
         rank = comm.rank
     else:
         comm = None
+        rank = 0
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=by, N=ny)
-    #    if nz > 0:
-    #        helper.add_axis(base=bz, N=nz)
+    if nz > 0:
+        helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
 
     u = helper.u_init
     u[...] = np.random.random(u.shape)
 
-    u_all = np.empty(shape=(1, nx, ny), dtype=u.dtype)
+    if nz > 0:
+        u_all = np.empty(shape=(1, nx, ny, nz), dtype=u.dtype)
+    else:
+        u_all = np.empty(shape=(1, nx, ny), dtype=u.dtype)
 
     if useMPI:
-        rank = comm.rank
         u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
         if comm.size == 1:
             assert np.allclose(u_all, u)
     else:
-        rank = 0
         u_all[...] = u
 
+    axes_ordered = []
+    for ax in axes:
+        if 'FFT' in type(helper.axes[ax]).__name__:
+            axes_ordered = axes_ordered + [ax]
+        else:
+            axes_ordered = [ax] + axes_ordered
+
     expect_trf = u_all.copy()
-
-    if bx == 'fft' and by == 'cheby':
-        axes_1d = sorted(axes)[::-1]
-    elif bx == 'cheby' and by == 'fft':
-        axes_1d = sorted(axes)
-    else:
-        axes_1d = axes
-
-    for i in axes_1d:
+    for i in axes_ordered:
         base = helper.axes[i]
         expect_trf = base.transform(expect_trf, axis=i)
 
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
-    expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
+    expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), ...]
 
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
@@ -591,8 +593,8 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(8, 3, 0, 'fft', 'cheby', 'fft', (-1,))
-        test_identity_matrix2D(2, 1, 4, 'T2U', 'fft')
+        test_transform(8, 3, 4, 'fft', 'cheby', 'fft', (-1, -2))
+        # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
