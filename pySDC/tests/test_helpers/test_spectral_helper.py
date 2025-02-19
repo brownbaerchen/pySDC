@@ -287,9 +287,8 @@ def _test_transform_dealias(
 @pytest.mark.parametrize('by', ['fft', 'cheby'])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -1), (-1, -2, -3)])
 def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
-    # def test_transform(nx, ny, bx, by, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -307,6 +306,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     helper.add_axis(base=by, N=ny)
     if nz > 0:
         helper.add_axis(base=bz, N=nz)
+    elif -3 in axes:
+        return None
     helper.setup_fft()
 
     u = helper.u_init
@@ -368,14 +369,20 @@ def run_MPI_test(num_procs, **kwargs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [4, 8])
-@pytest.mark.parametrize('ny', [4, 8])
+@pytest.mark.parallel([1, 2])
+@pytest.mark.parametrize('nx', [3, 8])
+@pytest.mark.parametrize('ny', [3, 8])
+@pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('by', ['fft', 'cheby'])
-@pytest.mark.parametrize('bx', ['fft'])
-@pytest.mark.parametrize('num_procs', [2, 1])
-@pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
-def test_transform_MPI(nx, ny, bx, by, num_procs, axes):
-    run_MPI_test(num_procs=num_procs, test='transform', nx=nx, ny=ny, bx=bx, by=by, axes=axes)
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+# @pytest.mark.parametrize('num_procs', [2, 1])
+# @pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
+def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, **kwargs):
+    test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=True, **kwargs)
+    # def test_transform_MPI(nx, ny, bx, by, num_procs, axes):
+    #     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, ny=ny, bx=bx, by=by, axes=axes)
 
 
 @pytest.mark.mpi4py
