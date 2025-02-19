@@ -1308,15 +1308,15 @@ class SpectralHelper:
         """
         Get grid in spectral space
         """
-        grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
-        return self.xp.meshgrid(*grids)
+        grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))]
+        return self.xp.meshgrid(*grids, indexing='ij')
 
     def get_grid(self):
         """
         Get grid in physical space
         """
-        grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))][::-1]
-        return self.xp.meshgrid(*grids)
+        grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))]
+        return self.xp.meshgrid(*grids, indexing='ij')
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None):
         """
@@ -1916,20 +1916,30 @@ class SpectralHelper:
 
     def expand_matrix_ND(self, matrix, aligned):
         sp = self.sparse_lib
-        ndim = self.ndim
+        axes = np.delete(np.arange(self.ndim), aligned)
+        ndim = len(axes) + 1
 
         if ndim == 1:
             return matrix
         elif ndim == 2:
-            axes = np.delete(np.arange(ndim), aligned)
+            axis = axes[0]
+            I1D = sp.eye(self.axes[axis].N)
+
+            mats = [None] * ndim
+            mats[aligned] = self.get_local_slice_of_1D_matrix(matrix, aligned)
+            mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
+
+            return sp.kron(*mats)
+        elif ndim == 3:
+
+            mats = [None] * ndim
+            mats[aligned] = self.get_local_slice_of_1D_matrix(matrix, aligned)
             for axis in axes:
                 I1D = sp.eye(self.axes[axis].N)
-
-                mats = [None] * ndim
-                mats[aligned] = self.get_local_slice_of_1D_matrix(matrix, aligned)
                 mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
 
-                return sp.kron(*mats)
+            return sp.kron(mats[0], sp.kron(*mats[1:]))
+
         else:
             raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')
 
