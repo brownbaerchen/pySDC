@@ -1,6 +1,17 @@
 import pytest
 
 
+def my_assert(*args, **kwargs):
+    try:
+        from pytest_mpi import parallel_assert as _assert
+    except ImportError:
+
+        def _assert(statement, msg=''):
+            assert statement, msg
+
+    _assert(*args, **kwargs)
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [16])
 @pytest.mark.parametrize('ny', [16])
@@ -68,36 +79,89 @@ def test_differentiation_matrix2D(nx, ny, variant, axes, bx, by, useMPI=False, *
     helper.add_axis(base=by, N=ny)
     helper.setup_fft()
 
-    X, Z = helper.get_grid()
+    X, Y = helper.get_grid()
     conv = helper.get_basis_change_matrix()
     D = helper.get_differentiation_matrix(axes)
 
     u = helper.u_init
 
     if by == 'cheby':
-        u[0, ...] = np.sin(X) * Z**2 + Z**3 + np.cos(2 * X)
+        u[0, ...] = np.sin(X) * Y**2 + Y**3 + np.cos(2 * X)
         if axes == (-2,):
-            expect = np.cos(X) * Z**2 - 2 * np.sin(2 * X)
+            expect = np.cos(X) * Y**2 - 2 * np.sin(2 * X)
         elif axes == (-1,):
-            expect = np.sin(X) * Z * 2 + Z**2 * 3
+            expect = np.sin(X) * Y * 2 + Y**2 * 3
         elif axes in [(-2, -1), (-1, -2)]:
-            expect = np.cos(X) * 2 * Z
+            expect = np.cos(X) * 2 * Y
         else:
             raise NotImplementedError
     else:
-        u[0, ...] = np.sin(X) * np.cos(2 * Z) + np.cos(2 * X) + np.sin(Z)
+        u[0, ...] = np.sin(X) * np.cos(2 * Y) + np.cos(2 * X) + np.sin(Y)
         if axes == (-2,):
-            expect = np.cos(X) * np.cos(2 * Z) - 2 * np.sin(2 * X)
+            expect = np.cos(X) * np.cos(2 * Y) - 2 * np.sin(2 * X)
         elif axes == (-1,):
-            expect = np.sin(X) * (-2) * np.sin(2 * Z) + np.cos(Z)
+            expect = np.sin(X) * (-2) * np.sin(2 * Y) + np.cos(Y)
         elif axes in [(-2, -1), (-1, -2)]:
-            expect = -2 * np.cos(X) * np.sin(2 * Z)
+            expect = -2 * np.cos(X) * np.sin(2 * Y)
         else:
             raise NotImplementedError
 
     u_hat = helper.transform(u, axes=(-2, -1))
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat, axes=(-1, -2)).real
+
+    assert np.allclose(D_u, expect, atol=1e-12)
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('nx', [32])
+@pytest.mark.parametrize('ny', [16])
+@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
+def test_differentiation_matrix3D(nx, ny, nz, axes, useMPI=False, **kwargs):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis(base='fft', N=nx)
+    helper.add_axis(base='fft', N=ny)
+    helper.add_axis(base='fft', N=nz)
+    helper.setup_fft()
+
+    X, Y, Z = helper.get_grid()
+    conv = helper.get_basis_change_matrix()
+    D = helper.get_differentiation_matrix(axes)
+
+    u = helper.u_init
+
+    u[0, ...] = np.sin(X) * np.cos(2 * Y) * np.sin(3 * Z) + np.cos(2 * X) + np.sin(Y) + np.sin(4 * Z)
+    if axes == (-3,):
+        expect = np.cos(X) * np.cos(2 * Y) * np.sin(3 * Z) - 2 * np.sin(2 * X)
+    elif axes == (-2,):
+        expect = np.sin(X) * (-2) * np.sin(2 * Y) * np.sin(3 * Z) + np.cos(Y)
+    elif axes == (-1,):
+        expect = np.sin(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z) + 4 * np.cos(4 * Z)
+    elif sorted(axes) == [-3, -2]:
+        expect = -2 * np.cos(X) * np.sin(2 * Y) * np.sin(3 * Z)
+    elif sorted(axes) == [-2, -1]:
+        expect = np.sin(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+    elif sorted(axes) == [-3, -1]:
+        expect = np.cos(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z)
+    elif axes == (-1, -2, -3):
+        expect = np.cos(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+    else:
+        raise NotImplementedError
+
+    u_hat = helper.transform(u)
+    D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
+    D_u = helper.itransform(D_u_hat).real
 
     assert np.allclose(D_u, expect, atol=1e-12)
 
@@ -291,7 +355,6 @@ def _test_transform_dealias(
 def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
-    from pytest_mpi import parallel_assert
 
     if useMPI:
         from mpi4py import MPI
@@ -346,8 +409,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
         )
     ]
 
-    parallel_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
-    parallel_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
+    my_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
+    my_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -616,7 +679,8 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform_MPI(3, 4, 3, 'fft', 'fft', 'fft', (-1,))
+        # test_transform_MPI(3, 4, 3, 'fft', 'fft', 'fft', (-1,))
+        test_differentiation_matrix3D(12, 12, 12, (-1, -3))
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')

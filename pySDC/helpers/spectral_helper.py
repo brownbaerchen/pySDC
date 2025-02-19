@@ -1387,6 +1387,8 @@ class SpectralHelper:
         Args:
             real_spectral_coefficients (bool): Allow only real coefficients in spectral space
         """
+        # TODO: I need to raise an error if weird transposes are required because of the distribution of axes!
+
         if len(self.components) == 0:
             self.add_component('u')
 
