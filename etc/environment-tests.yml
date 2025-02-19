@@ -9,3 +9,6 @@ dependencies:
   - pytest-timeout
   - pytest-order
   - coverage[toml]
+  - pip
+  - pip:
+    - mpi-pytest
