@@ -1538,7 +1538,6 @@ class SpectralHelper:
         bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
         axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
         shape = [max(u.shape[i], self.global_shape[1 + i]) for i in range(self.ndim)]
-        print(axes_collapsed)
 
         fft = self.get_fft(axes=axes, padding=padding, direction='object')
         if fft is not None:

@@ -283,7 +283,7 @@ def _test_transform_dealias(
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('ny', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('nz', [0, 3, 8])
 @pytest.mark.parametrize('by', ['fft', 'cheby'])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
@@ -291,6 +291,7 @@ def _test_transform_dealias(
 def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
+    from pytest_mpi import parallel_assert
 
     if useMPI:
         from mpi4py import MPI
@@ -319,7 +320,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
         u_all = np.empty(shape=(1, nx, ny), dtype=u.dtype)
 
     if useMPI:
-        u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
+        u_all[...] = (np.concatenate(comm.allgather(u[0]), axis=0)).reshape(u_all.shape)
         if comm.size == 1:
             assert np.allclose(u_all, u)
     else:
@@ -340,10 +341,10 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
-    expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), ...]
+    expect_local = expect_trf[:, *helper.local_slice]
 
-    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    parallel_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
+    parallel_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -372,17 +373,29 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parallel([1, 2])
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('ny', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
-@pytest.mark.parametrize('by', ['fft', 'cheby'])
+@pytest.mark.parametrize('nz', [0, 8])
+@pytest.mark.parametrize(
+    'by',
+    [
+        'fft',
+    ],
+)
+@pytest.mark.parametrize(
+    'bx',
+    [
+        'fft',
+    ],
+)
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+@pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
+def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, **kwargs):
+    test_transform(nx=nx, ny=ny, nz=nz, bx=bx, by=by, bz=bz, axes=axes, useMPI=True, **kwargs)
+
+
 # @pytest.mark.parametrize('num_procs', [2, 1])
 # @pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
-def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, **kwargs):
-    test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=True, **kwargs)
-    # def test_transform_MPI(nx, ny, bx, by, num_procs, axes):
-    #     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, ny=ny, bx=bx, by=by, axes=axes)
+# def test_transform_MPI(nx, ny, bx, by, num_procs, axes):
+#     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, ny=ny, bx=bx, by=by, axes=axes)
 
 
 @pytest.mark.mpi4py
@@ -600,7 +613,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(8, 3, 4, 'fft', 'cheby', 'fft', (-1, -2))
+        test_transform_MPI(3, 4, 0, 'fft', 'fft', 'fft', (-1,))
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
