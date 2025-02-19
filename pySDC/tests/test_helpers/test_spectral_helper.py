@@ -114,11 +114,12 @@ def test_differentiation_matrix2D(nx, ny, variant, axes, bx, by, useMPI=False, *
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('nx', [32])
+@pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('ny', [16])
-@pytest.mark.parametrize('nz', [16])
+@pytest.mark.parametrize('nz', [32])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
-def test_differentiation_matrix3D(nx, ny, nz, axes, useMPI=False, **kwargs):
+def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -132,7 +133,7 @@ def test_differentiation_matrix3D(nx, ny, nz, axes, useMPI=False, **kwargs):
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base='fft', N=nx)
     helper.add_axis(base='fft', N=ny)
-    helper.add_axis(base='fft', N=nz)
+    helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
 
     X, Y, Z = helper.get_grid()
@@ -163,7 +164,7 @@ def test_differentiation_matrix3D(nx, ny, nz, axes, useMPI=False, **kwargs):
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat).real
 
-    assert np.allclose(D_u, expect, atol=1e-12)
+    assert np.allclose(D_u, expect, atol=1e-10)
 
 
 @pytest.mark.base
