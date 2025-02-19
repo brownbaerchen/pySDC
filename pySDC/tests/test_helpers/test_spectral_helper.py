@@ -297,10 +297,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
         from mpi4py import MPI
 
         comm = MPI.COMM_WORLD
-        rank = comm.rank
     else:
         comm = None
-        rank = 0
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
@@ -341,7 +339,12 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
-    expect_local = expect_trf[:, *helper.local_slice]
+    expect_local = expect_trf[
+        (
+            ...,
+            *helper.local_slice,
+        )
+    ]
 
     parallel_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
     parallel_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
@@ -613,7 +616,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform_MPI(3, 4, 0, 'fft', 'fft', 'fft', (-1,))
+        test_transform_MPI(3, 4, 3, 'fft', 'fft', 'fft', (-1,))
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
