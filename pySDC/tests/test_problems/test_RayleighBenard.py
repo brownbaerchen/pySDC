@@ -204,6 +204,11 @@ def test_Poisson_problems(nx, component):
         u_exact[ip][0, 3] = 5 / (16 * 5)
         u_exact[ip][0, 1] = -70 / (16 * 5)
 
+    # print(P.L.toarray()[:6, :6])
+    import matplotlib.pyplot as plt
+
+    plt.imshow(A.toarray() / abs(A.toarray()))
+    plt.show()
     assert np.allclose(u_exact, u)
 
 
@@ -315,9 +320,9 @@ def test_apply_BCs():
 
 if __name__ == '__main__':
     # test_eval_f(2**0, 2**2, 'z', True)
-    # test_Poisson_problem(1, 'T')
+    test_Poisson_problems(1, 'u')
     # test_Poisson_problem_v()
-    test_apply_BCs()
+    # test_apply_BCs()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
     # test_viscous_dissipation()
