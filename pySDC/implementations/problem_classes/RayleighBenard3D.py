@@ -284,7 +284,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         iu, iw, iT, ip = self.index(['u', 'w', 'T', 'p'])
 
         # linear temperature gradient
-        for comp in ['T', 'w', 'u']:
+        for comp in ['T', 'u', 'v', 'w']:
             a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
             b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
             me[self.index(comp)] = a * self.Z + b
@@ -303,45 +303,6 @@ class RayleighBenard3D(GenericSpectralLinear):
             return me_hat
         else:
             return me
-
-    def apply_BCs(self, sol):
-        """
-        Enforce the Dirichlet BCs at the top and bottom for arbitrary solution.
-        The function modifies the last two modes of u, w, and T in order to achieve this.
-        Note that the pressure is not modified here and the Nyquist mode is not altered either.
-
-        Args:
-            sol: Some solution that does not need to enforce boundary conditions
-
-        Returns:
-            Modified version of the solution that satisfies Dirichlet BCs.
-        """
-        ultraspherical = self.spectral.axes[-1]
-
-        if self.spectral_space:
-            sol_half_hat = self.itransform(sol, axes=(-2,))
-        else:
-            sol_half_hat = self.transform(sol, axes=(-1,))
-
-        BC_bottom = ultraspherical.get_BC(x=-1, kind='dirichlet')
-        BC_top = ultraspherical.get_BC(x=1, kind='dirichlet')
-
-        M = np.array([BC_top[-2:], BC_bottom[-2:]])
-        M_I = np.linalg.inv(M)
-        rhs = np.empty((2, self.nx), dtype=complex)
-        for component in ['u', 'w', 'T']:
-            i = self.index(component)
-            rhs[0] = self.BCs[f'{component}_top'] - self.xp.sum(sol_half_hat[i, :, :-2] * BC_top[:-2], axis=1)
-            rhs[1] = self.BCs[f'{component}_bottom'] - self.xp.sum(sol_half_hat[i, :, :-2] * BC_bottom[:-2], axis=1)
-
-            BC_vals = M_I @ rhs
-
-            sol_half_hat[i, :, -2:] = BC_vals.T
-
-        if self.spectral_space:
-            return self.transform(sol_half_hat, axes=(-2,))
-        else:
-            return self.itransform(sol_half_hat, axes=(-1,))
 
     def get_fig(self):  # pragma: no cover
         """
@@ -404,6 +365,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         fig.colorbar(imV, self.cax[1])
 
     def compute_vorticity(self, u):
+        raise NotImplementedError
         if self.spectral_space:
             u_hat = u.copy()
         else:
