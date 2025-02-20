@@ -7,6 +7,8 @@ def get_config(args):
     name = args['config']
     if name[:2] == 'GS':
         from pySDC.projects.GPU.configs.GS_configs import get_config as _get_config
+    elif name[:5] == 'RBC3D':
+        from pySDC.projects.GPU.configs.RBC3D_configs import get_config as _get_config
     elif name[:3] == 'RBC':
         from pySDC.projects.GPU.configs.RBC_configs import get_config as _get_config
     else:
@@ -184,9 +186,9 @@ class LogStats(ConvergenceController):
     def setup(self, controller, params, *args, **kwargs):
         params['control_order'] = 999
         if 'hook' not in params.keys():
-            from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
+            from pySDC.implementations.hooks.log_solution import LogToPickleFileAfterXS
 
-            params['hook'] = LogToFileAfterXs
+            params['hook'] = LogToPickleFileAfterXS
 
         self.counter = params['hook'].counter
 

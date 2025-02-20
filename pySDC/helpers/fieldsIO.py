@@ -45,7 +45,7 @@ See :class:`pySDC.helpers.fieldsIO.writeFields_MPI` for an illustrative example.
 Warning
 -------
 To use MPI collective writing, you need to call first the class methods :class:`Rectilinear.initMPI` (cf their docstring).
-Also, `Rectilinear.setHeader` **must be given the global grids coordinates**, wether the code is run in parallel or not.
+Also, `Rectilinear.setHeader` **must be given the global grids coordinates**, weather the code is run in parallel or not.
 
 > ⚠️ Also : this module can only be imported with **Python 3.11 or higher** !
 """
@@ -202,7 +202,7 @@ class FieldsIO:
         if not self.ALLOW_OVERWRITE:
             assert not os.path.isfile(
                 self.fileName
-            ), "file already exists, use FieldsIO.ALLOW_OVERWRITE = True to allow overwriting"
+            ), f"file {self.fileName!r} already exists, use FieldsIO.ALLOW_OVERWRITE = True to allow overwriting"
 
         with open(self.fileName, "w+b") as f:
             self.hBase.tofile(f)
@@ -475,7 +475,7 @@ class Rectilinear(Scalar):
 
         Example
         -------
-        >>> # Suppose the FieldsIO object is already writen into outputs.pysdc
+        >>> # Suppose the FieldsIO object is already written into outputs.pysdc
         >>> import os
         >>> from pySDC.utils.fieldsIO import Rectilinear
         >>> os.makedirs("vtrFiles")  # to store all VTR files into a subfolder
@@ -707,7 +707,6 @@ def writeFields_MPI(fileName, dtypeIdx, algo, nSteps, nVar, gridSizes):
     Rectilinear.setupMPI(comm, iLoc, nLoc)
     s = [slice(i, i + n) for i, n in zip(iLoc, nLoc)]
     u0 = u0[:, *s]
-    print(MPI_RANK, u0.shape)
 
     f1 = Rectilinear(DTYPES[dtypeIdx], fileName)
     f1.setHeader(nVar=nVar, coords=coords)

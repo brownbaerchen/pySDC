@@ -37,43 +37,43 @@ def run(hook, Tend=0):
 
 @pytest.mark.base
 def test_errors():
-    from pySDC.implementations.hooks.log_solution import LogToFile
+    from pySDC.implementations.hooks.log_solution import LogToPickleFile
     import os
 
     with pytest.raises(ValueError):
-        run(LogToFile)
+        run(LogToPickleFile)
 
-    LogToFile.path = os.getcwd()
-    run(LogToFile)
+    LogToPickleFile.path = os.getcwd()
+    run(LogToPickleFile)
 
     path = f'{os.getcwd()}/tmp'
-    LogToFile.path = path
-    run(LogToFile)
+    LogToPickleFile.path = path
+    run(LogToPickleFile)
     os.path.isdir(path)
 
     with pytest.raises(ValueError):
-        LogToFile.path = __file__
-        run(LogToFile)
+        LogToPickleFile.path = __file__
+        run(LogToPickleFile)
 
 
 @pytest.mark.base
 def test_logging():
-    from pySDC.implementations.hooks.log_solution import LogToFile, LogSolution
+    from pySDC.implementations.hooks.log_solution import LogToPickleFile, LogSolution
     from pySDC.helpers.stats_helper import get_sorted
     import os
     import pickle
     import numpy as np
 
     path = f'{os.getcwd()}/tmp'
-    LogToFile.path = path
+    LogToPickleFile.path = path
     Tend = 2
 
-    u0, stats = run([LogToFile, LogSolution], Tend=Tend)
+    u0, stats = run([LogToPickleFile, LogSolution], Tend=Tend)
     u = [(0.0, u0)] + get_sorted(stats, type='u')
 
     u_file = []
     for i in range(len(u)):
-        data = LogToFile.load(i)
+        data = LogToPickleFile.load(i)
         u_file += [(data['t'], data['u'])]
 
     for us, uf in zip(u, u_file):

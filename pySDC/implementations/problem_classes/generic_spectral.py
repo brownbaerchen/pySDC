@@ -333,6 +333,29 @@ class GenericSpectralLinear(Problem):
 
             return sol
 
+    def getOutputFile(self, fileName):
+        from pySDC.helpers.fieldsIO import Rectilinear
+
+        coords = [me.get_1dgrid() for me in self.spectral.axes]
+        assert np.allclose([len(me) for me in coords], self.spectral.global_shape[1:])
+
+        Rectilinear.setupMPI(
+            comm=self.comm,
+            iLoc=[me.start for me in self.local_slice],
+            nLoc=[me.stop - me.start for me in self.local_slice],
+        )
+
+        fOut = Rectilinear(np.float64, fileName=fileName)
+        fOut.setHeader(nVar=len(self.components), coords=coords)
+        fOut.initialize()
+        return fOut
+
+    def processSolutionForOutput(self, u):
+        if self.spectral_space:
+            return np.array(self.itransform(u).real)
+        else:
+            return np.array(u.real)
+
 
 def compute_residual_DAE(self, stage=''):
     """
