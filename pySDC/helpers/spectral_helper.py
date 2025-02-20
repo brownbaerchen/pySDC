@@ -1014,7 +1014,7 @@ class SpectralHelper:
         else:
             BC[line, :] = base.get_BC(kind=kind, **kwargs)
 
-        ndim = len(self.axes)
+        ndim = self.ndim
         if ndim == 1:
             return self.sparse_lib.csc_matrix(BC)
         elif ndim == 2:
@@ -1036,12 +1036,33 @@ class SpectralHelper:
             mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
             mats[axis2] = Id
             return self.sparse_lib.csc_matrix(sp.kron(*mats))
+        if ndim == 3:
+            mats = [
+                None,
+            ] * ndim
+
+            for ax in range(ndim):
+                if ax == axis:
+                    continue
+
+                if scalar:
+                    _Id = self.sparse_lib.diags(self.xp.append([1], self.xp.zeros(self.axes[ax].N - 1)))
+                else:
+                    _Id = self.axes[ax].get_Id()
+
+                mats[ax] = self.get_local_slice_of_1D_matrix(self.axes[ax].get_Id() @ _Id, axis=ax)
+
+            mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
+
+            return self.sparse_lib.csc_matrix(sp.kron(mats[0], sp.kron(*mats[1:])))
+        else:
+            raise NotImplementedError(f'Constructing BC is not implemented in {self.ndim} dimensions!')
 
     def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, **kwargs):
         """
         Remove a BC from the matrix. This is useful e.g. when you add a non-scalar BC and then need to selectively
         remove single BCs again, as in incompressible Navier-Stokes, for instance.
-        Forward arguments for the boundary conditions using `kwargs`. Refer to documentation of 1D bases for details.
+        Forwards arguments for the boundary conditions using `kwargs`. Refer to documentation of 1D bases for details.
 
         Args:
             component (str): Name of the component the BC should act on
@@ -1165,6 +1186,8 @@ class SpectralHelper:
                         get = self.axes[axis].get_BC(**kwargs) @ u_hat[self.index(BC['component'])]
                     elif axis == 1:
                         get = u_hat[self.index(BC['component'])] @ self.axes[axis].get_BC(**kwargs)
+                    else:
+                        raise NotImplementedError(f'Not implemented for {axis=}')
                     want = BC['v']
                     assert self.xp.allclose(
                         get, want
@@ -1468,7 +1491,7 @@ class SpectralHelper:
             if padding is None or np.allclose(padding, 1.0):
                 return self.global_shape[1:]
             else:
-                raise NotImplementedError(f'Padding not implemented in {ndim} dimensions!')
+                raise NotImplementedError(f'Padding not implemented in {self.ndim} dimensions!')
 
         return shape
 
@@ -1869,7 +1892,7 @@ class SpectralHelper:
 
         Args:
             M (sparse matrix): Global 1D matrix you want to get the local version of
-            axis (int): Direction in which you want the local version. You will get the global matrix in other directions. This means slab decomposition only.
+            axis (int): Direction in which you want the local version.
 
         Returns:
             sparse local matrix

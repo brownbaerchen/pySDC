@@ -164,6 +164,10 @@ def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat).real
 
+    if useMPI:
+        assert u.shape[1] < nx, 'Not distributed along x'
+        assert u.shape[2] < ny, 'Not distributed along y'
+
     assert np.allclose(D_u, expect, atol=1e-10)
 
 
@@ -394,8 +398,10 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
         u_all = comm.bcast(u_all, root=0)
 
     u[...] = u_all[
-        0,
-        *(helper.local_slice),
+        (
+            0,
+            *helper.local_slice,
+        )
     ]
 
     axes_ordered = []
@@ -568,6 +574,81 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
 
 
 @pytest.mark.base
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('nz', [4, 8])
+@pytest.mark.parametrize('bc_val', [-2, 1.0])
+def test_tau_method3D(nx, nz, bc_val, bc=-1, useMPI=False, plotting=False, **kwargs):
+    '''
+    solve u_z - 0.1u_xx - 0.1u_yy -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
+    problem. We do FFT in x and y-directions and Chebychov in z-direction.
+    '''
+    from pySDC.helpers.spectral_helper import SpectralHelper
+    import numpy as np
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis('fft', N=nx)
+    helper.add_axis('fft', N=nx)
+    helper.add_axis('cheby', N=nz)
+    helper.add_component(['u'])
+    helper.setup_fft()
+
+    X, Y, Z = helper.get_grid()
+    x = X[:, 0, 0]
+    z = Z[0, 0, :]
+    shape = helper.init[0][1:]
+
+    bcs = np.sin(bc_val * x)
+    helper.add_BC('u', 'u', axis=2, kind='dirichlet', x=bc, v=bcs)
+    helper.setup_BCs()
+
+    # generate matrices
+    Dz = helper.get_differentiation_matrix(axes=(2,))
+    Dx = helper.get_differentiation_matrix(axes=(0,))
+    Dxx = helper.get_differentiation_matrix(axes=(0,), p=2)
+    Dyy = helper.get_differentiation_matrix(axes=(1,), p=2)
+
+    # generate operator
+    _A = helper.get_empty_operator_matrix()
+    helper.add_equation_lhs(_A, 'u', {'u': Dz - (Dxx + Dyy) * 1e-1 - Dx})
+    A = helper.convert_operator_matrix_to_operator(_A)
+
+    # prepare system to solve
+    A = helper.put_BCs_in_matrix(A)
+    rhs_hat = helper.put_BCs_in_rhs_hat(helper.u_init_forward)
+
+    # solve the system
+    sol_hat = helper.u_init_forward
+    sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
+    sol = helper.itransform(sol_hat).real
+
+    # construct polynomials for testing
+    sol_cheby = helper.transform(sol, axes=(-1,))
+    polys = [[np.polynomial.Chebyshev(sol_cheby[0, i, j, :]) for i in range(shape[0])] for j in range(shape[1])]
+
+    Pz = np.polynomial.Chebyshev(np.append(np.zeros(nz - 1), [1]))
+    (
+        _,
+        _,
+        tau_term,
+    ) = np.meshgrid(np.ones(shape[0]), np.ones(shape[1]), Pz(z), indexing='xy')
+    error = ((A @ sol_hat.flatten()).reshape(sol_hat.shape) / tau_term).real
+
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+
+            assert np.isclose(polys[i][j](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
+
+    assert np.allclose(error, error[0, 0]), 'Solution does not satisfy perturbed equation'
+
+
+@pytest.mark.base
 @pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('ny', [4, 8])
@@ -699,9 +780,10 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3))
-        test_transform_pencil_decomposition('cheby', (-1, -2, -3))
+        # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
+        test_tau_method3D(4, 8, 1, 1)
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
