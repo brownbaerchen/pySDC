@@ -204,11 +204,6 @@ def test_Poisson_problems(nx, component):
         u_exact[ip][0, 3] = 5 / (16 * 5)
         u_exact[ip][0, 1] = -70 / (16 * 5)
 
-    # print(P.L.toarray()[:6, :6])
-    import matplotlib.pyplot as plt
-
-    plt.imshow(A.toarray() / abs(A.toarray()))
-    plt.show()
     assert np.allclose(u_exact, u)
 
 
