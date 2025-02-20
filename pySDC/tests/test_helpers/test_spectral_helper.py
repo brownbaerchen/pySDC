@@ -579,14 +579,15 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
 def test_tau_method3DMPI(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
-    test_tau_method3D(nx, nz, bc_val, bc, useMPI=True)
+    test_tau_method3D(nx, nx, nz, bc_val, bc, useMPI=True)
 
 
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('ny', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method3D(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
+def test_tau_method3D(nx, ny, nz, bc_val, bc=-1, useMPI=False, **kwargs):
     '''
     solve u_z - 0.1u_xx - 0.1u_yy -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x and y-directions and Chebychov in z-direction.
@@ -603,7 +604,7 @@ def test_tau_method3D(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis('fft', N=nx)
-    helper.add_axis('fft', N=nx)
+    helper.add_axis('fft', N=ny)
     helper.add_axis('cheby', N=nz)
     helper.add_component(['u'])
     helper.setup_fft()
@@ -613,7 +614,7 @@ def test_tau_method3D(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
     z = Z[0, 0, :]
     shape = helper.init[0][1:]
 
-    bcs = np.sin(bc_val * x)
+    bcs = np.sin(bc_val * X[:, :, 0])
     helper.add_BC('u', 'u', axis=2, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
@@ -652,7 +653,7 @@ def test_tau_method3D(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
     for i in range(shape[0]):
         for j in range(shape[1]):
 
-            assert np.isclose(polys[j][i](bc), bcs[j]), f'Solution does not satisfy boundary condition x={x[i]}'
+            assert np.isclose(polys[j][i](bc), bcs[i, j]), f'Solution does not satisfy boundary condition x={x[i]}'
 
     assert np.allclose(error, error[0, 0]), 'Solution does not satisfy perturbed equation'
 
@@ -792,7 +793,7 @@ if __name__ == '__main__':
         # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
-        test_tau_method3D(4, 8, 1, 1, useMPI=True)
+        test_tau_method3D(4, 5, 8, 1, 1, useMPI=True)
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
