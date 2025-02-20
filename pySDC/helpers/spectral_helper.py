@@ -1357,15 +1357,21 @@ class SpectralHelper:
                 if direction == 'object':
                     from mpi4py_fft import PFFT
 
+                    _axes = sorted(axes)
+                    grid = [
+                        -1,
+                    ] * self.ndim
+                    grid[_axes[-1]] = 1
                     _fft = PFFT(
                         comm=self.comm,
                         shape=shape,
-                        axes=sorted(axes),
+                        axes=_axes,
                         dtype='D',
                         collapse=False,
                         backend=self.fft_backend,
                         comm_backend=self.fft_comm_backend,
                         padding=padding,
+                        grid=grid,
                     )
                 else:
                     _fft = self.get_fft(axes=axes, direction='object', padding=padding, shape=shape)
@@ -1442,6 +1448,30 @@ class SpectralHelper:
         fft = self.get_fft(axes, 'forward', **kwargs)
         return fft(u, axes=axes)
 
+    def infer_fft_shape(self, u, padding):
+        """
+        Communicate the shapes in distributed directions in order to infer the total current shape
+
+        Args:
+            u: Data to infer the global shape from
+
+        Returns:
+            list: Global shape
+        """
+        shape = list(u.shape)
+        if self.ndim == 2:
+            send_buf = np.array(u.shape[0])
+            recv_buf = np.array(u.shape[0])
+            self.comm.Allreduce(send_buf, recv_buf)
+            shape[0] = int(recv_buf)
+        else:
+            if padding is None or np.allclose(padding, 1.0):
+                return self.global_shape[1:]
+            else:
+                raise NotImplementedError(f'Padding not implemented in {ndim} dimensions!')
+
+        return shape
+
     def _transform_dct(self, u, axes, padding=None, **kwargs):
         '''
         DCT along `axes`.
@@ -1476,10 +1506,7 @@ class SpectralHelper:
                 if ('forward', *padding) in self.fft_dealias_shape_cache.keys():
                     shape[0] = self.fft_dealias_shape_cache[('forward', *padding)]
                 elif self.comm:
-                    send_buf = np.array(v.shape[0])
-                    recv_buf = np.array(v.shape[0])
-                    self.comm.Allreduce(send_buf, recv_buf)
-                    shape[0] = int(recv_buf)
+                    shape = self.infer_fft_shape(v, padding)
                 fft = self.get_fft(axes, 'forward', shape=shape)
             else:
                 fft = self.get_fft(axes, 'forward', **kwargs)
@@ -1653,10 +1680,7 @@ class SpectralHelper:
                     if ('backward', *padding) in self.fft_dealias_shape_cache.keys():
                         shape[0] = self.fft_dealias_shape_cache[('backward', *padding)]
                     elif self.comm:
-                        send_buf = np.array(v.shape[0])
-                        recv_buf = np.array(v.shape[0])
-                        self.comm.Allreduce(send_buf, recv_buf)
-                        shape[0] = int(recv_buf)
+                        shape = self.infer_fft_shape(v, padding)
                     ifft = self.get_fft(axes, 'backward', shape=shape)
                 else:
                     ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
