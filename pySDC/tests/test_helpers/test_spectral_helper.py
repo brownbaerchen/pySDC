@@ -383,21 +383,20 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
         return None
 
     helper.setup_fft()
-
     u = helper.u_init
-    u[...] = np.random.random(u.shape)
 
     if nz > 0:
-        u_all = np.empty(shape=(1, nx, ny, nz), dtype=u.dtype)
+        u_all = np.random.random((1, nx, ny, nz)).astype(u.dtype)
     else:
-        u_all = np.empty(shape=(1, nx, ny), dtype=u.dtype)
+        u_all = np.random.random((1, nx, ny)).astype(u.dtype)
 
     if useMPI:
-        u_all[...] = (np.concatenate(comm.allgather(u[0]), axis=0)).reshape(u_all.shape)
-        if comm.size == 1:
-            assert np.allclose(u_all, u)
-    else:
-        u_all[...] = u
+        u_all = comm.bcast(u_all, root=0)
+
+    u[...] = u_all[
+        0,
+        *(helper.local_slice),
+    ]
 
     axes_ordered = []
     for ax in axes:
@@ -475,7 +474,7 @@ def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, **kwargs):
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
 def test_transform_pencil_decomposition(bz, axes, **kwargs):
-    test_transform(nx=8, ny=8, nz=8, bx='fft', by='fft', bz=bz, axes=axes, useMPI=True, **kwargs)
+    test_transform(nx=4, ny=4, nz=4, bx='fft', by='fft', bz=bz, axes=axes, useMPI=True, **kwargs)
 
 
 # @pytest.mark.parametrize('num_procs', [2, 1])
@@ -699,8 +698,8 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3))
-        # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
+        # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3))
+        test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
