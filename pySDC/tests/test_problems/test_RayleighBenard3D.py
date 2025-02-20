@@ -65,13 +65,11 @@ def test_eval_f(nx, nz, direction, spectral_space):
     f = P.eval_f(u)
 
     f_expect = P.f_init
-    f_expect.expl[iT] = -y * (y_x + y_z)
+    for i in [iT, iu, iv, iw]:
+        f_expect.expl[i] = -y * (y_x + y_y + y_z)
     f_expect.impl[iT] = kappa * (y_xx + +y_yy + y_zz)
-    f_expect.expl[iu] = -y * y_z - y * y_x
     f_expect.impl[iu] = -y_x + nu * (y_xx + y_yy + y_zz)
-    f_expect.expl[iv] = -y * y_z - y * y_y - y * y_x
     f_expect.impl[iv] = -y_y + nu * (y_xx + y_yy + y_zz)
-    f_expect.expl[iw] = -y * (y_z + y_x)
     f_expect.impl[iw] = -y_z + nu * (y_xx + +y_yy + y_zz) + y
     f_expect.impl[ip] = -(y_x + y_y + y_z)
 
@@ -82,7 +80,7 @@ def test_eval_f(nx, nz, direction, spectral_space):
     for comp in ['u', 'v', 'T', 'p']:
         i = P.spectral.index(comp)
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
-        # assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
+        assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
 
 
 #
