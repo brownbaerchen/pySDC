@@ -225,7 +225,7 @@ class LogToFile(Hooks):
 
         # write initial conditions
         self.outfile.addField(time=L.time, field=L.prob.processSolutionForOutput(L.u[0]))
-        self.logger.info(f'Written initial conditions to file')
+        self.logger.info('Written initial conditions to file')
 
     def post_step(self, step, level_number):
         if level_number > 0:

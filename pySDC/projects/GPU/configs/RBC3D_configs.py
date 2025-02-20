@@ -20,7 +20,7 @@ class RayleighBenard3DRegular(Config):
         from pySDC.implementations.hooks.log_solution import LogToFile
 
         LogToFile.filename = f'{self.base_path}/data/{type(self).__name__}.pySDC'
-        LogToFile.time_increment = 1e0
+        LogToFile.time_increment = 1e-1
         LogToFile.allow_overwriting = True
 
         return LogToFile
