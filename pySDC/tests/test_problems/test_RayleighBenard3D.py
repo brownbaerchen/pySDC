@@ -77,7 +77,7 @@ def test_eval_f(nx, nz, direction, spectral_space):
         f.impl = P.itransform(f.impl).real
         f.expl = P.itransform(f.expl).real
 
-    for comp in ['u', 'v', 'T', 'p']:
+    for comp in ['u', 'v', 'w', 'T', 'p']:
         i = P.spectral.index(comp)
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
@@ -208,45 +208,6 @@ def test_Poisson_problem_w():
     u_exact = P.transform(u_exact_real)
     u_exact[ip, 0, 0] = u[ip, 0, 0]  # nobody cares about the constant offset
     assert np.allclose(u_exact, u)
-
-
-# @pytest.mark.mpi4py
-# def test_Nyquist_mode_elimination():
-#     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
-#     import numpy as np
-#
-#     P = RayleighBenard3D(nx=32, nz=8)
-#     u0 = P.u_exact(noise_level=1e-3)
-#
-#     u = P.solve_system(u0, dt=1e-3)
-#
-#     Nyquist_mode_index = P.axes[0].get_Nyquist_mode_index()
-#     assert np.allclose(u[:, Nyquist_mode_index, :], 0)
-#
-#
-# @pytest.mark.mpi4py
-# def test_apply_BCs():
-#     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
-#     import numpy as np
-#
-#     BCs = {
-#         'u_top': np.random.rand(),
-#         'u_bottom': np.random.rand(),
-#         'v_top': np.random.rand(),
-#         'v_bottom': np.random.rand(),
-#         'T_top': np.random.rand(),
-#         'T_bottom': np.random.rand(),
-#     }
-#     P = RayleighBenard3D(nx=5, nz=2**2, BCs=BCs)
-#
-#     u_in = P.u_init
-#     u_in[...] = np.random.rand(*u_in.shape)
-#     u_in_hat = P.transform(u_in)
-#
-#     u_hat = P.apply_BCs(u_in_hat)
-#     u = P.itransform(u_hat)
-#
-#     P.check_BCs(u)
 
 
 if __name__ == '__main__':
