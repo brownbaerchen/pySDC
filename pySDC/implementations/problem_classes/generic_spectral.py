@@ -333,17 +333,22 @@ class GenericSpectralLinear(Problem):
 
             return sol
 
-    def getOutputFile(self, fileName):
+    def setUpFieldsIO(self):
         from pySDC.helpers.fieldsIO import Rectilinear
-
-        coords = [me.get_1dgrid() for me in self.spectral.axes]
-        assert np.allclose([len(me) for me in coords], self.spectral.global_shape[1:])
 
         Rectilinear.setupMPI(
             comm=self.comm,
             iLoc=[me.start for me in self.local_slice],
             nLoc=[me.stop - me.start for me in self.local_slice],
         )
+
+    def getOutputFile(self, fileName):
+        from pySDC.helpers.fieldsIO import Rectilinear
+
+        self.setUpFieldsIO()
+
+        coords = [me.get_1dgrid() for me in self.spectral.axes]
+        assert np.allclose([len(me) for me in coords], self.spectral.global_shape[1:])
 
         fOut = Rectilinear(np.float64, fileName=fileName)
         fOut.setHeader(nVar=len(self.components), coords=coords)

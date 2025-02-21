@@ -7,6 +7,8 @@ def get_config(args):
         return RayleighBenard3DRegular(args)
     elif name == 'RBC3DAdaptivity':
         return RBC3DAdaptivity(args)
+    elif name == 'RBC3DBenchmarkRK':
+        return RBC3DBenchmarkRK(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -15,13 +17,16 @@ class RayleighBenard3DRegular(Config):
     sweeper_type = 'IMEX'
     Tend = 50
 
+    def get_file_name(self):
+        return f'{self.base_path}/data/{type(self).__name__}.pySDC'
+
     def get_LogToFile(self, *args, **kwargs):
         import numpy as np
         from pySDC.implementations.hooks.log_solution import LogToFile
 
-        LogToFile.filename = f'{self.base_path}/data/{type(self).__name__}.pySDC'
+        LogToFile.filename = self.get_file_name()
         LogToFile.time_increment = 1e-1
-        LogToFile.allow_overwriting = True
+        # LogToFile.allow_overwriting = True
 
         return LogToFile
 
@@ -71,9 +76,18 @@ class RayleighBenard3DRegular(Config):
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+
         if restart_idx > 0:
-            raise NotImplementedError
-            return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+            from pySDC.helpers.fieldsIO import FieldsIO
+
+            P.setUpFieldsIO()
+            outfile = FieldsIO.fromFile(self.get_file_name())
+            t0, solution = outfile.readField(restart_idx)
+
+            u0 = P.u_init
+            u0[...] = solution[:]
+            return u0, t0
+
         else:
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
             u0_with_pressure = P.solve_system(u0, 1e-9, u0)
@@ -97,4 +111,28 @@ class RBC3DAdaptivity(RayleighBenard3DRegular):
         desc['sweeper_params']['num_nodes'] = 3
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['step_params']['maxiter'] = 5
+        return desc
+
+
+class RBC3DBenchmarkRK(RayleighBenard3DRegular):
+    def get_description(self, *args, res=-1, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK3
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['sweeper_class'] = ARK3
+
+        desc['level_params']['dt'] = 1e-2 / 5
+        desc['level_params']['restol'] = -1
+
+        desc['convergence_controllers'] = {}
+
+        desc['sweeper_params'] = {}
+
+        desc['problem_params']['Rayleigh'] = 2e8
+        desc['problem_params']['nx'] = 64 if res == -1 else res
+        desc['problem_params']['ny'] = desc['problem_params']['nx']
+        desc['problem_params']['nz'] = desc['problem_params']['nx']
+
+        desc['step_params']['maxiter'] = 1
         return desc

@@ -157,6 +157,11 @@ def make_video(args, config):  # pragma: no cover
     subprocess.run(cmd)
 
 
+# def convert_to_vtr(path, outpath):
+#     from pySDC.helpers.fieldsIO import FieldsIO
+#     FieldsIO.fromFile(path).toVTR(baseName=outpath, varNames=self.varNames)
+
+
 if __name__ == '__main__':
     from pySDC.projects.GPU.configs.base_config import get_config
 

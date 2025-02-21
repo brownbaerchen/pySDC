@@ -80,6 +80,12 @@ class Problem(RegisterParams):
     def get_default_sweeper_class(cls):
         raise NotImplementedError(f'No default sweeper class implemented for {cls} problem!')
 
+    def setUpFieldsIO(self):
+        """
+        Set up FieldsIO for MPI with the space decomposition of this problem
+        """
+        pass
+
     def getOutputFile(self, fileName):
         raise NotImplementedError(f'No output implemented file for {type(self).__name__}')
 
