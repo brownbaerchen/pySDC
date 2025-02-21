@@ -220,19 +220,22 @@ class LogToFile(Hooks):
         L = step.levels[level_number]
 
         # setup outfile
-        if os.path.isfile(self.filename) and not self.allow_overwriting and L.time > 0:
+        if os.path.isfile(self.filename) and L.time > 0:
             from pySDC.helpers.fieldsIO import FieldsIO
 
             L.prob.setUpFieldsIO()
             self.outfile = FieldsIO.fromFile(self.filename)
+            self.logger.info(
+                f'Set up file {self.filename!r} for writing output. This file already contains solutions up to t={self.outfile.times[-1]:.4f}.'
+            )
         else:
             self.outfile = L.prob.getOutputFile(self.filename)
-        self.logger.info(f'Setup file {self.filename!r} for writing output')
+            self.logger.info(f'Set up file {self.filename!r} for writing output.')
 
         # write initial conditions
         if L.time not in self.outfile.times:
             self.outfile.addField(time=L.time, field=L.prob.processSolutionForOutput(L.u[0]))
-        self.logger.info(f'Written initial conditions at t={L.time:4f} to file')
+            self.logger.info(f'Written initial conditions at t={L.time:4f} to file')
 
     def post_step(self, step, level_number):
         if level_number > 0:
@@ -244,7 +247,7 @@ class LogToFile(Hooks):
             self.t_next_log = L.time + self.time_increment
 
         if L.time + L.dt >= self.t_next_log and not step.status.restart:
-            if L.time + L.dt in self.outfile.times:
+            if L.time + L.dt in self.outfile.times and not self.allow_overwriting:
                 raise Exception(f'Already have recorded data for time {L.time + L.dt} in this file!')
             self.outfile.addField(time=L.time + L.dt, field=L.prob.processSolutionForOutput(L.uend))
             self.logger.info(f'Written solution at t={L.time+L.dt:.4f} to file')

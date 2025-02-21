@@ -18,7 +18,8 @@ class RayleighBenard3DRegular(Config):
     Tend = 50
 
     def get_file_name(self):
-        return f'{self.base_path}/data/{type(self).__name__}.pySDC'
+        res = self.args['res']
+        return f'{self.base_path}/data/{type(self).__name__}-res{res}.pySDC'
 
     def get_LogToFile(self, *args, **kwargs):
         import numpy as np
@@ -77,21 +78,21 @@ class RayleighBenard3DRegular(Config):
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
 
-        if restart_idx > 0:
+        if restart_idx == 0:
+            u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
+            u0_with_pressure = P.solve_system(u0, 1e-9, u0)
+            return u0_with_pressure, 0
+        else:
             from pySDC.helpers.fieldsIO import FieldsIO
 
             P.setUpFieldsIO()
             outfile = FieldsIO.fromFile(self.get_file_name())
+
             t0, solution = outfile.readField(restart_idx)
 
             u0 = P.u_init
             u0[...] = solution[:]
             return u0, t0
-
-        else:
-            u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
-            u0_with_pressure = P.solve_system(u0, 1e-9, u0)
-            return u0_with_pressure, 0
 
     def prepare_caches(self, prob):
         """
