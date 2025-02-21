@@ -134,6 +134,8 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
         desc['problem_params']['nx'] = 64 if res == -1 else res
         desc['problem_params']['ny'] = desc['problem_params']['nx']
         desc['problem_params']['nz'] = desc['problem_params']['nx']
+        desc['problem_params']['Lx'] = 2
+        desc['problem_params']['Ly'] = 2
 
         desc['step_params']['maxiter'] = 1
         return desc
