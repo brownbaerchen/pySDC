@@ -9,6 +9,8 @@ def get_config(args):
         return RBC3DAdaptivity(args)
     elif name == 'RBC3DBenchmarkRK':
         return RBC3DBenchmarkRK(args)
+    elif name == 'RBC3DBenchmarkSDC':
+        return RBC3DBenchmarkSDC(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -22,6 +24,8 @@ class RayleighBenard3DRegular(Config):
         return f'{self.base_path}/data/{type(self).__name__}-res{res}.pySDC'
 
     def get_LogToFile(self, *args, **kwargs):
+        if self.comms[1].rank > 0:
+            return None
         import numpy as np
         from pySDC.implementations.hooks.log_solution import LogToFile
 
@@ -47,6 +51,7 @@ class RayleighBenard3DRegular(Config):
             compute_residual_DAE_MPI,
         )
         from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+        from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
 
         desc = super().get_description(*args, MPIsweeper=MPIsweeper, **kwargs)
 
@@ -59,6 +64,7 @@ class RayleighBenard3DRegular(Config):
         desc['level_params']['restol'] = 1e-7
 
         desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.1}
+        desc['convergence_controllers'][StopAtNan] = {}
 
         desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         desc['sweeper_params']['num_nodes'] = 2
@@ -126,8 +132,6 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
         desc['level_params']['dt'] = 1e-2 / 5
         desc['level_params']['restol'] = -1
 
-        desc['convergence_controllers'] = {}
-
         desc['sweeper_params'] = {}
 
         desc['problem_params']['Rayleigh'] = 2e8
@@ -136,6 +140,30 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
         desc['problem_params']['nz'] = desc['problem_params']['nx']
         desc['problem_params']['Lx'] = 2
         desc['problem_params']['Ly'] = 2
+
+        desc['step_params']['maxiter'] = 1
+        return desc
+
+
+class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
+    def get_description(self, *args, res=-1, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+
+        desc['level_params']['dt'] = 1e-2
+        desc['level_params']['restol'] = -1
+        desc['level_params']['nsweeps'] = 4
+
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
+        desc['sweeper_params']['QE'] = 'PIC'
+
+        desc['problem_params']['Rayleigh'] = 2e8
+        desc['problem_params']['nx'] = 64 if res == -1 else res
+        desc['problem_params']['ny'] = desc['problem_params']['nx']
+        desc['problem_params']['nz'] = desc['problem_params']['nx']
+        desc['problem_params']['Lx'] = 2
+        desc['problem_params']['Ly'] = 2
+        desc['problem_params']['max_cached_factorizations'] = 16
 
         desc['step_params']['maxiter'] = 1
         return desc
