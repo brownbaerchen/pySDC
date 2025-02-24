@@ -57,7 +57,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         ny=256,
         nz=64,
         BCs=None,
-        dealiasing=1.0,
+        dealiasing=1.5,
         comm=None,
         Lx=8,
         Ly=8,
