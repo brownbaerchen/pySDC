@@ -3,10 +3,12 @@ import pytest
 
 def my_assert(*args, **kwargs):
     try:
-        from pytest_mpi import parallel_assert as _assert
+        from pytest_mpi.parallel_assert import parallel_assert as _assert
     except ImportError:
 
         def _assert(statement, msg=''):
+            if callable(statement):
+                statement = statement()
             assert statement, msg
 
     _assert(*args, **kwargs)
@@ -367,7 +369,8 @@ def _test_transform_dealias(
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -1), (-1, -2, -3)])
-def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
+@pytest.mark.parametrize('padding', [1])
+def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -429,6 +432,14 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, useMPI=False, **kwargs):
     my_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
     my_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
 
+    if padding != 0:
+        _padding = [
+            padding,
+        ] * helper.ndim
+        u_pad = helper.itransform(trf, axes=axes, padding=_padding)
+        trf2 = helper.transform(u_pad, axes=axes, padding=_padding)
+        my_assert(lambda: np.allclose(trf2, trf))
+
 
 def run_MPI_test(num_procs, **kwargs):
     import os
@@ -471,16 +482,18 @@ def run_MPI_test(num_procs, **kwargs):
 )
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
-def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, **kwargs):
-    test_transform(nx=nx, ny=ny, nz=nz, bx=bx, by=by, bz=bz, axes=axes, useMPI=True, **kwargs)
+@pytest.mark.parametrize('padding', [1, 1.5])
+def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, padding, **kwargs):
+    test_transform(nx=nx, ny=ny, nz=nz, bx=bx, by=by, bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
 @pytest.mark.mpi4py
 @pytest.mark.parallel([4])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
-def test_transform_pencil_decomposition(bz, axes, **kwargs):
-    test_transform(nx=4, ny=4, nz=4, bx='fft', by='fft', bz=bz, axes=axes, useMPI=True, **kwargs)
+@pytest.mark.parametrize('padding', [1, 1.5])
+def test_transform_pencil_decomposition(bz, axes, padding, **kwargs):
+    test_transform(nx=4, ny=4, nz=4, bx='fft', by='fft', bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
 # @pytest.mark.parametrize('num_procs', [2, 1])
@@ -789,11 +802,11 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3))
+        test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
         # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
-        test_tau_method3D(4, 5, 8, 1, 1, useMPI=True)
+        # test_tau_method3D(4, 5, 8, 1, 1, useMPI=True)
         # test_identity_matrix_ND(2, 1, 4, 'T2U', 'fft')
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', by='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')

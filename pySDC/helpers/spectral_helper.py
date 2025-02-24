@@ -1491,7 +1491,11 @@ class SpectralHelper:
             if padding is None or np.allclose(padding, 1.0):
                 return self.global_shape[1:]
             else:
-                raise NotImplementedError(f'Padding not implemented in {self.ndim} dimensions!')
+                assert all(me < 2 for me in padding)
+                distributed_axes = [i for i in np.arange(self.ndim) if shape[i] < self.global_shape[i + 1]]
+                for i in distributed_axes:
+                    shape[i] = self.comm.allreduce(u.shape[i]) // len(distributed_axes)
+                print('inferred shape', distributed_axes, shape, flush=True)
 
         return shape
 
@@ -1526,7 +1530,7 @@ class SpectralHelper:
 
             if padding is not None:
                 shape = list(v.shape)
-                if ('forward', *padding) in self.fft_dealias_shape_cache.keys():
+                if ('forward', *padding) in self.fft_dealias_shape_cache.keys() and False:
                     shape[0] = self.fft_dealias_shape_cache[('forward', *padding)]
                 elif self.comm:
                     shape = self.infer_fft_shape(v, padding)
