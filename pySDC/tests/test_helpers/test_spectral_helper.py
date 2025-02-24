@@ -802,7 +802,8 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
+        # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
+        test_transform_MPI(3, 8, 0, 'fft', 'fft', 'cheby', (-2,), padding=1.5)
         # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)

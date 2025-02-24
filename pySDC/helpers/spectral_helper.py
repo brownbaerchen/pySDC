@@ -1482,20 +1482,17 @@ class SpectralHelper:
             list: Global shape
         """
         shape = list(u.shape)
-        if self.ndim == 2:
-            send_buf = np.array(u.shape[0])
-            recv_buf = np.array(u.shape[0])
-            self.comm.Allreduce(send_buf, recv_buf)
-            shape[0] = int(recv_buf)
+
+        if padding is None or np.allclose(padding, 1.0):
+            return self.global_shape[1:]
         else:
-            if padding is None or np.allclose(padding, 1.0):
-                return self.global_shape[1:]
-            else:
-                assert all(me < 2 for me in padding)
-                distributed_axes = [i for i in np.arange(self.ndim) if shape[i] < self.global_shape[i + 1]]
-                for i in distributed_axes:
-                    shape[i] = self.comm.allreduce(u.shape[i]) // len(distributed_axes)
-                print('inferred shape', distributed_axes, shape, flush=True)
+            assert all(me < 2 for me in padding)
+            distributed_axes = [i for i in np.arange(self.ndim) if shape[i] < self.global_shape[i + 1]]
+            for i in distributed_axes:
+                send_buf = np.array(u.shape[i])
+                recv_buf = np.array(u.shape[i])
+                self.comm.Allreduce(send_buf, recv_buf)
+                shape[i] = int(recv_buf) // len(distributed_axes)
 
         return shape
 
