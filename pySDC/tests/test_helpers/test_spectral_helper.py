@@ -438,8 +438,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
         ] * helper.ndim
         u_pad = helper.itransform(trf, axes=axes, padding=_padding)
         trf2 = helper.transform(u_pad, axes=axes, padding=_padding)
-        my_assert(np.allclose(trf2, trf))
-        my_assert(sum(u_pad.shape) > sum(u.shape)), f'{u_pad.shape}, {u.shape}'
+        my_assert(lambda: np.allclose(trf2, trf))
+        my_assert(lambda: sum(u_pad.shape) > sum(u.shape)), f'{u_pad.shape}, {u.shape}'
 
 
 def run_MPI_test(num_procs, **kwargs):
