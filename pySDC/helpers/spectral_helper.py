@@ -1485,14 +1485,24 @@ class SpectralHelper:
 
         if padding is None or np.allclose(padding, 1.0):
             return self.global_shape[1:]
+        elif self.comm.size == 1:
+            return shape
         else:
-            assert all(me < 2 for me in padding)
+            assert all(me < self.comm.size for me in padding), f'{padding}, {self.comm.size}'
             distributed_axes = [i for i in np.arange(self.ndim) if shape[i] < self.global_shape[i + 1]]
+            non_distributed_axes = [i for i in np.arange(self.ndim) if shape[i] >= self.global_shape[i + 1]]
+
             for i in distributed_axes:
-                send_buf = np.array(u.shape[i])
-                recv_buf = np.array(u.shape[i])
-                self.comm.Allreduce(send_buf, recv_buf)
-                shape[i] = int(recv_buf) // len(distributed_axes)
+                if (
+                    self.axes[i].N == self.axes[non_distributed_axes[0]].N
+                    and padding[i] == padding[non_distributed_axes[0]]
+                ):
+                    shape[i] = shape[non_distributed_axes[0]]
+                else:
+                    send_buf = np.array(u.shape[i])
+                    recv_buf = np.array(u.shape[i])
+                    self.comm.Allreduce(send_buf, recv_buf)
+                    shape[i] = int(recv_buf) // len(distributed_axes)
 
         return shape
 

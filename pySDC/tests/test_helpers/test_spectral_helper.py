@@ -432,13 +432,14 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
     my_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
     my_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
 
-    if padding != 0:
+    if padding != 1:
         _padding = [
             padding,
         ] * helper.ndim
         u_pad = helper.itransform(trf, axes=axes, padding=_padding)
         trf2 = helper.transform(u_pad, axes=axes, padding=_padding)
-        my_assert(lambda: np.allclose(trf2, trf))
+        my_assert(np.allclose(trf2, trf))
+        my_assert(sum(u_pad.shape) > sum(u.shape)), f'{u_pad.shape}, {u.shape}'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -802,8 +803,8 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
-        test_transform_MPI(3, 8, 0, 'fft', 'fft', 'cheby', (-2,), padding=1.5)
+        test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
+        # test_transform_MPI(3, 8, 0, 'fft', 'fft', 'cheby', (-2,), padding=1.5)
         # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
