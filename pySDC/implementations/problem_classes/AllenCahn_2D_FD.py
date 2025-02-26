@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import cg
+from scipy.sparse.linalg import cg, gmres
 
 from pySDC.core.errors import ParameterError, ProblemError
 from pySDC.core.problem import Problem, WorkCounter
@@ -184,13 +184,16 @@ class allencahn_fullyimplicit(Problem):
             dg = Id - factor * (self.A + 1.0 / eps2 * sp.diags((1.0 - (nu + 1) * u**nu), offsets=0))
 
             # newton update: u1 = u0 - g/dg
+            # from scipy.sparse.linalg import spsolve
             # u -= spsolve(dg, g)
-            u -= cg(
+            u -= gmres(
                 dg, g, x0=z, rtol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
             )[0]
+            # u -= cg(
+            #     dg, g, x0=z, rtol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
+            # )[0]
             # increase iteration count
             n += 1
-            # print(n, res)
 
             self.work_counters['newton']()
 

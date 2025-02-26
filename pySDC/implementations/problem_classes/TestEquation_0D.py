@@ -143,7 +143,8 @@ class testequation0d(Problem):
         t_init = 0.0 if t_init is None else t_init * 1.0
 
         me = self.dtype_u(self.init)
-        me[:] = u_init * self.xp.exp((t - t_init) * self.lambdas)
+        me[:] = np.random.random(me.shape)
+        me[:] *= u_init * self.xp.exp((t - t_init) * self.lambdas)
         return me
 
 
@@ -258,5 +259,6 @@ class test_equation_IMEX(Problem):
         t_init = 0.0 if t_init is None else t_init * 1.0
 
         me = self.dtype_u(self.init)
-        me[:] = u_init * self.xp.exp((t - t_init) * (self.lambdas_implicit + self.lambdas_explicit))
+        me[:] = np.random.random(me.shape)
+        me[:] *= u_init * self.xp.exp((t - t_init) * (self.lambdas_implicit + self.lambdas_explicit))
         return me
