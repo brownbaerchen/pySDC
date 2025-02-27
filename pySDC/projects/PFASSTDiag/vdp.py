@@ -8,7 +8,7 @@ import pickle
 
 def get_description(mu=1, mode='ParaDiag'):
     level_params = {}
-    level_params['dt'] = 1e-2  # / mu
+    level_params['dt'] = 1e-1  # / mu
     level_params['restol'] = 1e-6
 
     sweeper_params = {}
@@ -19,12 +19,9 @@ def get_description(mu=1, mode='ParaDiag'):
     if 'Diag' in mode:
         from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization as sweeper_class
 
-        # we only want to use the averaged Jacobian and do only one Newton iteration per ParaDiag iteration!
-        newton_maxiter = 1
     else:
         from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_class
 
-        newton_maxiter = 99
         # need diagonal preconditioner for same concurrency as ParaDiag
         sweeper_params['QI'] = 'MIN-SR-S'
 
@@ -32,7 +29,7 @@ def get_description(mu=1, mode='ParaDiag'):
 
     # need to not raise an error when Newton has not converged because we do only one iteration
     problem_params = {
-        'newton_maxiter': newton_maxiter,
+        'newton_maxiter': 99,
         'crash_at_maxiter': False,
         'mu': mu,
         'newton_tol': 1e-9,
@@ -59,7 +56,7 @@ def get_controller_params(mode='ParaDiag'):
     from pySDC.implementations.hooks.log_work import LogWork, LogSDCIterations
 
     controller_params = {}
-    controller_params['logger_level'] = 100
+    controller_params['logger_level'] = 150
     controller_params['hook_class'] = [LogGlobalErrorPostRun, LogWork, LogSDCIterations]
 
     if 'Diag' in mode:
@@ -123,10 +120,11 @@ def run_vdp(
 
     uend, stats = controller.run(u0=uinit, t0=t0, Tend=n_steps * controller.MS[0].levels[0].dt)
 
-    k_Newton = get_sorted(stats, type='work_newton')
+    # k_Newton = get_sorted(stats, type='work_newton')
+    k_Newton = get_sorted(stats, type='work_jacobian_solves')
 
     if mode == 'PFASSTDiag':
-        k_Newton_PFASST = get_sorted(controller.params.PFASST_controller.return_stats(), type='work_newton')
+        k_Newton_PFASST = get_sorted(controller.params.PFASST_controller.return_stats(), type='work_jacobian_solves')
         assert len(k_Newton) == len(k_Newton_PFASST)
         _k_Newton_tot = sum(me[1] for me in k_Newton)
         k_Newton = [(k_Newton[i][0], k_Newton[i][1] + k_Newton_PFASST[i][1]) for i in range(len(k_Newton))]
@@ -162,7 +160,7 @@ def get_iteration_counts(mode, mu_range, steps_range):
             else:
                 break
 
-            print(f'{mode} with {mu=:4f} and {n_steps=:4f} needed {k_Newton:6f} Newton iterations')
+            print(f'{mode} with {mu=:4f} and {n_steps=:4f} needed {k_Newton:6f} Jacobian inversions')
 
     with open(f'data/iteration_matrix_vdp_{mode}.pickle', 'wb') as file:
         data = {'newton_iter': newton_iter, 'mu': mu_range, 'n_steps': steps_range, 'errors': errors}
@@ -214,7 +212,7 @@ def plot_iteration_counts():
         axs[i].set_ylim((min(data['n_steps']), max(data['n_steps'])))
 
     axs[0].set_ylabel('number of parallel steps')
-    fig.colorbar(im, cax, label=r'$\log_{10}(\text{# Newton iterations per step})$')
+    fig.colorbar(im, cax, label=r'$\log_{10}(\text{# Jacobian inversions per step})$')
     fig.tight_layout()
     fig.savefig('compare_parallelization_schemes_van_der_pol.pdf')
     plt.show()
