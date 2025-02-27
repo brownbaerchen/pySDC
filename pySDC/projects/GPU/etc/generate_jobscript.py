@@ -1,4 +1,5 @@
 PROJECT_PATH = '/p/project1/ccstma/baumann7/pySDC/pySDC/projects/GPU'
+PROJECT_PATH = '.'
 DEFAULT_SBATCH_OPTIONS = ['-A cstma', '--threads-per-core=1', f'--output={PROJECT_PATH}/etc/slurm-out/%j.txt']
 DEFAULT_SRUN_OPTIONS = ['--cpu-bind=sockets']
 

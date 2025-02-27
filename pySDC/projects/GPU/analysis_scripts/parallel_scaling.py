@@ -5,6 +5,8 @@ from pySDC.helpers.stats_helper import get_sorted
 from pySDC.projects.GPU.configs.base_config import get_config
 from pySDC.projects.GPU.etc.generate_jobscript import write_jobscript, PROJECT_PATH
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
+import matplotlib.patches as patches
+import matplotlib.lines as mlines
 
 setup_mpl()
 
@@ -221,15 +223,15 @@ class GrayScottSpaceScalingGPU3D(GPUConfig, ScalingConfig):
     sbatch_options = ['--time=0:07:00']
 
     experiments = [
-        Experiment(res=512, PinT=True, start=1, stop=512, marker='>'),
         Experiment(res=512, PinT=False, start=1, stop=256, marker='>'),
-        Experiment(res=1024, PinT=True, start=16, stop=512, marker='x'),
+        Experiment(res=512, PinT=True, start=1, stop=512, marker='>'),
         Experiment(res=1024, PinT=False, start=16, stop=1024, marker='x'),
-        Experiment(res=2304, PinT=True, start=768, stop=1536, marker='.'),
+        Experiment(res=1024, PinT=True, start=16, stop=512, marker='x'),
         Experiment(res=2304, PinT=False, start=192, stop=768, marker='.'),
+        Experiment(res=2304, PinT=True, start=768, stop=1536, marker='.'),
         # Experiment(res=4608, PinT=False, start=1536, stop=1536, marker='o'),
-        Experiment(res=4480, PinT=True, sequence=[3584], marker='o'),
         Experiment(res=4480, PinT=False, sequence=[1494], marker='o'),
+        Experiment(res=4480, PinT=True, sequence=[3584], marker='o'),
     ]
 
 
@@ -383,6 +385,30 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         path = f'{PROJECT_PATH}/plots/scaling_{problem}_{quantity}.pdf'
+        ######################
+        for i in range(len(ax.get_lines()) // 2):
+            line1 = ax.get_lines()[2 * i]
+            line2 = ax.get_lines()[2 * i + 1]
+            # if i == len(ax.get_lines())//2-1:
+            #     text = 'PinT speedup'
+            #     ax.annotate('PinT speedup', xy=(line2._x[-1], line2._y[-1]), xytext=(line1._x[-1], line1._y[-1]),)
+            ax.annotate(
+                '',
+                xy=(line2._x[-1], line2._y[-1]),
+                xytext=(line1._x[-1], line1._y[-1]),
+                arrowprops=dict(facecolor='black', width=1.2, headwidth=4, shrink=0.001),
+            )
+        # arrow_legend = patches.Patch(color='black', label="PinT speedup")
+        handles, labels = ax.get_legend_handles_labels()
+        # ax.legend(handles=[*handles, arrow_legend])
+        arrow_legend = mlines.Line2D(
+            [], [], color='blue', marker='>', linestyle='None', markersize=10, label="PinT speedup"
+        )
+        handles.append(arrow_legend)
+        labels.append("PinT speedup")
+        ax.legend(handles, labels)
+
+        ######################
         fig.savefig(path, bbox_inches='tight')
         print(f'Saved {path!r}', flush=True)
 
