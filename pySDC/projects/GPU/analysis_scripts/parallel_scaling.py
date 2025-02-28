@@ -398,15 +398,15 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
                 xytext=(line1._x[-1], line1._y[-1]),
                 arrowprops=dict(facecolor='black', width=1.2, headwidth=4, shrink=0.001),
             )
-        # arrow_legend = patches.Patch(color='black', label="PinT speedup")
-        handles, labels = ax.get_legend_handles_labels()
-        # ax.legend(handles=[*handles, arrow_legend])
-        arrow_legend = mlines.Line2D(
-            [], [], color='blue', marker='>', linestyle='None', markersize=10, label="PinT speedup"
-        )
-        handles.append(arrow_legend)
-        labels.append("PinT speedup")
-        ax.legend(handles, labels)
+        # # arrow_legend = patches.Patch(color='black', label="PinT speedup")
+        # handles, labels = ax.get_legend_handles_labels()
+        # # ax.legend(handles=[*handles, arrow_legend])
+        # arrow_legend = mlines.Line2D(
+        #     [], [], color='blue', marker='>', linestyle='None', markersize=10, label="PinT speedup"
+        # )
+        # handles.append(arrow_legend)
+        # labels.append("PinT speedup")
+        # ax.legend(handles, labels)
 
         ######################
         fig.savefig(path, bbox_inches='tight')
