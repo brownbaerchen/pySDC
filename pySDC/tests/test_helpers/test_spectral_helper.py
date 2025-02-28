@@ -497,12 +497,6 @@ def test_transform_pencil_decomposition(bz, axes, padding, **kwargs):
     test_transform(nx=4, ny=4, nz=4, bx='fft', by='fft', bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
-# @pytest.mark.parametrize('num_procs', [2, 1])
-# @pytest.mark.parametrize('axes', ["-1", "-2", "-1,-2"])
-# def test_transform_MPI(nx, ny, bx, by, num_procs, axes):
-#     run_MPI_test(num_procs=num_procs, test='transform', nx=nx, ny=ny, bx=bx, by=by, axes=axes)
-
-
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('ny', [16])

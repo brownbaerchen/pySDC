@@ -1499,6 +1499,8 @@ class SpectralHelper:
                 ):
                     shape[i] = shape[non_distributed_axes[0]]
                 else:
+                    if len(distributed_axes) > 1 and all(padding[distributed_axes] != 1.0):
+                        raise NotImplementedError
                     send_buf = np.array(u.shape[i])
                     recv_buf = np.array(u.shape[i])
                     self.comm.Allreduce(send_buf, recv_buf)
