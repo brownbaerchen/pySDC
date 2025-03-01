@@ -157,11 +157,8 @@ class allencahn_fullyimplicit(Problem):
         """
 
         u = self.dtype_u(u0).flatten()
-        z = self.dtype_u(self.init, val=0.0).flatten()
         nu = self.nu
         eps2 = self.eps**2
-
-        Id = sp.eye(self.nvars[0] * self.nvars[1])
 
         # start newton iteration
         n = 0
@@ -180,18 +177,8 @@ class allencahn_fullyimplicit(Problem):
             if res < self.newton_tol:
                 break
 
-            # assemble dg
-            dg = Id - factor * (self.A + 1.0 / eps2 * sp.diags((1.0 - (nu + 1) * u**nu), offsets=0))
+            u -= self.solve_jacobian(g, factor, u, u0=None)
 
-            # newton update: u1 = u0 - g/dg
-            # from scipy.sparse.linalg import spsolve
-            # u -= spsolve(dg, g)
-            u -= gmres(
-                dg, g, x0=z, rtol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
-            )[0]
-            # u -= cg(
-            #     dg, g, x0=z, rtol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
-            # )[0]
             # increase iteration count
             n += 1
 
@@ -207,6 +194,32 @@ class allencahn_fullyimplicit(Problem):
         self.newton_itercount += n
 
         return me
+
+    def solve_jacobian(self, rhs, dt, u, u0=None, **kwargs):
+        u0 = self.dtype_u(self.init, val=0.0) if u0 is None else u0
+
+        nu = self.nu
+        eps2 = self.eps**2
+
+        Id = sp.eye(self.nvars[0] * self.nvars[1])
+        # assemble dg
+        dg = Id - dt * (self.A + 1.0 / eps2 * sp.diags((1.0 - (nu + 1) * u.flatten() ** nu), offsets=0))
+
+        # newton update: u1 = u0 - g/dg
+        # from scipy.sparse.linalg import spsolve
+        # u -= spsolve(dg, g)
+        return gmres(
+            dg,
+            rhs.flatten(),
+            x0=u0.flatten(),
+            rtol=self.lin_tol,
+            maxiter=self.lin_maxiter,
+            atol=0,
+            callback=self.work_counters['linear'],
+        )[0].reshape(self.init[0])
+        # u -= cg(
+        #     dg, g, x0=z, rtol=self.lin_tol, maxiter=self.lin_maxiter, atol=0, callback=self.work_counters['linear']
+        # )[0]
 
     def eval_f(self, u, t):
         """
