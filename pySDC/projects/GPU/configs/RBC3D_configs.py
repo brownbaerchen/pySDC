@@ -60,7 +60,7 @@ class RayleighBenard3DRegular(Config):
         else:
             desc['sweeper_class'].compute_residual = compute_residual_DAE
 
-        desc['level_params']['dt'] = 0.1
+        desc['level_params']['dt'] = 0.01
         desc['level_params']['restol'] = 1e-7
 
         desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.1}
@@ -73,8 +73,8 @@ class RayleighBenard3DRegular(Config):
 
         desc['problem_params']['Rayleigh'] = 2e6
         desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = 64 if res == -1 else res
-        desc['problem_params']['nz'] = desc['problem_params']['nx'] // 4
+        desc['problem_params']['ny'] = desc['problem_params']['nx']
+        desc['problem_params']['nz'] = desc['problem_params']['nx']
         desc['problem_params']['Lx'] = 1
         desc['problem_params']['Ly'] = 1
         desc['problem_params']['Lz'] = 1
@@ -118,9 +118,10 @@ class RBC3DAdaptivity(RayleighBenard3DRegular):
 
         desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
         desc['level_params']['restol'] = -1
-        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['num_nodes'] = 4
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
-        desc['step_params']['maxiter'] = 5
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['step_params']['maxiter'] = 4
         return desc
 
 
