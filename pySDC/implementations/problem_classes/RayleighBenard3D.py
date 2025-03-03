@@ -59,8 +59,9 @@ class RayleighBenard3D(GenericSpectralLinear):
         BCs=None,
         dealiasing=1.5,
         comm=None,
-        Lx=8,
-        Ly=8,
+        Lz=1,
+        Lx=1,
+        Ly=1,
         **kwargs,
     ):
         """
@@ -80,7 +81,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
-            'T_bottom': 2,
+            'T_bottom': Lz,
             'w_top': 0,
             'w_bottom': 0,
             'v_top': 0,
@@ -108,6 +109,7 @@ class RayleighBenard3D(GenericSpectralLinear):
             'comm',
             'Lx',
             'Ly',
+            'Lz',
             localVars=locals(),
             readOnly=True,
         )
@@ -115,7 +117,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         bases = [
             {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx},
             {'base': 'fft', 'N': ny, 'x0': 0, 'x1': self.Ly},
-            {'base': 'ultraspherical', 'N': nz},
+            {'base': 'ultraspherical', 'N': nz, 'x0': 0, 'x1': self.Lz},
         ]
         components = ['u', 'v', 'w', 'T', 'p']
         super().__init__(bases, components, comm=comm, **kwargs)
