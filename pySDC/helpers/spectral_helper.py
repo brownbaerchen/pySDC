@@ -566,7 +566,7 @@ class UltrasphericalHelper(ChebychevHelper):
         xp = self.xp
         N = self.N
         l = p
-        return 2 ** (l - 1) * factorial(l - 1) * sp.diags(xp.arange(N - l) + l, offsets=l)
+        return 2 ** (l - 1) * factorial(l - 1) * sp.diags(xp.arange(N - l) + l, offsets=l) / self.lin_trf_fac**p
 
     def get_S(self, lmbda):
         """
@@ -648,8 +648,10 @@ class UltrasphericalHelper(ChebychevHelper):
         Returns:
             sparse integration matrix
         """
-        return self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1) @ self.get_basis_change_matrix(
-            p_out=1, p_in=0
+        return (
+            self.sparse_lib.diags(1 / (self.xp.arange(self.N - 1) + 1), offsets=-1)
+            @ self.get_basis_change_matrix(p_out=1, p_in=0)
+            * self.lin_trf_fac
         )
 
     def get_integration_constant(self, u_hat, axis):
