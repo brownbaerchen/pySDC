@@ -286,9 +286,10 @@ class RayleighBenard3D(GenericSpectralLinear):
         iu, iw, iT, ip = self.index(['u', 'w', 'T', 'p'])
 
         # linear temperature gradient
+        assert self.Lz == 1
         for comp in ['T', 'u', 'v', 'w']:
-            a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
-            b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
+            a = self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']
+            b = self.BCs[f'{comp}_bottom']
             me[self.index(comp)] = a * self.Z + b
 
         # perturb slightly
