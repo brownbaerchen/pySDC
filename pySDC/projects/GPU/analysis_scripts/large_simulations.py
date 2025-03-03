@@ -202,7 +202,7 @@ class RBC3DLarge(LargeSim):
             'tasks_per_node': 32,
             'partition': 'batch',
             'cluster': 'jusuf',
-            'res': 64,
+            'res': 128,
             'time': '4:30:00',
         }
 
