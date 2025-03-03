@@ -216,8 +216,6 @@ class ChebychevHelper(SpectralHelper1D):
             numpy.ndarray: 1D grid
         '''
         return self.lin_trf_fac * self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5)) + self.lin_trf_off
-        return (self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5)) - self.lin_trf_off) / self.lin_trf_fac
-        return self.xp.cos(np.pi / self.N * (self.xp.arange(self.N) + 0.5))
 
     def get_wavenumbers(self):
         """Get the domain in spectral space"""
@@ -309,7 +307,7 @@ class ChebychevHelper(SpectralHelper1D):
                 (n / (2 * (self.xp.arange(self.N) + 1)))[1::2]
                 * (-1) ** (self.xp.arange(self.N // 2))
                 / (np.append([1], self.xp.arange(self.N // 2 - 1) + 1))
-            ) / self.lin_trf_fac
+            ) * self.lin_trf_fac
         else:
             raise NotImplementedError(f'This function allows to integrate only from x=0, you attempted from x={lbnd}.')
         return S
@@ -330,7 +328,7 @@ class ChebychevHelper(SpectralHelper1D):
                 D[k, j] = 2 * j * ((j - k) % 2)
 
         D[0, :] /= 2
-        return self.sparse_lib.csc_matrix(self.xp.linalg.matrix_power(D, p))  # * self.lin_trf_fac**p
+        return self.sparse_lib.csc_matrix(self.xp.linalg.matrix_power(D, p)) / self.lin_trf_fac**p
 
     def get_norm(self, N=None):
         '''
