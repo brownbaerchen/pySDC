@@ -381,34 +381,22 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
             config.plot_scaling_test(ax=ax, quantity=quantity)
         if (problem, quantity) in ideal_lines.keys():
             ax.loglog(*ideal_lines[(problem, quantity)].values(), color='black', ls=':', label='ideal')
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        path = f'{PROJECT_PATH}/plots/scaling_{problem}_{quantity}.pdf'
-        ######################
         for i in range(len(ax.get_lines()) // 2):
             line1 = ax.get_lines()[2 * i]
             line2 = ax.get_lines()[2 * i + 1]
-            # if i == len(ax.get_lines())//2-1:
-            #     text = 'PinT speedup'
-            #     ax.annotate('PinT speedup', xy=(line2._x[-1], line2._y[-1]), xytext=(line1._x[-1], line1._y[-1]),)
             ax.annotate(
                 '',
                 xy=(line2._x[-1], line2._y[-1]),
                 xytext=(line1._x[-1], line1._y[-1]),
                 arrowprops=dict(facecolor='black', width=1.2, headwidth=4, shrink=0.001),
             )
-        # # arrow_legend = patches.Patch(color='black', label="PinT speedup")
-        # handles, labels = ax.get_legend_handles_labels()
-        # # ax.legend(handles=[*handles, arrow_legend])
-        # arrow_legend = mlines.Line2D(
-        #     [], [], color='blue', marker='>', linestyle='None', markersize=10, label="PinT speedup"
-        # )
-        # handles.append(arrow_legend)
-        # labels.append("PinT speedup")
-        # ax.legend(handles, labels)
-
-        ######################
+        if problem == 'GS3D':
+            ax.axvline(896, label='Full JUWELS booster', color='black', ls='--')
+        ax.plot([], [], label='Arrows: PinT speedup', color='white')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        path = f'{PROJECT_PATH}/plots/scaling_{problem}_{quantity}.pdf'
         fig.savefig(path, bbox_inches='tight')
         print(f'Saved {path!r}', flush=True)
 
