@@ -31,7 +31,7 @@ display = Show(data, view, 'UniformGridRepresentation')
 if args.noClip:
     # Surface for data for data
     display.Representation = 'Surface'
-    ColorBy(display, ('POINTS', 'buoyancy'))
+    ColorBy(display, ('POINTS', 'T'))
     display.RescaleTransferFunctionToDataRange(True, False)
     display.SetScalarBarVisibility(view, True)
 else:
@@ -45,7 +45,7 @@ else:
     clip1.ClipType.Normal = [0.707, 0.707, 0.0]
     clip1Display = Show(clip1, view, 'UnstructuredGridRepresentation')
     clip1Display.Representation = 'Surface'
-    ColorBy(clip1Display, ('POINTS', 'buoyancy'))
+    ColorBy(clip1Display, ('POINTS', 'T'))
     clip1Display.RescaleTransferFunctionToDataRange(True, False)
     clip1Display.SetScalarBarVisibility(view, True)
 
@@ -54,16 +54,16 @@ else:
     clip2.ClipType.Normal = [0.0, 0.0, 1.0]
     clip2Display = Show(clip2, view, 'UnstructuredGridRepresentation')
     clip2Display.Representation = 'Surface'
-    ColorBy(clip2Display, ('POINTS', 'buoyancy'))
+    ColorBy(clip2Display, ('POINTS', 'T'))
     clip2Display.RescaleTransferFunctionToDataRange(True, False)
     clip2Display.SetScalarBarVisibility(view, True)
 
 # Colorbar stuff
-buoyancyTF2D = GetTransferFunction2D('buoyancy')
+buoyancyTF2D = GetTransferFunction2D('T')
 buoyancyTF2D.ScalarRangeInitialized = 1
 buoyancyTF2D.Range = [0.00015009482740424573, 0.9998499751091003, 0.0, 1.0]
 
-buoyancyLUT = GetColorTransferFunction('buoyancy')
+buoyancyLUT = GetColorTransferFunction('T')
 buoyancyLUT.TransferFunction2D = buoyancyTF2D
 buoyancyLUT.RGBPoints = [
     0.00015009482740424573,
@@ -104,13 +104,13 @@ buoyancyLUT.ScalarRangeInitialized = 1.0
 buoyancyLUT.ApplyPreset('Rainbow Desaturated', True)
 
 buoyancyLUTColorBar = GetScalarBar(buoyancyLUT, view)
-buoyancyLUTColorBar.Title = 'buoyancy'
+buoyancyLUTColorBar.Title = 'T'
 buoyancyLUTColorBar.ComponentTitle = ''
 buoyancyLUTColorBar.WindowLocation = 'Any Location'
 buoyancyLUTColorBar.Position = [0.8758553274682307, 0.028636884306987402]
 buoyancyLUTColorBar.ScalarBarLength = 0.32999999999999996
 
-buoyancyPWF = GetOpacityTransferFunction('buoyancy')
+buoyancyPWF = GetOpacityTransferFunction('T')
 buoyancyPWF.Points = [0.00015009482740424573, 0.0, 0.5, 0.0, 0.9998499751091003, 1.0, 0.5, 0.0]
 buoyancyPWF.ScalarRangeInitialized = 1
 
