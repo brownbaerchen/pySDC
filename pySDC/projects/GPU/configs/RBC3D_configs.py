@@ -105,7 +105,7 @@ class RayleighBenard3DRegular(Config):
             u0[...] = solution[:]
 
             if P.spectral_space:
-                u0 = P.transform(u0)
+                u0[...] = P.transform(u0)
             return u0, t0
 
     def prepare_caches(self, prob):
