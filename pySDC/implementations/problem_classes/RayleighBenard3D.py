@@ -245,7 +245,7 @@ class RayleighBenard3D(GenericSpectralLinear):
                 {'u': {'u': Dx}, 'v': {'v': Dx}, 'w': {'w': Dx}, 'T': {'T': Dx}, 'p': {}}
             )
             self._Dy_expanded = self._setup_operator(
-                {'u': {'u': Dy}, 'v': {'v': Dy}, 'w': {'w': Dy}, 'T': {'T': Dx}, 'p': {}}
+                {'u': {'u': Dy}, 'v': {'v': Dy}, 'w': {'w': Dy}, 'T': {'T': Dy}, 'p': {}}
             )
             self._Dz_expanded = self._setup_operator(
                 {'u': {'u': Dz}, 'v': {'v': Dz}, 'w': {'w': Dz}, 'T': {'T': Dz}, 'p': {}}
