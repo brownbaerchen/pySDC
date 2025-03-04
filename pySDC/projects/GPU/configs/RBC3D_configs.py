@@ -138,7 +138,7 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
 
         desc['sweeper_class'] = ARK3
 
-        desc['level_params']['dt'] = 1e-2 / 5
+        desc['level_params']['dt'] = 1e-3 / 5
         desc['level_params']['restol'] = -1
 
         desc['sweeper_params'] = {}
@@ -156,7 +156,7 @@ class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
     def get_description(self, *args, res=-1, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
-        desc['level_params']['dt'] = 1e-2
+        desc['level_params']['dt'] = 5e-3
         desc['level_params']['restol'] = -1
         desc['level_params']['nsweeps'] = 4
 

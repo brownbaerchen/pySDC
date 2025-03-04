@@ -203,7 +203,7 @@ class RBC3DLarge(LargeSim):
             'partition': 'batch',
             'cluster': 'jusuf',
             'res': 128,
-            'time': '4:30:00',
+            'time': '12:30:00',
         }
 
 
