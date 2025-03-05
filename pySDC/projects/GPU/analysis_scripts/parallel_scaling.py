@@ -5,8 +5,6 @@ from pySDC.helpers.stats_helper import get_sorted
 from pySDC.projects.GPU.configs.base_config import get_config
 from pySDC.projects.GPU.etc.generate_jobscript import write_jobscript, PROJECT_PATH
 from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
-import matplotlib.patches as patches
-import matplotlib.lines as mlines
 
 setup_mpl()
 
@@ -388,7 +386,7 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
                 '',
                 xy=(line2._x[-1], line2._y[-1]),
                 xytext=(line1._x[-1], line1._y[-1]),
-                arrowprops=dict(facecolor='black', width=1.2, headwidth=4, shrink=0.001),
+                arrowprops=dict(facecolor='black', width=1.0, headwidth=3, shrink=0.001),
             )
         if problem == 'GS3D':
             ax.axvline(896, label='Full JUWELS booster', color='black', ls='--')
