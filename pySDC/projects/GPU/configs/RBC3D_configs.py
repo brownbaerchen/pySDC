@@ -196,3 +196,12 @@ class RBC3Dscaling(RayleighBenard3DRegular):
 
         desc['step_params']['maxiter'] = 1
         return desc
+
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.hooks.log_work import LogWork
+
+        params = super().get_controller_params(*args, **kwargs)
+        params['hook_class'] = [LogWork]
+        return params
+

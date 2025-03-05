@@ -61,7 +61,7 @@ class ScalingConfig(object):
                     f'-p {self.partition}',
                     f'--tasks-per-node={self.tasks_per_node}',
                 ] + self.sbatch_options
-                srun_options = [f'--tasks-per-node={self.tasks_per_node}'] + self.srun_option
+                srun_options = [f'--tasks-per-node={self.tasks_per_node}'] + self.srun_options
                 if self.useGPU:
                     srun_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
                     sbatch_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
@@ -135,6 +135,7 @@ class ScalingConfig(object):
                         timing_step = get_sorted(stats, type='timing_step')
 
                     t_mean = np.mean([me[1] for me in timing_step])
+                    t_mean_filtered = np.mean([me[1] for me in timing_step[1:]])
                     t_min = np.min([me[1] for me in timing_step][1:])
 
                     if quantity == 'throughput':
@@ -147,6 +148,8 @@ class ScalingConfig(object):
                         )
                     elif quantity == 'time':
                         timings[np.prod(procs) / self.tasks_per_node] = t_mean
+                    elif quantity == 'time_filtered':
+                        timings[np.prod(procs) / self.tasks_per_node] = t_mean_filtered
                     elif quantity == 'time_per_task':
                         timings[np.prod(procs)] = t_mean
                     elif quantity == 'min_time_per_task':
@@ -170,6 +173,7 @@ class ScalingConfig(object):
             'throughput': 'throughput / DoF/s',
             'throughput_per_task': 'throughput / DoF/s',
             'time': r'$t_\mathrm{step}$ / s',
+            'time_filtered': r'$t_\mathrm{step}$ / s',
             'time_per_task': r'$t_\mathrm{step}$ / s',
             'min_time_per_task': r'minimal $t_\mathrm{step}$ / s',
             'efficiency': 'efficiency / DoF/s/task',
@@ -284,7 +288,7 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
 
 class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     ndim = 3
-    config = 'RBCscaling'
+    config = 'RBC3Dscaling'
     tasks_time = 4
     sbatch_options = ['--time=0:15:00']
     tasks_per_node = 64
@@ -292,7 +296,9 @@ class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        Experiment(res=128, PinT=False, start=1, stop=4096, marker='.'),
+        # Experiment(res=128, PinT=False, start=128, stop=256, marker='.'),
+        Experiment(res=128, PinT=False, start=64, stop=4096, marker='.'),
+        Experiment(res=128, PinT=True, start=32, stop=8192, marker='.'),
     ]
 
 
@@ -390,24 +396,25 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
         ('GS3D', 'time'): {'x': [0.25, 400], 'y': [80, 5e-2]},
         ('RBC', 'throughput'): {'x': [1 / 10, 64], 'y': [2e4, 2e4 * 640]},
         ('RBC', 'time'): {'x': [1 / 10, 64], 'y': [60, 60 / 640]},
+        ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
         ('RBC', 'time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'throughput_per_task'): {'x': [1 / 1, 640], 'y': [2e4, 2e4 * 640]},
     }
 
-    fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
-    configs[1].plot_scaling_test(ax=ax, quantity='efficiency')
-    # ax.legend(frameon=False)
-    box = ax.get_position()
-    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    # fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
+    # configs[1].plot_scaling_test(ax=ax, quantity='efficiency')
+    # # ax.legend(frameon=False)
+    # box = ax.get_position()
+    # ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    # ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-    ax.set_yscale('linear')
-    path = f'{PROJECT_PATH}/plots/scaling_{problem}_efficiency.pdf'
-    fig.savefig(path, bbox_inches='tight')
-    print(f'Saved {path!r}', flush=True)
+    # ax.set_yscale('linear')
+    # path = f'{PROJECT_PATH}/plots/scaling_{problem}_efficiency.pdf'
+    # fig.savefig(path, bbox_inches='tight')
+    # print(f'Saved {path!r}', flush=True)
 
-    for quantity in ['time', 'throughput', 'time_per_task', 'throughput_per_task', 'min_time_per_task'][::-1]:
+    for quantity in ['time_filtered', 'time', 'throughput', 'time_per_task', 'throughput_per_task', 'min_time_per_task']:
         fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
         for config in configs:
             config.plot_scaling_test(ax=ax, quantity=quantity)
