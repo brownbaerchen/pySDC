@@ -40,6 +40,7 @@ class ScalingConfig(object):
     ndim = 2
     tasks_time = 1
     sbatch_options = []
+    srun_options = []
     experiments = []
     OMP_NUM_THREADS = 1
 
@@ -60,7 +61,7 @@ class ScalingConfig(object):
                     f'-p {self.partition}',
                     f'--tasks-per-node={self.tasks_per_node}',
                 ] + self.sbatch_options
-                srun_options = [f'--tasks-per-node={self.tasks_per_node}']
+                srun_options = [f'--tasks-per-node={self.tasks_per_node}'] + self.srun_option
                 if self.useGPU:
                     srun_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
                     sbatch_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
@@ -288,6 +289,7 @@ class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     sbatch_options = ['--time=0:15:00']
     tasks_per_node = 64
     OMP_NUM_THREADS = 1
+    srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
         Experiment(res=128, PinT=False, start=1, stop=4096, marker='.'),
