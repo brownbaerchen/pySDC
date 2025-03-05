@@ -11,6 +11,8 @@ def get_config(args):
         return RBC3DBenchmarkRK(args)
     elif name == 'RBC3DBenchmarkSDC':
         return RBC3DBenchmarkSDC(args)
+    elif name == 'RBC3Dscaling':
+        return RBC3Dscaling(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -71,7 +73,7 @@ class RayleighBenard3DRegular(Config):
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['QE'] = 'PIC'
 
-        desc['problem_params']['Rayleigh'] = 2e6
+        desc['problem_params']['Rayleigh'] = 1e8
         desc['problem_params']['nx'] = 64 if res == -1 else res
         desc['problem_params']['ny'] = desc['problem_params']['nx']
         desc['problem_params']['nz'] = desc['problem_params']['nx']
@@ -141,7 +143,7 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
 
         desc['sweeper_params'] = {}
 
-        desc['problem_params']['Rayleigh'] = 2e8
+        desc['problem_params']['Rayleigh'] = 1e8
         desc['problem_params']['nx'] = 64 if res == -1 else res
         desc['problem_params']['ny'] = desc['problem_params']['nx']
         desc['problem_params']['nz'] = desc['problem_params']['nx']
@@ -162,7 +164,31 @@ class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
         desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
         desc['sweeper_params']['QE'] = 'PIC'
 
-        desc['problem_params']['Rayleigh'] = 2e8
+        desc['problem_params']['Rayleigh'] = 1e8
+        desc['problem_params']['nx'] = 64 if res == -1 else res
+        desc['problem_params']['ny'] = desc['problem_params']['nx']
+        desc['problem_params']['nz'] = desc['problem_params']['nx']
+        desc['problem_params']['max_cached_factorizations'] = 16
+
+        desc['step_params']['maxiter'] = 1
+        return desc
+
+
+class RBC3Dscaling(RayleighBenard3DRegular):
+    Tend = 21e-2
+
+    def get_description(self, *args, res=-1, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+
+        desc['level_params']['dt'] = self.Tend / 21
+        desc['level_params']['restol'] = -1
+        desc['level_params']['nsweeps'] = 4
+
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
+        desc['sweeper_params']['QE'] = 'PIC'
+
+        desc['problem_params']['Rayleigh'] = 1e8
         desc['problem_params']['nx'] = 64 if res == -1 else res
         desc['problem_params']['ny'] = desc['problem_params']['nx']
         desc['problem_params']['nz'] = desc['problem_params']['nx']

@@ -281,6 +281,33 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
     ]
 
 
+class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
+    ndim = 3
+    config = 'RBCscaling'
+    tasks_time = 4
+    sbatch_options = ['--time=0:15:00']
+    tasks_per_node = 64
+    OMP_NUM_THREADS = 1
+
+    experiments = [
+        Experiment(res=128, PinT=False, start=1, stop=4096, marker='.'),
+    ]
+
+
+class RayleighBenard3DSpaceScalingGPU(GPUConfig):
+    ndim = 3
+    config = 'RBC3Dscaling'
+    tasks_time = 4
+    sbatch_options = ['--time=0:15:00']
+
+    experiments = [
+        Experiment(res=128, PinT=False, start=1, stop=32, marker='.'),
+        Experiment(res=128, PinT=True, start=4, stop=128, marker='.'),
+        Experiment(res=256, PinT=False, start=16, stop=256, marker='x'),
+        Experiment(res=256, PinT=True, start=16, stop=256, marker='x'),
+    ]
+
+
 # class RayleighBenardSpaceScalingCPU(CPUConfig, ScalingConfig):
 #     base_resolution = 1024
 #     base_resolution_weak = 128
@@ -341,6 +368,11 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
         configs = [
             RayleighBenardSpaceScalingGPU(),
             RayleighBenardSpaceScalingCPU(),
+        ]
+    elif problem == 'RBC3D':
+        configs = [
+            # RayleighBenard3DSpaceScalingGPU(),
+            RayleighBenard3DSpaceScalingCPU(),
         ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -415,6 +447,11 @@ if __name__ == '__main__':
             config_classes += [RayleighBenardSpaceScalingCPU]
         else:
             config_classes += [RayleighBenardSpaceScalingGPU]
+    elif args.problem == 'RBC3D':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU]
+        else:
+            config_classes += [RayleighBenard3DSpaceScalingGPU]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]
