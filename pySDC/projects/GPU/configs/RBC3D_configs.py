@@ -187,6 +187,7 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         desc['sweeper_params']['num_nodes'] = 4
         desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
         desc['sweeper_params']['QE'] = 'PIC'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
 
         desc['problem_params']['Rayleigh'] = 1e8
         desc['problem_params']['nx'] = 64 if res == -1 else res
@@ -197,11 +198,9 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         desc['step_params']['maxiter'] = 1
         return desc
 
-
     def get_controller_params(self, *args, **kwargs):
         from pySDC.implementations.hooks.log_work import LogWork
 
         params = super().get_controller_params(*args, **kwargs)
         params['hook_class'] = [LogWork]
         return params
-
