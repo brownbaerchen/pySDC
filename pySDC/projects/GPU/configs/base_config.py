@@ -69,7 +69,9 @@ class Config(object):
         self.comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
         self.n_procs_list = args["procs"]
         if args['mode'] == 'run':
-            self.comms = get_comms(n_procs_list=self.n_procs_list, useGPU=args['useGPU'], comm_world=self.comm_world)
+            self.comms = get_comms(
+                n_procs_list=self.n_procs_list[::-1], useGPU=args['useGPU'], comm_world=self.comm_world
+            )[::-1]
         else:
             self.comms = [MPI.COMM_SELF, MPI.COMM_SELF, MPI.COMM_SELF]
         self.ranks = [me.rank for me in self.comms]
