@@ -194,6 +194,12 @@ class JurecaCPU(ScalingConfig):
     tasks_per_node = 64
     OMP_NUM_THREADS = 1
 
+class JusufCPU(ScalingConfig):
+    cluster = 'jusuf'
+    partition = 'batch'
+    tasks_per_node = 64
+    OMP_NUM_THREADS = 1
+
 
 class GPUConfig(ScalingConfig):
     cluster = 'booster'
@@ -286,19 +292,27 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
     ]
 
 
-class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
+class RayleighBenard3DSpaceScalingCPU(JusufCPU):
+    # partition = 'develgpus'
     ndim = 3
     config = 'RBC3Dscaling'
     tasks_time = 4
     sbatch_options = ['--time=0:15:00']
-    tasks_per_node = 64
+    tasks_per_node = 16
     OMP_NUM_THREADS = 1
-    srun_options = ['--distribution=block:cyclic:cyclic']
+    # srun_options = ['--distribution=block:cyclic:cyclic']
+    # srun_options = ['--distribution=cyclic:cyclic']
+    srun_options = ['--distribution=block:block']
 
     experiments = [
-        # Experiment(res=128, PinT=False, start=128, stop=256, marker='.'),
-        Experiment(res=128, PinT=False, start=64, stop=4096, marker='.'),
-        Experiment(res=128, PinT=True, start=32, stop=8192, marker='.'),
+        # Experiment(res=128, PinT=False, start=128, stop=4096, marker='.'),
+        # Experiment(res=128, PinT=True, start=128, stop=8192, marker='.'),
+        # Experiment(res=256, PinT=False, start=2048, stop=4096, marker='x'),
+        # Experiment(res=256, PinT=True, start=2048, stop=4096, marker='x'),
+        Experiment(res=128, PinT=True, start=16, stop=64, marker='.'),
+        Experiment(res=128, PinT=False, start=16, stop=64, marker='.'),
+        # Experiment(res=32, PinT=False, start=1, stop=32, marker='.'),
+        # Experiment(res=32, PinT=True, start=4, stop=32, marker='.'),
     ]
 
 
