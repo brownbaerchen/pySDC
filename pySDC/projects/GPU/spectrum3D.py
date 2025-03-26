@@ -104,6 +104,5 @@ if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
 
-    plt.plot(spectrum)
-    plt.yscale('log')
+    plt.loglog(spectrum)
     plt.savefig('plots/spectrum_3D.png')
