@@ -90,15 +90,17 @@ if __name__ == '__main__':
     from pySDC.helpers.fieldsIO import FieldsIO
 
     data = FieldsIO.fromFile('./data/RBC3DBenchmarkSDC-res32.pySDC')
-    vel = np.empty((len(data.times), data.dim, *data.gridSizes), data.dtype)
-    for i in range(len(data.times)):
-        _data = data.readField(i)[1]
-        vel[i][0] = _data[1]
-        vel[i][1] = _data[2]
-        vel[i][2] = _data[3]
     x_coords = data.header['coords'][0]
     z_coords = data.header['coords'][-1]
-    spectrum = computeMeanSpectrum(vel, x_coords, z_coords, True).mean(axis=0)
+    spectrum_all = []
+    for i in range(len(data.times)):
+        _data = data.readField(i)[1]
+        vel = np.empty((1, data.dim, *data.gridSizes), data.dtype)
+        vel[0][0] = _data[1]
+        vel[0][1] = _data[2]
+        vel[0][2] = _data[3]
+        spectrum_all = computeMeanSpectrum(vel, x_coords, z_coords, True)
+    spectrum = np.array(spectrum_all).mean(axis=0)
 
     import matplotlib.pyplot as plt
 
