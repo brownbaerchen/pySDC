@@ -99,10 +99,10 @@ if __name__ == '__main__':
         vel[0][0] = _data[1]
         vel[0][1] = _data[2]
         vel[0][2] = _data[3]
-        spectrum_all = computeMeanSpectrum(vel, x_coords, z_coords, True)
-    spectrum = np.array(spectrum_all).mean(axis=0)
+        spectrum_all.append(computeMeanSpectrum(vel, x_coords, z_coords, True))
+    spectrum = np.array(spectrum_all).mean(axis=(0, 1))
 
     import matplotlib.pyplot as plt
 
-    plt.loglog(spectrum)
+    plt.loglog(np.arange(len(spectrum)) + 1, spectrum)
     plt.savefig('plots/spectrum_3D.png')
