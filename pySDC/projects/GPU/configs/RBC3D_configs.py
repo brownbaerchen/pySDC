@@ -153,6 +153,8 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
 
 
 class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
+    Tend = 200
+
     def get_description(self, *args, res=-1, **kwargs):
         desc = super().get_description(*args, **kwargs)
 

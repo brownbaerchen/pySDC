@@ -75,6 +75,7 @@ class Config(object):
         else:
             self.comms = [MPI.COMM_SELF, MPI.COMM_SELF, MPI.COMM_SELF]
         self.ranks = [me.rank for me in self.comms]
+        self.comm_world.barrier()
 
     def get_description(self, *args, MPIsweeper=False, useGPU=False, **kwargs):
         description = {}

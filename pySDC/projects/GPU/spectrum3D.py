@@ -89,20 +89,22 @@ def computeMeanSpectrum(uValues, xGrid, zGrid, verbose=False):
 if __name__ == '__main__':
     from pySDC.helpers.fieldsIO import FieldsIO
 
-    data = FieldsIO.fromFile('./data/RBC3DBenchmarkSDC-res32.pySDC')
+    path = '/p/scratch/ccstma/baumann7/large_runs/data/RBC3DBenchmarkSDC-res64.pySDC'
+    data = FieldsIO.fromFile(path)
     x_coords = data.header['coords'][0]
-    z_coords = data.header['coords'][-1]
+    z_coords = data.header['coords'][-1][::-1]
     spectrum_all = []
-    for i in range(len(data.times)):
+    for i in range(1000, len(data.times), 5):
         _data = data.readField(i)[1]
         vel = np.empty((1, data.dim, *data.gridSizes), data.dtype)
-        vel[0][0] = _data[1]
-        vel[0][1] = _data[2]
-        vel[0][2] = _data[3]
-        spectrum_all.append(computeMeanSpectrum(vel, x_coords, z_coords, True))
-    spectrum = np.array(spectrum_all).mean(axis=(0, 1))
+        vel[0][0] = _data[0, :, :, ::-1]
+        vel[0][1] = _data[1, :, :, ::-1]
+        vel[0][2] = _data[2, :, :, ::-1]
+        print(np.min(_data[3]))
+        spectrum_all.append(computeMeanSpectrum(vel, x_coords, z_coords, True)[0])
+    spectrum = np.array(spectrum_all).mean(axis=(0))
 
     import matplotlib.pyplot as plt
 
-    plt.loglog(np.arange(len(spectrum)) + 1, spectrum)
+    plt.loglog(np.arange(len(spectrum)) + 0.5, spectrum)
     plt.savefig('plots/spectrum_3D.png')

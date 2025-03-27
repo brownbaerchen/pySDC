@@ -194,6 +194,7 @@ class JurecaCPU(ScalingConfig):
     tasks_per_node = 64
     OMP_NUM_THREADS = 1
 
+
 class JusufCPU(ScalingConfig):
     cluster = 'jusuf'
     partition = 'batch'
@@ -207,6 +208,7 @@ class GPUConfig(ScalingConfig):
     tasks_per_node = 4
     useGPU = True
     OMP_NUM_THREADS = 12
+    srun_options = ['--cpu-bind=sockets']
 
 
 class GrayScottSpaceScalingCPU3D(CPUConfig, ScalingConfig):
@@ -293,26 +295,17 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
 
 
 class RayleighBenard3DSpaceScalingCPU(JusufCPU):
-    # partition = 'develgpus'
     ndim = 3
     config = 'RBC3Dscaling'
     tasks_time = 4
     sbatch_options = ['--time=0:15:00']
-    tasks_per_node = 16
+    tasks_per_node = 32
     OMP_NUM_THREADS = 1
-    # srun_options = ['--distribution=block:cyclic:cyclic']
-    # srun_options = ['--distribution=cyclic:cyclic']
-    srun_options = ['--distribution=block:block']
+    srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        # Experiment(res=128, PinT=False, start=128, stop=4096, marker='.'),
-        # Experiment(res=128, PinT=True, start=128, stop=8192, marker='.'),
-        # Experiment(res=256, PinT=False, start=2048, stop=4096, marker='x'),
-        # Experiment(res=256, PinT=True, start=2048, stop=4096, marker='x'),
-        Experiment(res=128, PinT=True, start=16, stop=64, marker='.'),
-        Experiment(res=128, PinT=False, start=16, stop=64, marker='.'),
-        # Experiment(res=32, PinT=False, start=1, stop=32, marker='.'),
-        # Experiment(res=32, PinT=True, start=4, stop=32, marker='.'),
+        Experiment(res=128, PinT=True, start=128, stop=2048, marker='^'),
+        Experiment(res=128, PinT=False, start=128, stop=2048, marker='^'),
     ]
 
 
@@ -395,6 +388,10 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
         configs = [
             # RayleighBenard3DSpaceScalingGPU(),
             RayleighBenard3DSpaceScalingCPU(),
+            RayleighBenard3DSpaceScalingCPU2(),
+            RayleighBenard3DSpaceScalingCPU3(),
+            RayleighBenard3DSpaceScalingCPU4(),
+            RayleighBenard3DSpaceScalingCPU5(),
         ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -428,7 +425,14 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
     # fig.savefig(path, bbox_inches='tight')
     # print(f'Saved {path!r}', flush=True)
 
-    for quantity in ['time_filtered', 'time', 'throughput', 'time_per_task', 'throughput_per_task', 'min_time_per_task']:
+    for quantity in [
+        'time_filtered',
+        'time',
+        'throughput',
+        'time_per_task',
+        'throughput_per_task',
+        'min_time_per_task',
+    ]:
         fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
         for config in configs:
             config.plot_scaling_test(ax=ax, quantity=quantity)
@@ -475,6 +479,18 @@ if __name__ == '__main__':
             config_classes += [RayleighBenard3DSpaceScalingCPU]
         else:
             config_classes += [RayleighBenard3DSpaceScalingGPU]
+    elif args.problem == 'RBC3D2':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU2]
+    elif args.problem == 'RBC3D3':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU3]
+    elif args.problem == 'RBC3D4':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU4]
+    elif args.problem == 'RBC3D5':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU5]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]
