@@ -101,6 +101,45 @@ def plot(
             print(f'Saved {path}', flush=True)
 
 
+def convert_to_vtk(
+    n_time,
+    n_space,
+    useGPU,
+    n_frames,
+    base_path,
+    space_range,
+    res,
+    start_frame=0,
+):
+    comm = MPI.COMM_WORLD
+
+    space_range = tqdm(space_range)
+    space_range.set_description('load files')
+
+    for frame in range(start_frame, n_frames, comm.size):
+        i = frame + comm.rank
+
+        v = None
+        gc.collect()
+        for procs in space_range:
+            gc.collect()
+
+            path = f'{base_path}/GrayScottLarge-res_{res}-useGPU_{useGPU}-procs_1_{n_time}_{n_space}-0-{procs}-solution_{i:06d}.pickle'
+            with open(path, 'rb') as file:
+                _data = pickle.load(file)
+
+            if v is None:
+                shape = _data['shape']
+                v = pv.ImageData(dimensions=[me + 1 for me in shape], spacing=tuple([1 / me for me in shape]))
+                v.cell_data['values'] = np.zeros(np.prod(shape))
+
+            local_slice_flat = slice(np.prod(_data['v'].shape) * procs, np.prod(_data['v'].shape) * (procs + 1))
+            v['values'][local_slice_flat] = _data['v'].flatten()
+
+        output_path = './vtk_data/'
+        v.save(f'{output_path}/GrayScottLarge-res_{res}_{i:06d}.vtk')
+
+
 def video(view=None):  # pragma: no cover
     path = f'simulation_plots/GS_large_%06d{view}.png'
     path_target = f'videos/GS_large{view}.mp4'
@@ -115,7 +154,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--XPU', type=str, choices=['CPU', 'GPU'], default='GPU')
-    parser.add_argument('--mode', type=str, choices=['plot', 'video'], default='plot')
+    parser.add_argument('--mode', type=str, choices=['plot', 'convert', 'video'], default='plot')
     parser.add_argument('--nframes', type=int, default=100)
     parser.add_argument('--start', type=int, default=0)
     parser.add_argument('--base_path', type=str, default='/p/scratch/ccstma/baumann7/large_runs/data/')
@@ -154,6 +193,17 @@ if __name__ == '__main__':
             start_frame=args.start,
             n_samples=args.n_samples,
             zoom=args.zoom,
+        )
+    elif args.mode == 'convert':
+        convert_to_vtk(
+            n_time=sim.params['procs'][1],
+            n_space=sim.params['procs'][2],
+            useGPU=sim.params['useGPU'],
+            base_path=args.base_path,
+            space_range=space_range,
+            n_frames=args.nframes,
+            res=sim.params['res'],
+            start_frame=args.start,
         )
     elif args.mode == 'video':
         for view in ['', '_zoomed']:
