@@ -45,7 +45,7 @@ See :class:`pySDC.helpers.fieldsIO.writeFields_MPI` for an illustrative example.
 Warning
 -------
 To use MPI collective writing, you need to call first the class methods :class:`Rectilinear.initMPI` (cf their docstring).
-Also, `Rectilinear.setHeader` **must be given the global grids coordinates**, weather the code is run in parallel or not.
+Also, `Rectilinear.setHeader` **must be given the global grids coordinates**, wether the code is run in parallel or not.
 
 > ⚠️ Also : this module can only be imported with **Python 3.11 or higher** !
 """

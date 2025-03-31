@@ -388,10 +388,6 @@ def plot_scalings(problem, **kwargs):  # pragma: no cover
         configs = [
             # RayleighBenard3DSpaceScalingGPU(),
             RayleighBenard3DSpaceScalingCPU(),
-            RayleighBenard3DSpaceScalingCPU2(),
-            RayleighBenard3DSpaceScalingCPU3(),
-            RayleighBenard3DSpaceScalingCPU4(),
-            RayleighBenard3DSpaceScalingCPU5(),
         ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -479,18 +475,6 @@ if __name__ == '__main__':
             config_classes += [RayleighBenard3DSpaceScalingCPU]
         else:
             config_classes += [RayleighBenard3DSpaceScalingGPU]
-    elif args.problem == 'RBC3D2':
-        if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU2]
-    elif args.problem == 'RBC3D3':
-        if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU3]
-    elif args.problem == 'RBC3D4':
-        if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU4]
-    elif args.problem == 'RBC3D5':
-        if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU5]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]
