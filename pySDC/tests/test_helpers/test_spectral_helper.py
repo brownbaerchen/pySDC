@@ -429,8 +429,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
         )
     ]
 
-    my_assert(lambda: np.allclose(expect_local, trf), msg='Forward transform is unexpected')
-    my_assert(lambda: np.allclose(itrf, u), msg='Backward transform is unexpected')
+    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+    assert np.allclose(itrf, u), 'Backward transform is unexpected'
 
     if padding != 1:
         _padding = [
@@ -438,8 +438,8 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
         ] * helper.ndim
         u_pad = helper.itransform(trf, axes=axes, padding=_padding)
         trf2 = helper.transform(u_pad, axes=axes, padding=_padding)
-        my_assert(lambda: np.allclose(trf2, trf))
-        my_assert(lambda: sum(u_pad.shape) > sum(u.shape)), f'{u_pad.shape}, {u.shape}'
+        assert np.allclose(trf2, trf)
+        assert sum(u_pad.shape) > sum(u.shape), f'{u_pad.shape}, {u.shape}'
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -465,7 +465,7 @@ def run_MPI_test(num_procs, **kwargs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parallel([1, 2])
+@pytest.mark.mpi(ranks=[1, 2])
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('ny', [3, 8])
 @pytest.mark.parametrize('nz', [0, 8])
@@ -484,16 +484,16 @@ def run_MPI_test(num_procs, **kwargs):
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
 @pytest.mark.parametrize('padding', [1, 1.5])
-def test_transform_MPI(nx, ny, nz, bx, by, bz, axes, padding, **kwargs):
+def test_transform_MPI(mpi_ranks, nx, ny, nz, bx, by, bz, axes, padding, **kwargs):
     test_transform(nx=nx, ny=ny, nz=nz, bx=bx, by=by, bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parallel([4])
+@pytest.mark.mpi(ranks=[4])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
 @pytest.mark.parametrize('padding', [1, 1.5])
-def test_transform_pencil_decomposition(bz, axes, padding, **kwargs):
+def test_transform_pencil_decomposition(mpi_ranks, bz, axes, padding, **kwargs):
     test_transform(nx=4, ny=4, nz=4, bx='fft', by='fft', bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
@@ -797,9 +797,9 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
+        # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
         # test_transform_MPI(3, 8, 0, 'fft', 'fft', 'cheby', (-2,), padding=1.5)
-        # test_transform_pencil_decomposition('cheby', (-1, -2, -3))
+        test_transform_pencil_decomposition(4, 'cheby', (-1,), 1.5)
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
         # test_tau_method3D(4, 5, 8, 1, 1, useMPI=True)
