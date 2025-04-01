@@ -582,11 +582,11 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parallel([4])
+@pytest.mark.mpi(ranks=[4])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method3DMPI(nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
+def test_tau_method3DMPI(mpi_ranks, nx, nz, bc_val, bc=-1, useMPI=False, **kwargs):
     test_tau_method3D(nx, nx, nz, bc_val, bc, useMPI=True)
 
 
@@ -749,22 +749,22 @@ def test_tau_method2D(variant, ny, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
 
 
 @pytest.mark.mpi4py
+@pytest.mark.mpi(ranks=[1, 2])
 @pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('ny', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2])
-@pytest.mark.parametrize('num_procs', [2, 1])
-def test_tau_method2D_MPI(variant, ny, nx, bc_val, num_procs, **kwargs):
-    run_MPI_test(variant=variant, ny=ny, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
+def test_tau_method2D_MPI(mpi_ranks, variant, ny, nx, bc_val, **kwargs):
+    test_tau_method2D(variant=variant, ny=ny, nx=nx, bc_val=bc_val)
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('num_procs', [1])
 @pytest.mark.parametrize('axis', [-1, -2])
 @pytest.mark.parametrize('bx', ['fft'])
 @pytest.mark.parametrize('by', ['cheby'])
-def test_dealias_MPI(num_procs, axis, bx, by, nx=32, ny=64, **kwargs):
-    run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, ny=ny, bx=bx, by=by, test='dealias')
+@pytest.mark.mpi(ranks=[1, 2])
+def test_dealias_MPI(mpi_ranks, axis, bx, by, nx=32, ny=64, **kwargs):
+    _test_transform_dealias(axis=axis, nx=nx, ny=ny, bx=bx, by=by)
 
 
 if __name__ == '__main__':
@@ -799,7 +799,7 @@ if __name__ == '__main__':
     elif args.test is None:
         # test_transform_MPI(4, 4, 4, 'fft', 'fft', 'cheby', (-1, -2, -3), padding=1.5)
         # test_transform_MPI(3, 8, 0, 'fft', 'fft', 'cheby', (-2,), padding=1.5)
-        test_transform_pencil_decomposition(4, 'cheby', (-1,), 1.5)
+        test_transform_pencil_decomposition(4, 'cheby', (-1, -2), 1.5)
 
         # test_differentiation_matrix3D(12, 12, 12, 'cheby', (-1, -3), useMPI=True)
         # test_tau_method3D(4, 5, 8, 1, 1, useMPI=True)
