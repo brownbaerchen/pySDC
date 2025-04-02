@@ -1915,70 +1915,6 @@ class SpectralHelper:
         """
         return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]
 
-    def get_filter_matrix(self, axis, **kwargs):
-        """
-        Get bandpass filter along `axis`. See the documentation `get_filter_matrix` in the 1D bases for what kwargs are
-        admissible.
-
-        Returns:
-            sparse bandpass matrix
-        """
-        if self.ndim == 1:
-            return self.axes[0].get_filter_matrix(**kwargs)
-
-        mats = [base.get_Id() for base in self.axes]
-        mats[axis] = self.axes[axis].get_filter_matrix(**kwargs)
-        return self.sparse_lib.kron(*mats)
-
-    def get_differentiation_matrix(self, axes, **kwargs):
-        """
-        Get differentiation matrix along specified axis. `kwargs` are forwarded to the 1D base implementation.
-
-        Args:
-            axes (tuple): Axes along which to differentiate.
-
-        Returns:
-            sparse differentiation matrix
-        """
-
-        D = self.expand_matrix_ND(self.axes[axes[0]].get_differentiation_matrix(**kwargs), axes[0])
-        for axis in axes[1:]:
-            _D = self.axes[axis].get_differentiation_matrix(**kwargs)
-            D = D @ self.expand_matrix_ND(_D, axis)
-        return D
-
-    def get_integration_matrix(self, axes):
-        """
-        Get integration matrix to integrate along specified axis.
-
-        Args:
-            axes (tuple): Axes along which to integrate over.
-
-        Returns:
-            sparse integration matrix
-        """
-
-        S = self.expand_matrix_ND(self.axes[axes[0]].get_integration_matrix(), axes[0])
-        for axis in axes[1:]:
-            _S = self.axes[axis].get_integration_matrix()
-            S = S @ self.expand_matrix_ND(_S, axis)
-        return S
-
-    def get_Id(self):
-        """
-        Get identity matrix
-
-        Returns:
-            sparse identity matrix
-        """
-        ndim = self.ndim
-
-        I = self.expand_matrix_ND(self.axes[0].get_Id(), 0)
-        for axis in range(1, ndim):
-            _I = self.axes[axis].get_Id()
-            I = I @ self.expand_matrix_ND(_I, axis)
-        return I
-
     def expand_matrix_ND(self, matrix, aligned):
         sp = self.sparse_lib
         axes = np.delete(np.arange(self.ndim), aligned)
@@ -2008,6 +1944,66 @@ class SpectralHelper:
         else:
             raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')
 
+    def get_filter_matrix(self, axis, **kwargs):
+        """
+        Get bandpass filter along `axis`. See the documentation `get_filter_matrix` in the 1D bases for what kwargs are
+        admissible.
+
+        Returns:
+            sparse bandpass matrix
+        """
+        if self.ndim == 1:
+            return self.axes[0].get_filter_matrix(**kwargs)
+
+        mats = [base.get_Id() for base in self.axes]
+        mats[axis] = self.axes[axis].get_filter_matrix(**kwargs)
+        return self.sparse_lib.kron(*mats)
+
+    def get_differentiation_matrix(self, axes, **kwargs):
+        """
+        Get differentiation matrix along specified axis. `kwargs` are forwarded to the 1D base implementation.
+
+        Args:
+            axes (tuple): Axes along which to differentiate.
+
+        Returns:
+            sparse differentiation matrix
+        """
+        D = self.expand_matrix_ND(self.axes[axes[0]].get_differentiation_matrix(**kwargs), axes[0])
+        for axis in axes[1:]:
+            _D = self.axes[axis].get_differentiation_matrix(**kwargs)
+            D = D @ self.expand_matrix_ND(_D, axis)
+        return D
+
+    def get_integration_matrix(self, axes):
+        """
+        Get integration matrix to integrate along specified axis.
+
+        Args:
+            axes (tuple): Axes along which to integrate over.
+
+        Returns:
+            sparse integration matrix
+        """
+        S = self.expand_matrix_ND(self.axes[axes[0]].get_integration_matrix(), axes[0])
+        for axis in axes[1:]:
+            _S = self.axes[axis].get_integration_matrix()
+            S = S @ self.expand_matrix_ND(_S, axis)
+        return S
+
+    def get_Id(self):
+        """
+        Get identity matrix
+
+        Returns:
+            sparse identity matrix
+        """
+        I = self.expand_matrix_ND(self.axes[0].get_Id(), 0)
+        for axis in range(1, self.ndim):
+            _I = self.axes[axis].get_Id()
+            I = I @ self.expand_matrix_ND(_I, axis)
+        return I
+
     def get_Dirichlet_recombination_matrix(self, axis=-1):
         """
         Get Dirichlet recombination matrix along axis. Not that it only makes sense in directions discretized with variations of Chebychev bases.
@@ -2018,7 +2014,6 @@ class SpectralHelper:
         Returns:
             sparse matrix
         """
-
         C1D = self.axes[axis].get_Dirichlet_recombination_matrix()
         return self.expand_matrix_ND(C1D, axis)
 
