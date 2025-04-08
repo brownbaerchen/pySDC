@@ -101,7 +101,7 @@ def plot(
             print(f'Saved {path}', flush=True)
 
 
-def convert_to_vtk(
+def convert_to_vti(
     n_time,
     n_space,
     useGPU,
@@ -137,7 +137,7 @@ def convert_to_vtk(
             v['values'][local_slice_flat] = _data['v'].flatten()
 
         output_path = './vtk_data/'
-        v.save(f'{output_path}/GrayScottLarge-res_{res}_{i:06d}.vtk')
+        v.save(f'{output_path}/GrayScottLarge-res_{res}_{i:06d}.vti')
 
 
 def video(view=None):  # pragma: no cover
@@ -195,7 +195,7 @@ if __name__ == '__main__':
             zoom=args.zoom,
         )
     elif args.mode == 'convert':
-        convert_to_vtk(
+        convert_to_vti(
             n_time=sim.params['procs'][1],
             n_space=sim.params['procs'][2],
             useGPU=sim.params['useGPU'],
