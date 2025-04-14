@@ -2,6 +2,7 @@ from pySDC.core.problem import Problem, WorkCounter
 from pySDC.helpers.spectral_helper import SpectralHelper
 import numpy as np
 from pySDC.core.errors import ParameterError
+from pySDC.helpers.fieldsIO import Rectilinear
 
 
 class GenericSpectralLinear(Problem):
@@ -334,8 +335,6 @@ class GenericSpectralLinear(Problem):
             return sol
 
     def setUpFieldsIO(self):
-        from pySDC.helpers.fieldsIO import Rectilinear
-
         Rectilinear.setupMPI(
             comm=self.comm,
             iLoc=[me.start for me in self.local_slice],
@@ -343,8 +342,6 @@ class GenericSpectralLinear(Problem):
         )
 
     def getOutputFile(self, fileName):
-        from pySDC.helpers.fieldsIO import Rectilinear
-
         self.setUpFieldsIO()
 
         coords = [me.get_1dgrid() for me in self.spectral.axes]
