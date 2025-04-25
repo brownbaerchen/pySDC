@@ -8,6 +8,11 @@ from paraview.simple import *
 #### disable automatic camera reset on 'Show'
 paraview.simple._DisableFirstRenderCameraReset()
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--idx', type=int, default=0)
+args = parser.parse_args()
+
 # ----------------------------------------------------------------
 # setup views used in the visualization
 # ----------------------------------------------------------------
@@ -17,7 +22,7 @@ materialLibrary1 = GetMaterialLibrary()
 
 # Create a new 'Render View'
 renderView1 = CreateView('RenderView')
-renderView1.ViewSize = [801, 744]
+renderView1.ViewSize = [1856, 1104]
 renderView1.AxesGrid = 'Grid Axes 3D Actor'
 renderView1.CenterOfRotation = [0.5, 0.5, 0.5]
 renderView1.StereoType = 'Crystal Eyes'
@@ -35,15 +40,15 @@ renderView1.OSPRayMaterialLibrary = materialLibrary1
 
 # Create a new 'Render View'
 renderView2 = CreateView('RenderView')
-renderView2.ViewSize = [801, 744]
+renderView2.ViewSize = [1856, 1104]
 renderView2.AxesGrid = 'Grid Axes 3D Actor'
-renderView2.CenterOfRotation = [0.75, 0.75, 0.25]
+renderView2.CenterOfRotation = [0.390625, 0.4782986111111111, 0.5477430555555556]
 renderView2.StereoType = 'Crystal Eyes'
-renderView2.CameraPosition = [1.1101682224564904, 1.1101682224564902, 0.6101682224564906]
-renderView2.CameraFocalPoint = [0.1442423961674227, 0.1442423961674228, -0.35575760383257704]
+renderView2.CameraPosition = [0.5026408771490182, 0.5903144882601291, 0.6597589327045738]
+renderView2.CameraFocalPoint = [0.32117817260657244, 0.4088517837176832, 0.4782962281621271]
 renderView2.CameraViewUp = [-0.4082482904638631, 0.816496580927726, -0.40824829046386296]
 renderView2.CameraFocalDisk = 1.0
-renderView2.CameraParallelScale = 0.4330127018922193
+renderView2.CameraParallelScale = 0.08134750500301806
 renderView2.LegendGrid = 'Legend Grid Actor'
 renderView2.PolarGrid = 'Polar Grid Actor'
 renderView2.UseColorPaletteForBackground = 0
@@ -74,8 +79,8 @@ SetActiveView(renderView2)
 # ----------------------------------------------------------------
 
 # create a new 'XML Image Data Reader'
-idx = 80
-path = f'/p/project1/ccstma/baumann7/pySDC/pySDC/projects/GPU/vtk_data/GrayScottLarge-res_2304_{idx:06d}.vti'
+# path = f'/p/project1/ccstma/baumann7/pySDC/pySDC/projects/GPU/vtk_data/GrayScottLarge-res_2304_{args.idx:06d}.vti'
+path = f'/p/scratch/ccstma/baumann7/GS3D_vti/GrayScottLarge-res_2304_{args.idx:06d}.vti'
 print(f'Plotting {path}', flush=True)
 data = XMLImageDataReader(registrationName='data.vti', FileName=[path])
 data.CellArrayStatus = ['values']
@@ -83,7 +88,8 @@ data.TimeArray = 'None'
 
 # create a new 'Extract Subset'
 extractSubset1 = ExtractSubset(registrationName='ExtractSubset1', Input=data)
-extractSubset1.VOI = [180, 360, 180, 360, 0, 180]
+# extractSubset1.VOI = [180, 360, 180, 360, 0, 180]
+extractSubset1.VOI = [800, 1100, 924, 1200, 1124, 1420]
 
 # ----------------------------------------------------------------
 # setup the visualization in view 'renderView1'
@@ -100,12 +106,15 @@ valuesTF2D.Range = [-4.714955210161051e-05, 0.42375012117331917, 0.0, 1.0]
 # get color transfer function/color map for 'values'
 valuesLUT = GetColorTransferFunction('values')
 valuesLUT.TransferFunction2D = valuesTF2D
-valuesLUT.RGBPoints = [-4.714955210161051e-05, 0.231373, 0.298039, 0.752941, 0.21559500151153457, 0.865003, 0.865003, 0.865003, 0.43123715257517076, 0.705882, 0.0156863, 0.14902]
+valuesLUT.RGBPoints = [-0.00010914247462833595, 0.0, 0.0, 0.34902, 0.01387773478635173, 0.039216, 0.062745, 0.380392, 0.027864612047331795, 0.062745, 0.117647, 0.411765, 0.04185148930831186, 0.090196, 0.184314, 0.45098, 0.055838366569291926, 0.12549, 0.262745, 0.501961, 0.069825243830272, 0.160784, 0.337255, 0.541176, 0.08381212109125206, 0.2, 0.396078, 0.568627, 0.09779899835223213, 0.239216, 0.454902, 0.6, 0.1117858756132122, 0.286275, 0.521569, 0.65098, 0.12577275287419226, 0.337255, 0.592157, 0.701961, 0.1397596301351723, 0.388235, 0.654902, 0.74902, 0.1537465073961524, 0.466667, 0.737255, 0.819608, 0.16773338465713244, 0.572549, 0.819608, 0.878431, 0.18172026191811252, 0.654902, 0.866667, 0.909804, 0.19570713917909258, 0.752941, 0.917647, 0.941176, 0.20969401644007266, 0.823529, 0.956863, 0.968627, 0.2236808937010527, 0.941176, 0.984314, 0.988235, 0.2236808937010527, 0.988235, 0.960784, 0.901961, 0.23263249514807996, 0.988235, 0.945098, 0.85098, 0.2415840965951072, 0.980392, 0.898039, 0.784314, 0.25165464822301287, 0.968627, 0.835294, 0.698039, 0.2656415254839929, 0.94902, 0.733333, 0.588235, 0.27962840274497297, 0.929412, 0.65098, 0.509804, 0.29361528000595305, 0.909804, 0.564706, 0.435294, 0.30760215726693313, 0.878431, 0.458824, 0.352941, 0.32158903452791315, 0.839216, 0.388235, 0.286275, 0.33557591178889323, 0.760784, 0.294118, 0.211765, 0.3495627890498733, 0.701961, 0.211765, 0.168627, 0.3635496663108534, 0.65098, 0.156863, 0.129412, 0.3775365435718334, 0.6, 0.094118, 0.094118, 0.3915234208328135, 0.54902, 0.066667, 0.098039, 0.4055102980937936, 0.501961, 0.05098, 0.12549, 0.41949717535477365, 0.45098, 0.054902, 0.172549, 0.4334840526157537, 0.4, 0.054902, 0.192157, 0.44747092987673376, 0.34902, 0.070588, 0.211765]
+valuesLUT.ColorSpace = 'Lab'
+valuesLUT.NanColor = [0.25, 0.0, 0.0]
 valuesLUT.ScalarRangeInitialized = 1.0
 
 # get opacity transfer function/opacity map for 'values'
 valuesPWF = GetOpacityTransferFunction('values')
-valuesPWF.Points = [-4.714955210161051e-05, 0.0, 0.5, 0.0, 0.3092452883720398, 0.008928571827709675, 0.5, 0.0, 0.37578630447387695, 0.6383928656578064, 0.5, 0.0, 0.43123715257517076, 1.0, 0.5, 0.0]
+valuesPWF.Points = [-0.00010914247462833595, 0.0, 0.5, 0.0, 0.21217168867588043, 0.0, 0.5, 0.0, 0.3758581280708313, 0.9, 0.5, 0.0, 0.44747092987673376, 0.95, 0.5, 0.0]
+
 valuesPWF.ScalarRangeInitialized = 1
 
 # trace defaults for the display properties.
@@ -278,7 +287,7 @@ SetActiveSource(extractSubset1)
 # SaveScreenshot("path/to/screenshot.png")
 #
 ## Save a screenshot of a layout (multiple splitted view)
-save_path = f"plots/GS_large/GS3D_{idx:06d}.png"
+save_path = f"/p/project1/ccstma/baumann7/pySDC/pySDC/projects/GPU/plots/GS_large/GS3D_{args.idx:06d}.png"
 SaveScreenshot(save_path, GetLayout())
 print(f'Saved {save_path}', flush=True)
 #
