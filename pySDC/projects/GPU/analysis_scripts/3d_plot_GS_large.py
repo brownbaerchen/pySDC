@@ -136,7 +136,7 @@ def convert_to_vti(
             local_slice_flat = slice(np.prod(_data['v'].shape) * procs, np.prod(_data['v'].shape) * (procs + 1))
             v['values'][local_slice_flat] = _data['v'].flatten()
 
-        output_path = '/p/scratch/ccstma/baumann7/GS3D_vti/' 
+        output_path = '/p/scratch/ccstma/baumann7/GS3D_vti/'
         v.save(f'{output_path}/GrayScottLarge-res_{res}_{i:06d}.vti')
 
 
