@@ -315,14 +315,23 @@ class RayleighBenard(GenericSpectralLinear):
         """
         import matplotlib.pyplot as plt
         from mpl_toolkits.axes_grid1 import make_axes_locatable
+        from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
+
+        setup_mpl()
 
         plt.rcParams['figure.constrained_layout.use'] = True
-        self.fig, axs = plt.subplots(2, 1, sharex=True, sharey=True, figsize=((10, 5)))
+        self.fig, axs = plt.subplots(
+            2, 1, sharex=True, sharey=True, figsize=(figsize_by_journal('TUHH_thesis', 1.0, 0.5))
+        )
         self.cax = []
         divider = make_axes_locatable(axs[0])
         self.cax += [divider.append_axes('right', size='3%', pad=0.03)]
         divider2 = make_axes_locatable(axs[1])
         self.cax += [divider2.append_axes('right', size='3%', pad=0.03)]
+
+        axs[0].set_ylabel('$z$')
+        axs[1].set_xlabel('$x$')
+        axs[1].set_ylabel('$z$')
         return self.fig
 
     def plot(self, u, t=None, fig=None, quantity='T'):  # pragma: no cover
@@ -360,8 +369,6 @@ class RayleighBenard(GenericSpectralLinear):
 
         if t is not None:
             fig.suptitle(f't = {t:.2f}')
-        axs[1].set_xlabel(r'$x$')
-        axs[1].set_ylabel(r'$z$')
         fig.colorbar(imT, self.cax[0])
         fig.colorbar(imV, self.cax[1])
 

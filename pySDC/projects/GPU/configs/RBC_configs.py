@@ -21,6 +21,8 @@ def get_config(args):
         return RayleighBenard_scaling(args)
     elif name == 'RBC_large':
         return RayleighBenard_large(args)
+    elif name == 'RBC_resilience':
+        return RayleighBenard_resilience(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -140,6 +142,7 @@ class RayleighBenardRegular(Config):
 
     def plot(self, P, idx, n_procs_list, quantitiy='T', quantitiy2='vorticity'):
         import numpy as np
+        import matplotlib.ticker as ticker
 
         cmaps = {'vorticity': 'bwr', 'p': 'bwr'}
 
@@ -186,11 +189,16 @@ class RayleighBenardRegular(Config):
                 vmax=-vmin[quantitiy] if cmaps.get(quantitiy, None) in ['bwr', 'seismic'] else vmax[quantitiy],
                 cmap=cmaps.get(quantitiy, 'plasma'),
             )
-        fig.colorbar(im2, cax[1])
-        fig.colorbar(im, cax[0])
+        cbar = fig.colorbar(im2, cax[1])
+        cbar.formatter = ticker.ScalarFormatter()
+        cbar.formatter.set_scientific(True)
+        cbar.formatter.set_powerlimits((0, 0))  # Force sci notation for small/large numbers
+        cbar.update_ticks()
+        cbar.set_label('vorticity')
+
+        cbar2 = fig.colorbar(im, cax[0])
+        cbar2.set_label('$T$')
         axs[0].set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
-        axs[1].set_xlabel('x')
-        axs[1].set_ylabel('z')
         axs[0].set_aspect(1.0)
         axs[1].set_aspect(1.0)
         return fig
@@ -221,6 +229,54 @@ class RayleighBenard_k_adaptivity(RayleighBenardRegular):
             me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
         ]
         return controller_params
+
+
+class RayleighBenard_resilience(RayleighBenardRegular):
+    relaxation_steps = 5
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+        from pySDC.implementations.problem_classes.RayleighBenard import CFLLimit
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'][AdaptivityPolynomialError] = {
+            'e_tol': 1e-3,
+            'abort_at_growing_residual': False,
+            'interpolate_between_restarts': False,
+            'dt_min': 1e-3,
+            'dt_rel_min_slope': 0.1,
+        }
+        desc['convergence_controllers'].pop(CFLLimit)
+        desc['level_params']['restol'] = 1e-7
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['step_params']['maxiter'] = 16
+        desc['problem_params']['nx'] = 256
+        desc['problem_params']['nz'] = 128
+        desc['problem_params']['Rayleigh'] = 3.2e5
+
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            LogAnalysisVariables,
+        )
+
+        controller_params = super().get_controller_params(*args, **kwargs)
+        controller_params['hook_class'] = [
+            me for me in controller_params['hook_class'] if me is not LogAnalysisVariables
+        ]
+        return controller_params
+
+    def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+        if restart_idx > 0:
+            return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+        else:
+            u0 = P.u_exact(t=0, noise_level=1e-3)
+            for _ in range(self.relaxation_steps):
+                u0 = P.solve_system(u0, 1e-1, u0)
+            return u0, 0
 
 
 class RayleighBenard_dt_k_adaptivity(RayleighBenardRegular):
