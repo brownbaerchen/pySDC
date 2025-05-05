@@ -623,30 +623,29 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 @pytest.mark.firedrake
 @pytest.mark.mpi(ranks=[1, 4])
 @pytest.mark.parametrize('n_steps', [1, 2, 4])
-@pytest.mark.parametrize('useMPIController', [True, False])
-def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, mpi_ranks, submit=False, n_tasks=4):
-    if submit and useMPIController:
-        import os
-        import subprocess
+def test_pySDC_integrator_MSSDC(n_steps, setup, mpi_ranks, submit=False, n_tasks=4):
+    # if submit and useMPIController:
+    #     import os
+    #     import subprocess
 
-        assert n_steps <= n_tasks
+    #     assert n_steps <= n_tasks
 
-        my_env = os.environ.copy()
-        my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
-        cwd = '.'
-        cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps}'.split()
+    #     my_env = os.environ.copy()
+    #     my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
+    #     cwd = '.'
+    #     cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps}'.split()
 
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
-        p.wait()
-        for line in p.stdout:
-            print(line)
-        for line in p.stderr:
-            print(line)
-        assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
-            p.returncode,
-            n_steps,
-        )
-        return None
+    #     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
+    #     p.wait()
+    #     for line in p.stdout:
+    #         print(line)
+    #     for line in p.stderr:
+    #         print(line)
+    #     assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
+    #         p.returncode,
+    #         n_steps,
+    #     )
+    #     return None
 
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
@@ -656,6 +655,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, mpi_ranks, sub
 
     MSSDC_args = {}
     dirname = './tmp'
+    useMPIController = COMM_WORLD.size > 1
     if useMPIController:
         print(f'Hello from {COMM_WORLD.rank}/{COMM_WORLD.size}', flush=True)
         from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
