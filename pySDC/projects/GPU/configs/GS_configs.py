@@ -1,5 +1,6 @@
 from pySDC.projects.GPU.configs.base_config import Config
 from mpi4py_fft.distarray import newDistArray
+from mpi4py import MPI
 
 
 def get_config(args):
@@ -28,11 +29,11 @@ def get_A_B_from_f_k(f, k):
 
 
 class GrayScott(Config):
-    Tend = 6000
-    num_frames = 200
+    Tend = 10000
+    num_frames = 360
     sweeper_type = 'IMEX'
     res_per_blob = 2**7
-    ndim = 3
+    ndim = 2
 
     def get_LogToFile(self, ranks=None):
         import numpy as np
@@ -94,6 +95,7 @@ class GrayScott(Config):
         cax = P.cax
         ax = fig.get_axes()[0]
 
+        ic_buffer = {}
         buffer = {}
         vmin = {'u': np.inf, 'v': np.inf}
         vmax = {'u': -np.inf, 'v': -np.inf}
@@ -104,6 +106,7 @@ class GrayScott(Config):
             LogToFile = self.get_LogToFile(ranks=ranks)
 
             buffer[f'u-{rank}'] = LogToFile.load(idx)
+            ic_buffer[f'u-{rank}'] = LogToFile.load(0)
 
             vmin['v'] = min([vmin['v'], buffer[f'u-{rank}']['v'].real.min()])
             vmax['v'] = max([vmax['v'], buffer[f'u-{rank}']['v'].real.max()])
@@ -111,12 +114,12 @@ class GrayScott(Config):
             vmax['u'] = max([vmax['u'], buffer[f'u-{rank}']['u'].real.max()])
 
         for rank in range(n_procs_list[2]):
-            if len(buffer[f'u-{rank}']['X']) == 2:
+            if len(ic_buffer[f'u-{rank}']['X']) == 2:
                 ax.set_xlabel('$x$')
                 ax.set_ylabel('$y$')
                 im = ax.pcolormesh(
-                    buffer[f'u-{rank}']['X'][0],
-                    buffer[f'u-{rank}']['X'][1],
+                    ic_buffer[f'u-{rank}']['X'][0],
+                    ic_buffer[f'u-{rank}']['X'][1],
                     buffer[f'u-{rank}']['v'].real,
                     vmin=vmin['v'],
                     vmax=vmax['v'],
@@ -157,7 +160,8 @@ class GrayScott(Config):
                     vmax=vmax['v'],
                     cmap='binary',
                 )
-            fig.colorbar(im, cax, format=tkr.FormatStrFormatter('%.1f'))
+            cbar = fig.colorbar(im, cax, format=tkr.FormatStrFormatter('%.2f'))
+            cbar.set_label('$v$')
             ax.set_title(f't={buffer[f"u-{rank}"]["t"]:.2f}')
             ax.set_aspect(1.0)
         return fig
@@ -184,6 +188,17 @@ class GrayScott(Config):
         desc['problem_params']['B'] = 0.1
         desc['problem_params']['L'] = 2 * desc['problem_params']['nvars'][0] // self.res_per_blob
         desc['problem_params']['num_blobs'] = desc['problem_params']['nvars'][0] // self.res_per_blob
+
+        desc['problem_params'] = {
+            'comm': MPI.COMM_SELF,
+            'num_blobs': -48,
+            'L': 2,
+            'nvars': (128,) * 2,
+            'A': 0.062,
+            'B': 0.1229,
+            'Du': 2e-5,
+            'Dv': 1e-5,
+        }
 
         desc['problem_class'] = grayscott_imex_diffusion
 

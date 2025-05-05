@@ -152,7 +152,7 @@ def make_video(args, config):  # pragma: no cover
     path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-%06d.png'
     path_target = f'videos/{args["config"]}.mp4'
 
-    cmd = f'ffmpeg -framerate 24 -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 -y {path_target}'.split()
+    cmd = f'ffmpeg -framerate 36 -i {path} -pix_fmt yuv420p -r 9 -s 2048:1536 -y {path_target}'.split()
 
     subprocess.run(cmd)
 

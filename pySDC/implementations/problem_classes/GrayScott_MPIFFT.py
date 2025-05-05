@@ -308,6 +308,9 @@ class grayscott_imex_diffusion(IMEX_Laplacian_MPIFFT):
         """
         import matplotlib.pyplot as plt
         from mpl_toolkits.axes_grid1 import make_axes_locatable
+        from pySDC.helpers.plot_helper import setup_mpl, figsize_by_journal
+
+        setup_mpl()
 
         plt.rcParams['figure.constrained_layout.use'] = True
 
