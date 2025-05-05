@@ -656,12 +656,17 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
     MSSDC_args = {}
     dirname = './tmp'
     if useMPIController:
+        print(f'Hello from {COMM_WORLD.rank}/{COMM_WORLD.size}', flush=True)
         from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
 
         controller_communicator = FiredrakeEnsembleCommunicator(COMM_WORLD, COMM_WORLD.size // n_steps)
         assert controller_communicator.size == n_steps
         MSSDC_args = {'useMPIController': True, 'controller_communicator': controller_communicator}
         dirname = f'./tmp_{controller_communicator.rank}'
+        print(
+            f'Hello from {COMM_WORLD.rank}/{COMM_WORLD.size}: {controller_communicator.rank} and {controller_communicator.space_comm.rank}',
+            flush=True,
+        )
         setup = tracer_setup(tmpdir=dirname, comm=controller_communicator.space_comm)
     else:
         MSSDC_args = {'useMPIController': False, 'n_steps': n_steps}
