@@ -27,6 +27,7 @@ def test_benchmark_collocation(benchmark):
 
 @pytest.mark.parametrize("node_type", node_types)
 @pytest.mark.parametrize("quad_type", quad_types)
+@pytest.mark.benchmark
 def test_canintegratepolynomials(node_type, quad_type):
     for M in range(2, 13):
         coll = CollBase(M, t_start, t_end, node_type=node_type, quad_type=quad_type)
@@ -63,6 +64,7 @@ def test_canintegratepolynomials(node_type, quad_type):
 
 @pytest.mark.parametrize("node_type", node_types)
 @pytest.mark.parametrize("quad_type", quad_types)
+@pytest.mark.benchmark
 def test_relateQandSmat(node_type, quad_type):
     for M in range(2, 13):
         coll = CollBase(M, t_start, t_end, node_type=node_type, quad_type=quad_type)
@@ -84,6 +86,7 @@ def test_relateQandSmat(node_type, quad_type):
 
 @pytest.mark.parametrize("node_type", node_types)
 @pytest.mark.parametrize("quad_type", quad_types)
+@pytest.mark.benchmark
 def test_partialquadraturewithQ(node_type, quad_type):
     for M in range(2, 13):
         coll = CollBase(M, t_start, t_end, node_type=node_type, quad_type=quad_type)
@@ -106,6 +109,7 @@ def test_partialquadraturewithQ(node_type, quad_type):
 
 @pytest.mark.parametrize("node_type", node_types)
 @pytest.mark.parametrize("quad_type", quad_types)
+@pytest.mark.benchmark
 def test_partialquadraturewithS(node_type, quad_type):
     for M in range(2, 13):
         coll = CollBase(M, t_start, t_end, node_type=node_type, quad_type=quad_type)
