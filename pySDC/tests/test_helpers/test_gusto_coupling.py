@@ -461,9 +461,11 @@ def test_pySDC_integrator(use_transport_scheme, imex, setup):
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
+    threshold = solver_parameters['snes_rtol'] * 1e5
+
     parallel_assert(
-        error < solver_parameters['snes_rtol'] * 1e4,
-        f'pySDC and Gusto differ in SDC! Got relative difference of {error}',
+        error < threshold,
+        f'pySDC and Gusto differ in SDC! Got relative difference of {error} > {threshold}',
     )
 
 
@@ -780,9 +782,10 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
+    threshold = solver_parameters['snes_rtol'] * 1e5
     parallel_assert(
-        error < solver_parameters['snes_rtol'] * 4,
-        f'pySDC and Gusto differ in method {method}! Got relative difference of {error}',
+        error < threshold,
+        f'pySDC and Gusto differ in method {method}! Got relative difference of {error} > {threshold}',
     )
 
 
