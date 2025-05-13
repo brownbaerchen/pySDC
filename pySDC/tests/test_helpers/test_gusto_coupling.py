@@ -1,6 +1,14 @@
 import pytest
 
 
+def parallel_assert(statement, message='', comm=None):
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD if comm is None else comm
+    glob_statement = comm.allreduce(statement, MPI.LAND)
+    assert glob_statement, message
+
+
 def get_gusto_stepper(eqns, method, spatial_methods, dirname='./tmp'):
     from gusto import IO, OutputParameters, PrescribedTransport
     import sys
@@ -155,7 +163,7 @@ def test_generic_gusto_problem(setup):
 
     error = abs(u_start - u02) / abs(u_start)
 
-    assert error < np.finfo(float).eps * 1e2
+    parallel_assert(error < np.finfo(float).eps * 1e2)
 
     # test forward Euler step
     stepper_forward.run(t=0, tmax=dt)
@@ -164,9 +172,10 @@ def test_generic_gusto_problem(setup):
     un_forward = u_start + dt * problem.eval_f(u_start)
     error = abs(un_forward - un_ref) / abs(un_ref)
 
-    assert (
-        error < np.finfo(float).eps * 1e4
-    ), f'Forward Euler does not match reference implementation! Got relative difference of {error}'
+    parallel_assert(
+        error < np.finfo(float).eps * 1e4,
+        f'Forward Euler does not match reference implementation! Got relative difference of {error}',
+    )
 
     # test backward Euler step
     stepper_backward.run(t=0, tmax=dt)
@@ -174,9 +183,10 @@ def test_generic_gusto_problem(setup):
     un_ref.assign(stepper_backward.fields('f'))
     error = abs(un - un_ref) / abs(un_ref)
 
-    assert (
-        error < np.finfo(float).eps * 1e2
-    ), f'Backward Euler does not match reference implementation! Got relative difference of {error}'
+    parallel_assert(
+        error < np.finfo(float).eps * 1e2,
+        f'Backward Euler does not match reference implementation! Got relative difference of {error}',
+    )
 
 
 class Method(object):
@@ -325,9 +335,10 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
-    assert (
-        error < solver_parameters['snes_rtol'] * 1e4
-    ), f'pySDC and Gusto differ in method {method}! Got relative difference of {error}'
+    parallel_assert(
+        error < solver_parameters['snes_rtol'] * 1e4,
+        f'pySDC and Gusto differ in method {method}! Got relative difference of {error}',
+    )
 
 
 @pytest.mark.firedrake
@@ -448,9 +459,10 @@ def test_pySDC_integrator(use_transport_scheme, imex, setup):
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
-    assert (
-        error < solver_parameters['snes_rtol'] * 1e4
-    ), f'pySDC and Gusto differ in SDC! Got relative difference of {error}'
+    parallel_assert(
+        error < solver_parameters['snes_rtol'] * 1e4,
+        f'pySDC and Gusto differ in SDC! Got relative difference of {error}',
+    )
 
 
 @pytest.mark.firedrake
@@ -585,7 +597,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
     stats = stepper_pySDC.scheme.stats
     dts_pySDC = get_sorted(stats, type='dt', recomputed=False)
 
-    assert len(dts_pySDC) > 0, 'No step sizes were recorded in adaptivity test!'
+    parallel_assert(len(dts_pySDC) > 0, 'No step sizes were recorded in adaptivity test!')
 
     # run with Gusto using same step sizes
     get_initial_conditions(stepper_gusto, setup)
@@ -608,16 +620,17 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
         # clear solver cache with old step size
         del stepper_gusto.scheme.solvers
 
-    assert np.isclose(float(stepper_pySDC.t), float(stepper_gusto.t))
+    parallel_assert(np.isclose(float(stepper_pySDC.t), float(stepper_gusto.t)))
 
     print(dts_pySDC)
 
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error, norm(stepper_gusto.fields('f')))
 
-    assert (
-        error < np.finfo(float).eps * 1e2
-    ), f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}'
+    parallel_assert(
+        error < np.finfo(float).eps * 1e2,
+        f'SDC does not match reference implementation with adaptive step size selection! Got relative difference of {error}',
+    )
 
 
 @pytest.mark.firedrake
@@ -628,7 +641,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
         import os
         import subprocess
 
-        assert n_steps <= n_tasks
+        parallel_assert(n_steps <= n_tasks)
 
         my_env = os.environ.copy()
         my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
@@ -641,9 +654,13 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
             print(line)
         for line in p.stderr:
             print(line)
-        assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
-            p.returncode,
-            n_steps,
+        parallel_assert(
+            p.returncode == 0,
+            'ERROR: did not get return code 0, got %s with %2i processes'
+            % (
+                p.returncode,
+                n_steps,
+            ),
         )
         return None
 
@@ -659,7 +676,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
         from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
 
         controller_communicator = FiredrakeEnsembleCommunicator(COMM_WORLD, COMM_WORLD.size // n_steps)
-        assert controller_communicator.size == n_steps
+        parallel_assert(controller_communicator.size == n_steps)
         MSSDC_args = {'useMPIController': True, 'controller_communicator': controller_communicator}
         dirname = f'./tmp_{controller_communicator.rank}'
         setup = tracer_setup(tmpdir=dirname, comm=controller_communicator.space_comm)
@@ -756,14 +773,15 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
     # Check results
     # ------------------------------------------------------------------------ #
 
-    assert stepper_gusto.t == stepper_pySDC.t
+    parallel_assert(stepper_gusto.t == stepper_pySDC.t)
 
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
-    assert (
-        error < solver_parameters['snes_rtol'] * 1e4
-    ), f'pySDC and Gusto differ in method {method}! Got relative difference of {error}'
+    parallel_assert(
+        error < solver_parameters['snes_rtol'] * 4,
+        f'pySDC and Gusto differ in method {method}! Got relative difference of {error}',
+    )
 
 
 if __name__ == '__main__':
