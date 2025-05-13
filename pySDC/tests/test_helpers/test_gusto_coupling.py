@@ -3,8 +3,9 @@ import pytest
 
 def parallel_assert(statement, message='', comm=None):
     from mpi4py import MPI
+    from firedrake import COMM_WORLD
 
-    comm = MPI.COMM_WORLD if comm is None else comm
+    comm = COMM_WORLD if comm is None else comm
     glob_statement = comm.allreduce(statement, MPI.LAND)
     assert glob_statement, message
 
