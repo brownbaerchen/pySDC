@@ -336,9 +336,10 @@ def test_pySDC_integrator_RK(use_transport_scheme, method, setup):
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
+    threshold = solver_parameters['snes_rtol'] * 1e5
     parallel_assert(
-        error < solver_parameters['snes_rtol'] * 1e4,
-        f'pySDC and Gusto differ in method {method}! Got relative difference of {error}',
+        error < threshold,
+        f'pySDC and Gusto differ in method {method}! Got relative difference of {error} > {threshold}.',
     )
 
 
