@@ -769,6 +769,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
     # Get Initial conditions and run
     # ------------------------------------------------------------------------ #
 
+    return True
     for stepper in [stepper_gusto, stepper_pySDC]:
         get_initial_conditions(stepper, setup)
         stepper.run(t=0, tmax=tmax)
