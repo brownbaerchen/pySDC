@@ -640,7 +640,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 @pytest.mark.firedrake
 @pytest.mark.parametrize('n_steps', [1, 2, 4])
 @pytest.mark.parametrize('useMPIController', [True, False])
-def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n_tasks=4):
+def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit=True, n_tasks=4):
     if submit and useMPIController:
         import os
         import subprocess
@@ -675,15 +675,13 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
     import numpy as np
 
     MSSDC_args = {}
-    dirname = './tmp'
     if useMPIController:
         from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
 
         controller_communicator = FiredrakeEnsembleCommunicator(COMM_WORLD, COMM_WORLD.size // n_steps)
         parallel_assert(controller_communicator.size == n_steps)
         MSSDC_args = {'useMPIController': True, 'controller_communicator': controller_communicator}
-        dirname = f'./tmp_{controller_communicator.rank}'
-        setup = tracer_setup(tmpdir=dirname, comm=controller_communicator.space_comm)
+        setup = tracer_setup(tmpdir=tmpdir, comm=controller_communicator.space_comm)
     else:
         MSSDC_args = {'useMPIController': False, 'n_steps': n_steps}
 
@@ -746,7 +744,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
         eqns,
         method.get_Gusto_method()(domain, solver_parameters=solver_parameters),
         spatial_methods,
-        dirname=dirname,
+        dirname=tmpdir,
     )
 
     domain.dt = Constant(domain.dt) * n_steps
@@ -762,7 +760,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
             **MSSDC_args,
         ),
         spatial_methods,
-        dirname=dirname,
+        dirname=tmpdir,
     )
 
     # ------------------------------------------------------------------------ #
