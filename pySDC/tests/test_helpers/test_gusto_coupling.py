@@ -650,10 +650,10 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
         my_env = os.environ.copy()
         my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
         cwd = '.'
-        cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps}'.split()
+        cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps} --tmpdir={tmpdir}'.split()
 
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
-        p.wait()
+        p.wait(timeout=240)
         for line in p.stdout:
             print(line)
         for line in p.stderr:
@@ -809,10 +809,18 @@ if __name__ == '__main__':
         type=int,
         default=None,
     )
+    parser.add_argument(
+        '--tmpdir',
+        help="temporary directory",
+        type=str,
+        default=None,
+    )
     args = parser.parse_args()
 
     if args.test == 'MSSDC':
-        test_pySDC_integrator_MSSDC(n_steps=args.n_steps, useMPIController=True, setup=setup, submit=False)
+        test_pySDC_integrator_MSSDC(
+            n_steps=args.n_steps, useMPIController=True, setup=setup, tmpdir=args.tmpdir, submit=False
+        )
     else:
         # test_generic_gusto_problem(setup)
         # test_pySDC_integrator_RK(False, RK4, setup)
