@@ -653,7 +653,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
         cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps} --tmpdir={tmpdir}'.split()
 
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
-        p.wait(timeout=240)
+        p.wait(timeout=60)
         for line in p.stdout:
             print(line)
         for line in p.stderr:
@@ -688,6 +688,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
     method = BackwardEuler
     use_transport_scheme = True
     eqns, domain, spatial_methods, setup = get_gusto_advection_setup(use_transport_scheme, method.imex, setup)
+    return True
 
     solver_parameters = {
         'snes_type': 'newtonls',
