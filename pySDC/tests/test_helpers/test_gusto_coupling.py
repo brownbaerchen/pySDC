@@ -688,7 +688,6 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
     method = BackwardEuler
     use_transport_scheme = True
     eqns, domain, spatial_methods, setup = get_gusto_advection_setup(use_transport_scheme, method.imex, setup)
-    return True
 
     solver_parameters = {
         'snes_type': 'newtonls',
@@ -771,6 +770,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
     for stepper in [stepper_gusto, stepper_pySDC][::-1]:
         get_initial_conditions(stepper, setup)
         stepper.run(t=0, tmax=tmax)
+        return True
 
     # ------------------------------------------------------------------------ #
     # Check results
