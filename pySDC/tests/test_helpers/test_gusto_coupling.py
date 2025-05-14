@@ -47,6 +47,7 @@ def tracer_setup(tmpdir='./tmp', degree=1, small_dt=False, comm=None):
     radius = 1
     comm = COMM_WORLD if comm is None else comm
     mesh = IcosahedralSphereMesh(radius=radius, refinement_level=3, degree=1, comm=comm)
+    assert False, (mesh, comm.rank, COMM_WORLD.rank)
     x = SpatialCoordinate(mesh)
 
     # Parameters chosen so that dt != 1
