@@ -229,9 +229,12 @@ jobs:
           . venv-pySDC/bin/activate
           cd ./pySDC
           mpiexec --oversubscribe -np ${{ matrix.num_procs }} python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and parallel[${{ matrix.num_procs }}]"
+          exit_code=$?
           if [ "$?" = 5 ]; then
               echo "No tests collected.  Exiting with 0 (instead of 5)."
               exit 0
+          else
+            exit $exit_code
           fi
         timeout-minutes: 15
       - name: Make coverage report
