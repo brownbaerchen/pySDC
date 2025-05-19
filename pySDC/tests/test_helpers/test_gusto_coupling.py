@@ -625,11 +625,13 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 @pytest.mark.parametrize('n_steps', [1, 2, 4])
 @pytest.mark.parametrize('useMPIController', [True, False])
 def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, n_tasks=4):
+    from pytest_mpi import parallel_assert
+
     if submit and useMPIController:
         import os
         import subprocess
 
-        assert n_steps <= n_tasks
+        parallel_assert(n_steps <= n_tasks)
 
         my_env = os.environ.copy()
         my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
@@ -642,9 +644,13 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, 
             print(line)
         for line in p.stderr:
             print(line)
-        assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
-            p.returncode,
-            n_steps,
+        parallel_assert(
+            p.returncode == 0,
+            'ERROR: did not get return code 0, got %s with %2i processes'
+            % (
+                p.returncode,
+                n_steps,
+            ),
         )
         return None
 
@@ -660,7 +666,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, 
         from pySDC.helpers.firedrake_ensemble_communicator import FiredrakeEnsembleCommunicator
 
         controller_communicator = FiredrakeEnsembleCommunicator(COMM_WORLD, COMM_WORLD.size // n_steps)
-        assert controller_communicator.size == n_steps
+        parallel_assert(controller_communicator.size == n_steps)
         MSSDC_args = {'useMPIController': True, 'controller_communicator': controller_communicator}
         dirname = f'./tmp_{controller_communicator.rank}'
         setup = tracer_setup(tmpdir=dirname, comm=controller_communicator.space_comm)
@@ -757,14 +763,15 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, 
     # Check results
     # ------------------------------------------------------------------------ #
 
-    assert stepper_gusto.t == stepper_pySDC.t
+    parallel_assert(stepper_gusto.t == stepper_pySDC.t)
 
     error = norm(stepper_gusto.fields('f') - stepper_pySDC.fields('f')) / norm(stepper_gusto.fields('f'))
     print(error)
 
-    assert (
-        error < solver_parameters['snes_rtol'] * 1e4
-    ), f'pySDC and Gusto differ in method {method}! Got relative difference of {error}'
+    parallel_assert(
+        error < solver_parameters['snes_rtol'] * 1e4,
+        f'pySDC and Gusto differ in method {method}! Got relative difference of {error}',
+    )
 
 
 if __name__ == '__main__':
