@@ -244,10 +244,10 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: test-artifacts-firedrake
+          name: test-artifacts-firedrake_${{ matrix.num_procs }}
           path: |
             data_firedrake
-            coverage_firedrake.dat
+            coverage_firedrake_${{ matrix.num_procs }}.dat
          
   user_monodomain_tests_linux:
     runs-on: ubuntu-latest
