@@ -175,7 +175,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        num_procs: [2, 3, 4, 5, 6, 7, 8, 1]
+        num_procs: [1, 2, 3, 4, 5, 6, 7, 8]
     container:
       image: firedrakeproject/firedrake-vanilla-default:latest
       options: --user root
@@ -216,25 +216,31 @@ jobs:
           pip install -e /repositories/gusto_repo
           # test installation
           python -c "import gusto; print(f'gusto module: {gusto}')"
-      # - name: run pytest
-      #   run: |
-      #     . venv-pySDC/bin/activate
-      #     firedrake-clean
-      #     cd ./pySDC
-      #     python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and not parallel or firedrake and parallel[1]"
       - name: run pytest
+        if: matrix.num_procs == 1
+        run: |
+          . venv-pySDC/bin/activate
+          firedrake-clean
+          cd ./pySDC
+          python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and not parallel or firedrake and parallel[1]"
+      - name: run pytest parallel
+        if: matrix.num_procs > 1
         run: |
           . venv-pySDC/bin/activate
           cd ./pySDC
           mpiexec --oversubscribe -np ${{ matrix.num_procs }} python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and parallel[${{ matrix.num_procs }}]"
-        timeout-minutes: 45
+          if [ "$?" = 5 ]; then
+              echo "No tests collected.  Exiting with 0 (instead of 5)."
+              exit 0
+          fi
+        timeout-minutes: 15
       - name: Make coverage report
         run: |
 
           cd ./pySDC
           mv data ../data_firedrake
           coverage combine
-          mv .coverage ../coverage_firedrake.dat
+          mv .coverage ../coverage_firedrake_${{ matrix.num_procs }}.dat
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
