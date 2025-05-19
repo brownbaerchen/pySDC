@@ -172,6 +172,8 @@ jobs:
 
   user_firedrake_tests:
     runs-on: ubuntu-latest
+    matrix:
+      num_procs: [2, 3, 4, 5, 6, 7, 8, 1]
     container:
       image: firedrakeproject/firedrake-vanilla-default:latest
       options: --user root
@@ -212,17 +214,17 @@ jobs:
           pip install -e /repositories/gusto_repo
           # test installation
           python -c "import gusto; print(f'gusto module: {gusto}')"
+      # - name: run pytest
+      #   run: |
+      #     . venv-pySDC/bin/activate
+      #     firedrake-clean
+      #     cd ./pySDC
+      #     python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and not parallel or firedrake and parallel[1]"
       - name: run pytest
         run: |
           . venv-pySDC/bin/activate
-          firedrake-clean
           cd ./pySDC
-          python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and not parallel or firedrake and parallel[1]"
-      - name: run pytest parallel
-        run: |
-          . venv-pySDC/bin/activate
-          cd ./pySDC
-          mpiexec --oversubscribe -np 4 python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and parallel[4]"
+          mpiexec --oversubscribe -np ${{ matrix.num_procs }} python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and parallel[${{ matrix.num_procs }}]"
         timeout-minutes: 45
       - name: Make coverage report
         run: |
