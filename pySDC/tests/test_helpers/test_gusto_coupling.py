@@ -625,7 +625,7 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 @pytest.mark.parametrize('n_steps', [1, 2, 4])
 @pytest.mark.parametrize('useMPIController', [True, False])
 def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, n_tasks=4):
-    from pytest_mpi import parallel_assert
+    from pytest_mpi.parallel_assert import parallel_assert
 
     if submit and useMPIController:
         import os
@@ -755,7 +755,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, 
     # Get Initial conditions and run
     # ------------------------------------------------------------------------ #
 
-    for stepper in [stepper_gusto]:  # , stepper_pySDC]:
+    for stepper in [stepper_gusto, stepper_pySDC]:
         get_initial_conditions(stepper, setup)
         stepper.run(t=0, tmax=tmax)
 
