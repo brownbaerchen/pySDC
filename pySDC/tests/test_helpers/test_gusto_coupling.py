@@ -47,7 +47,6 @@ def tracer_setup(tmpdir='./tmp', degree=1, small_dt=False, comm=None):
     radius = 1
     comm = COMM_WORLD if comm is None else comm
     mesh = IcosahedralSphereMesh(radius=radius, refinement_level=3, degree=1, comm=comm)
-    assert False, (mesh, comm.rank, COMM_WORLD.rank)
     x = SpatialCoordinate(mesh)
 
     # Parameters chosen so that dt != 1
@@ -668,7 +667,6 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
             ),
         )
         return None
-
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.pySDC_as_gusto_time_discretization import pySDC_integrator
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit as sweeper_cls
@@ -682,6 +680,12 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
         controller_communicator = FiredrakeEnsembleCommunicator(COMM_WORLD, COMM_WORLD.size // n_steps)
         parallel_assert(controller_communicator.size == n_steps)
         MSSDC_args = {'useMPIController': True, 'controller_communicator': controller_communicator}
+
+        import os
+
+        tmpdir = f'{tmpdir}/{controller_communicator.rank}'
+        os.makedirs(tmpdir, exist_ok=True)
+
         setup = tracer_setup(tmpdir=tmpdir, comm=controller_communicator.space_comm)
     else:
         MSSDC_args = {'useMPIController': False, 'n_steps': n_steps}
@@ -771,7 +775,6 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, tmpdir, submit
     for stepper in [stepper_gusto, stepper_pySDC][::-1]:
         get_initial_conditions(stepper, setup)
         stepper.run(t=0, tmax=tmax)
-        return True
 
     # ------------------------------------------------------------------------ #
     # Check results
@@ -828,4 +831,4 @@ if __name__ == '__main__':
         # test_pySDC_integrator_RK(False, RK4, setup)
         # test_pySDC_integrator(False, False, setup)
         # test_pySDC_integrator_with_adaptivity(1e-3, setup)
-        test_pySDC_integrator_MSSDC(4, True, setup)
+        test_pySDC_integrator_MSSDC(2, True, setup, './tmp', submit=True)
