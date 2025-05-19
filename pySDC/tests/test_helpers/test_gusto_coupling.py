@@ -621,9 +621,10 @@ def test_pySDC_integrator_with_adaptivity(dt_initial, setup):
 
 
 @pytest.mark.firedrake
+@pytest.mark.parallel(4)
 @pytest.mark.parametrize('n_steps', [1, 2, 4])
 @pytest.mark.parametrize('useMPIController', [True, False])
-def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n_tasks=4):
+def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=False, n_tasks=4):
     if submit and useMPIController:
         import os
         import subprocess
@@ -636,7 +637,7 @@ def test_pySDC_integrator_MSSDC(n_steps, useMPIController, setup, submit=True, n
         cmd = f'mpiexec -np {n_tasks} --oversubscribe python {__file__} --test=MSSDC --n_steps={n_steps}'.split()
 
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=my_env, cwd=cwd)
-        p.wait()
+        p.wait(40)
         for line in p.stdout:
             print(line)
         for line in p.stderr:

@@ -217,7 +217,8 @@ jobs:
           . venv-pySDC/bin/activate
           firedrake-clean
           cd ./pySDC
-          python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m firedrake
+          python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and not parallel or firedrake and parallel[1]"
+          mpiexec -np 4 python -m coverage run -m pytest --continue-on-collection-errors -v --durations=0 /repositories/pySDC/pySDC/tests -m "firedrake and parallel[4]"
         timeout-minutes: 45
       - name: Make coverage report
         run: |
