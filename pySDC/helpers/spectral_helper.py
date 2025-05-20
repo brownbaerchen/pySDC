@@ -3,6 +3,8 @@ import scipy
 from pySDC.implementations.datatype_classes.mesh import mesh
 from scipy.special import factorial
 
+# TODO: implement FFTW for individual transforms
+
 
 class SpectralHelper1D:
     """
@@ -773,31 +775,33 @@ class FFTHelper(SpectralHelper1D):
         k[0] = 1j * self.L
         return self.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
-    def transform(self, u, axis=-1, **kwargs):
+    def transform(self, u, *args, axes=None, **kwargs):
         """
-        1D FFT along axis. `kwargs` are passed on to the FFT library.
+        FFT along axes. `kwargs` are passed on to the FFT library.
 
         Args:
             u: Data you want to transform
-            axis (int): Axis you want to transform along
+            axes (tuple): Axes you want to transform over
 
         Returns:
             transformed data
         """
-        return self.fft_lib.fft(u, axis=axis, **kwargs)
+        axes = axes if axes else tuple(i for i in range(u.ndim))
+        return self.fft_lib.fftn(u, *args, axes=axes, **kwargs)
 
-    def itransform(self, u, axis=-1):
+    def itransform(self, u, *args, axes=None, **kwargs):
         """
-        Inverse 1D FFT.
+        Inverse FFT.
 
         Args:
             u: Data you want to transform
-            axis (int): Axis you want to transform along
+            axes (tuple): Axes over which to transform
 
         Returns:
             transformed data
         """
-        return self.fft_lib.ifft(u, axis=axis)
+        axes = axes if axes else tuple(i for i in range(u.ndim))
+        return self.fft_lib.ifftn(u, *args, axes=axes, **kwargs)
 
     def get_BC(self, kind):
         """

@@ -270,7 +270,7 @@ def test_tau_method2D(bc, nz, nx, bc_val, plotting=False):
     bcs = np.sin(bc_val * x)
     rhs = np.zeros_like(X)
     rhs[:, -1] = bcs
-    rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychev spectral space
+    rhs_hat = fft.transform(rhs, axes=(-2,))  # the rhs is already in Chebychev spectral space
 
     # generate matrices
     Dx = fft.get_differentiation_matrix(p=2) * 1e-1 + fft.get_differentiation_matrix()
@@ -289,7 +289,7 @@ def test_tau_method2D(bc, nz, nx, bc_val, plotting=False):
     sol_hat = (sp.linalg.spsolve(A, rhs_hat.flatten())).reshape(rhs.shape)
 
     # transform back to real space
-    _sol = fft.itransform(sol_hat, axis=-2).real
+    _sol = fft.itransform(sol_hat, axes=(-2,)).real
     sol = cheby.itransform(_sol, axes=(-1,))
 
     # construct polynomials for testing
@@ -346,7 +346,7 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
     rhs = np.zeros((2, nx, nz))  # components u and u_x
     rhs[0, :, -1] = np.sin(bc_val * x) + 1
     rhs[1, :, -1] = 3 * np.exp(-((x - 3.6) ** 2)) + np.cos(x)
-    rhs_hat = fft.transform(rhs, axis=-2)  # the rhs is already in Chebychev spectral space
+    rhs_hat = fft.transform(rhs, axes=(-2,))  # the rhs is already in Chebychev spectral space
 
     # generate 1D matrices
     Dx = fft.get_differentiation_matrix()
@@ -379,7 +379,7 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
     sol_hat = (sp.linalg.spsolve(A, rhs_hat.flatten())).reshape(rhs.shape)
 
     # transform back to real space
-    _sol = fft.itransform(sol_hat, axis=-2).real
+    _sol = fft.itransform(sol_hat, axes=(-2,)).real
     sol = cheby.itransform(_sol, axes=(-1,))
 
     polys = [np.polynomial.Chebyshev(_sol[0, i, :]) for i in range(nx)]
