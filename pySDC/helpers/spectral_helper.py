@@ -920,11 +920,6 @@ class SpectralHelper:
             slab_decomposition (bool): Whether to use slab or pencil decomposition
             debug (bool): Perform additional checks at extra computational cost
         """
-        if comm is None:
-            from mpi4py import MPI
-
-            comm = MPI.COMM_WORLD
-
         self.comm = comm
         self.debug = debug
         self.useGPU = useGPU
@@ -1379,6 +1374,8 @@ class SpectralHelper:
 
     @lru_cache(maxsize=99)
     def get_pfft(self, axes=None, padding=None, grid=None):
+        if self.ndim == 1 or self.comm is None:
+            return None
         from mpi4py_fft import PFFT
 
         axes = axes if axes else tuple(i for i in range(self.ndim))
@@ -1489,7 +1486,7 @@ class SpectralHelper:
         self.local_slice = [slice(0, me.N) for me in self.axes]
 
         axes = tuple(i for i in range(len(self.axes)))
-        self.fft_obj = self.get_fft(axes=axes, direction='object')
+        self.fft_obj = self.get_pfft(axes=axes)  # self.get_fft(axes=axes, direction='object')
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice(False)
 
@@ -1673,6 +1670,12 @@ class SpectralHelper:
         from mpi4py_fft.distarray import DistArray
 
         pfft = pfft if pfft else self.get_pfft()
+        if pfft is None:
+            if forward_output:
+                return self.u_init_forward
+            else:
+                return self.u_init
+
         global_shape = pfft.global_shape(forward_output)
         p0 = pfft.pencil[forward_output]
         if forward_output is True:
@@ -1689,8 +1692,15 @@ class SpectralHelper:
         z = darraycls(global_shape, subcomm=p0.subcomm, val=val, dtype=dtype, alignment=p0.axis, rank=rank)
         return z.v if view else z
 
-    def transform(self, u, *args, **kwargs):
-        pfft = self.get_pfft(*args, **kwargs)
+    def transform(self, u, *args, axes=None, **kwargs):
+        pfft = self.get_pfft(*args, axes=axes, **kwargs)
+        if pfft is None:
+            axes = axes if axes else tuple(i for i in range(self.ndim))
+            u_hat = u.copy()
+            for i in axes:
+                _axis = 1 + i if i >= 0 else i
+                u_hat = self.axes[i].transform(u_hat, axes=(_axis,))
+            return u_hat
 
         _in = self.newDistArray(pfft, forward_output=False, rank=1)
         _out = self.newDistArray(pfft, forward_output=True, rank=1)
@@ -1928,8 +1938,15 @@ class SpectralHelper:
 
             return _in.redistribute(axis_out)
 
-    def itransform(self, u, *args, **kwargs):
-        pfft = self.get_pfft(*args, **kwargs)
+    def itransform(self, u, *args, axes=None, **kwargs):
+        pfft = self.get_pfft(*args, axes=axes, **kwargs)
+        if pfft is None:
+            axes = axes if axes else tuple(i for i in range(self.ndim))
+            u_hat = u.copy()
+            for i in axes:
+                _axis = 1 + i if i >= 0 else i
+                u_hat = self.axes[i].itransform(u_hat, axes=(_axis,))
+            return u_hat
 
         _in = self.newDistArray(pfft, forward_output=True, rank=1)
         _out = self.newDistArray(pfft, forward_output=False, rank=1)

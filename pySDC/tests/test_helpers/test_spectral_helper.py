@@ -95,7 +95,7 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, **kwargs):
     assert np.allclose(D_u, expect, atol=1e-11)
 
 
-@pytest.mark.mpi4py
+@pytest.mark.base
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
@@ -148,7 +148,7 @@ def test_matrix1D(N, base, type):
 
     u = helper.u_init
     u[0] = C @ D @ coeffs
-    du = helper.itransform(u, axes=(-1,))
+    du = helper.itransform(u)
 
     if type == 'diff':
         exact = np.polynomial.Chebyshev(coeffs).deriv(1)(x)
@@ -260,20 +260,23 @@ def _test_transform_dealias(
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
 
-@pytest.mark.mpi4py
+@pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-def test_transform(nx, nz, bx, bz, axes, **kwargs):
+def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    from mpi4py import MPI
+    if useMPI:
+        from mpi4py import MPI
 
-    comm = MPI.COMM_WORLD
-    rank = comm.rank
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+    else:
+        comm = None
     SpectralHelper.fft_backend = 'scipy'
 
     helper = SpectralHelper(comm=comm, debug=True)
@@ -282,11 +285,16 @@ def test_transform(nx, nz, bx, bz, axes, **kwargs):
     helper.setup_fft()
     pfft = helper.get_pfft(axes=axes)
 
-    u_global = np.empty(shape=helper.global_shape)
-    u_global[...] = comm.bcast(np.random.random(u_global.shape))
+    if comm:
+        u_global = np.empty(shape=helper.global_shape)
+        u_global[...] = comm.bcast(np.random.random(u_global.shape))
+        u = u_global[:, *helper.local_slice]
+    else:
+        u = np.empty(shape=helper.global_shape)
+        u[...] = np.random.random(u.shape)
 
-    u = u_global[:, *helper.local_slice]
-    expect_trf = u_global.copy()
+    u[:] = 1
+    expect_trf = u.copy()
 
     if bx == 'fft' and bz == 'cheby':
         axes_1d = sorted(axes)[::-1]
@@ -303,8 +311,13 @@ def test_transform(nx, nz, bx, bz, axes, **kwargs):
     trf = helper.itransform(u, axes=axes)
     itrf = helper.transform(trf, axes=axes)
 
-    expect_local = expect_trf[:, *pfft.local_slice(False)]
+    if comm:
+        expect_local = expect_trf[:, *pfft.local_slice(False)]
+    else:
+        expect_local = expect_trf
 
+    print(expect_local)
+    print(trf)
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
 
@@ -471,7 +484,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, **kwargs):
     # solve the system
     sol_hat = helper.u_init_forward
     sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
-    sol = helper.itransform(sol_hat, axes=(-2, -1)).real
+    sol = helper.itransform(sol_hat).real
 
     # construct polynomials for testing
     sol_cheby = helper.transform(sol, axes=(-1,))
@@ -550,11 +563,11 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(4, 2, 'cheby', 'fft', (0, 1))
+        test_transform(2, 2, 'fft', 'fft', (-1,))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
-        # test_matrix1D(4, 'cheby', 'int')
+        # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**2, 2**1, -2, plotting=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:
