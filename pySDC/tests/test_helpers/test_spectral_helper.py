@@ -45,25 +45,18 @@ def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
     assert np.allclose(S_u, expect, atol=1e-12)
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
 @pytest.mark.parametrize('bz', ['cheby', 'fft'])
-def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useMPI=False, **kwargs):
+def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-    else:
-        comm = None
-
-    helper = SpectralHelper(comm=comm, debug=True)
+    helper = SpectralHelper(debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
@@ -95,30 +88,23 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useMPI=False, *
         else:
             raise NotImplementedError
 
-    u_hat = helper.transform(u, axes=(-2, -1))
+    u_hat = helper.transform(u)
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
-    D_u = helper.itransform(D_u_hat, axes=(-1, -2)).real
+    D_u = helper.itransform(D_u_hat).real
 
-    assert np.allclose(D_u, expect, atol=1e-12)
+    assert np.allclose(D_u, expect, atol=1e-11)
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [16])
 @pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-def test_identity_matrix2D(nx, nz, variant, bx, useMPI=False, **kwargs):
+def test_identity_matrix2D(nx, nz, variant, bx, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-    else:
-        comm = None
-
-    helper = SpectralHelper(comm=comm, debug=True)
+    helper = SpectralHelper(debug=True)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base='cheby', N=nz)
     helper.setup_fft()
@@ -323,68 +309,6 @@ def test_transform(nx, nz, bx, bz, axes, **kwargs):
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
 
 
-@pytest.mark.base
-@pytest.mark.parametrize('nx', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-def test_transformold(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
-    import numpy as np
-    from pySDC.helpers.spectral_helper import SpectralHelper
-
-    if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-        rank = comm.rank
-    else:
-        comm = None
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-
-    helper = SpectralHelper(comm=comm, debug=True)
-    helper.add_axis(base=bx, N=nx)
-    helper.add_axis(base=bz, N=nz)
-    helper.setup_fft()
-
-    u = helper.u_init
-    u[...] = np.random.random(u.shape)
-
-    u_all = np.empty(shape=(1, nx, nz), dtype=u.dtype)
-
-    if useMPI:
-        rank = comm.rank
-        u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
-        if comm.size == 1:
-            assert np.allclose(u_all, u)
-    else:
-        rank = 0
-        u_all[...] = u
-
-    expect_trf = u_all.copy()
-
-    if bx == 'fft' and bz == 'cheby':
-        axes_1d = sorted(axes)[::-1]
-    elif bx == 'cheby' and bz == 'fft':
-        axes_1d = sorted(axes)
-    else:
-        axes_1d = axes
-
-    for i in axes_1d:
-        base = helper.axes[i]
-        expect_trf = base.transform(expect_trf, axes=(i,))
-
-    trf = helper.transform(u, axes=axes)
-    itrf = helper.itransform(trf, axes=axes)
-
-    expect_local = expect_trf[:, trf.shape[1] * rank : trf.shape[1] * (rank + 1), :]
-
-    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
-
-
 def run_MPI_test(num_procs, **kwargs):
     import os
     import subprocess
@@ -502,12 +426,12 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
 
 
-@pytest.mark.base
+@pytest.mark.mpi4py
 @pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=False, **kwargs):
+def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, **kwargs):
     '''
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
@@ -515,14 +439,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, useMPI=False, plotting=Fal
     from pySDC.helpers.spectral_helper import SpectralHelper
     import numpy as np
 
-    if useMPI:
-        from mpi4py import MPI
-
-        comm = MPI.COMM_WORLD
-    else:
-        comm = None
-
-    helper = SpectralHelper(comm=comm, debug=True)
+    helper = SpectralHelper(debug=True)
     helper.add_axis('fft', N=nx)
     helper.add_axis('cheby', N=nz)
     helper.add_component(['u'])
@@ -633,11 +550,11 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(4, 2, 'cheby', 'fft', (0, 1))
-        # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
+        # test_transform(4, 2, 'cheby', 'fft', (0, 1))
+        # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
+        test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:

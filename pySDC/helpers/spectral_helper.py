@@ -890,7 +890,7 @@ class SpectralHelper:
     sparse_lib = scipy.sparse
     linalg = scipy.sparse.linalg
     dtype = mesh
-    fft_backend = 'fftw'
+    fft_backend = 'scipy'  #'fftw'
     fft_comm_backend = 'MPI'
 
     @classmethod
@@ -920,6 +920,11 @@ class SpectralHelper:
             slab_decomposition (bool): Whether to use slab or pencil decomposition
             debug (bool): Perform additional checks at extra computational cost
         """
+        if comm is None:
+            from mpi4py import MPI
+
+            comm = MPI.COMM_WORLD
+
         self.comm = comm
         self.debug = debug
         self.useGPU = useGPU
@@ -1387,8 +1392,10 @@ class SpectralHelper:
             for i in axes
         }
 
-        if self.slab_decomposition:
-            grid = (-1,) + (self.ndim - 1) * (self.axes[-1].N,)
+        if self.comm and self.comm.size == 1:
+            grid = None
+        elif self.slab_decomposition:
+            grid = (-1,) + tuple(me.N for me in self.axes[1:])
         else:
             grid = (-1,) * (self.ndim - 1) + (self.axes[-1].N,)
 
@@ -1924,10 +1931,12 @@ class SpectralHelper:
     def itransform(self, u, *args, **kwargs):
         pfft = self.get_pfft(*args, **kwargs)
 
-        tmp = self.newDistArray(pfft, forward_output=True, rank=1)
+        _in = self.newDistArray(pfft, forward_output=True, rank=1)
+        _out = self.newDistArray(pfft, forward_output=False, rank=1)
 
-        tmp[...] = u
-        return pfft.backward(tmp)
+        _in[...] = u
+        pfft.backward(_in, _out)
+        return _out
 
     def itransformold(self, u, axes=None, padding=None):
         """
