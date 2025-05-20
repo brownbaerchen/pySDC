@@ -910,18 +910,20 @@ class SpectralHelper:
 
         cls.dtype = cupy_mesh
 
-    def __init__(self, comm=None, useGPU=False, debug=False):
+    def __init__(self, comm=None, useGPU=False, slab_decomposition=False, debug=False):
         """
         Constructor
 
         Args:
             comm (mpi4py.Intracomm): MPI communicator
             useGPU (bool): Whether to use GPUs
+            slab_decomposition (bool): Whether to use slab or pencil decomposition
             debug (bool): Perform additional checks at extra computational cost
         """
         self.comm = comm
         self.debug = debug
         self.useGPU = useGPU
+        self.slab_decomposition = slab_decomposition
 
         if useGPU:
             self.setup_GPU()
@@ -1371,7 +1373,7 @@ class SpectralHelper:
         return self.xp.meshgrid(*grids, indexing='ij')
 
     @lru_cache(maxsize=99)
-    def get_pfft(self, axes=None, padding=None):
+    def get_pfft(self, axes=None, padding=None, grid=None):
         from mpi4py_fft import PFFT
 
         axes = axes if axes else tuple(i for i in range(self.ndim))
@@ -1384,18 +1386,26 @@ class SpectralHelper:
             )
             for i in axes
         }
+        # grid = tuple(axis.N if type(axis) in [FFTHelper] else -1 for axis in self.axes)
+
+        if self.slab_decomposition:
+            grid = (-1,) + (self.ndim - 1) * (self.axes[-1].N,)
+        else:
+            grid = (-1,) * (self.ndim - 1) + (self.axes[-1].N,)
 
         pfft = PFFT(
             comm=self.comm,
-            shape=self.shape,
-            axes=sorted(axes),
+            shape=self.global_shape[1:],  # shape,
+            axes=sorted(axes)[::-1],
             dtype='D',
             collapse=False,  # TODO depending on padding, I may be able to collapse transforms
             backend=self.fft_backend,
             comm_backend=self.fft_comm_backend,
             padding=padding,
             transforms=transforms,
+            grid=grid,  # (-1, 2,),#(axes[0],),
         )
+        print(grid, self.shape)
         return pfft
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None):

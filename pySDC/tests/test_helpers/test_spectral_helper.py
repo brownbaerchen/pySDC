@@ -294,17 +294,13 @@ def test_transform(nx, nz, bx, bz, axes, **kwargs):
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
+    pfft = helper.get_pfft(axes=axes)
 
-    u = helper.newDistArray(helper.get_pfft(axes=axes))
-    u[...] = np.random.random(u.shape)
+    u_global = np.empty(shape=helper.global_shape)
+    u_global[...] = comm.bcast(np.random.random(u_global.shape))
 
-    u_all = np.empty(shape=(1, nx, nz), dtype=u.dtype)
-
-    u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
-    if comm.size == 1:
-        assert np.allclose(u_all, u)
-
-    expect_trf = u_all.copy()
+    u = u_global[:, *helper.local_slice]
+    expect_trf = u_global.copy()
 
     if bx == 'fft' and bz == 'cheby':
         axes_1d = sorted(axes)[::-1]
@@ -316,15 +312,13 @@ def test_transform(nx, nz, bx, bz, axes, **kwargs):
     for i in axes_1d:
         base = helper.axes[i]
         axis = i + 1 if i >= 0 else i
-        expect_trf = base.transform(expect_trf, axes=(axis,))
+        expect_trf = base.itransform(expect_trf, axes=(axis,))
 
-    trf = helper.transform(u, axes=axes)
-    itrf = helper.itransform(trf, axes=axes)
+    trf = helper.itransform(u, axes=axes)
+    itrf = helper.transform(trf, axes=axes)
 
-    expect_local = expect_trf[:, *helper.local_slice]
+    expect_local = expect_trf[:, *pfft.local_slice(False)]
 
-    print(expect_local)
-    print(trf)
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
 
@@ -639,7 +633,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(4, 2, 'cheby', 'fft', (0,))
+        test_transform(4, 2, 'cheby', 'fft', (0, 1))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
