@@ -154,12 +154,12 @@ def test_transform(N, d, transform_type):
     x = (cheby.get_1dgrid() * cheby.lin_trf_fac + cheby.lin_trf_off) * cheby.lin_trf_fac + cheby.lin_trf_off
     x = (cheby.get_1dgrid() - cheby.lin_trf_off) / cheby.lin_trf_fac
 
-    itransform = cheby.itransform(u, axis=-1).real
+    itransform = cheby.itransform(u, axes=(-1,)).real
 
     for i in range(d):
         assert np.allclose(np.polynomial.Chebyshev(u[i])(x), itransform[i])
     assert np.allclose(u.shape, itransform.shape)
-    assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axis=-1).real)
+    assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axes=(-1,)).real)
     assert np.allclose(scipy.fft.idct(u / norm, axis=-1), itransform)
     assert np.allclose(cheby.transform(cheby.itransform(u)), u)
     assert np.allclose(cheby.itransform(cheby.transform(u)), u)
@@ -290,7 +290,7 @@ def test_tau_method2D(bc, nz, nx, bc_val, plotting=False):
 
     # transform back to real space
     _sol = fft.itransform(sol_hat, axis=-2).real
-    sol = cheby.itransform(_sol, axis=-1)
+    sol = cheby.itransform(_sol, axes=(-1,))
 
     # construct polynomials for testing
     polys = [np.polynomial.Chebyshev(_sol[i, :]) for i in range(nx)]
@@ -380,7 +380,7 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
 
     # transform back to real space
     _sol = fft.itransform(sol_hat, axis=-2).real
-    sol = cheby.itransform(_sol, axis=-1)
+    sol = cheby.itransform(_sol, axes=(-1,))
 
     polys = [np.polynomial.Chebyshev(_sol[0, i, :]) for i in range(nx)]
 
@@ -401,3 +401,7 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
         assert np.allclose(
             polys[i](z), sol[0, i, :]
         ), f'Solution is incorrectly transformed back to real space at x={x[i]}'
+
+
+if __name__ == '__main__':
+    test_transform(4, 2, 'dct')

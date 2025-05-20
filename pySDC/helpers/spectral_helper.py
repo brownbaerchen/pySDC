@@ -409,7 +409,7 @@ class ChebychevHelper(SpectralHelper1D):
 
         return self.fft_utils
 
-    def transform(self, u, axis=-1, **kwargs):
+    def transform_old(self, u, axis=-1, **kwargs):
         """
         1D DCT along axis. `kwargs` will be passed on to the FFT library.
 
@@ -442,7 +442,7 @@ class ChebychevHelper(SpectralHelper1D):
         else:
             raise NotImplementedError(f'Please choose a transform type from fft and dct, not {self.transform_type=}')
 
-    def itransform(self, u, axis=-1):
+    def itransform_old(self, u, axis=-1):
         """
         1D inverse DCT along axis.
 
@@ -473,6 +473,44 @@ class ChebychevHelper(SpectralHelper1D):
             return result
         else:
             raise NotImplementedError
+
+    def transform(self, u, *args, axes=None, **kwargs):
+        """
+        DCT along axes. `kwargs` will be passed on to the FFT library.
+
+        Args:
+            u: Data you want to transform
+            axes (tuple): Axes you want to transform along
+
+        Returns:
+            Data in spectral space
+        """
+        axes = axes if axes else tuple(i for i in range(u.ndim))
+        trf = self.fft_lib.dctn(u, *args, axes=axes, **kwargs)
+        for axis in axes:
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, u.shape[axis], 1)
+            trf *= self.norm[*expansion]
+        return trf
+
+    def itransform(self, u, *args, axes=None, **kwargs):
+        """
+        Inverse DCT along axis.
+
+        Args:
+            u: Data you want to transform
+            axes (tuple): Axes you want to transform along
+
+        Returns:
+            Data in physical space
+        """
+        axes = axes if axes else tuple(i for i in range(u.ndim))
+        _u = u.copy()
+        for axis in axes:
+            expansion = [np.newaxis for _ in u.shape]
+            expansion[axis] = slice(0, u.shape[axis], 1)
+            _u /= self.norm[*expansion]
+        return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, **kwargs)
 
     def get_BC(self, kind, **kwargs):
         """
