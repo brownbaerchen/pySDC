@@ -274,13 +274,68 @@ def _test_transform_dealias(
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
 
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nx', [3, 8])
+@pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('bx', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+def test_transform(nx, nz, bx, bz, axes, **kwargs):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+    SpectralHelper.fft_backend = 'scipy'
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis(base=bx, N=nx)
+    helper.add_axis(base=bz, N=nz)
+    helper.setup_fft()
+
+    u = helper.newDistArray(helper.get_pfft(axes=axes))
+    u[...] = np.random.random(u.shape)
+
+    u_all = np.empty(shape=(1, nx, nz), dtype=u.dtype)
+
+    u_all[...] = (np.array(comm.allgather(u[0]))).reshape(u_all.shape)
+    if comm.size == 1:
+        assert np.allclose(u_all, u)
+
+    expect_trf = u_all.copy()
+
+    if bx == 'fft' and bz == 'cheby':
+        axes_1d = sorted(axes)[::-1]
+    elif bx == 'cheby' and bz == 'fft':
+        axes_1d = sorted(axes)
+    else:
+        axes_1d = axes
+
+    for i in axes_1d:
+        base = helper.axes[i]
+        axis = i + 1 if i >= 0 else i
+        expect_trf = base.transform(expect_trf, axes=(axis,))
+
+    trf = helper.transform(u, axes=axes)
+    itrf = helper.itransform(trf, axes=axes)
+
+    expect_local = expect_trf[:, *helper.local_slice]
+
+    print(expect_local)
+    print(trf)
+    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
+def test_transformold(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -291,6 +346,9 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
         rank = comm.rank
     else:
         comm = None
+    from mpi4py import MPI
+
+    comm = MPI.COMM_WORLD
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
@@ -322,7 +380,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
 
     for i in axes_1d:
         base = helper.axes[i]
-        expect_trf = base.transform(expect_trf, axis=i)
+        expect_trf = base.transform(expect_trf, axes=(i,))
 
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
@@ -581,11 +639,11 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(8, 3, 'fft', 'cheby', (-1,))
+        test_transform(4, 2, 'cheby', 'fft', (0,))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='fft', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'int')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', (-1, -2))
     else:

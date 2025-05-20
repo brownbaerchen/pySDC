@@ -404,4 +404,4 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
 
 
 if __name__ == '__main__':
-    test_transform(4, 2, 'dct')
+    test_transform(4, 1, 'dct')
