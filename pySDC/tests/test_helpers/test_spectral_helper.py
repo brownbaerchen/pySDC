@@ -293,7 +293,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
-    pfft = helper.get_pfft(axes=axes)
+    pfft = helper.get_pfft()
 
     if comm:
         u_global = np.empty(shape=helper.global_shape)
@@ -570,7 +570,7 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        test_transform(nx=3, nz=2, bx='fft', bz='fft', axes=(-1,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
