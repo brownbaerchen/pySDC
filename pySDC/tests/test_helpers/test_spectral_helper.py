@@ -252,12 +252,13 @@ def _test_transform_dealias(
     u2 = u**2
     u2_pad = u_pad**2
 
-    print(u_pad)
-    print(u_expect_pad / u_pad)
     assert np.allclose(u, u_expect)
     assert np.allclose(u_pad, u_expect_pad)
 
-    assert np.allclose(u2_hat_expect, helper.transform(u2_pad, padding=_padding))
+    print('loggge')
+    u2_hat = helper.transform(u2_pad, padding=_padding)
+    print(u2_hat_expect / u2_hat)
+    assert np.allclose(u2_hat_expect, u2_hat)
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
 
@@ -576,7 +577,7 @@ if __name__ == '__main__':
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', -2, nx=2**8, nz=2**8, padding=1.5)
+        _test_transform_dealias('fft', 'cheby', -2, nx=2**4, nz=3, padding=1.5)
     else:
         raise NotImplementedError
     print('done')

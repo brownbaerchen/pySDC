@@ -495,7 +495,9 @@ class ChebychevHelper(SpectralHelper1D):
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
-            trf *= self.get_norm(u.shape[axis])[*expansion]
+            norm = self.xp.ones(trf.shape[axis])
+            norm[: self.N] = self.norm
+            trf *= norm[*expansion]
         return trf * M
 
     def itransform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
