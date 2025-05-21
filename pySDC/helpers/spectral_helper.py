@@ -333,6 +333,7 @@ class ChebychevHelper(SpectralHelper1D):
         D[0, :] /= 2
         return self.sparse_lib.csc_matrix(self.xp.linalg.matrix_power(D, p)) / self.lin_trf_fac**p
 
+    @lru_cache(maxsize=99)
     def get_norm(self, N=None):
         '''
         Get normalization for converting Chebychev coefficients and DCT
@@ -494,7 +495,7 @@ class ChebychevHelper(SpectralHelper1D):
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
-            trf *= self.norm[*expansion]
+            trf *= self.get_norm(u.shape[axis])[*expansion]
         return trf * M
 
     def itransform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
@@ -514,7 +515,7 @@ class ChebychevHelper(SpectralHelper1D):
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
-            _u /= self.norm[*expansion]
+            _u /= self.get_norm(_u.shape[axis])[*expansion]
         return (
             self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs) * M
         )
@@ -1382,7 +1383,7 @@ class SpectralHelper:
         padding = list(padding if padding else [1.0 for _ in range(self.ndim)])
 
         transforms = {
-            (i,): (
+            ((i + self.ndim) % self.ndim,): (
                 partial(self.axes[i].transform, M=self.axes[i].N),
                 partial(self.axes[i].itransform, M=1 / self.axes[i].N),
             )
@@ -1401,7 +1402,7 @@ class SpectralHelper:
             shape=self.global_shape[1:],
             axes=sorted(axes)[::-1],  # TODO: control the order of the transforms better
             dtype='D',
-            collapse=False,  # TODO depending on padding, I may be able to collapse transforms
+            collapse=False,
             backend=self.fft_backend,
             comm_backend=self.fft_comm_backend,
             padding=padding,

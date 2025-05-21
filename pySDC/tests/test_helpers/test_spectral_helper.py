@@ -188,9 +188,12 @@ def _test_transform_dealias(
     helper.setup_fft()
     xp = helper.xp
 
-    _padding = [
-        padding,
-    ] * helper.ndim
+    _padding = tuple(
+        [
+            padding,
+        ]
+        * helper.ndim
+    )
 
     helper_pad = SpectralHelper(comm=comm, debug=True)
     helper_pad.add_axis(base=bx, N=int(_padding[0] * nx))
@@ -245,14 +248,17 @@ def _test_transform_dealias(
 
     assert bx == 'fft' and bz == 'cheby', 'This test is not implemented for the bases you are looking for'
 
+    print(u_hat)
     u_pad = helper.itransform(u_hat, padding=_padding, axes=axes)
     u = helper.itransform(u_hat, axes=axes).real
 
-    assert not np.allclose(u_pad.shape, u.shape)
+    assert not np.allclose(u_pad.shape, u.shape) or padding == 1
 
     u2 = u**2
     u2_pad = u_pad**2
 
+    print(u)
+    print(u_expect)
     assert np.allclose(u, u_expect)
     assert np.allclose(u_pad, u_expect_pad)
 
@@ -316,8 +322,6 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     else:
         expect_local = expect_trf
 
-    print(expect_local)
-    print(trf)
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
 
@@ -439,12 +443,12 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
 
 
-@pytest.mark.mpi4py
+@pytest.mark.base
 @pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, **kwargs):
+def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=False, **kwargs):
     '''
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
@@ -452,7 +456,15 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, **kwargs):
     from pySDC.helpers.spectral_helper import SpectralHelper
     import numpy as np
 
-    helper = SpectralHelper(debug=True)
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+        rank = comm.rank
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis('fft', N=nx)
     helper.add_axis('cheby', N=nz)
     helper.add_component(['u'])
@@ -563,13 +575,13 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(2, 2, 'fft', 'fft', (-1,))
+        # test_transform(2, 2, 'fft', 'cheby', (-1,))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        # test_tau_method2D('T2U', 2**2, 2**1, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        # _test_transform_dealias('fft', 'cheby', (-1, -2))
+        _test_transform_dealias('fft', 'cheby', -2, nx=2**2, nz=3, padding=2)
     else:
         raise NotImplementedError
     print('done')
