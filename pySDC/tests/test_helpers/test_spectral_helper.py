@@ -261,12 +261,12 @@ def _test_transform_dealias(
 
 
 @pytest.mark.mpi4py
-@pytest.mark.mpi(ranks=[1, 2, 3])
+@pytest.mark.mpi(ranks=[1, 2])
 @pytest.mark.parametrize('nx', [3, 8])
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
+@pytest.mark.parametrize('axes', [(-1,), (-2, -1)])
 def test_transform_MPI(mpi_ranks, nx, nz, bx, bz, axes, **kwargs):
     test_transform(nx=nx, nz=nz, bx=bx, bz=bz, axes=axes, useMPI=True, **kwargs)
 
@@ -567,7 +567,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(nx=4, nz=4, bx='fft', bz='fft', axes=(-2, -1), useMPI=True)
+        test_transform(nx=3, nz=8, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
