@@ -165,10 +165,6 @@ def _test_transform_dealias(
     nx=2**4 + 1,
     nz=2**2 + 1,
     padding=3 / 2,
-    axes=(
-        -2,
-        -1,
-    ),
     useMPI=True,
     **kwargs,
 ):
@@ -248,17 +244,16 @@ def _test_transform_dealias(
 
     assert bx == 'fft' and bz == 'cheby', 'This test is not implemented for the bases you are looking for'
 
-    print(u_hat)
-    u_pad = helper.itransform(u_hat, padding=_padding, axes=axes)
-    u = helper.itransform(u_hat, axes=axes).real
+    u_pad = helper.itransform(u_hat, padding=_padding)
+    u = helper.itransform(u_hat).real
 
     assert not np.allclose(u_pad.shape, u.shape) or padding == 1
 
     u2 = u**2
     u2_pad = u_pad**2
 
-    print(u)
-    print(u_expect)
+    print(u_pad)
+    print(u_expect_pad / u_pad)
     assert np.allclose(u, u_expect)
     assert np.allclose(u_pad, u_expect_pad)
 
@@ -581,7 +576,7 @@ if __name__ == '__main__':
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', -2, nx=2**2, nz=3, padding=2)
+        _test_transform_dealias('fft', 'cheby', -2, nx=2**8, nz=2**8, padding=1.5)
     else:
         raise NotImplementedError
     print('done')
