@@ -500,7 +500,7 @@ class ChebychevHelper(SpectralHelper1D):
             trf *= norm[*expansion]
         return trf * M
 
-    def itransform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
+    def itransform(self, u, axes, *args, shape=None, M=1, **kwargs):
         """
         Inverse DCT along axis.
 
@@ -512,7 +512,6 @@ class ChebychevHelper(SpectralHelper1D):
             Data in physical space
         """
         assert self.fft_lib == scipy.fft
-        axes = axes if axes else tuple(i for i in range(u.ndim))
         _u = u.copy()
         for axis in axes:
             expansion = [np.newaxis for _ in u.shape]
@@ -1397,14 +1396,16 @@ class SpectralHelper:
         if self.comm and self.comm.size == 1:
             grid = None
         elif self.slab_decomposition:
+            raise NotImplementedError
             grid = (-1,) + tuple(me.N for me in self.axes[1:])
         else:
-            grid = (-1,) * (self.ndim - 1) + (self.axes[-1].N,)
+            grid = (-1,) * (self.ndim - 1) + (1,)
 
+        _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))  # [::-1]
         pfft = PFFT(
             comm=self.comm,
             shape=self.global_shape[1:],
-            axes=sorted(axes)[::-1],  # TODO: control the order of the transforms better
+            axes=_axes,  # TODO: control the order of the transforms better
             dtype='D',
             collapse=False,
             backend=self.fft_backend,

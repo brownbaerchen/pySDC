@@ -115,7 +115,7 @@ def test_differentiation_non_standard_domain_size(N, x0, x1, p):
     D = cheby.get_differentiation_matrix(p)
 
     du_hat = D @ u_hat
-    du = cheby.itransform(du_hat)
+    du = cheby.itransform(du_hat, axes=(-1,))
 
     assert np.allclose(du_hat_exact, du_hat), np.linalg.norm(du_hat_exact - du_hat)
     assert np.allclose(du, du_exact), np.linalg.norm(du_exact - du)
@@ -161,8 +161,8 @@ def test_transform(N, d, transform_type):
     assert np.allclose(u.shape, itransform.shape)
     assert np.allclose(scipy.fft.dct(u, axis=-1) * norm, cheby.transform(u, axes=(-1,)).real)
     assert np.allclose(scipy.fft.idct(u / norm, axis=-1), itransform)
-    assert np.allclose(cheby.transform(cheby.itransform(u)), u)
-    assert np.allclose(cheby.itransform(cheby.transform(u)), u)
+    assert np.allclose(cheby.transform(cheby.itransform(u, axes=(-1,)), axes=(-1,)), u)
+    assert np.allclose(cheby.itransform(cheby.transform(u, axes=(-1,)), axes=(-1,)), u)
 
 
 @pytest.mark.base
