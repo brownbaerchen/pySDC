@@ -1382,13 +1382,13 @@ class SpectralHelper:
             return None
         from mpi4py_fft import PFFT
 
-        axes = axes if axes else tuple(i for i in range(self.ndim))
+        axes = tuple(i for i in range(self.ndim)) if axes is None else axes
         padding = list(padding if padding else [1.0 for _ in range(self.ndim)])
 
         transforms = {
             ((i + self.ndim) % self.ndim,): (
                 partial(self.axes[i].transform, M=self.axes[i].N),
-                partial(self.axes[i].itransform, M=1 / self.axes[i].N),  # / np.sqrt(padding[i])),
+                partial(self.axes[i].itransform, M=1 / self.axes[i].N),
             )
             for i in axes
         }
@@ -1402,6 +1402,9 @@ class SpectralHelper:
             grid = (-1,) * (self.ndim - 1) + (1,)
 
         _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))  # [::-1]
+        if _axes == (0,):
+            grid = (1, -1)
+            print('warning: this needs fixing!')
         pfft = PFFT(
             comm=self.comm,
             shape=self.global_shape[1:],
@@ -1490,11 +1493,16 @@ class SpectralHelper:
 
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
         self.local_slice = [slice(0, me.N) for me in self.axes]
+        self.forward_alignment = 0
+        self.backward_alignment = 0
 
         axes = tuple(i for i in range(len(self.axes)))
         self.fft_obj = self.get_pfft(axes=axes)  # self.get_fft(axes=axes, direction='object')
         if self.fft_obj is not None:
             self.local_slice = self.fft_obj.local_slice(False)
+
+            self.backward_alignment = self.newDistArray(self.fft_obj, forward_output=False, rank=1).alignment
+            self.forward_alignment = self.newDistArray(self.fft_obj, forward_output=True, rank=1).alignment
 
         self.init = (
             np.empty(shape=self.global_shape)[
@@ -1698,6 +1706,23 @@ class SpectralHelper:
         z = darraycls(global_shape, subcomm=p0.subcomm, val=val, dtype=dtype, alignment=p0.axis, rank=rank)
         return z.v if view else z
 
+    def infer_alignment(self, u, forward_output, **kwargs):
+        pfft = self.get_pfft(**kwargs)
+        _arr = self.newDistArray(pfft, forward_output=forward_output)
+        aligned_axes = [i for i in range(self.ndim) if _arr.global_shape[i + 1] == u.shape[i + 1]]
+
+        assert len(aligned_axes) > 0, 'Found no aligned axes!'
+        return aligned_axes
+
+    def redistribute(self, u, axis, forward_output, **kwargs):
+        pfft = self.get_pfft(**kwargs)
+        _arr = self.newDistArray(pfft, forward_output=forward_output)
+        u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
+
+        _arr = _arr.redistribute(u_alignment)
+        _arr[...] = u
+        return _arr.redistribute(axis)
+
     def transform(self, u, *args, axes=None, **kwargs):
         pfft = self.get_pfft(*args, axes=axes, **kwargs)
         if pfft is None:
@@ -1711,9 +1736,10 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=False, rank=1)
         _out = self.newDistArray(pfft, forward_output=True, rank=1)
 
-        _in[...] = u
+        _in = self.redistribute(u, axis=_in.alignment, forward_output=False, **kwargs)
+
         pfft.forward(_in, _out)
-        return _out
+        return _out.redistribute(self.forward_alignment)
 
     def transform_old(self, u, axes=None, padding=None):
         """
@@ -1957,9 +1983,10 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=True, rank=1)
         _out = self.newDistArray(pfft, forward_output=False, rank=1)
 
-        _in[...] = u
+        _in = self.redistribute(u, axis=_in.alignment, forward_output=True, **kwargs)
+
         pfft.backward(_in, _out)
-        return _out
+        return _out.redistribute(self.backward_alignment)
 
     def itransformold(self, u, axes=None, padding=None):
         """

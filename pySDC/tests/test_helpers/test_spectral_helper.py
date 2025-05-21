@@ -266,7 +266,7 @@ def _test_transform_dealias(
 @pytest.mark.parametrize('nz', [3, 8])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2, -1)])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-2, -1)])
 def test_transform_MPI(mpi_ranks, nx, nz, bx, bz, axes, **kwargs):
     test_transform(nx=nx, nz=nz, bx=bx, bz=bz, axes=axes, useMPI=True, **kwargs)
 
@@ -519,13 +519,15 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
 
 
 @pytest.mark.mpi4py
+@pytest.mark.mpi(ranks=[2])
 @pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2])
 @pytest.mark.parametrize('num_procs', [2, 1])
-def test_tau_method2D_MPI(variant, nz, nx, bc_val, num_procs, **kwargs):
-    run_MPI_test(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
+def test_tau_method2D_MPI(mpi_ranks, variant, nz, nx, bc_val, num_procs, **kwargs):
+    # run_MPI_test(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
+    test_tau_method2D(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau', useMPI=True)
 
 
 @pytest.mark.mpi4py
@@ -567,12 +569,13 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(nx=3, nz=8, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8+1, padding=2.0)
     else:
