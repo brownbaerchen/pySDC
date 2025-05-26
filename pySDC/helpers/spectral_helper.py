@@ -1267,7 +1267,7 @@ class SpectralHelper:
                             self._rhs_hat_zero_mask[(*_slice,)] = True
 
         rhs_hat[self._rhs_hat_zero_mask] = 0
-        return rhs_hat + self.rhs_BCs_hat
+        return rhs_hat + self.redistribute(self.rhs_BCs_hat, self.infer_alignment(rhs_hat, True)[0], True)
 
     def put_BCs_in_rhs(self, rhs):
         """
@@ -1289,6 +1289,7 @@ class SpectralHelper:
             _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
 
             for bc in self.full_BCs:
+                print('The slice here needs to be in the non-distributed axis', flush=True)
                 slices = (
                     [slice(0, self.init[0][i + 1]) for i in range(axis)]
                     + [bc['line']]

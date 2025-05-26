@@ -467,7 +467,8 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     z = Z[0, :]
     shape = helper.init[0][1:]
 
-    bcs = np.sin(bc_val * x)
+    bcs = np.ones_like(x)  # np.sin(bc_val * x)
+    print('need to fix above thing')
     helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
@@ -484,11 +485,13 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     # prepare system to solve
     A = helper.put_BCs_in_matrix(A)
     rhs_hat = helper.put_BCs_in_rhs_hat(helper.u_init_forward)
+    print('rhs_hat', rhs_hat)
 
     # solve the system
     sol_hat = helper.u_init_forward
     sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
     sol = helper.itransform(sol_hat).real
+    print('sol', sol)
 
     # construct polynomials for testing
     sol_cheby = helper.transform(sol, axes=(-1,))
@@ -570,12 +573,12 @@ if __name__ == '__main__':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        test_transform(nx=3, nz=2, bx='fft', bz='fft', axes=(-1,), useMPI=True)
+        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True, useMPI=True)
+        test_tau_method2D('T2U', 2**1, 2**1, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8+1, padding=2.0)
     else:
