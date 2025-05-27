@@ -28,6 +28,7 @@ class SpectralHelper1D:
     sparse_lib = scipy.sparse
     linalg = scipy.sparse.linalg
     xp = np
+    distributable = False
 
     def __init__(self, N, x0=None, x1=None, useGPU=False):
         """
@@ -722,6 +723,8 @@ class UltrasphericalHelper(ChebychevHelper):
 
 
 class FFTHelper(SpectralHelper1D):
+    distributable = True
+
     def __init__(self, *args, x0=0, x1=2 * np.pi, **kwargs):
         """
         Constructor.
@@ -883,7 +886,6 @@ class SpectralHelper:
         BC_line_zero_matrix (sparse matrix): Matrix that zeros rows where we can then add the BCs in using `BCs`
         rhs_BCs_hat (self.xp.ndarray): Boundary conditions in spectral space
         global_shape (tuple): Global shape of the solution as in `mpi4py-fft`
-        local_slice (slice): Local slice of the solution as in `mpi4py-fft`
         fft_obj: When using distributed FFTs, this will be a parallel transform object from `mpi4py-fft`
         init (tuple): This is the same `init` that is used throughout the problem classes
         init_forward (tuple): This is the equivalent of `init` in spectral space
@@ -1126,7 +1128,7 @@ class SpectralHelper:
                 + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
             )
         N = self.axes[axis].N
-        if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
+        if (N + line) % N in self.xp.arange(N)[self.local_slice()[axis]]:
             self.BC_rhs_mask[(*slices,)] = False
 
     def add_BC(self, component, equation, axis, kind, v, line=-1, scalar=False, **kwargs):
@@ -1170,15 +1172,10 @@ class SpectralHelper:
             else:
                 self.BC_rhs_mask[(*slices,)] = True
         else:
-            slices = (
-                [self.index(equation)]
-                + [slice(0, self.init[0][i + 1]) for i in range(axis)]
-                + [line]
-                + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-            )
+            slices = [self.index(equation), *self.global_slice(True)]
             N = self.axes[axis].N
-            if (N + line) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                slices[axis + 1] -= self.local_slice[axis].start
+            if (N + line) % N in self.get_indices(True)[axis]:
+                slices[axis + 1] = (N + line) % N - self.local_slice()[axis].start
                 self.BC_rhs_mask[(*slices,)] = True
 
     def setup_BCs(self):
@@ -1250,21 +1247,17 @@ class SpectralHelper:
             Generate a mask where we need to set values in the rhs in spectral space to zero, such that can replace them
             by the boundary conditions. The mask is then cached.
             """
-            self._rhs_hat_zero_mask = self.xp.zeros(shape=rhs_hat.shape, dtype=bool)
+            self._rhs_hat_zero_mask = self.newDistArray().astype(bool)
 
             for axis in range(self.ndim):
                 for bc in self.full_BCs:
-                    slices = (
-                        [slice(0, self.init[0][i + 1]) for i in range(axis)]
-                        + [bc['line']]
-                        + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-                    )
                     if axis == bc['axis']:
-                        _slice = [self.index(bc['equation'])] + slices
+                        slices = [self.index(bc['equation']), *self.global_slice(True)]
                         N = self.axes[axis].N
-                        if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                            _slice[axis + 1] -= self.local_slice[axis].start
-                            self._rhs_hat_zero_mask[(*_slice,)] = True
+                        line = bc['line']
+                        if (N + line) % N in self.get_indices(True)[axis]:
+                            slices[axis + 1] = (N + line) % N - self.local_slice()[axis].start
+                            self._rhs_hat_zero_mask[(*slices,)] = True
 
         rhs_hat[self._rhs_hat_zero_mask] = 0
         return rhs_hat + self.redistribute(self.rhs_BCs_hat, self.infer_alignment(rhs_hat, True)[0], True)
@@ -1289,19 +1282,14 @@ class SpectralHelper:
             _rhs_hat = self.transform(rhs, axes=(axis - ndim,))
 
             for bc in self.full_BCs:
-                print('The slice here needs to be in the non-distributed axis', flush=True)
-                slices = (
-                    [slice(0, self.init[0][i + 1]) for i in range(axis)]
-                    + [bc['line']]
-                    + [slice(0, self.init[0][i + 1]) for i in range(axis + 1, len(self.axes))]
-                )
+
                 if axis == bc['axis']:
-                    _slice = [self.index(bc['equation'])] + slices
+                    _slice = [self.index(bc['equation']), *self.global_slice(True)]
 
                     N = self.axes[axis].N
-                    if (N + bc['line']) % N in self.xp.arange(N)[self.local_slice[axis]]:
-                        _slice[axis + 1] -= self.local_slice[axis].start
-
+                    line = bc['line']
+                    if (N + line) % N in self.get_indices(True)[axis]:
+                        _slice[axis + 1] = (N + line) % N - self.local_slice()[axis].start
                         _rhs_hat[(*_slice,)] = bc['v']
 
             rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
@@ -1367,15 +1355,18 @@ class SpectralHelper:
         """
         Get grid in spectral space
         """
-        grids = [self.axes[i].get_wavenumbers()[self.local_slice[i]] for i in range(len(self.axes))]
+        grids = [self.axes[i].get_wavenumbers()[self.local_slice(True)[i]] for i in range(len(self.axes))]
         return self.xp.meshgrid(*grids, indexing='ij')
 
-    def get_grid(self):
+    def get_grid(self, forward_output=False):
         """
         Get grid in physical space
         """
-        grids = [self.axes[i].get_1dgrid()[self.local_slice[i]] for i in range(len(self.axes))]
+        grids = [self.axes[i].get_1dgrid()[self.local_slice(forward_output)[i]] for i in range(len(self.axes))]
         return self.xp.meshgrid(*grids, indexing='ij')
+
+    def get_indices(self, forward_output=True):
+        return [self.xp.arange(self.axes[i].N)[self.local_slice(forward_output)[i]] for i in range(len(self.axes))]
 
     @lru_cache(maxsize=99)
     def get_pfft(self, axes=None, padding=None, grid=None):
@@ -1402,10 +1393,11 @@ class SpectralHelper:
         else:
             grid = (-1,) * (self.ndim - 1) + (1,)
 
-        _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))  # [::-1]
-        if _axes == (0,):
-            grid = (1, -1)
-            print('warning: this needs fixing!')
+        _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))
+        _axes = [axis for axis in _axes if not self.axes[axis].distributable] + [
+            axis for axis in _axes if self.axes[axis].distributable
+        ]
+        grid = None
         pfft = PFFT(
             comm=self.comm,
             shape=self.global_shape[1:],
@@ -1481,6 +1473,18 @@ class SpectralHelper:
 
         return self.fft_cache[key]
 
+    def local_slice(self, forward_output=True):
+        if self.fft_obj:
+            return self.fft_obj.local_slice(forward_output=forward_output)
+        else:
+            return [slice(0, me.N) for me in self.axes]
+
+    def global_slice(self, forward_output=True):
+        if self.fft_obj:
+            return [slice(0, me) for me in self.fft_obj.global_shape(forward_output=forward_output)]
+        else:
+            return self.local_slice(forward_output=forward_output)
+
     def setup_fft(self, real_spectral_coefficients=False):
         """
         This function must be called after all axes have been setup in order to prepare the local shapes of the data.
@@ -1493,14 +1497,14 @@ class SpectralHelper:
             self.add_component('u')
 
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
-        self.local_slice = [slice(0, me.N) for me in self.axes]
+        # self.local_slice = [slice(0, me.N) for me in self.axes]
         self.forward_alignment = 0
         self.backward_alignment = 0
 
         axes = tuple(i for i in range(len(self.axes)))
         self.fft_obj = self.get_pfft(axes=axes)  # self.get_fft(axes=axes, direction='object')
         if self.fft_obj is not None:
-            self.local_slice = self.fft_obj.local_slice(False)
+            # self.local_slice = self.fft_obj.local_slice(False)
 
             self.backward_alignment = self.newDistArray(self.fft_obj, forward_output=False, rank=1).alignment
             self.forward_alignment = self.newDistArray(self.fft_obj, forward_output=True, rank=1).alignment
@@ -1509,7 +1513,7 @@ class SpectralHelper:
             np.empty(shape=self.global_shape)[
                 (
                     ...,
-                    *self.local_slice,
+                    *self.local_slice(False),
                 )
             ].shape,
             self.comm,
@@ -1519,7 +1523,7 @@ class SpectralHelper:
             np.empty(shape=self.global_shape)[
                 (
                     ...,
-                    *self.local_slice,
+                    *self.local_slice(True),
                 )
             ].shape,
             self.comm,
@@ -1527,10 +1531,7 @@ class SpectralHelper:
         )
 
         self.BC_mat = self.get_empty_operator_matrix()
-        self.BC_rhs_mask = self.xp.zeros(
-            shape=self.init[0],
-            dtype=bool,
-        )
+        self.BC_rhs_mask = self.newDistArray().astype(bool)
 
     def _transform_fft(self, u, axes, **kwargs):
         """
@@ -1708,6 +1709,8 @@ class SpectralHelper:
         return z.v if view else z
 
     def infer_alignment(self, u, forward_output, **kwargs):
+        if self.comm is None:
+            return [0]
         pfft = self.get_pfft(**kwargs)
         _arr = self.newDistArray(pfft, forward_output=forward_output)
         aligned_axes = [i for i in range(self.ndim) if _arr.global_shape[i + 1] == u.shape[i + 1]]
@@ -1716,6 +1719,8 @@ class SpectralHelper:
         return aligned_axes
 
     def redistribute(self, u, axis, forward_output, **kwargs):
+        if self.comm is None:
+            return u
         pfft = self.get_pfft(**kwargs)
         _arr = self.newDistArray(pfft, forward_output=forward_output)
         u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
@@ -2024,7 +2029,7 @@ class SpectralHelper:
     def get_local_slice_of_1D_matrix(self, M, axis):
         """
         Get the local version of a 1D matrix. When using distributed FFTs, each rank will carry only a subset of modes,
-        which you can sort out via the `SpectralHelper.local_slice` attribute. When constructing a 1D matrix, you can
+        which you can sort out via the `SpectralHelper.local_slice()` attribute. When constructing a 1D matrix, you can
         use this method to get the part corresponding to the modes carried by this rank.
 
         Args:
@@ -2034,7 +2039,7 @@ class SpectralHelper:
         Returns:
             sparse local matrix
         """
-        return M.tocsc()[self.local_slice[axis], self.local_slice[axis]]
+        return M.tocsc()[self.local_slice(True)[axis], self.local_slice(True)[axis]]
 
     def expand_matrix_ND(self, matrix, aligned):
         sp = self.sparse_lib

@@ -298,7 +298,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     if comm:
         u_global = np.empty(shape=helper.global_shape)
         u_global[...] = comm.bcast(np.random.random(u_global.shape))
-        u = u_global[:, *helper.local_slice]
+        u = u_global[:, *helper.local_slice(False)]
         expect_trf = u_global.copy()
     else:
         u = np.empty(shape=helper.global_shape)
@@ -462,13 +462,12 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     helper.add_component(['u'])
     helper.setup_fft()
 
-    X, Z = helper.get_grid()
+    X, Z = helper.get_grid(forward_output=True)
     x = X[:, 0]
     z = Z[0, :]
     shape = helper.init[0][1:]
 
-    bcs = np.ones_like(x)  # np.sin(bc_val * x)
-    print('need to fix above thing')
+    bcs = np.sin(bc_val * x)
     helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
@@ -485,20 +484,18 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     # prepare system to solve
     A = helper.put_BCs_in_matrix(A)
     rhs_hat = helper.put_BCs_in_rhs_hat(helper.u_init_forward)
-    print('rhs_hat', rhs_hat)
 
     # solve the system
     sol_hat = helper.u_init_forward
     sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
-    sol = helper.itransform(sol_hat).real
-    print('sol', sol)
+    sol = helper.redistribute(helper.itransform(sol_hat), True, 1).real
 
     # construct polynomials for testing
     sol_cheby = helper.transform(sol, axes=(-1,))
-    polys = [np.polynomial.Chebyshev(sol_cheby[0, i, :]) for i in range(shape[0])]
+    polys = [np.polynomial.Chebyshev(sol_cheby[0, i, :]) for i in range(sol_cheby.shape[1])]
 
     Pz = np.polynomial.Chebyshev(np.append(np.zeros(nz - 1), [1]))
-    tau_term, _ = np.meshgrid(Pz(z), np.ones(shape[0]))
+    tau_term, _ = np.meshgrid(Pz(z), np.ones(sol_hat.shape[1]))
     error = ((A @ sol_hat.flatten()).reshape(X.shape) / tau_term).real
 
     if plotting:
@@ -510,7 +507,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
         plt.ylabel('t')
         plt.show()
 
-    for i in range(shape[0]):
+    for i in range(sol.shape[1]):
 
         assert np.isclose(polys[i](bc), bcs[i]), f'Solution does not satisfy boundary condition x={x[i]}'
 
@@ -572,13 +569,13 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        test_tau_method2D('T2U', 2**1, 2**1, -2, plotting=False, useMPI=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8+1, padding=2.0)
     else:
