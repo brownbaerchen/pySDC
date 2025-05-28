@@ -577,7 +577,7 @@ if __name__ == '__main__':
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8 + 1, padding=2.0)
+        _test_transform_dealias('fft', 'cheby', -1, nx=32, nz=64, padding=1.5)
     else:
         raise NotImplementedError
     print('done')

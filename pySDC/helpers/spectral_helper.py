@@ -3,8 +3,10 @@ import scipy
 from pySDC.implementations.datatype_classes.mesh import mesh
 from scipy.special import factorial
 from functools import lru_cache, partial
+import logging
 
-# TODO: implement FFTW for individual transforms
+# TODO: implement FFTW for individual transforms (possibly change normalisation in mpi4py-fft)
+# TODO: implement cupy for transforms
 
 
 class SpectralHelper1D:
@@ -944,6 +946,8 @@ class SpectralHelper:
         self.fft_cache = {}
         self.fft_dealias_shape_cache = {}
 
+        self.logger = logging.getLogger(name='Spectral Discretization')
+
     @property
     def u_init(self):
         """
@@ -1708,17 +1712,33 @@ class SpectralHelper:
         z = darraycls(global_shape, subcomm=p0.subcomm, val=val, dtype=dtype, alignment=p0.axis, rank=rank)
         return z.v if view else z
 
-    def infer_alignment(self, u, forward_output, **kwargs):
+    def infer_alignment(self, u, forward_output, padding=None, **kwargs):
         if self.comm is None:
             return [0]
-        pfft = self.get_pfft(**kwargs)
-        _arr = self.newDistArray(pfft, forward_output=forward_output)
-        aligned_axes = [i for i in range(self.ndim) if _arr.global_shape[i + 1] == u.shape[i + 1]]
 
-        # if len(aligned_axes) == 0:
-        #     print(_arr.global_shape, u.shape)
-        #     breakpoint()
-        assert len(aligned_axes) > 0, 'Found no aligned axes!'
+        def _alignment(pfft):
+            _arr = self.newDistArray(pfft, forward_output=forward_output)
+            _aligned_axes = [i for i in range(self.ndim) if _arr.global_shape[i + 1] == u.shape[i + 1]]
+            return _aligned_axes
+
+        if padding is None:
+            pfft = self.get_pfft(**kwargs)
+            aligned_axes = _alignment(pfft)
+        else:
+            if self.ndim == 2:
+                padding_options = [(1.0, padding[1]), (padding[0], 1.0), padding, (1.0, 1.0)]
+                for _padding in padding_options:
+                    pfft = self.get_pfft(padding=_padding, **kwargs)
+                    aligned_axes = _alignment(pfft)
+                    if len(aligned_axes) > 0:
+                        self.logger.debug(
+                            f'Found alignment of array with size {u.shape}: {aligned_axes} using padding {_padding}'
+                        )
+                        break
+            else:
+                raise NotImplementedError
+
+        assert len(aligned_axes) > 0, f'Found no aligned axes for array of size {u.shape}!'
         return aligned_axes
 
     def redistribute(self, u, axis, forward_output, **kwargs):
