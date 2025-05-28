@@ -481,7 +481,7 @@ class ChebychevHelper(SpectralHelper1D):
         else:
             raise NotImplementedError
 
-    def transform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
+    def transform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         DCT along axes. `kwargs` will be passed on to the FFT library.
 
@@ -501,9 +501,9 @@ class ChebychevHelper(SpectralHelper1D):
             norm = self.xp.ones(trf.shape[axis])
             norm[: self.N] = self.norm
             trf *= norm[*expansion]
-        return trf * M
+        return trf
 
-    def itransform(self, u, axes, *args, shape=None, M=1, **kwargs):
+    def itransform(self, u, axes, *args, shape=None, **kwargs):
         """
         Inverse DCT along axis.
 
@@ -522,9 +522,7 @@ class ChebychevHelper(SpectralHelper1D):
             norm = self.xp.ones(_u.shape[axis])
             norm[: self.N] = self.norm
             _u /= norm[*expansion]
-        return (
-            self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs) * M
-        )
+        return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs)
 
     def get_BC(self, kind, **kwargs):
         """
@@ -789,7 +787,7 @@ class FFTHelper(SpectralHelper1D):
         k[0] = 1j * self.L
         return self.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
-    def transform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
+    def transform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         FFT along axes. `kwargs` are passed on to the FFT library.
 
@@ -802,9 +800,9 @@ class FFTHelper(SpectralHelper1D):
         """
         assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        return self.fft_lib.fftn(u, *args, axes=axes, s=shape, **kwargs) * M
+        return self.fft_lib.fftn(u, *args, axes=axes, s=shape, **kwargs)
 
-    def itransform(self, u, *args, axes=None, shape=None, M=1, **kwargs):
+    def itransform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         Inverse FFT.
 
@@ -817,7 +815,7 @@ class FFTHelper(SpectralHelper1D):
         """
         assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        return self.fft_lib.ifftn(u, *args, axes=axes, s=shape, **kwargs) * M
+        return self.fft_lib.ifftn(u, *args, axes=axes, s=shape, **kwargs)
 
     def get_BC(self, kind):
         """
@@ -1383,8 +1381,8 @@ class SpectralHelper:
 
         transforms = {
             ((i + self.ndim) % self.ndim,): (
-                partial(self.axes[i].transform, M=self.axes[i].N),
-                partial(self.axes[i].itransform, M=1 / self.axes[i].N),
+                self.axes[i].transform,
+                self.axes[i].itransform,
             )
             for i in axes
         }
@@ -1537,155 +1535,6 @@ class SpectralHelper:
         self.BC_mat = self.get_empty_operator_matrix()
         self.BC_rhs_mask = self.newDistArray().astype(bool)
 
-    def _transform_fft(self, u, axes, **kwargs):
-        """
-        FFT along `axes`
-
-        Args:
-            u: The solution
-            axes (tuple): Axes you want to transform over
-
-        Returns:
-            transformed solution
-        """
-        # TODO: clean up and try putting more of this in the 1D bases
-        fft = self.get_fft(axes, 'forward', **kwargs)
-        return fft(u, axes=axes)
-
-    def _transform_dct(self, u, axes, padding=None, **kwargs):
-        '''
-        DCT along `axes`.
-        This will only return real values!
-        When padding the solution, we cannot just use the mpi4py-fft implementation, because of the unusual ordering of
-        wavenumbers in FFTs.
-
-        Args:
-            u: The solution
-            axes (tuple): Axes you want to transform over
-
-        Returns:
-            transformed solution
-        '''
-        # TODO: clean up and try putting more of this in the 1D bases
-        if self.debug:
-            assert self.xp.allclose(u.imag, 0), 'This function can only handle real input.'
-
-        if len(axes) > 1:
-            v = self._transform_dct(self._transform_dct(u, axes[1:], **kwargs), (axes[0],), **kwargs)
-        else:
-            v = u.copy().astype(complex)
-            axis = axes[0]
-            base = self.axes[axis]
-
-            shuffle = [slice(0, s, 1) for s in u.shape]
-            shuffle[axis] = base.get_fft_shuffle(True, N=v.shape[axis])
-            v = v[(*shuffle,)]
-
-            if padding is not None:
-                shape = list(v.shape)
-                if ('forward', *padding) in self.fft_dealias_shape_cache.keys():
-                    shape[0] = self.fft_dealias_shape_cache[('forward', *padding)]
-                elif self.comm:
-                    send_buf = np.array(v.shape[0])
-                    recv_buf = np.array(v.shape[0])
-                    self.comm.Allreduce(send_buf, recv_buf)
-                    shape[0] = int(recv_buf)
-                fft = self.get_fft(axes, 'forward', shape=shape)
-            else:
-                fft = self.get_fft(axes, 'forward', **kwargs)
-
-            v = fft(v, axes=axes)
-
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, v.shape[axis], 1)
-
-            if padding is not None:
-                shift = base.get_fft_shift(True, v.shape[axis])
-
-                if padding[axis] != 1:
-                    N = int(np.ceil(v.shape[axis] / padding[axis]))
-                    _expansion = [slice(0, n) for n in v.shape]
-                    _expansion[axis] = slice(0, N, 1)
-                    v = v[(*_expansion,)]
-            else:
-                shift = base.fft_utils['fwd']['shift']
-
-            v *= shift[(*expansion,)]
-
-        return v.real
-
-    def transform_single_component(self, u, axes=None, padding=None):
-        """
-        Transform a single component of the solution
-
-        Args:
-            u data to transform:
-            axes (tuple): Axes over which to transform
-            padding (list): Padding factor for transform. E.g. a padding factor of 2 will discard the upper half of modes after transforming
-
-        Returns:
-            Transformed data
-        """
-        # TODO: clean up and try putting more of this in the 1D bases
-        trfs = {
-            ChebychevHelper: self._transform_dct,
-            UltrasphericalHelper: self._transform_dct,
-            FFTHelper: self._transform_fft,
-        }
-
-        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
-        padding = (
-            [
-                1,
-            ]
-            * self.ndim
-            if padding is None
-            else padding
-        )  # You know, sometimes I feel very strongly about Black still. This atrocious formatting is readable by Sauron only.
-
-        result = u.copy().astype(complex)
-        alignment = self.ndim - 1
-
-        axes_collapsed = [tuple(sorted(me for me in axes if type(self.axes[me]) == base)) for base in trfs.keys()]
-        bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
-        axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
-        shape = [max(u.shape[i], self.global_shape[1 + i]) for i in range(self.ndim)]
-
-        fft = self.get_fft(axes=axes, padding=padding, direction='object')
-        if fft is not None:
-            shape = list(fft.global_shape(False))
-
-        for trf in range(len(axes_collapsed)):
-            _axes = axes_collapsed[trf]
-            base = bases[trf]
-
-            if len(_axes) == 0:
-                continue
-
-            for _ax in _axes:
-                shape[_ax] = self.global_shape[1 + self.ndim + _ax]
-
-            fft = self.get_fft(_axes, 'object', padding=padding, shape=shape)
-
-            _in = self.get_aligned(
-                result, axis_in=alignment, axis_out=self.ndim + _axes[-1], forward=False, fft=fft, shape=shape
-            )
-
-            alignment = self.ndim + _axes[-1]
-
-            _out = trfs[base](_in, axes=_axes, padding=padding, shape=shape)
-
-            if self.comm is not None:
-                _out *= np.prod([self.axes[i].N for i in _axes])
-
-            axes_next_base = (axes_collapsed + [(-1,)])[trf + 1]
-            alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[-1]
-            result = self.get_aligned(
-                _out, axis_in=self.ndim + _axes[0], axis_out=alignment, fft=fft, forward=True, shape=shape
-            )
-
-        return result
-
     def newDistArray(self, pfft=None, forward_output=True, val=0, rank=1, view=False):
         from mpi4py_fft.distarray import DistArray
 
@@ -1752,8 +1601,9 @@ class SpectralHelper:
         _arr[...] = u
         return _arr.redistribute(axis)
 
-    def transform(self, u, *args, axes=None, **kwargs):
-        pfft = self.get_pfft(*args, axes=axes, **kwargs)
+    def transform(self, u, *args, axes=None, padding=None, **kwargs):
+        pfft = self.get_pfft(*args, axes=axes, padding=padding, **kwargs)
+
         if pfft is None:
             axes = axes if axes else tuple(i for i in range(self.ndim))
             u_hat = u.copy()
@@ -1765,175 +1615,14 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=False, rank=1)
         _out = self.newDistArray(pfft, forward_output=True, rank=1)
 
-        _in = self.redistribute(u, axis=_in.alignment, forward_output=False, **kwargs)
+        _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=False, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
-            pfft.forward(_in[i], _out[i])
+            pfft.forward(_in[i], _out[i], normalize=False)
+
+        if padding is not None:
+            _out /= np.prod(padding)
         return _out.redistribute(self.forward_alignment)
-
-    def transform_old(self, u, axes=None, padding=None):
-        """
-        Transform all components from physical space to spectral space
-
-        Args:
-            u data to transform:
-            axes (tuple): Axes over which to transform
-            padding (list): Padding factor for transform. E.g. a padding factor of 2 will discard the upper half of modes after transforming
-
-        Returns:
-            Transformed data
-        """
-        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
-        padding = (
-            [
-                1,
-            ]
-            * self.ndim
-            if padding is None
-            else padding
-        )
-
-        result = [
-            None,
-        ] * self.ncomponents
-        for comp in self.components:
-            i = self.index(comp)
-
-            result[i] = self.transform_single_component(u[i], axes=axes, padding=padding)
-
-        return self.xp.stack(result)
-
-    def _transform_ifft(self, u, axes, **kwargs):
-        # TODO: clean up and try putting more of this in the 1D bases
-        ifft = self.get_fft(axes, 'backward', **kwargs)
-        return ifft(u, axes=axes)
-
-    def _transform_idct(self, u, axes, padding=None, **kwargs):
-        '''
-        This will only ever return real values!
-        '''
-        # TODO: clean up and try putting more of this in the 1D bases
-        if self.debug:
-            assert self.xp.allclose(u.imag, 0), 'This function can only handle real input.'
-
-        v = u.copy().astype(complex)
-
-        if len(axes) > 1:
-            v = self._transform_idct(self._transform_idct(u, axes[1:]), (axes[0],))
-        else:
-            axis = axes[0]
-            base = self.axes[axis]
-
-            if padding is not None:
-                if padding[axis] != 1:
-                    N_pad = int(np.ceil(v.shape[axis] * padding[axis]))
-                    _pad = [[0, 0] for _ in v.shape]
-                    _pad[axis] = [0, N_pad - base.N]
-                    v = self.xp.pad(v, _pad, 'constant')
-
-                    shift = self.xp.exp(1j * np.pi * self.xp.arange(N_pad) / (2 * N_pad)) * base.N
-                else:
-                    shift = base.fft_utils['bck']['shift']
-            else:
-                shift = base.fft_utils['bck']['shift']
-
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, v.shape[axis], 1)
-
-            v *= shift[(*expansion,)]
-
-            if padding is not None:
-                if padding[axis] != 1:
-                    shape = list(v.shape)
-                    if ('backward', *padding) in self.fft_dealias_shape_cache.keys():
-                        shape[0] = self.fft_dealias_shape_cache[('backward', *padding)]
-                    elif self.comm:
-                        send_buf = np.array(v.shape[0])
-                        recv_buf = np.array(v.shape[0])
-                        self.comm.Allreduce(send_buf, recv_buf)
-                        shape[0] = int(recv_buf)
-                    ifft = self.get_fft(axes, 'backward', shape=shape)
-                else:
-                    ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
-            else:
-                ifft = self.get_fft(axes, 'backward', padding=padding, **kwargs)
-            v = ifft(v, axes=axes)
-
-            shuffle = [slice(0, s, 1) for s in v.shape]
-            shuffle[axis] = base.get_fft_shuffle(False, N=v.shape[axis])
-            v = v[(*shuffle,)]
-
-        return v.real
-
-    def itransform_single_component(self, u, axes=None, padding=None):
-        """
-        Inverse transform over single component of the solution
-
-        Args:
-            u data to transform:
-            axes (tuple): Axes over which to transform
-            padding (list): Padding factor for transform. E.g. a padding factor of 2 will add as many zeros as there were modes before before transforming
-
-        Returns:
-            Transformed data
-        """
-        # TODO: clean up and try putting more of this in the 1D bases
-        trfs = {
-            FFTHelper: self._transform_ifft,
-            ChebychevHelper: self._transform_idct,
-            UltrasphericalHelper: self._transform_idct,
-        }
-
-        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
-        padding = (
-            [
-                1,
-            ]
-            * self.ndim
-            if padding is None
-            else padding
-        )
-
-        result = u.copy().astype(complex)
-        alignment = self.ndim - 1
-
-        axes_collapsed = [tuple(sorted(me for me in axes if type(self.axes[me]) == base)) for base in trfs.keys()]
-        bases = [list(trfs.keys())[i] for i in range(len(axes_collapsed)) if len(axes_collapsed[i]) > 0]
-        axes_collapsed = [me for me in axes_collapsed if len(me) > 0]
-        shape = list(self.global_shape[1:])
-
-        for trf in range(len(axes_collapsed)):
-            _axes = axes_collapsed[trf]
-            base = bases[trf]
-
-            if len(_axes) == 0:
-                continue
-
-            fft = self.get_fft(_axes, 'object', padding=padding, shape=shape)
-
-            _in = self.get_aligned(
-                result, axis_in=alignment, axis_out=self.ndim + _axes[0], forward=True, fft=fft, shape=shape
-            )
-            if self.comm is not None:
-                _in /= np.prod([self.axes[i].N for i in _axes])
-
-            alignment = self.ndim + _axes[0]
-
-            _out = trfs[base](_in, axes=_axes, padding=padding, shape=shape)
-
-            for _ax in _axes:
-                if fft:
-                    shape[_ax] = fft._input_shape[_ax]
-                else:
-                    shape[_ax] = _out.shape[_ax]
-
-            axes_next_base = (axes_collapsed + [(-1,)])[trf + 1]
-            alignment = alignment if len(axes_next_base) == 0 else self.ndim + axes_next_base[0]
-            result = self.get_aligned(
-                _out, axis_in=self.ndim + _axes[-1], axis_out=alignment, fft=fft, forward=False, shape=shape
-            )
-
-        return result
 
     def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, **kwargs):
         """
@@ -2000,8 +1689,8 @@ class SpectralHelper:
 
             return _in.redistribute(axis_out)
 
-    def itransform(self, u, *args, axes=None, **kwargs):
-        pfft = self.get_pfft(*args, axes=axes, **kwargs)
+    def itransform(self, u, *args, axes=None, padding=None, **kwargs):
+        pfft = self.get_pfft(*args, axes=axes, padding=padding, **kwargs)
         if pfft is None:
             axes = axes if axes else tuple(i for i in range(self.ndim))
             u_hat = u.copy()
@@ -2013,43 +1702,14 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=True, rank=1)
         _out = self.newDistArray(pfft, forward_output=False, rank=1)
 
-        _in = self.redistribute(u, axis=_in.alignment, forward_output=True, **kwargs)
+        _in = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
-            pfft.backward(_in[i], _out[i])
+            pfft.backward(_in[i], _out[i], normalize=True)
+
+        if padding is not None:
+            _out *= np.prod(padding)
         return _out.redistribute(self.backward_alignment)
-
-    def itransformold(self, u, axes=None, padding=None):
-        """
-        Inverse transform over all components of the solution
-
-        Args:
-            u data to transform:
-            axes (tuple): Axes over which to transform
-            padding (list): Padding factor for transform. E.g. a padding factor of 2 will add as many zeros as there were modes before before transforming
-
-        Returns:
-            Transformed data
-        """
-        axes = tuple(-i - 1 for i in range(self.ndim)[::-1]) if axes is None else axes
-        padding = (
-            [
-                1,
-            ]
-            * self.ndim
-            if padding is None
-            else padding
-        )
-
-        result = [
-            None,
-        ] * self.ncomponents
-        for comp in self.components:
-            i = self.index(comp)
-
-            result[i] = self.itransform_single_component(u[i], axes=axes, padding=padding)
-
-        return self.xp.stack(result)
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         """

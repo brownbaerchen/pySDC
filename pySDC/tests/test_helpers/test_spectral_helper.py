@@ -253,6 +253,8 @@ def _test_transform_dealias(
     u2_pad = u_pad**2
 
     assert np.allclose(u, u_expect)
+    print(u_pad.real / u_expect_pad, 1 / padding**2)
+    # print(u_expect_pad)
     assert np.allclose(u_pad, u_expect_pad)
 
     u2_hat = helper.transform(u2_pad, padding=_padding)
@@ -577,7 +579,7 @@ if __name__ == '__main__':
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', -1, nx=32, nz=64, padding=1.5)
+        _test_transform_dealias('fft', 'cheby', -2, nx=3, nz=3, padding=3)
     else:
         raise NotImplementedError
     print('done')
