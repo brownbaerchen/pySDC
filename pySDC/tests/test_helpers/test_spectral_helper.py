@@ -323,7 +323,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     itrf = helper.itransform(trf, axes=axes)
 
     if comm:
-        expect_local = expect_trf[:, *pfft.local_slice(True)]
+        expect_local = expect_trf[(slice(None),) + pfft.local_slice(True)]
     else:
         expect_local = expect_trf
 
