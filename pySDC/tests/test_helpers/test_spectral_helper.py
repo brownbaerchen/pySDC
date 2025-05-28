@@ -300,7 +300,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     if comm:
         u_global = np.empty(shape=helper.global_shape)
         u_global[...] = comm.bcast(np.random.random(u_global.shape))
-        u = u_global[:, *(helper.local_slice(False))]
+        u = u_global[(slice(None),) + helper.local_slice(False)]
         expect_trf = u_global.copy()
     else:
         u = np.empty(shape=helper.global_shape)
@@ -571,7 +571,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
