@@ -500,7 +500,7 @@ class ChebychevHelper(SpectralHelper1D):
             expansion[axis] = slice(0, u.shape[axis], 1)
             norm = self.xp.ones(trf.shape[axis])
             norm[: self.N] = self.norm
-            trf *= norm[*expansion]
+            trf *= norm[*(expansion,)]
         return trf
 
     def itransform(self, u, axes, *args, shape=None, **kwargs):

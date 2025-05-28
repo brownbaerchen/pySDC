@@ -300,7 +300,7 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
     if comm:
         u_global = np.empty(shape=helper.global_shape)
         u_global[...] = comm.bcast(np.random.random(u_global.shape))
-        u = u_global[:, *helper.local_slice(False)]
+        u = u_global[:, *(helper.local_slice(False))]
         expect_trf = u_global.copy()
     else:
         u = np.empty(shape=helper.global_shape)
