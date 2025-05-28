@@ -521,7 +521,7 @@ class ChebychevHelper(SpectralHelper1D):
             expansion[axis] = slice(0, u.shape[axis], 1)
             norm = self.xp.ones(_u.shape[axis])
             norm[: self.N] = self.norm
-            _u /= norm[*expansion]
+            _u /= norm[(*expansion,)]
         return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs)
 
     def get_BC(self, kind, **kwargs):
