@@ -569,7 +569,7 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(4, 4, 'fft', 'fft', (-1,-2))
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
@@ -577,7 +577,7 @@ if __name__ == '__main__':
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
-        # _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8+1, padding=2.0)
+        _test_transform_dealias('fft', 'cheby', -1, nx=2**1, nz=2**8 + 1, padding=2.0)
     else:
         raise NotImplementedError
     print('done')

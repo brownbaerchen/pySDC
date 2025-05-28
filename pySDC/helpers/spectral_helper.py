@@ -1715,6 +1715,9 @@ class SpectralHelper:
         _arr = self.newDistArray(pfft, forward_output=forward_output)
         aligned_axes = [i for i in range(self.ndim) if _arr.global_shape[i + 1] == u.shape[i + 1]]
 
+        # if len(aligned_axes) == 0:
+        #     print(_arr.global_shape, u.shape)
+        #     breakpoint()
         assert len(aligned_axes) > 0, 'Found no aligned axes!'
         return aligned_axes
 
@@ -1744,7 +1747,8 @@ class SpectralHelper:
 
         _in = self.redistribute(u, axis=_in.alignment, forward_output=False, **kwargs)
 
-        pfft.forward(_in, _out)
+        for i in range(self.ncomponents):
+            pfft.forward(_in[i], _out[i])
         return _out.redistribute(self.forward_alignment)
 
     def transform_old(self, u, axes=None, padding=None):
@@ -1991,7 +1995,8 @@ class SpectralHelper:
 
         _in = self.redistribute(u, axis=_in.alignment, forward_output=True, **kwargs)
 
-        pfft.backward(_in, _out)
+        for i in range(self.ncomponents):
+            pfft.backward(_in[i], _out[i])
         return _out.redistribute(self.backward_alignment)
 
     def itransformold(self, u, axes=None, padding=None):
