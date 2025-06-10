@@ -1062,6 +1062,27 @@ class SpectralHelper:
             mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
             mats[axis2] = Id
             return self.sparse_lib.csc_matrix(sp.kron(*mats))
+        if ndim == 3:
+            mats = [
+                None,
+            ] * ndim
+
+            for ax in range(ndim):
+                if ax == axis:
+                    continue
+
+                if scalar:
+                    _Id = self.sparse_lib.diags(self.xp.append([1], self.xp.zeros(self.axes[ax].N - 1)))
+                else:
+                    _Id = self.axes[ax].get_Id()
+
+                mats[ax] = self.get_local_slice_of_1D_matrix(self.axes[ax].get_Id() @ _Id, axis=ax)
+
+            mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
+
+            return self.sparse_lib.csc_matrix(sp.kron(mats[0], sp.kron(*mats[1:])))
+        else:
+            raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')
 
     def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, **kwargs):
         """
@@ -1648,6 +1669,15 @@ class SpectralHelper:
             mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
 
             return sp.kron(*mats)
+        elif ndim == 3:
+
+            mats = [None] * ndim
+            mats[aligned] = self.get_local_slice_of_1D_matrix(matrix, aligned)
+            for axis in axes:
+                I1D = sp.eye(self.axes[axis].N)
+                mats[axis] = self.get_local_slice_of_1D_matrix(I1D, axis)
+
+            return sp.kron(mats[0], sp.kron(*mats[1:]))
 
         else:
             raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')

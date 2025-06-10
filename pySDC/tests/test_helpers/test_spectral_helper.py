@@ -541,6 +541,74 @@ def test_dealias_MPI(num_procs, axis, bx, bz, nx=32, nz=64, **kwargs):
     run_MPI_test(num_procs=num_procs, axis=axis, nx=nx, nz=nz, bx=bx, bz=bz, test='dealias')
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('nx', [8])
+@pytest.mark.parametrize('ny', [16])
+@pytest.mark.parametrize('nz', [32])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
+def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis(base='fft', N=nx)
+    helper.add_axis(base='fft', N=ny)
+    helper.add_axis(base=bz, N=nz)
+    helper.setup_fft()
+
+    X, Y, Z = helper.get_grid()
+    conv = helper.get_basis_change_matrix()
+    D = helper.get_differentiation_matrix(axes)
+
+    u = helper.u_init
+
+    u[0, ...] = np.sin(X) * np.cos(2 * Y) * np.sin(3 * Z) + np.cos(2 * X) + np.sin(Y) + np.sin(4 * Z)
+    if axes == (-3,):
+        expect = np.cos(X) * np.cos(2 * Y) * np.sin(3 * Z) - 2 * np.sin(2 * X)
+    elif axes == (-2,):
+        expect = np.sin(X) * (-2) * np.sin(2 * Y) * np.sin(3 * Z) + np.cos(Y)
+    elif axes == (-1,):
+        expect = np.sin(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z) + 4 * np.cos(4 * Z)
+    elif sorted(axes) == [-3, -2]:
+        expect = -2 * np.cos(X) * np.sin(2 * Y) * np.sin(3 * Z)
+    elif sorted(axes) == [-2, -1]:
+        expect = np.sin(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+    elif sorted(axes) == [-3, -1]:
+        expect = np.cos(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z)
+    elif axes == (-1, -2, -3):
+        expect = np.cos(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+    else:
+        raise NotImplementedError
+
+    u_hat = helper.transform(u)
+    D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
+    D_u = helper.itransform(D_u_hat).real
+
+    if useMPI:
+        assert u.shape[1] < nx, 'Not distributed along x'
+        assert u.shape[2] < ny, 'Not distributed along y'
+
+    assert np.allclose(D_u, expect, atol=1e-10)
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('nx', [8])
+@pytest.mark.parametrize('ny', [16])
+@pytest.mark.parametrize('nz', [32])
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
+def test_differentiation_matrix3DMPI(nx, ny, nz, bz, axes, useMPI=True, **kwargs):
+    test_differentiation_matrix3D(nx, ny, nz, bz, axes, **kwargs)
+
+
 if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
     str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
