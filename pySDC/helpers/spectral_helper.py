@@ -32,7 +32,7 @@ class SpectralHelper1D:
     xp = np
     distributable = False
 
-    def __init__(self, N, x0=None, x1=None, useGPU=False):
+    def __init__(self, N, x0=None, x1=None, useGPU=False, useFFTW=False):
         """
         Constructor
 
@@ -41,15 +41,24 @@ class SpectralHelper1D:
             x0 (float): Coordinate of left boundary
             x1 (float): Coordinate of right boundary
             useGPU (bool): Whether to use GPUs
+            useFFTW (bool): Whether to use FFTW for the transforms
         """
         self.N = N
         self.x0 = x0
         self.x1 = x1
         self.L = x1 - x0
         self.useGPU = useGPU
+        self.plans = {}
 
         if useGPU:
             self.setup_GPU()
+        elif useFFTW:
+            self.setup_FFTW()
+        else:
+            self.fft_lib = scipy.fft
+
+        if useGPU and useFFTW:
+            raise ValueError('Please run either on GPUs or with FFTW, not both!')
 
     @classmethod
     def setup_GPU(cls):
@@ -64,6 +73,16 @@ class SpectralHelper1D:
         cls.sparse_lib = sparse_lib
         cls.linalg = linalg
         cls.fft_lib = fft_lib
+
+    @classmethod
+    def setup_FFTW(cls):
+        """switch to FFTW modules"""
+        from mpi4py_fft import fftw
+
+        cls.xp = np
+        cls.sparse_lib = scipy.sparse
+        cls.linalg = scipy.sparse.linalg
+        cls.fft_lib = fftw
 
     def get_Id(self):
         """
@@ -716,6 +735,23 @@ class FFTHelper(SpectralHelper1D):
         k[0] = 1j * self.L
         return self.linalg.matrix_power(self.sparse_lib.diags(1 / (1j * k)), p)
 
+    def get_plan(self, u, forward, *args, **kwargs):
+        if self.fft_lib.__name__ == 'mpi4py_fft.fftw':
+            print(forward, args, kwargs)
+            key = (forward, u.shape, args, *(me for me in kwargs.values()))
+            if key in self.plans.keys():
+                return self.plans[key]
+            else:
+                transform = self.fft_lib.fftn(u, *args, **kwargs) if forward else self.fft_lib.ifftn(u, *args, **kwargs)
+                self.plans[key] = transform
+
+            return self.plans[key]
+        else:
+            if forward:
+                return self.fft_lib.fftn
+            else:
+                return partial(self.fft_lib.ifftn, norm='forward')
+
     def transform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         FFT along axes. `kwargs` are passed on to the FFT library.
@@ -727,9 +763,9 @@ class FFTHelper(SpectralHelper1D):
         Returns:
             transformed data
         """
-        assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        return self.fft_lib.fftn(u, *args, axes=axes, s=shape, **kwargs)
+        plan = self.get_plan(u, *args, forward=True, axes=axes, s=shape, **kwargs)
+        return plan(u, *args, axes=axes, s=shape, **kwargs)
 
     def itransform(self, u, *args, axes=None, shape=None, **kwargs):
         """
@@ -742,9 +778,9 @@ class FFTHelper(SpectralHelper1D):
         Returns:
             transformed data
         """
-        assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        return self.fft_lib.ifftn(u, *args, axes=axes, s=shape, **kwargs)
+        plan = self.get_plan(u, *args, forward=False, axes=axes, s=shape, **kwargs)
+        return plan(u, *args, axes=axes, s=shape, **kwargs) / np.prod([u.shape[axis] for axis in axes])
 
     def get_BC(self, kind):
         """
