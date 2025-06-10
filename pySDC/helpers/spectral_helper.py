@@ -206,8 +206,8 @@ class ChebychevHelper(SpectralHelper1D):
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
         self.transform_type = transform_type
 
-        if self.transform_type == 'fft':
-            self.get_fft_utils()
+        # if self.transform_type == 'fft':
+        #     self.get_fft_utils()
 
         self.cache = {}
         self.norm = self.get_norm()
@@ -352,135 +352,6 @@ class ChebychevHelper(SpectralHelper1D):
         norm[0] /= 2
         return norm
 
-    def get_fft_shuffle(self, forward, N):
-        """
-        In order to more easily parallelize using distributed FFT libraries, we express the DCT via an FFT following
-        doi.org/10.1109/TASSP.1980.1163351. The idea is based on reshuffling the data to be periodic and rotating it
-        in the complex plane. This function returns a mask to do the shuffling.
-
-        Args:
-            forward (bool): Whether you want the shuffle for forward transform or backward transform
-            N (int): size of the grid
-
-        Returns:
-            self.xp.array: Use as mask
-        """
-        xp = self.xp
-        if forward:
-            return xp.append(xp.arange((N + 1) // 2) * 2, -xp.arange(N // 2) * 2 - 1 - N % 2)
-        else:
-            mask = xp.zeros(N, dtype=int)
-            mask[: N - N % 2 : 2] = xp.arange(N // 2)
-            mask[1::2] = N - xp.arange(N // 2) - 1
-            mask[-1] = N // 2
-            return mask
-
-    def get_fft_shift(self, forward, N):
-        """
-        As described in the docstring for `get_fft_shuffle`, we need to rotate in the complex plane in order to use FFT for DCT.
-
-        Args:
-            forward (bool): Whether you want the rotation for forward transform or backward transform
-            N (int): size of the grid
-
-        Returns:
-            self.xp.array: Rotation
-        """
-        k = self.get_wavenumbers()
-        norm = self.get_norm()
-        xp = self.xp
-        if forward:
-            return 2 * xp.exp(-1j * np.pi * k / (2 * N) + 0j * np.pi / 4) * norm
-        else:
-            shift = xp.exp(1j * np.pi * k / (2 * N))
-            shift[0] = 0.5
-            return shift / norm
-
-    def get_fft_utils(self):
-        """
-        Get the required utilities for using FFT to do DCT as described in the docstring for `get_fft_shuffle` and keep
-        them cached.
-        """
-        self.fft_utils = {
-            'fwd': {},
-            'bck': {},
-        }
-
-        # forwards transform
-        self.fft_utils['fwd']['shuffle'] = self.get_fft_shuffle(True, self.N)
-        self.fft_utils['fwd']['shift'] = self.get_fft_shift(True, self.N)
-
-        # backwards transform
-        self.fft_utils['bck']['shuffle'] = self.get_fft_shuffle(False, self.N)
-        self.fft_utils['bck']['shift'] = self.get_fft_shift(False, self.N)
-
-        return self.fft_utils
-
-    def transform_old(self, u, axis=-1, **kwargs):
-        """
-        1D DCT along axis. `kwargs` will be passed on to the FFT library.
-
-        Args:
-            u: Data you want to transform
-            axis (int): Axis you want to transform along
-
-        Returns:
-            Data in spectral space
-        """
-        if self.transform_type.lower() == 'dct':
-            return self.fft_lib.dct(u, axis=axis, **kwargs) * self.norm
-        elif self.transform_type.lower() == 'fft':
-            result = u.copy()
-
-            shuffle = [slice(0, s, 1) for s in u.shape]
-            shuffle[axis] = self.fft_utils['fwd']['shuffle']
-
-            v = u[(*shuffle,)]
-
-            V = self.fft_lib.fft(v, axis=axis, **kwargs)
-
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, u.shape[axis], 1)
-
-            V *= self.fft_utils['fwd']['shift'][(*expansion,)]
-
-            result.real[...] = V.real[...]
-            return result
-        else:
-            raise NotImplementedError(f'Please choose a transform type from fft and dct, not {self.transform_type=}')
-
-    def itransform_old(self, u, axis=-1):
-        """
-        1D inverse DCT along axis.
-
-        Args:
-            u: Data you want to transform
-            axis (int): Axis you want to transform along
-
-        Returns:
-            Data in physical space
-        """
-        assert self.norm.shape[0] == u.shape[axis]
-
-        if self.transform_type == 'dct':
-            return self.fft_lib.idct(u / self.norm, axis=axis)
-        elif self.transform_type == 'fft':
-            result = u.copy()
-
-            expansion = [np.newaxis for _ in u.shape]
-            expansion[axis] = slice(0, u.shape[axis], 1)
-
-            v = self.fft_lib.ifft(u * self.fft_utils['bck']['shift'][(*expansion,)], axis=axis)
-
-            shuffle = [slice(0, s, 1) for s in u.shape]
-            shuffle[axis] = self.fft_utils['bck']['shuffle']
-            V = v[(*shuffle,)]
-
-            result.real[...] = V.real[...]
-            return result
-        else:
-            raise NotImplementedError
-
     def transform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         DCT along axes. `kwargs` will be passed on to the FFT library.
@@ -515,12 +386,40 @@ class ChebychevHelper(SpectralHelper1D):
             Data in physical space
         """
         assert self.fft_lib == scipy.fft
-        _u = u.copy()
         for axis in axes:
+
+            if self.N == u.shape[axis]:
+                _u = u.copy()
+            else:
+                # mpi4py-fft implements padding only for FFT, where the frequencies are sorted such that the zeros are
+                # added in the middle rather than the end. We need to resort this here and put the padding in the end.
+                N = self.N
+                _u = self.xp.zeros_like(u)
+
+                # copy first half
+                su = [slice(None)] * u.ndim
+                su[axis] = slice(0, N // 2 + 1)
+                _u[tuple(su)] = u[tuple(su)]
+
+                # copy second half
+                su = [slice(None)] * u.ndim
+                su[axis] = slice(-(N // 2), None)
+                s_u = [slice(None)] * u.ndim
+                s_u[axis] = slice(N // 2, N // 2 + (N // 2))
+                _u[tuple(s_u)] = u[tuple(su)]
+
+                if N % 2 == 0:
+                    su = [slice(None)] * u.ndim
+                    su[axis] = N // 2
+                    _u[tuple(su)] *= 2
+
+            # generate norm
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
             norm = self.xp.ones(_u.shape[axis])
             norm[: self.N] = self.norm
+            norm = self.get_norm(u.shape[axis]) * _u.shape[axis] / self.N
+
             _u /= norm[(*expansion,)]
         return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs)
 
@@ -1625,71 +1524,6 @@ class SpectralHelper:
         if padding is not None:
             _out /= np.prod(padding)
         return _out.redistribute(self.forward_alignment)
-
-    def get_aligned(self, u, axis_in, axis_out, fft=None, forward=False, **kwargs):
-        """
-        Realign the data along the axis when using distributed FFTs. `kwargs` will be used to get the correct PFFT
-        object from `mpi4py-fft`, which has suitable transfer classes for the shape of data. Hence, they should include
-        shape especially, if applicable.
-
-        Args:
-            u: The solution
-            axis_in (int): Current alignment
-            axis_out (int): New alignment
-            fft (mpi4py_fft.PFFT), optional: parallel FFT object
-            forward (bool): Whether the input is in spectral space or not
-
-        Returns:
-            solution aligned on `axis_in`
-        """
-        if self.comm is None or axis_in == axis_out:
-            return u.copy()
-        if self.comm.size == 1:
-            return u.copy()
-
-        global_fft = self.get_fft(**kwargs)
-        axisA = [me.axisA for me in global_fft.transfer]
-        axisB = [me.axisB for me in global_fft.transfer]
-
-        current_axis = axis_in
-
-        if axis_in in axisA and axis_out in axisB:
-            while current_axis != axis_out:
-                transfer = global_fft.transfer[axisA.index(current_axis)]
-
-                arrayB = self.xp.empty(shape=transfer.subshapeB, dtype=transfer.dtype)
-                arrayA = self.xp.empty(shape=transfer.subshapeA, dtype=transfer.dtype)
-                arrayA[:] = u[:]
-
-                transfer.forward(arrayA=arrayA, arrayB=arrayB)
-
-                current_axis = transfer.axisB
-                u = arrayB
-
-            return u
-        elif axis_in in axisB and axis_out in axisA:
-            while current_axis != axis_out:
-                transfer = global_fft.transfer[axisB.index(current_axis)]
-
-                arrayB = self.xp.empty(shape=transfer.subshapeB, dtype=transfer.dtype)
-                arrayA = self.xp.empty(shape=transfer.subshapeA, dtype=transfer.dtype)
-                arrayB[:] = u[:]
-
-                transfer.backward(arrayA=arrayA, arrayB=arrayB)
-
-                current_axis = transfer.axisA
-                u = arrayA
-
-            return u
-        else:  # go the potentially slower route of not reusing transfer classes
-            from mpi4py_fft import newDistArray
-
-            fft = self.get_fft(**kwargs) if fft is None else fft
-
-            _in = newDistArray(fft, forward).redistribute(axis_in)
-            _in[...] = u
-
-            return _in.redistribute(axis_out)
 
     def itransform(self, u, *args, axes=None, padding=None, **kwargs):
         pfft = self.get_pfft(*args, axes=axes, padding=padding, **kwargs)
