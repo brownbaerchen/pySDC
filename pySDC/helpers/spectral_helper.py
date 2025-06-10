@@ -365,8 +365,38 @@ class ChebychevHelper(SpectralHelper1D):
         """
         assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
+
         trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, norm='backward', s=shape, **kwargs)
         for axis in axes:
+
+            if self.N < trf.shape[axis]:
+                # mpi4py-fft implements padding only for FFT, where the frequencies are sorted such that the zeros are
+                # removed in the middle rather than the end. We need to resort this here and put the highest frequencies
+                # in the middle.
+                _trf = self.xp.zeros_like(trf)
+                N = self.N
+
+                # copy first "half"
+                su = [slice(None)] * trf.ndim
+                su[axis] = slice(0, N // 2 + 1)
+                _trf[tuple(su)] = trf[tuple(su)]
+
+                # copy second "half"
+                su = [slice(None)] * u.ndim
+                su[axis] = slice(-(N // 2), None)
+                s_u = [slice(None)] * u.ndim
+                s_u[axis] = slice(N // 2 + 1, N // 2 + 1 + (N // 2))
+                _trf[tuple(su)] = trf[tuple(s_u)]
+
+                # copy highest frequencies that will be cut
+                su = [slice(None)] * u.ndim
+                su[axis] = slice(N // 2 + 1, -(N // 2))
+                s_u = [slice(None)] * u.ndim
+                s_u[axis] = slice(-(trf.shape[axis] - self.N) + 1, None)
+                _trf[tuple(su)] = trf[tuple(s_u)]
+
+                trf = _trf
+
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
             norm = self.xp.ones(trf.shape[axis])
