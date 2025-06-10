@@ -737,7 +737,6 @@ class FFTHelper(SpectralHelper1D):
 
     def get_plan(self, u, forward, *args, **kwargs):
         if self.fft_lib.__name__ == 'mpi4py_fft.fftw':
-            print(forward, args, kwargs)
             key = (forward, u.shape, args, *(me for me in kwargs.values()))
             if key in self.plans.keys():
                 return self.plans[key]
