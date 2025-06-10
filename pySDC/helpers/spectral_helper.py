@@ -1556,6 +1556,11 @@ class SpectralHelper:
         return _out.redistribute(self.forward_alignment)
 
     def itransform(self, u, *args, axes=None, padding=None, **kwargs):
+        if padding is not None:
+            assert all(
+                (self.axes[i].N * padding[i]) % 1 == 0 for i in range(self.ndim)
+            ), 'Cannot do this padding with this resolution. Resulting resolution must be integer'
+
         pfft = self.get_pfft(*args, axes=axes, padding=padding, **kwargs)
         if pfft is None:
             axes = axes if axes else tuple(i for i in range(self.ndim))
