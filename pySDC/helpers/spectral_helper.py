@@ -1462,8 +1462,9 @@ class SpectralHelper:
 
         return self.fft_cache[key]
 
-    def local_slice(self, forward_output=True):
+    def local_slice(self, forward_output=True, axes=None, padding=None):
         if self.fft_obj:
+            return self.get_pfft(axes=axes, padding=padding).local_slice(forward_output=forward_output)
             return self.fft_obj.local_slice(forward_output=forward_output)
         else:
             return [slice(0, me.N) for me in self.axes]

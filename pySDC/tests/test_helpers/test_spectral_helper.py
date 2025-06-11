@@ -304,7 +304,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
     u[...] = u_all[
         (
             0,
-            *helper.local_slice(False),
+            *helper.local_slice(False, axes=axes),
         )
     ]
 
@@ -326,7 +326,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
     expect_local = expect_trf[
         (
             ...,
-            *helper.local_slice(False),
+            *helper.local_slice(True, axes=axes),
         )
     ]
 
@@ -717,7 +717,7 @@ if __name__ == '__main__':
     elif args.test is None:
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        test_transform(2, 2, 4, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
+        test_transform(2, 2, 2, 'fft', 'fft', 'cheby', axes=(-3, -2), padding=1.0, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
