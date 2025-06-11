@@ -407,13 +407,6 @@ class ChebychevHelper(SpectralHelper1D):
                 s_u[axis] = slice(N // 2 + 1, N // 2 + 1 + (N // 2))
                 _trf[tuple(su)] = trf[tuple(s_u)]
 
-                # copy highest frequencies that will be cut
-                su = [slice(None)] * u.ndim
-                su[axis] = slice(N // 2 + 1, -(N // 2))
-                s_u = [slice(None)] * u.ndim
-                s_u[axis] = slice(-(trf.shape[axis] - self.N) + 1, None)
-                _trf[tuple(su)] = trf[tuple(s_u)]
-
                 trf = _trf
 
             expansion = [np.newaxis for _ in u.shape]
