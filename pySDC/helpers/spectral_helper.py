@@ -880,20 +880,18 @@ class SpectralHelper:
 
         cls.dtype = cupy_mesh
 
-    def __init__(self, comm=None, useGPU=False, slab_decomposition=False, debug=False):
+    def __init__(self, comm=None, useGPU=False, debug=False):
         """
         Constructor
 
         Args:
             comm (mpi4py.Intracomm): MPI communicator
             useGPU (bool): Whether to use GPUs
-            slab_decomposition (bool): Whether to use slab or pencil decomposition
             debug (bool): Perform additional checks at extra computational cost
         """
         self.comm = comm
         self.debug = debug
         self.useGPU = useGPU
-        self.slab_decomposition = slab_decomposition
 
         if useGPU:
             self.setup_GPU()
@@ -1249,7 +1247,11 @@ class SpectralHelper:
                             self._rhs_hat_zero_mask[(*slices,)] = True
 
         rhs_hat[self._rhs_hat_zero_mask] = 0
-        return rhs_hat + self.redistribute(self.rhs_BCs_hat, self.infer_alignment(rhs_hat, True)[0], True)
+        _rhs_BCs_hat = self.xp.zeros_like(rhs_hat)
+        self.redistribute(in_arr=self.rhs_BCs_hat, out_arr=_rhs_BCs_hat, forward_output=True)
+        return rhs_hat + _rhs_BCs_hat
+
+    # return rhs_hat + self.redistribute(self.rhs_BCs_hat, self.infer_alignment(rhs_hat, forward_output=True)[0], True)
 
     def put_BCs_in_rhs(self, rhs):
         """
@@ -1374,19 +1376,15 @@ class SpectralHelper:
             for i in axes
         }
 
-        if self.comm and self.comm.size == 1:
-            grid = None
-        elif self.slab_decomposition:
-            raise NotImplementedError
-            grid = (-1,) + tuple(me.N for me in self.axes[1:])
-        else:
-            grid = (-1,) * (self.ndim - 1) + (1,)
+        # if self.comm and self.comm.size == 1:
+        #     grid = None
+        # else:
+        #     grid = (-1,) * (self.ndim - 1) + (1,)
 
         _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))
         _axes = [axis for axis in _axes if not self.axes[axis].distributable] + [
             axis for axis in _axes if self.axes[axis].distributable
         ]
-        grid = None
         pfft = PFFT(
             comm=self.comm,
             shape=self.global_shape[1:],
@@ -1399,6 +1397,9 @@ class SpectralHelper:
             transforms=transforms,
             grid=grid,
         )
+        print([comm.size for comm in pfft.subcomm])
+        # exit()
+        # breakpoint()
         return pfft
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None):
@@ -1591,18 +1592,73 @@ class SpectralHelper:
         assert len(aligned_axes) > 0, f'Found no aligned axes for array of size {u.shape}!'
         return aligned_axes
 
-    def redistribute(self, u, axis, forward_output, **kwargs):
+    def redistributeold(self, u, axes, forward_output, **kwargs):
         if self.comm is None:
             return u
+
+        u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)
+
+        from mpi4py_fft.pencil import Subcomm, Pencil
+
+        in_dist = [
+            1,
+        ] + [1 if i in axes else 0 for i in range(self.ndim)]
+        print(in_dist, out_dist)
+        ##############
+
         pfft = self.get_pfft(**kwargs)
         _arr = self.newDistArray(pfft, forward_output=forward_output)
 
-        if 'Dist' in type(u).__name__:
+        if 'Dist' in type(u).__name__ and False:
             u.redistribute(out=_arr)
         else:
-            u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
-            _arr = _arr.redistribute(u_alignment)
+            u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)
+            _arr = _arr.redistribute(u_alignment[0])
+            print(u_alignment, flush=True)
             _arr[...] = u
+        return _arr.redistribute(axis)
+
+    def redistribute(self, in_arr, out_arr, forward_output, **kwargs):
+        if self.comm is None:
+            out_arr[...] = in_arr
+            return out_arr
+
+        pfft = self.get_pfft(**kwargs)
+        in_alignment = self.infer_alignment(in_arr, forward_output=forward_output, **kwargs)
+        out_alignment = self.infer_alignment(out_arr, forward_output=forward_output, **kwargs)
+
+        from mpi4py_fft.pencil import Subcomm, Pencil
+
+        in_dist = [
+            1,
+        ] + [1 if i in in_alignment else 0 for i in range(self.ndim)]
+        out_dist = [
+            1,
+        ] + [1 if i in out_alignment else 0 for i in range(self.ndim)]
+
+        global_shape = [
+            self.ncomponents,
+        ] + list(pfft.global_shape(forward_output=forward_output))
+
+        # print(in_dist, out_dist, global_shape, in_alignment, out_alignment, flush=True)
+        in_pencil = Pencil(Subcomm(self.comm, in_dist), global_shape, in_alignment[0] + 1)
+        out_pencil = in_pencil.pencil(out_alignment[-1] + 1)
+        # out_pencil = Pencil(Subcomm(self.comm, in_dist), global_shape, out_alignment[0]+1)
+        # print(in_pencil.subshape, out_pencil.subshape, in_arr.shape, flush=True)
+
+        transfer = in_pencil.transfer(out_pencil, complex)
+        # print(transfer.subshapeA, transfer.subshapeB, in_arr.shape, out_arr.shape, flush=True)
+        transfer.forward(in_arr, out_arr)
+        return out_arr
+
+        ##############
+
+        _arr = self.newDistArray(pfft, forward_output=forward_output)
+
+        u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)
+        _arr = _arr.redistribute(u_alignment[0])
+        print(u_alignment, flush=True)
+        _arr[...] = u
         return _arr.redistribute(axis)
 
     def transform(self, u, *args, axes=None, padding=None, **kwargs):
@@ -1622,7 +1678,7 @@ class SpectralHelper:
         if _in.shape == u.shape:
             _in[...] = u
         else:
-            _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=False, padding=padding, **kwargs)
+            _in[...] = self.redistribute(in_arr=u, out_arr=_in, forward_output=False, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
             pfft.forward(_in[i], _out[i], normalize=False)
@@ -1652,7 +1708,8 @@ class SpectralHelper:
         if _in.shape == u.shape:
             _in[...] = u
         else:
-            _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
+            # _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
+            _in[...] = self.redistribute(in_arr=u, out_arr=_in, forward_output=True, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
             pfft.backward(_in[i], _out[i], normalize=True)

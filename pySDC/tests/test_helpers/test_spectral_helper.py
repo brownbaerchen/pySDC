@@ -326,9 +326,12 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
     expect_local = expect_trf[
         (
             ...,
-            *helper.local_slice(True, axes=axes),
+            *helper.local_slice(True),
         )
     ]
+
+    print('all', expect_local)
+    print(comm.rank, trf.shape, expect_local.shape)
 
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
     assert np.allclose(itrf, u), 'Backward transform is unexpected'
@@ -524,7 +527,9 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     # solve the system
     sol_hat = helper.u_init_forward
     sol_hat[0] = (helper.sparse_lib.linalg.spsolve(A, rhs_hat.flatten())).reshape(X.shape)
-    sol = helper.redistribute(helper.itransform(sol_hat), True, 1).real
+    sol = helper.u_init.astype('D')
+    helper.redistribute(helper.itransform(sol_hat), sol, True).real
+    # sol = helper.redistribute(helper.itransform(sol_hat), True, 1).real
 
     # construct polynomials for testing
     sol_cheby = helper.transform(sol, axes=(-1,))
@@ -717,7 +722,7 @@ if __name__ == '__main__':
     elif args.test is None:
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        test_transform(2, 2, 2, 'fft', 'fft', 'cheby', axes=(-3, -2), padding=1.0, useMPI=True)
+        test_transform(8, 8, 8, 'fft', 'fft', 'fft', axes=(-1,), padding=1.0, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
