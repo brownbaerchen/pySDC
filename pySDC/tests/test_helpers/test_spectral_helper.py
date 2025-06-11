@@ -262,24 +262,16 @@ def _test_transform_dealias(
     assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
 
-@pytest.mark.mpi4py
-@pytest.mark.mpi(ranks=[1, 2])
-@pytest.mark.parametrize('nx', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-2, -1)])
-def test_transform_MPI(mpi_ranks, nx, nz, bx, bz, axes, **kwargs):
-    test_transform(nx=nx, nz=nz, bx=bx, bz=bz, axes=axes, useMPI=True, **kwargs)
-
-
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [3, 8])
-@pytest.mark.parametrize('nz', [3, 8])
+@pytest.mark.parametrize('ny', [3, 8])
+@pytest.mark.parametrize('nz', [0, 3, 8])
+@pytest.mark.parametrize('by', ['fft', 'cheby'])
 @pytest.mark.parametrize('bz', ['fft', 'cheby'])
 @pytest.mark.parametrize('bx', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-1, -2), (-2, -1)])
-def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -1), (-1, -2, -3)])
+@pytest.mark.parametrize('padding', [1])
+def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -287,48 +279,90 @@ def test_transform(nx, nz, bx, bz, axes, useMPI=False, **kwargs):
         from mpi4py import MPI
 
         comm = MPI.COMM_WORLD
-        rank = comm.rank
     else:
         comm = None
 
     helper = SpectralHelper(comm=comm, debug=True)
     helper.add_axis(base=bx, N=nx)
-    helper.add_axis(base=bz, N=nz)
+    helper.add_axis(base=by, N=ny)
+    if nz > 0:
+        helper.add_axis(base=bz, N=nz)
+    elif -3 in axes:
+        return None
+
     helper.setup_fft()
-    pfft = helper.get_pfft()
+    u = helper.u_init
 
-    if comm:
-        u_global = np.empty(shape=helper.global_shape)
-        u_global[...] = comm.bcast(np.random.random(u_global.shape))
-        u = u_global[(slice(None),) + helper.local_slice(False)]
-        expect_trf = u_global.copy()
+    if nz > 0:
+        u_all = np.random.random((1, nx, ny, nz)).astype(u.dtype)
     else:
-        u = np.empty(shape=helper.global_shape)
-        u[...] = np.random.random(u.shape)
-        expect_trf = u.copy()
+        u_all = np.random.random((1, nx, ny)).astype(u.dtype)
 
-    if bx == 'fft' and bz == 'cheby':
-        axes_1d = sorted(axes)[::-1]
-    elif bx == 'cheby' and bz == 'fft':
-        axes_1d = sorted(axes)
-    else:
-        axes_1d = axes
+    if useMPI:
+        u_all = comm.bcast(u_all, root=0)
 
-    for i in axes_1d:
+    u[...] = u_all[
+        (
+            0,
+            *helper.local_slice(False),
+        )
+    ]
+
+    axes_ordered = []
+    for ax in axes:
+        if 'FFT' in type(helper.axes[ax]).__name__:
+            axes_ordered = axes_ordered + [ax]
+        else:
+            axes_ordered = [ax] + axes_ordered
+
+    expect_trf = u_all.copy()
+    for i in axes_ordered:
         base = helper.axes[i]
-        axis = i + 1 if i >= 0 else i
-        expect_trf = base.transform(expect_trf, axes=(axis,))
+        expect_trf = base.transform(expect_trf, axes=(i,))
 
     trf = helper.transform(u, axes=axes)
     itrf = helper.itransform(trf, axes=axes)
 
-    if comm:
-        expect_local = expect_trf[(slice(None),) + pfft.local_slice(True)]
-    else:
-        expect_local = expect_trf
+    expect_local = expect_trf[
+        (
+            ...,
+            *helper.local_slice(False),
+        )
+    ]
 
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
+    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+
+    if padding > 1:
+        _padding = (padding,) * helper.ndim
+        u_pad = helper.itransform(trf, axes=axes, padding=_padding)
+        trf2 = helper.transform(u_pad, axes=axes, padding=_padding)
+        assert np.allclose(trf2, trf)
+        assert sum(u_pad.shape) > sum(u.shape), f'{u_pad.shape}, {u.shape}'
+
+
+@pytest.mark.mpi4py
+@pytest.mark.mpi(ranks=[1, 2])
+@pytest.mark.parametrize('nx', [4, 8])
+@pytest.mark.parametrize('ny', [4, 8])
+@pytest.mark.parametrize('nz', [0, 8])
+@pytest.mark.parametrize(
+    'by',
+    [
+        'fft',
+    ],
+)
+@pytest.mark.parametrize(
+    'bx',
+    [
+        'fft',
+    ],
+)
+@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('axes', [(-1,), (-1, -2), (-2, -1, -3)])
+@pytest.mark.parametrize('padding', [1, 1.5])
+def test_transform_MPI(mpi_ranks, nx, ny, nz, bx, by, bz, axes, padding, **kwargs):
+    test_transform(nx=nx, ny=ny, nz=nz, bx=bx, by=by, bz=bz, axes=axes, padding=padding, useMPI=True, **kwargs)
 
 
 def run_MPI_test(num_procs, **kwargs):
@@ -599,6 +633,47 @@ def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
     assert np.allclose(D_u, expect, atol=1e-10)
 
 
+@pytest.mark.base
+@pytest.mark.parametrize('nx', [32])
+@pytest.mark.parametrize('ny', [0, 16])
+@pytest.mark.parametrize('nz', [8])
+@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
+@pytest.mark.parametrize('bx', ['cheby', 'fft'])
+def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
+    import numpy as np
+    from pySDC.helpers.spectral_helper import SpectralHelper
+
+    if useMPI:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+    else:
+        comm = None
+
+    helper = SpectralHelper(comm=comm, debug=True)
+    helper.add_axis(base=bx, N=nx)
+    if ny > 0:
+        helper.add_axis(base=bx, N=ny)
+    helper.add_axis(base='cheby', N=nz)
+    helper.setup_fft()
+
+    grid = helper.get_grid()
+    conv = helper.get_basis_change_matrix()
+    I = helper.get_Id()
+
+    u = helper.u_init
+    u[0, ...] = np.sin(grid[-2]) * grid[-1] ** 2 + grid[-1] ** 3 + np.cos(2 * grid[-2])
+
+    if ny > 0:
+        u[0, ...] += np.cos(grid[-3])
+
+    u_hat = helper.transform(u, axes=(-2, -1))
+    I_u_hat = (conv @ I @ u_hat.flatten()).reshape(u_hat.shape)
+    I_u = helper.itransform(I_u_hat, axes=(-1, -2))
+
+    assert np.allclose(I_u, u, atol=1e-12)
+
+
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('ny', [16])
@@ -610,6 +685,7 @@ def test_differentiation_matrix3DMPI(nx, ny, nz, bz, axes, useMPI=True, **kwargs
 
 
 if __name__ == '__main__':
+
     str_to_bool = lambda me: False if me == 'False' else True
     str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
 
@@ -639,15 +715,15 @@ if __name__ == '__main__':
     elif args.test == 'dealias':
         _test_transform_dealias(**vars(args))
     elif args.test is None:
-        test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        # test_transform(4, 4, 'fft', 'fft', (-1,-2))
+        # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
+        test_transform(2, 2, 4, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
         # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
-        _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
+        # _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
     else:
         raise NotImplementedError
     print('done')

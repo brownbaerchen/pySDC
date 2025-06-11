@@ -909,6 +909,8 @@ class SpectralHelper:
         self.fft_dealias_shape_cache = {}
 
         self.logger = logging.getLogger(name='Spectral Discretization')
+        if debug:
+            self.logger.setLevel(logging.DEBUG)
 
     @property
     def u_init(self):
@@ -1563,16 +1565,27 @@ class SpectralHelper:
         else:
             if self.ndim == 2:
                 padding_options = [(1.0, padding[1]), (padding[0], 1.0), padding, (1.0, 1.0)]
-                for _padding in padding_options:
-                    pfft = self.get_pfft(padding=_padding, **kwargs)
-                    aligned_axes = _alignment(pfft)
-                    if len(aligned_axes) > 0:
-                        self.logger.debug(
-                            f'Found alignment of array with size {u.shape}: {aligned_axes} using padding {_padding}'
-                        )
-                        break
+            elif self.ndim == 3:
+                padding_options = [
+                    (1.0, 1.0, padding[2]),
+                    (1.0, padding[1], 1.0),
+                    (padding[0], 1.0, 1.0),
+                    (1.0, padding[1], padding[2]),
+                    (padding[0], 1.0, padding[2]),
+                    (padding[0], padding[1], 1.0),
+                    padding,
+                    (1.0, 1.0, 1.0),
+                ]
             else:
-                raise NotImplementedError
+                raise NotImplementedError(f'Don\'t know how to infer alignment in {self.ndim}D!')
+            for _padding in padding_options:
+                pfft = self.get_pfft(padding=_padding, **kwargs)
+                aligned_axes = _alignment(pfft)
+                if len(aligned_axes) > 0:
+                    self.logger.debug(
+                        f'Found alignment of array with size {u.shape}: {aligned_axes} using padding {_padding}'
+                    )
+                    break
 
         assert len(aligned_axes) > 0, f'Found no aligned axes for array of size {u.shape}!'
         return aligned_axes
@@ -1582,10 +1595,13 @@ class SpectralHelper:
             return u
         pfft = self.get_pfft(**kwargs)
         _arr = self.newDistArray(pfft, forward_output=forward_output)
-        u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
 
-        _arr = _arr.redistribute(u_alignment)
-        _arr[...] = u
+        if 'Dist' in type(u).__name__:
+            u.redistribute(out=_arr)
+        else:
+            u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
+            _arr = _arr.redistribute(u_alignment)
+            _arr[...] = u
         return _arr.redistribute(axis)
 
     def transform(self, u, *args, axes=None, padding=None, **kwargs):
@@ -1602,7 +1618,10 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=False, rank=1)
         _out = self.newDistArray(pfft, forward_output=True, rank=1)
 
-        _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=False, padding=padding, **kwargs)
+        if _in.shape == u.shape:
+            _in[...] = u
+        else:
+            _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=False, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
             pfft.forward(_in[i], _out[i], normalize=False)
@@ -1629,7 +1648,10 @@ class SpectralHelper:
         _in = self.newDistArray(pfft, forward_output=True, rank=1)
         _out = self.newDistArray(pfft, forward_output=False, rank=1)
 
-        _in = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
+        if _in.shape == u.shape:
+            _in[...] = u
+        else:
+            _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
             pfft.backward(_in[i], _out[i], normalize=True)
