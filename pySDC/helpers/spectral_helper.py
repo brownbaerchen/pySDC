@@ -409,11 +409,18 @@ class ChebychevHelper(SpectralHelper1D):
                 s_u[axis] = slice(end_first_half, N)
                 _trf[tuple(su)] = trf[tuple(s_u)]
 
+                # # copy values to be cut
+                # su = [slice(None)] * u.ndim
+                # su[axis] = slice(end_first_half, end_first_half + N_pad)
+                # s_u = [slice(None)] * u.ndim
+                # s_u[axis] = slice(-N_pad, None)
+                # _trf[tuple(su)] = trf[tuple(s_u)]
+
                 trf = _trf
 
             expansion = [np.newaxis for _ in u.shape]
             expansion[axis] = slice(0, u.shape[axis], 1)
-            norm = self.xp.ones(trf.shape[axis])
+            norm = self.xp.ones(trf.shape[axis]) * self.norm[-1]
             norm[: self.N] = self.norm
             trf *= norm[(*expansion,)]
         return trf
