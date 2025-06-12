@@ -394,17 +394,19 @@ class ChebychevHelper(SpectralHelper1D):
                 # in the middle.
                 _trf = self.xp.zeros_like(trf)
                 N = self.N
+                N_pad = _trf.shape[axis] - N
+                end_first_half = N // 2 + 1
 
                 # copy first "half"
                 su = [slice(None)] * trf.ndim
-                su[axis] = slice(0, N // 2 + 1)
+                su[axis] = slice(0, end_first_half)
                 _trf[tuple(su)] = trf[tuple(su)]
 
                 # copy second "half"
                 su = [slice(None)] * u.ndim
-                su[axis] = slice(-(N // 2), None)
+                su[axis] = slice(end_first_half + N_pad, None)
                 s_u = [slice(None)] * u.ndim
-                s_u[axis] = slice(N // 2 + 1, N // 2 + 1 + (N // 2))
+                s_u[axis] = slice(end_first_half, N)
                 _trf[tuple(su)] = trf[tuple(s_u)]
 
                 trf = _trf
