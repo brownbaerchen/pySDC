@@ -18,18 +18,19 @@ def test_eval_f(nx, nz, direction, spectral_space):
     kappa = P.kappa
     nu = P.nu
 
+    k = 2
     if direction == 'x':
-        y = sin(X * np.pi)
-        y_x = cos(X * np.pi) * np.pi
-        y_xx = -sin(X * np.pi) * np.pi**2
+        y = sin(X * k * np.pi)
+        y_x = cos(X * k * np.pi) * k * np.pi
+        y_xx = -sin(X * k * np.pi) * k * k * np.pi**2
         y_y = 0
         y_yy = 0
         y_z = 0
         y_zz = 0
     elif direction == 'y':
-        y = sin(Y * np.pi)
-        y_y = cos(Y * np.pi) * np.pi
-        y_yy = -sin(Y * np.pi) * np.pi**2
+        y = sin(Y * k * np.pi)
+        y_y = cos(Y * k * np.pi) * k * np.pi
+        y_yy = -sin(Y * k * np.pi) * k * k * np.pi**2
         y_x = 0
         y_xx = 0
         y_z = 0
@@ -43,19 +44,20 @@ def test_eval_f(nx, nz, direction, spectral_space):
         y_z = 2 * Z
         y_zz = 2.0
     elif direction == 'mixed':
-        y = sin(X * np.pi) * sin(Y * np.pi) * Z**2
-        y_x = cos(X * np.pi) * np.pi * sin(Y * np.pi) * Z**2
-        y_xx = -sin(X * np.pi) * np.pi**2 * sin(Y * np.pi) * Z**2
-        y_y = cos(Y * np.pi) * np.pi * sin(X * np.pi) * Z**2
-        y_yy = -sin(Y * np.pi) * np.pi**2 * sin(X * np.pi) * Z**2
-        y_z = sin(X * np.pi) * sin(Y * np.pi) * 2 * Z
-        y_zz = sin(X * np.pi) * sin(Y * np.pi) * 2
+        y = sin(X * k * np.pi) * sin(Y * k * np.pi) * Z**2
+        y_x = cos(X * k * np.pi) * k * np.pi * sin(k * Y * np.pi) * Z**2
+        y_xx = -sin(X * k * np.pi) * k * k * np.pi**2 * sin(Y * k * np.pi) * Z**2
+        y_y = cos(Y * k * np.pi) * k * np.pi * sin(X * k * np.pi) * Z**2
+        y_yy = -sin(Y * k * np.pi) * k * k * np.pi**2 * sin(X * k * np.pi) * Z**2
+        y_z = sin(X * k * np.pi) * sin(Y * k * np.pi) * 2 * Z
+        y_zz = sin(X * k * np.pi) * sin(Y * k * np.pi) * 2
     else:
         raise NotImplementedError
 
     assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
 
     u = P.u_init
+
     for i in [iu, iv, iw, iT, ip]:
         u[i][:] = y
 
@@ -211,7 +213,7 @@ def test_Poisson_problem_w():
 
 
 if __name__ == '__main__':
-    test_eval_f(2**1, 2**1, 'y', True)
+    test_eval_f(2**2, 2**1, 'x', True)
     # test_Poisson_problems(3, 'u')
     # test_Poisson_problem_w()
     # test_Nusselt_numbers(1)

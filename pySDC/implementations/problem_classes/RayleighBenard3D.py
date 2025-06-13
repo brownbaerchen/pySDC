@@ -167,7 +167,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'w', 'T']}
         self.setup_M(M_lhs)
 
-        # Prepare going from second (first for divergence free equation) derivative basis back to Chebychov-T
+        # Prepare going from second (first for divergence free equation) derivative basis back to Chebychev-T
         self.base_change = self._setup_operator({**{comp: {comp: S2} for comp in ['u', 'v', 'w', 'T']}, 'p': {'p': S1}})
 
         # BCs
