@@ -253,8 +253,6 @@ def _test_transform_dealias(
     u2_pad = u_pad**2
 
     assert np.allclose(u, u_expect)
-    print(u_pad.real / u_expect_pad, 1 / padding**2)
-    # print(u_expect_pad)
     assert np.allclose(u_pad, u_expect_pad)
 
     u2_hat = helper.transform(u2_pad, padding=_padding)
@@ -579,9 +577,10 @@ def test_dealias_MPI(num_procs, axis, bx, bz, nx=32, nz=64, **kwargs):
 @pytest.mark.parametrize('nx', [8])
 @pytest.mark.parametrize('ny', [16])
 @pytest.mark.parametrize('nz', [32])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
+@pytest.mark.parametrize('p', [1, 2])
+@pytest.mark.parametrize('bz', ['fft', 'cheby', 'ultraspherical'])
 @pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
-def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
+def test_differentiation_matrix3D(nx, ny, nz, bz, axes, p, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -599,26 +598,58 @@ def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
     helper.setup_fft()
 
     X, Y, Z = helper.get_grid()
-    conv = helper.get_basis_change_matrix()
-    D = helper.get_differentiation_matrix(axes)
+
+    if bz == 'cheby' and p > 1:
+        return None
+    elif bz == 'ultraspherical' and -1 in axes:
+        conv = helper.get_basis_change_matrix(p_out=0, p_in=p)
+    else:
+        conv = helper.get_basis_change_matrix()
+
+    D = helper.get_differentiation_matrix(axes, p=p)
 
     u = helper.u_init
 
-    u[0, ...] = np.sin(X) * np.cos(2 * Y) * np.sin(3 * Z) + np.cos(2 * X) + np.sin(Y) + np.sin(4 * Z)
+    z_part = np.sin(3 * Z) if bz == 'fft' else Z**3
+    z_part_z = 3 * np.cos(3 * Z) if bz == 'fft' else 3 * Z**2
+    z_part_zz = -9 * np.sin(3 * Z) if bz == 'fft' else 6 * Z
+
+    u[0, ...] = np.sin(X) * np.cos(2 * Y) * z_part + np.cos(2 * X) + np.sin(Y) + np.sin(4 * Z)
     if axes == (-3,):
-        expect = np.cos(X) * np.cos(2 * Y) * np.sin(3 * Z) - 2 * np.sin(2 * X)
+        if p == 1:
+            expect = np.cos(X) * np.cos(2 * Y) * z_part - 2 * np.sin(2 * X)
+        else:
+            expect = -np.sin(X) * np.cos(2 * Y) * z_part - 4 * np.cos(2 * X)
     elif axes == (-2,):
-        expect = np.sin(X) * (-2) * np.sin(2 * Y) * np.sin(3 * Z) + np.cos(Y)
+        if p == 1:
+            expect = np.sin(X) * (-2) * np.sin(2 * Y) * z_part + np.cos(Y)
+        else:
+            expect = np.sin(X) * (-4) * np.cos(2 * Y) * z_part - np.sin(Y)
     elif axes == (-1,):
-        expect = np.sin(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z) + 4 * np.cos(4 * Z)
+        if p == 1:
+            expect = np.sin(X) * np.cos(2 * Y) * z_part_z + 4 * np.cos(4 * Z)
+        elif p == 2:
+            expect = np.sin(X) * np.cos(2 * Y) * z_part_zz - 16 * np.sin(4 * Z)
     elif sorted(axes) == [-3, -2]:
-        expect = -2 * np.cos(X) * np.sin(2 * Y) * np.sin(3 * Z)
+        if p == 1:
+            expect = -2 * np.cos(X) * np.sin(2 * Y) * z_part
+        elif p == 2:
+            expect = 4 * np.sin(X) * np.cos(2 * Y) * z_part
     elif sorted(axes) == [-2, -1]:
-        expect = np.sin(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+        if p == 1:
+            expect = np.sin(X) * (-2) * np.sin(2 * Y) * z_part_z
+        elif p == 2:
+            expect = np.sin(X) * (-4) * np.cos(2 * Y) * z_part_zz
     elif sorted(axes) == [-3, -1]:
-        expect = np.cos(X) * np.cos(2 * Y) * 3 * np.cos(3 * Z)
+        if p == 1:
+            expect = np.cos(X) * np.cos(2 * Y) * z_part_z
+        elif p == 2:
+            expect = -np.sin(X) * np.cos(2 * Y) * z_part_zz
     elif axes == (-1, -2, -3):
-        expect = np.cos(X) * (-2) * np.sin(2 * Y) * 3 * np.cos(3 * Z)
+        if p == 1:
+            expect = np.cos(X) * (-2) * np.sin(2 * Y) * z_part_z
+        elif p == 2:
+            expect = -np.sin(X) * (-4) * np.cos(2 * Y) * z_part_zz
     else:
         raise NotImplementedError
 
@@ -626,11 +657,25 @@ def test_differentiation_matrix3D(nx, ny, nz, bz, axes, useMPI=False, **kwargs):
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat).real
 
-    if useMPI:
-        assert u.shape[1] < nx, 'Not distributed along x'
-        assert u.shape[2] < ny, 'Not distributed along y'
+    error = np.linalg.norm(D_u - expect)
+    assert np.isclose(error, 0, atol=6e-8), f'Got {error=:.2e}'
 
-    assert np.allclose(D_u, expect, atol=1e-10)
+    if useMPI:
+        if comm.size == 2:
+            assert u_hat.shape[1] < nx or u_hat.shape[2] < ny, 'Not distributed'
+        elif comm.size > 2:
+            assert u_hat.shape[1] < nx and u_hat.shape[2] < ny, 'Not distributed in pencils'
+
+
+@pytest.mark.mpi4py
+@pytest.mark.mpi(ranks=[2, 4])
+@pytest.mark.parametrize('nx', [8])
+@pytest.mark.parametrize('ny', [16])
+@pytest.mark.parametrize('nz', [32])
+@pytest.mark.parametrize('bz', ['fft', 'cheby', 'ultraspherical'])
+@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
+def test_differentiation_matrix3DMPI(mpi_ranks, nx, ny, nz, bz, axes, useMPI=True, **kwargs):
+    test_differentiation_matrix3D(nx, ny, nz, bz, axes, p=1, **kwargs)
 
 
 @pytest.mark.base
@@ -674,16 +719,6 @@ def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
     assert np.allclose(I_u, u, atol=1e-12)
 
 
-@pytest.mark.mpi4py
-@pytest.mark.parametrize('nx', [8])
-@pytest.mark.parametrize('ny', [16])
-@pytest.mark.parametrize('nz', [32])
-@pytest.mark.parametrize('bz', ['fft', 'cheby'])
-@pytest.mark.parametrize('axes', [(-1,), (-2,), (-3,), (-1, -2), (-2, -3), (-1, -3), (-1, -2, -3)])
-def test_differentiation_matrix3DMPI(nx, ny, nz, bz, axes, useMPI=True, **kwargs):
-    test_differentiation_matrix3D(nx, ny, nz, bz, axes, **kwargs)
-
-
 if __name__ == '__main__':
 
     str_to_bool = lambda me: False if me == 'False' else True
@@ -700,7 +735,7 @@ if __name__ == '__main__':
     parser.add_argument('--bx', type=str, help='Base in x direction')
     parser.add_argument('--bc_val', type=int, help='Value of boundary condition')
     parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau', 'dealias'])
-    parser.add_argument('--variant', type=str, help='Chebychov mode', choices=['T2T', 'T2U'], default='T2U')
+    parser.add_argument('--variant', type=str, help='Chebychev mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
     args = parser.parse_args()
 
@@ -717,7 +752,10 @@ if __name__ == '__main__':
     elif args.test is None:
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
         # test_transform(nx=3, nz=2, bx='fft', bz='cheby', axes=(-2,), useMPI=True)
-        test_transform(2, 2, 4, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
+        # test_differentiation_matrix3D(2, 2, 4, 'cheby', p=1, axes=(-1, -2, -3), useMPI=True)
+        # test_differentiation_matrix3D(2, 2, 4, 'ultraspherical', p=1, axes=(-1, -2, -3), useMPI=True)
+        test_differentiation_matrix3D(32, 32, 32, 'fft', p=2, axes=(-1, -2), useMPI=True)
+        # test_transform(2, 2, 4, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')

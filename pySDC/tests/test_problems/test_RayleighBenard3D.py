@@ -67,20 +67,20 @@ def test_eval_f(nx, nz, direction, spectral_space):
     f_expect = P.f_init
     for i in [iT, iu, iv, iw]:
         f_expect.expl[i] = -y * (y_x + y_y + y_z)
-    f_expect.impl[iT] = kappa * (y_xx + +y_yy + y_zz)
+    f_expect.impl[iT] = kappa * (y_xx + y_yy + y_zz)
     f_expect.impl[iu] = -y_x + nu * (y_xx + y_yy + y_zz)
     f_expect.impl[iv] = -y_y + nu * (y_xx + y_yy + y_zz)
-    f_expect.impl[iw] = -y_z + nu * (y_xx + +y_yy + y_zz) + y
+    f_expect.impl[iw] = -y_z + nu * (y_xx + y_yy + y_zz) + y
     f_expect.impl[ip] = -(y_x + y_y + y_z)
 
     if spectral_space:
-        f.impl = P.itransform(f.impl).real
-        f.expl = P.itransform(f.expl).real
+        f.impl = P.itransform(f.impl)
+        f.expl = P.itransform(f.expl)
 
-    for comp in ['u', 'v', 'w', 'T', 'p']:
+    for comp in ['u', 'v', 'w', 'T', 'p'][::-1]:
         i = P.spectral.index(comp)
-        assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
+        assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
 
 
 #
@@ -211,7 +211,7 @@ def test_Poisson_problem_w():
 
 
 if __name__ == '__main__':
-    test_eval_f(2**0, 2**2, 'z', True)
+    test_eval_f(2**1, 2**1, 'y', True)
     # test_Poisson_problems(3, 'u')
     # test_Poisson_problem_w()
     # test_Nusselt_numbers(1)

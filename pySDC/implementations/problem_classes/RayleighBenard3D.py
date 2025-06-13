@@ -220,10 +220,6 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         f_impl_hat = self.u_init_forward
 
-        Dz = self.Dz
-        Dy = self.Dy
-        Dx = self.Dx
-
         iu, iv, iw, iT, ip = self.index(['u', 'v', 'w', 'T', 'p'])
 
         # evaluate implicit terms
@@ -241,6 +237,10 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         # start by computing derivatives
         if not hasattr(self, '_Dx_expanded') or not hasattr(self, '_Dz_expanded'):
+            Dz = self.Dz
+            Dy = self.Dy
+            Dx = self.Dx
+
             self._Dx_expanded = self._setup_operator(
                 {'u': {'u': Dx}, 'v': {'v': Dx}, 'w': {'w': Dx}, 'T': {'T': Dx}, 'p': {}}
             )
