@@ -142,16 +142,14 @@ def test_integration_matrix(N):
 @pytest.mark.base
 @pytest.mark.parametrize('N', [4])
 @pytest.mark.parametrize('d', [1, 2, 3])
-@pytest.mark.parametrize('transform_type', ['dct', 'fft'])
-def test_transform(N, d, transform_type):
+def test_transform(N, d):
     import scipy
     import numpy as np
     from pySDC.helpers.spectral_helper import ChebychevHelper
 
-    cheby = ChebychevHelper(N, transform_type=transform_type)
+    cheby = ChebychevHelper(N)
     u = np.random.random((d, N))
     norm = cheby.get_norm()
-    x = (cheby.get_1dgrid() * cheby.lin_trf_fac + cheby.lin_trf_off) * cheby.lin_trf_fac + cheby.lin_trf_off
     x = (cheby.get_1dgrid() - cheby.lin_trf_off) / cheby.lin_trf_fac
 
     itransform = cheby.itransform(u, axes=(-1,)).real

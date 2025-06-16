@@ -207,15 +207,13 @@ class ChebychevHelper(SpectralHelper1D):
     This implementation is largely based on the Dedalus paper (arXiv:1905.10388).
     """
 
-    def __init__(self, *args, transform_type='fft', x0=-1, x1=1, **kwargs):
+    def __init__(self, *args, x0=-1, x1=1, **kwargs):
         """
         Constructor.
         Please refer to the parent class for additional arguments. Notably, you have to supply a resolution `N` and you
         may choose to run on GPUs via the `useGPU` argument.
 
         Args:
-            transform_type ('fft' or 'dct'): Either use DCT functions directly implemented in the transform library or
-                                             use the FFT from the library to compute the DCT
             x0 (float): Coordinate of left boundary. Note that only -1 is currently implented
             x1 (float): Coordinate of right boundary. Note that only +1 is currently implented
         """
@@ -223,10 +221,6 @@ class ChebychevHelper(SpectralHelper1D):
         self.lin_trf_fac = (x1 - x0) / 2
         self.lin_trf_off = (x1 + x0) / 2
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
-        self.transform_type = transform_type
-
-        # if self.transform_type == 'fft':
-        #     self.get_fft_utils()
 
         self.cache = {}
         self.norm = self.get_norm()
@@ -682,8 +676,6 @@ class FFTHelper(SpectralHelper1D):
         may choose to run on GPUs via the `useGPU` argument.
 
         Args:
-            transform_type ('fft' or 'dct'): Either use DCT functions directly implemented in the transform library or
-                                             use the FFT from the library to compute the DCT
             x0 (float, optional): Coordinate of left boundary
             x1 (float, optional): Coordinate of right boundary
         """
@@ -969,7 +961,6 @@ class SpectralHelper:
         kwargs['useGPU'] = self.useGPU
 
         if base.lower() in ['chebychov', 'chebychev', 'cheby', 'chebychovhelper']:
-            kwargs['transform_type'] = kwargs.get('transform_type', 'fft')
             self.axes.append(ChebychevHelper(*args, **kwargs))
         elif base.lower() in ['fft', 'fourier', 'ffthelper']:
             self.axes.append(FFTHelper(*args, **kwargs))
