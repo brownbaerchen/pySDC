@@ -929,6 +929,13 @@ class SpectralHelper:
         return self.dtype(self.init_forward)
 
     @property
+    def u_init_real(self):
+        """
+        Get empty data container in spectral space
+        """
+        return self.dtype(self.init_real)
+
+    @property
     def shape(self):
         """
         Get shape of individual solution component
@@ -1502,6 +1509,16 @@ class SpectralHelper:
             self.forward_alignment = self.newDistArray(self.fft_obj, forward_output=True, rank=1).alignment
 
         self.init = (
+            np.empty(shape=self.global_shape)[
+                (
+                    ...,
+                    *self.local_slice(False),
+                )
+            ].shape,
+            self.comm,
+            np.dtype('float'),
+        )
+        self.init_real = (
             np.empty(shape=self.global_shape)[
                 (
                     ...,

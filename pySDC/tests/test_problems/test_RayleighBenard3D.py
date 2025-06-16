@@ -54,9 +54,8 @@ def test_eval_f(nx, nz, direction, spectral_space):
     else:
         raise NotImplementedError
 
+    u = P.u_init_real
     assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
-
-    u = P.u_init
 
     for i in [iu, iv, iw, iT, ip]:
         u[i][:] = y
@@ -83,6 +82,13 @@ def test_eval_f(nx, nz, direction, spectral_space):
         i = P.spectral.index(comp)
         assert np.allclose(f.expl[i], f_expect.expl[i]), f'Unexpected explicit function evaluation in component {comp}'
         assert np.allclose(f.impl[i], f_expect.impl[i]), f'Unexpected implicit function evaluation in component {comp}'
+
+
+@pytest.mark.mpi4py
+@pytest.mark.parametrize('direction', ['x', 'y', 'z', 'mixed'])
+@pytest.mark.mpi(ranks=[2, 4])
+def test_eval_f_parallel(mpi_ranks, direction):
+    test_eval_f(nx=4, nz=4, direction=direction, spectral_space=False)
 
 
 #
@@ -219,9 +225,9 @@ def test_Poisson_problem_w():
 
 
 if __name__ == '__main__':
-    # test_eval_f(2**2, 2**1, 'x', True)
+    test_eval_f(2**2, 2**1, 'x', False)
     # test_Poisson_problems(1, 'T')
-    test_Poisson_problem_w()
+    # test_Poisson_problem_w()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
     # test_viscous_dissipation()
