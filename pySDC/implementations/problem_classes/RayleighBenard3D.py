@@ -116,8 +116,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         )
 
         bases = [
-            {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx},
-            {'base': 'fft', 'N': ny, 'x0': 0, 'x1': self.Ly},
+            {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx, 'useFFTW': True},
+            {'base': 'fft', 'N': ny, 'x0': 0, 'x1': self.Ly, 'useFFTW': True},
             {'base': 'ultraspherical', 'N': nz, 'x0': 0, 'x1': self.Lz},
         ]
         components = ['u', 'v', 'w', 'T', 'p']

@@ -731,6 +731,8 @@ class FFTHelper(SpectralHelper1D):
 
     def get_plan(self, u, forward, *args, **kwargs):
         if self.fft_lib.__name__ == 'mpi4py_fft.fftw':
+            if 'axes' in kwargs.keys():
+                kwargs['axes'] = tuple(kwargs['axes'])
             key = (forward, u.shape, args, *(me for me in kwargs.values()))
             if key in self.plans.keys():
                 return self.plans[key]
@@ -1487,14 +1489,12 @@ class SpectralHelper:
             self.add_component('u')
 
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
-        # self.local_slice = [slice(0, me.N) for me in self.axes]
         self.forward_alignment = 0
         self.backward_alignment = 0
 
         axes = tuple(i for i in range(len(self.axes)))
-        self.fft_obj = self.get_pfft(axes=axes)  # self.get_fft(axes=axes, direction='object')
+        self.fft_obj = self.get_pfft(axes=axes)
         if self.fft_obj is not None:
-            # self.local_slice = self.fft_obj.local_slice(False)
 
             self.backward_alignment = self.newDistArray(self.fft_obj, forward_output=False, rank=1).alignment
             self.forward_alignment = self.newDistArray(self.fft_obj, forward_output=True, rank=1).alignment
