@@ -91,41 +91,6 @@ def test_eval_f_parallel(mpi_ranks, direction):
     test_eval_f(nx=4, nz=4, direction=direction, spectral_space=False)
 
 
-#
-# @pytest.mark.mpi4py
-# @pytest.mark.parametrize('nx', [16])
-# @pytest.mark.parametrize('nz', [4])
-# @pytest.mark.parametrize('direction', ['x', 'z', 'mixed'])
-# def test_vorticity(nx, nz, direction):
-#     import numpy as np
-#     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
-#
-#     assert nz > 3
-#     assert nx > 8
-#
-#     P = RayleighBenard3D(nx=nx, nz=nz, spectral_space=False)
-#     iu, iv = P.index(['u', 'v'])
-#
-#     u = P.u_init
-#
-#     if direction == 'x':
-#         u[iv] = np.sin(P.X * np.pi)
-#         u[iu] = np.cos(P.X * np.pi)
-#         expect = np.cos(P.X * np.pi) * np.pi
-#     elif direction == 'z':
-#         u[iv] = P.Z**2
-#         u[iu] = P.Z**3
-#         expect = 3 * P.Z**2
-#     elif direction == 'mixed':
-#         u[iv] = np.sin(P.X * np.pi) * P.Z**2
-#         u[iu] = np.cos(P.X * np.pi) * P.Z**3
-#         expect = np.cos(P.X * np.pi) * np.pi * P.Z**2 + np.cos(P.X * np.pi) * 3 * P.Z**2
-#     else:
-#         raise NotImplementedError
-#
-#     assert np.allclose(P.compute_vorticity(u), expect)
-
-
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [1, 8])
 @pytest.mark.parametrize('component', ['u', 'v', 'T'])
@@ -229,7 +194,3 @@ if __name__ == '__main__':
     test_eval_f(2**2, 2**1, 'x', False)
     # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
-    # test_Nusselt_numbers(1)
-    # test_buoyancy_computation()
-    # test_viscous_dissipation()
-    # test_Nyquist_mode_elimination()

@@ -364,17 +364,3 @@ class RayleighBenard3D(GenericSpectralLinear):
         axs[1].set_ylabel(r'$z$')
         fig.colorbar(imT, self.cax[0])
         fig.colorbar(imV, self.cax[1])
-
-    def compute_vorticity(self, u):
-        raise NotImplementedError
-        if self.spectral_space:
-            u_hat = u.copy()
-        else:
-            u_hat = self.transform(u)
-        Dz = self.Dz
-        Dx = self.Dx
-        iu, iw = self.index(['u', 'w'])
-
-        vorticity_hat = self.spectral.u_init_forward
-        vorticity_hat[0] = (Dx * u_hat[iw].flatten() + Dz @ u_hat[iu].flatten()).reshape(u[iu].shape)
-        return self.itransform(vorticity_hat)[0].real
