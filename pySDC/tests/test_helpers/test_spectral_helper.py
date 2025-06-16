@@ -486,7 +486,6 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
         from mpi4py import MPI
 
         comm = MPI.COMM_WORLD
-        rank = comm.rank
     else:
         comm = None
 
@@ -499,7 +498,6 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     X, Z = helper.get_grid(forward_output=True)
     x = X[:, 0]
     z = Z[0, :]
-    shape = helper.init[0][1:]
 
     bcs = np.sin(bc_val * x)
     helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
@@ -719,8 +717,31 @@ def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
     assert np.allclose(I_u, u, atol=1e-12)
 
 
-if __name__ == '__main__':
+@pytest.mark.base
+def test_cache():
+    from pySDC.helpers.spectral_helper import cache
+    import numpy as np
 
+    class Dummy:
+        num_calls = 0
+
+        @cache
+        def increment(self, x):
+            self.num_calls += 1
+            return x + 1
+
+    dummy = Dummy()
+    values = [0, 1, 1, 0, 3, 1, 2]
+    unique_vals = np.unique(values)
+
+    for x in values:
+        assert dummy.increment(x) == x + 1
+
+    assert dummy.num_calls < len(values)
+    assert dummy.num_calls == len(unique_vals)
+
+
+if __name__ == '__main__':
     str_to_bool = lambda me: False if me == 'False' else True
     str_to_tuple = lambda arg: tuple(int(me) for me in arg.split(','))
 

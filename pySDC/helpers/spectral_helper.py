@@ -2,11 +2,31 @@ import numpy as np
 import scipy
 from pySDC.implementations.datatype_classes.mesh import mesh
 from scipy.special import factorial
-from functools import lru_cache, partial
+from functools import partial, wraps
 import logging
 
-# TODO: implement FFTW for individual transforms (possibly change normalisation in mpi4py-fft)
 # TODO: implement cupy for transforms
+# TODO: fix edge cases
+
+
+def cache(func):
+    attr_cache = f"_{func.__name__}_cache"
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if not hasattr(self, attr_cache):
+            setattr(self, attr_cache, {})
+
+        cache = getattr(self, attr_cache)
+
+        key = (args, frozenset(kwargs.items()))
+        if key in cache:
+            return cache[key]
+        result = func(self, *args, **kwargs)
+        cache[key] = result
+        return result
+
+    return wrapper
 
 
 class SpectralHelper1D:
@@ -222,7 +242,6 @@ class ChebychevHelper(SpectralHelper1D):
         self.lin_trf_off = (x1 + x0) / 2
         super().__init__(*args, x0=x0, x1=x1, **kwargs)
 
-        self.cache = {}
         self.norm = self.get_norm()
 
     def get_1dgrid(self):
@@ -240,6 +259,7 @@ class ChebychevHelper(SpectralHelper1D):
         """Get the domain in spectral space"""
         return self.xp.arange(self.N)
 
+    @cache
     def get_conv(self, name, N=None):
         '''
         Get conversion matrix between different kinds of polynomials. The supported kinds are
@@ -257,9 +277,6 @@ class ChebychevHelper(SpectralHelper1D):
         Returns:
             scipy.sparse: Sparse conversion matrix
         '''
-        if name in self.cache.keys() and not N:
-            return self.cache[name]
-
         N = N if N else self.N
         sp = self.sparse_lib
         xp = self.xp
@@ -290,7 +307,6 @@ class ChebychevHelper(SpectralHelper1D):
             except NotImplementedError:
                 raise NotImplementedError from E
 
-        self.cache[name] = mat
         return mat
 
     def get_basis_change_matrix(self, conv='T2T', **kwargs):
@@ -349,7 +365,7 @@ class ChebychevHelper(SpectralHelper1D):
         D[0, :] /= 2
         return self.sparse_lib.csc_matrix(self.xp.linalg.matrix_power(D, p)) / self.lin_trf_fac**p
 
-    @lru_cache(maxsize=99)
+    @cache
     def get_norm(self, N=None):
         '''
         Get normalization for converting Chebychev coefficients and DCT
@@ -1359,7 +1375,7 @@ class SpectralHelper:
     def get_indices(self, forward_output=True):
         return [self.xp.arange(self.axes[i].N)[self.local_slice(forward_output)[i]] for i in range(len(self.axes))]
 
-    @lru_cache(maxsize=99)
+    @cache
     def get_pfft(self, axes=None, padding=None, grid=None):
         if self.ndim == 1 or self.comm is None:
             return None
