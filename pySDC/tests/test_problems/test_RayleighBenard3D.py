@@ -185,7 +185,7 @@ def test_Poisson_problem_w():
         'w_top': 0,
         'w_bottom': 0,
         'T_top': 0,
-        'T_bottom': 2,
+        'T_bottom': 1,
     }
     P = RayleighBenard3D(nx=2, ny=2, nz=2**3, BCs=BCs, Rayleigh=1.0)
     iw = P.index('w')
@@ -212,6 +212,7 @@ def test_Poisson_problem_w():
 
     u_exact = P.transform(u_exact_real)
     u_exact[ip, 0, 0] = u[ip, 0, 0]  # nobody cares about the constant offset
+
     for comp in ['u', 'v', 'w', 'T', 'p']:
         i = P.spectral.index(comp)
         assert np.allclose(u_exact[i], u[i]), f'Unexpected solution in component {comp}'
@@ -219,8 +220,8 @@ def test_Poisson_problem_w():
 
 if __name__ == '__main__':
     # test_eval_f(2**2, 2**1, 'x', True)
-    test_Poisson_problems(1, 'T')
-    # test_Poisson_problem_w()
+    # test_Poisson_problems(1, 'T')
+    test_Poisson_problem_w()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
     # test_viscous_dissipation()
