@@ -141,7 +141,7 @@ def test_Poisson_problems(nx, component):
         'T_bottom': 0,
     }
     P = RayleighBenard3D(
-        nx=nx, ny=nx, nz=6, BCs=BCs, Rayleigh=(max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * 2**3)
+        nx=nx, ny=nx, nz=6, BCs=BCs, Rayleigh=(max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * 2**4)
     )
     rhs = P.u_init
 
@@ -150,20 +150,23 @@ def test_Poisson_problems(nx, component):
     A = P.put_BCs_in_matrix(-P.L)
     rhs[idx][0, 0, 2] = 6
     rhs[idx][0, 0, 0] = 6
+    rhs = P.put_BCs_in_rhs_hat(rhs)
     u = P.sparse_lib.linalg.spsolve(A, P.M @ rhs.flatten()).reshape(rhs.shape).real
 
-    u_exact = P.u_init
+    u_exact = P.u_init_forward.astype('d')
     u_exact[idx][0, 0, 4] = 1 / 8
     u_exact[idx][0, 0, 2] = 1 / 2
     u_exact[idx][0, 0, 0] = -5 / 8
 
     if component == 'T':
         ip = P.index('p')
-        u_exact[ip][0, 0, 5] = 1 / (16 * 5)
-        u_exact[ip][0, 0, 3] = 5 / (16 * 5)
-        u_exact[ip][0, 0, 1] = -70 / (16 * 5)
+        u_exact[ip][0, 0, 5] = 1 / (16 * 5) / 2
+        u_exact[ip][0, 0, 3] = 5 / (16 * 5) / 2
+        u_exact[ip][0, 0, 1] = -70 / (16 * 5) / 2
 
-    assert np.allclose(u_exact, u)
+    for comp in ['u', 'v', 'w', 'T', 'p']:
+        i = P.spectral.index(comp)
+        assert np.allclose(u_exact[i], u[i]), f'Unexpected solution in component {comp}'
 
 
 @pytest.mark.mpi4py
@@ -209,12 +212,14 @@ def test_Poisson_problem_w():
 
     u_exact = P.transform(u_exact_real)
     u_exact[ip, 0, 0] = u[ip, 0, 0]  # nobody cares about the constant offset
-    assert np.allclose(u_exact, u)
+    for comp in ['u', 'v', 'w', 'T', 'p']:
+        i = P.spectral.index(comp)
+        assert np.allclose(u_exact[i], u[i]), f'Unexpected solution in component {comp}'
 
 
 if __name__ == '__main__':
-    test_eval_f(2**2, 2**1, 'x', True)
-    # test_Poisson_problems(3, 'u')
+    # test_eval_f(2**2, 2**1, 'x', True)
+    test_Poisson_problems(1, 'T')
     # test_Poisson_problem_w()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
