@@ -15,10 +15,11 @@ class RayleighBenard3D(GenericSpectralLinear):
 
     The equations we solve are
 
-        u_x + v_z = 0
-        T_t - kappa (T_xx + T_zz) = -uT_x - vT_z
-        u_t - nu (u_xx + u_zz) + p_x = -uu_x - vu_z
-        v_t - nu (v_xx + v_zz) + p_z - T = -uv_x - vv_z
+        u_x + v_y + w_z = 0
+        T_t - kappa (T_xx + T_yy + T_zz) = -uT_x - vT_y - wT_z
+        u_t - nu (u_xx + u_yy + u_zz) + p_x = -uu_x - vu_y - wu_z
+        v_t - nu (v_xx + v_yy + v_zz) + p_y = -uv_x - vv_y - wv_z
+        w_t - nu (w_xx + w_yy + w_zz) + p_z - T = -uw_x - vw_y - ww_z
 
     with u the horizontal velocity, v the vertical velocity (in z-direction), T the temperature, p the pressure, indices
     denoting derivatives, kappa=(Rayleigh * Prandtl)**(-1/2) and nu = (Rayleigh / Prandtl)**(-1/2). Everything on the left
