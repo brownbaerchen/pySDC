@@ -160,15 +160,16 @@ def test_Poisson_problems(nx, component):
     u = P.sparse_lib.linalg.spsolve(A, P.M @ rhs.flatten()).reshape(rhs.shape).real
 
     u_exact = P.u_init_forward.astype('d')
-    u_exact[idx][0, 0, 4] = 1 / 8
-    u_exact[idx][0, 0, 2] = 1 / 2
-    u_exact[idx][0, 0, 0] = -5 / 8
+    if P.comm.rank == 0:
+        u_exact[idx][0, 0, 4] = 1 / 8
+        u_exact[idx][0, 0, 2] = 1 / 2
+        u_exact[idx][0, 0, 0] = -5 / 8
 
-    if component == 'T':
-        ip = P.index('p')
-        u_exact[ip][0, 0, 5] = 1 / (16 * 5) / 2
-        u_exact[ip][0, 0, 3] = 5 / (16 * 5) / 2
-        u_exact[ip][0, 0, 1] = -70 / (16 * 5) / 2
+        if component == 'T':
+            ip = P.index('p')
+            u_exact[ip][0, 0, 5] = 1 / (16 * 5) / 2
+            u_exact[ip][0, 0, 3] = 5 / (16 * 5) / 2
+            u_exact[ip][0, 0, 1] = -70 / (16 * 5) / 2
 
     for comp in ['u', 'v', 'w', 'T', 'p']:
         i = P.spectral.index(comp)
@@ -226,7 +227,7 @@ def test_Poisson_problem_w():
 
 if __name__ == '__main__':
     test_eval_f(2**2, 2**1, 'x', False)
-    # test_Poisson_problems(1, 'T')
+    # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
