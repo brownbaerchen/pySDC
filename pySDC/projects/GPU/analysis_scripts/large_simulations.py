@@ -189,11 +189,29 @@ class RBCLarge(LargeSim):
         }
 
 
+class RBC3DLarge(LargeSim):
+    config = 'RBC3DBenchmarkSDC'
+
+    def setup_CPU_params(self):
+        """
+        Params for the large run
+        """
+        self.params = {
+            'procs': [1, 4, 32],
+            'useGPU': False,
+            'tasks_per_node': 32,
+            'partition': 'batch',
+            'cluster': 'jusuf',
+            'res': 128,
+            'time': '12:30:00',
+        }
+
+
 if __name__ == '__main__':
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--problem', type=str, default='GS', choices=['RBC', 'GS'])
+    parser.add_argument('--problem', type=str, default='GS', choices=['RBC', 'GS', 'RBC3D'])
     parser.add_argument('--XPU', type=str, choices=['CPU', 'GPU'], default='CPU')
     parser.add_argument('--mode', type=str, choices=['run', 'plot', 'video', 'plot_series'], default='plot')
     parser.add_argument('--submit', type=str, choices=['yes', 'no'], default='yes')
@@ -205,6 +223,8 @@ if __name__ == '__main__':
         cls = GSLarge
     elif args.problem == 'RBC':
         cls = RBCLarge
+    elif args.problem == 'RBC3D':
+        cls = RBC3DLarge
     else:
         raise NotImplementedError
 
