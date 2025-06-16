@@ -1620,16 +1620,27 @@ class SpectralHelper:
     def redistribute(self, u, axis, forward_output, **kwargs):
         if self.comm is None:
             return u
+
         pfft = self.get_pfft(**kwargs)
         _arr = self.newDistArray(pfft, forward_output=forward_output)
 
-        if 'Dist' in type(u).__name__:
-            u.redistribute(out=_arr)
-        else:
-            u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)[0]
-            _arr = _arr.redistribute(u_alignment)
-            _arr[...] = u
-        return _arr.redistribute(axis)
+        if 'Dist' in type(u).__name__ and False:
+            try:
+                u.redistribute(out=_arr)
+                return _arr
+            except AssertionError:
+                pass
+
+        u_alignment = self.infer_alignment(u, forward_output=False, **kwargs)
+        for alignment in u_alignment:
+            _arr = _arr.redistribute(alignment)
+            if _arr.shape == u.shape:
+                _arr[...] = u
+                return _arr.redistribute(axis)
+
+        raise Exception(
+            f'Don\'t know how to align array of local shape {u.shape} and global shape {self.global_shape}, aligned in axes {u_alignment}, to axis {axis}'
+        )
 
     def transform(self, u, *args, axes=None, padding=None, **kwargs):
         pfft = self.get_pfft(*args, axes=axes, padding=padding, **kwargs)
