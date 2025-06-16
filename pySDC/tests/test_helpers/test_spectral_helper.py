@@ -302,7 +302,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
     u[...] = u_all[
         (
             0,
-            *helper.local_slice(False, axes=axes),
+            *helper.local_slice(False),
         )
     ]
 
@@ -327,10 +327,24 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
             *helper.local_slice(True),
         )
     ]
+    if expect_local.shape != trf.shape:
+        expect_local = expect_trf[
+            (
+                ...,
+                *helper.local_slice(True, axes=axes),
+            )
+        ]
 
-    print(trf.shape, helper.local_slice(True), flush=True)
     assert np.allclose(expect_local, trf), 'Forward transform is unexpected'
-    assert np.allclose(itrf, u), 'Backward transform is unexpected'
+    assert np.allclose(
+        itrf,
+        u_all[
+            (
+                0,
+                *helper.local_slice(False, axes=axes),
+            )
+        ],
+    ), 'Backward transform is unexpected'
 
     if padding > 1:
         _padding = (padding,) * helper.ndim
@@ -775,7 +789,7 @@ if __name__ == '__main__':
         # test_differentiation_matrix3D(2, 2, 4, 'cheby', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(2, 2, 4, 'ultraspherical', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(32, 32, 32, 'fft', p=2, axes=(-1, -2), useMPI=True)
-        test_transform(4, 4, 8, 'fft', 'fft', 'fft', axes=(-2,), padding=1.5, useMPI=True)
+        test_transform(4, 4, 8, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
