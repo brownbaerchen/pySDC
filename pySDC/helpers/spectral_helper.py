@@ -6,10 +6,34 @@ from functools import partial, wraps
 import logging
 
 # TODO: implement cupy for transforms
-# TODO: fix edge cases
 
 
 def cache(func):
+    """
+    Decorator for caching return values of functions.
+
+    Example:
+
+    .. code-block:: python
+
+        num_calls = 0
+
+        @cache
+        def increment(x):
+            num_calls += 1
+            return x + 1
+
+        increment(0)  # returns 1, num_calls = 1
+        increment(1)  # returns 2, num_calls = 2
+        increment(0)  # returns 1, num_calls = 2
+
+
+    Args:
+        func (function): The function you want to cache the return value of
+
+    Returns:
+        return value of func
+    """
     attr_cache = f"_{func.__name__}_cache"
 
     @wraps(func)
