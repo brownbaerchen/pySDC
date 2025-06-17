@@ -40,6 +40,7 @@ class ScalingConfig(object):
     ndim = 2
     tasks_time = 1
     sbatch_options = []
+    srun_options = []
     experiments = []
     OMP_NUM_THREADS = 1
 
@@ -60,7 +61,7 @@ class ScalingConfig(object):
                     f'-p {self.partition}',
                     f'--tasks-per-node={self.tasks_per_node}',
                 ] + self.sbatch_options
-                srun_options = [f'--tasks-per-node={self.tasks_per_node}']
+                srun_options = [f'--tasks-per-node={self.tasks_per_node}'] + self.srun_options
                 if self.useGPU:
                     srun_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
                     sbatch_options += [f'--cpus-per-task={self.OMP_NUM_THREADS}', '--gpus-per-task=1']
@@ -138,6 +139,7 @@ class ScalingConfig(object):
                         timing_step = get_sorted(stats, type='timing_step')
 
                     t_mean = np.mean([me[1] for me in timing_step])
+                    t_mean_filtered = np.mean([me[1] for me in timing_step[1:]])
                     t_min = np.min([me[1] for me in timing_step][1:])
 
                     if quantity == 'throughput':
@@ -154,6 +156,8 @@ class ScalingConfig(object):
                         )
                     elif quantity == 'time':
                         timings[np.prod(procs) / self.tasks_per_node] = t_mean
+                    elif quantity == 'time_filtered':
+                        timings[np.prod(procs) / self.tasks_per_node] = t_mean_filtered
                     elif quantity == 'time_per_task':
                         timings[np.prod(procs)] = t_mean
                     elif quantity == 'min_time_per_task':
@@ -183,6 +187,7 @@ class ScalingConfig(object):
             'throughput': 'throughput / DoF/s',
             'throughput_per_task': 'throughput / DoF/s',
             'time': r'$t_\mathrm{step}$ / s',
+            'time_filtered': r'$t_\mathrm{step}$ / s',
             'time_per_task': r'$t_\mathrm{step}$ / s',
             'min_time_per_task': r'minimal $t_\mathrm{step}$ / s',
             'min_time': r'minimal $t_\mathrm{step}$ / s',
@@ -205,12 +210,20 @@ class JurecaCPU(ScalingConfig):
     OMP_NUM_THREADS = 1
 
 
+class JusufCPU(ScalingConfig):
+    cluster = 'jusuf'
+    partition = 'batch'
+    tasks_per_node = 64
+    OMP_NUM_THREADS = 1
+
+
 class GPUConfig(ScalingConfig):
     cluster = 'booster'
     partition = 'booster'
     tasks_per_node = 4
     useGPU = True
     OMP_NUM_THREADS = 12
+    srun_options = ['--cpu-bind=sockets']
 
 
 class GrayScottSpaceScalingCPU3D(CPUConfig, ScalingConfig):
@@ -296,6 +309,35 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
     ]
 
 
+class RayleighBenard3DSpaceScalingCPU(JusufCPU):
+    ndim = 3
+    config = 'RBC3Dscaling'
+    tasks_time = 4
+    sbatch_options = ['--time=0:15:00']
+    tasks_per_node = 32
+    OMP_NUM_THREADS = 1
+    srun_options = ['--distribution=block:cyclic:cyclic']
+
+    experiments = [
+        Experiment(res=128, PinT=True, start=128, stop=2048, marker='^'),
+        Experiment(res=128, PinT=False, start=128, stop=2048, marker='^'),
+    ]
+
+
+class RayleighBenard3DSpaceScalingGPU(GPUConfig):
+    ndim = 3
+    config = 'RBC3Dscaling'
+    tasks_time = 4
+    sbatch_options = ['--time=0:15:00']
+
+    experiments = [
+        Experiment(res=128, PinT=False, start=1, stop=32, marker='.'),
+        Experiment(res=128, PinT=True, start=4, stop=128, marker='.'),
+        Experiment(res=256, PinT=False, start=16, stop=256, marker='x'),
+        Experiment(res=256, PinT=True, start=16, stop=256, marker='x'),
+    ]
+
+
 # class RayleighBenardSpaceScalingCPU(CPUConfig, ScalingConfig):
 #     base_resolution = 1024
 #     base_resolution_weak = 128
@@ -368,6 +410,11 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
                 RayleighBenardSpaceScalingGPU(),
                 RayleighBenardSpaceScalingCPU(),
             ]
+    elif problem == 'RBC3D':
+        configs = [
+            # RayleighBenard3DSpaceScalingGPU(),
+            RayleighBenard3DSpaceScalingCPU(),
+        ]
     elif problem == 'RBC_dedalus':
         configs = [
             RayleighBenardDedalusComparison(),
@@ -382,6 +429,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         ('GS3D', 'time'): {'x': [0.25, 400], 'y': [80, 5e-2]},
         ('RBC', 'throughput'): {'x': [1 / 10, 64], 'y': [2e4, 2e4 * 640]},
         ('RBC', 'time'): {'x': [1 / 10, 64], 'y': [60, 60 / 640]},
+        ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
         ('RBC', 'time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time'): {'x': [1, 640], 'y': [60, 60 / 640]},
@@ -443,6 +491,11 @@ if __name__ == '__main__':
             config_classes += [RayleighBenardSpaceScalingCPU]
         else:
             config_classes += [RayleighBenardSpaceScalingGPU]
+    elif args.problem == 'RBC3D':
+        if args.XPU == 'CPU':
+            config_classes += [RayleighBenard3DSpaceScalingCPU]
+        else:
+            config_classes += [RayleighBenard3DSpaceScalingGPU]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]
