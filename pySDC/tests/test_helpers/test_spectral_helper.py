@@ -331,7 +331,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
         expect_local = expect_trf[
             (
                 ...,
-                *helper.local_slice(True, axes=axes),
+                *helper.local_slice(True),
             )
         ]
 
@@ -341,7 +341,7 @@ def test_transform(nx, ny, nz, bx, by, bz, axes, padding, useMPI=False, **kwargs
         u_all[
             (
                 0,
-                *helper.local_slice(False, axes=axes),
+                *helper.local_slice(False),
             )
         ],
     ), 'Backward transform is unexpected'
@@ -515,6 +515,7 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     z = Z[0, :]
 
     bcs = np.sin(bc_val * x)
+    # bcs = x**2
     helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
@@ -548,7 +549,8 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     if plotting:
         import matplotlib.pyplot as plt
 
-        im = plt.pcolormesh(X, Z, sol[0])
+        _X, _Z = helper.get_grid(forward_output=False)
+        im = plt.pcolormesh(_X, _Z, sol[0])
         plt.colorbar(im)
         plt.xlabel('x')
         plt.ylabel('t')
@@ -789,11 +791,12 @@ if __name__ == '__main__':
         # test_differentiation_matrix3D(2, 2, 4, 'cheby', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(2, 2, 4, 'ultraspherical', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(32, 32, 32, 'fft', p=2, axes=(-1, -2), useMPI=True)
-        test_transform(4, 4, 8, 'fft', 'fft', 'fft', axes=(-1,), padding=1.5, useMPI=True)
+        test_transform(4, 4, 8, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
-        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=False, useMPI=True)
+        # test_tau_method2D('T2U', 2**8, 2**8, -2, plotting=True, useMPI=True)
+        # test_tau_method2D('T2U', 2**1, 2**2, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
     else:

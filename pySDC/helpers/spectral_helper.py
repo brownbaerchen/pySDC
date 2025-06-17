@@ -1102,7 +1102,9 @@ class SpectralHelper:
 
             return self.sparse_lib.csc_matrix(sp.kron(mats[0], sp.kron(*mats[1:])))
         else:
-            raise NotImplementedError(f'Matrix expansion not implemented for {ndim} dimensions!')
+            raise NotImplementedError(
+                f'Matrix expansion for boundary conditions not implemented for {ndim} dimensions!'
+            )
 
     def remove_BC(self, component, equation, axis, kind, line=-1, scalar=False, **kwargs):
         """
@@ -1267,7 +1269,7 @@ class SpectralHelper:
                             self._rhs_hat_zero_mask[(*slices,)] = True
 
         rhs_hat[self._rhs_hat_zero_mask] = 0
-        return rhs_hat + self.redistribute(self.rhs_BCs_hat, self.infer_alignment(rhs_hat, True)[0], True)
+        return rhs_hat + self.rhs_BCs_hat
 
     def put_BCs_in_rhs(self, rhs):
         """
@@ -1384,13 +1386,12 @@ class SpectralHelper:
         axes = tuple(i for i in range(self.ndim)) if axes is None else axes
         padding = list(padding if padding else [1.0 for _ in range(self.ndim)])
 
-        transforms = {
-            ((i + self.ndim) % self.ndim,): (
-                self.axes[i].transform,
-                self.axes[i].itransform,
-            )
-            for i in axes
-        }
+        def no_transform(u, *args, **kwargs):
+            return u
+
+        transforms = {(i,): (no_transform, no_transform) for i in range(self.ndim)}
+        for i in axes:
+            transforms[((i + self.ndim) % self.ndim,)] = (self.axes[i].transform, self.axes[i].itransform)
 
         if self.comm and self.comm.size == 1:
             grid = None
@@ -1400,10 +1401,14 @@ class SpectralHelper:
         else:
             grid = (-1,) * (self.ndim - 1) + (1,)
 
+        # "transform" all axes to ensure consistent shapes.
+        # Transform non-distributable axes last to ensure they are aligned
         _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))
-        _axes = [axis for axis in _axes if not self.axes[axis].distributable] + [
-            axis for axis in _axes if self.axes[axis].distributable
-        ]
+        _axes = [axis for axis in _axes if not self.axes[axis].distributable] + sorted(
+            [axis for axis in _axes if self.axes[axis].distributable]
+            + [axis for axis in range(self.ndim) if axis not in _axes]
+        )
+
         grid = None
         pfft = PFFT(
             comm=self.comm,
@@ -1480,10 +1485,9 @@ class SpectralHelper:
 
         return self.fft_cache[key]
 
-    def local_slice(self, forward_output=True, axes=None, padding=None):
+    def local_slice(self, forward_output=True):
         if self.fft_obj:
-            return self.get_pfft(axes=axes, padding=padding).local_slice(forward_output=forward_output)
-            return self.fft_obj.local_slice(forward_output=forward_output)
+            return self.get_pfft().local_slice(forward_output=forward_output)
         else:
             return [slice(0, me.N) for me in self.axes]
 
@@ -1706,7 +1710,7 @@ class SpectralHelper:
 
         Args:
             M (sparse matrix): Global 1D matrix you want to get the local version of
-            axis (int): Direction in which you want the local version. You will get the global matrix in other directions. This means slab decomposition only.
+            axis (int): Direction in which you want the local version. You will get the global matrix in other directions.
 
         Returns:
             sparse local matrix
