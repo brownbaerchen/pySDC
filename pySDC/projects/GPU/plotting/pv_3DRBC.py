@@ -1,5 +1,7 @@
 import glob
 import argparse
+
+# from paraview.simple import *
 from paraview.simple import (
     XMLRectilinearGridReader,
     GetAnimationScene,
@@ -26,14 +28,14 @@ parser = argparse.ArgumentParser(
     description="Create a video from VTR files stores in a given folder",
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
-parser.add_argument("folder", help="folder where are stored all the VTR files")
+parser.add_argument("--folder", help="folder where are stored all the VTR files", type=str)
 parser.add_argument("--outputFile", "-o", default="video.avi", help="name (with extension !) of the video file")
 parser.add_argument("--frameRate", "-r", default=25, type=int, help="frame rate used for the video")
 parser.add_argument("--quality", "-q", default=1, choices=["0", "1", "2"], help="video quality (0:low, 2:high)")
 parser.add_argument("--noClip", action="store_true", help="don't use the clips in the video (cube only)")
 args = parser.parse_args()
 
-files = sorted(glob.glob(f"{args.folder}/*.vtr"))
+files = sorted(glob.glob(f"3Dvtr/_*.vtr"))
 
 # create a new 'XML Rectilinear Grid Reader'
 data = XMLRectilinearGridReader(registrationName='mouahahaha_[...].vtr', FileName=files)
