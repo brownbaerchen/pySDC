@@ -749,7 +749,7 @@ def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
 
 
 @pytest.mark.base
-def test_cache():
+def test_cache_decorator():
     from pySDC.helpers.spectral_helper import cache
     import numpy as np
 

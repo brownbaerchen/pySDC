@@ -11,6 +11,8 @@ import logging
 def cache(func):
     """
     Decorator for caching return values of functions.
+    This is very similar to `functools.cache`, but without the memory leaks (see
+    https://docs.astral.sh/ruff/rules/cached-instance-method/).
 
     Example:
 
