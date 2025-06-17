@@ -1522,15 +1522,9 @@ class SpectralHelper:
             self.add_component('u')
 
         self.global_shape = (len(self.components),) + tuple(me.N for me in self.axes)
-        self.forward_alignment = 0
-        self.backward_alignment = 0
 
         axes = tuple(i for i in range(len(self.axes)))
         self.fft_obj = self.get_pfft(axes=axes)
-        if self.fft_obj is not None:
-
-            self.backward_alignment = self.newDistArray(self.fft_obj, forward_output=False, rank=1).alignment
-            self.forward_alignment = self.newDistArray(self.fft_obj, forward_output=True, rank=1).alignment
 
         self.init = (
             np.empty(shape=self.global_shape)[
@@ -1683,7 +1677,7 @@ class SpectralHelper:
 
         if padding is not None:
             _out /= np.prod(padding)
-        return _out.redistribute(self.forward_alignment)
+        return _out
 
     def itransform(self, u, *args, axes=None, padding=None, **kwargs):
         if padding is not None:
@@ -1713,7 +1707,7 @@ class SpectralHelper:
 
         if padding is not None:
             _out *= np.prod(padding)
-        return _out.redistribute(self.backward_alignment)
+        return _out
 
     def get_local_slice_of_1D_matrix(self, M, axis):
         """
