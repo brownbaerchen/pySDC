@@ -480,19 +480,20 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet', useGPU=False):
     '''
     from pySDC.helpers.spectral_helper import SpectralHelper
     import scipy.sparse as sp
+    import numpy as np
 
     helper = SpectralHelper(debug=True, useGPU=useGPU)
     helper.add_component('u')
     helper.add_axis(base='cheby', N=N)
     helper.setup_fft()
 
-    np = helper.xp
+    xp = helper.xp
     linalg = helper.linalg
 
     if useGPU:
         import cupy
 
-        assert np == cupy
+        assert xp == cupy
 
 
     if kind == 'integral':
@@ -510,20 +511,24 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet', useGPU=False):
     A = helper.convert_operator_matrix_to_operator(_A)
     A = helper.put_BCs_in_matrix(A)
 
-    rhs = helper.put_BCs_in_rhs(np.zeros((1, N)))
+    rhs = helper.put_BCs_in_rhs(xp.zeros((1, N)))
     rhs_hat = helper.transform(rhs, axes=(-1,))
 
     sol_hat = linalg.spsolve(A, rhs_hat.flatten())
 
+    if useGPU:
+        C = C.get()
+        sol_hat = sol_hat.get()
+
     sol_poly = np.polynomial.Chebyshev(sol_hat)
     d_sol_poly = sol_poly.deriv(1)
-    x = np.linspace(-1, 1, 100)
+    x = xp.linspace(-1, 1, 100)
 
     if kind == 'integral':
         integral = sol_poly.integ(1, lbnd=-1)
-        assert np.isclose(integral(1), bc_val), 'Solution does not satisfy boundary condition'
+        assert xp.isclose(integral(1), bc_val), 'Solution does not satisfy boundary condition'
     else:
-        assert np.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
+        assert xp.isclose(sol_poly(bc), bc_val), 'Solution does not satisfy boundary condition'
 
     coef = np.append(np.zeros(N - 1), [1])
     P = np.polynomial.Chebyshev(C @ coef)
@@ -567,7 +572,6 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
     z = Z[0, :]
 
     bcs = np.sin(bc_val * x)
-    # bcs = x**2
     helper.add_BC('u', 'u', 1, kind='dirichlet', x=bc, v=bcs)
     helper.setup_BCs()
 
@@ -844,7 +848,7 @@ if __name__ == '__main__':
         # test_differentiation_matrix3D(2, 2, 4, 'ultraspherical', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(32, 32, 32, 'fft', p=2, axes=(-1, -2), useMPI=True)
         # test_transform(4, 4, 8, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
-        test_dealias_GPU(axis=(-1, -2), bx='fft', bz='cheby', padding=1.5)
+        # test_dealias_GPU(axis=(-1, -2), bx='fft', bz='cheby', padding=1.5)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')
@@ -852,6 +856,7 @@ if __name__ == '__main__':
         # test_tau_method2D('T2U', 2**1, 2**2, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
+        test_tau_method_GPU()
     else:
         raise NotImplementedError
     print('done')
