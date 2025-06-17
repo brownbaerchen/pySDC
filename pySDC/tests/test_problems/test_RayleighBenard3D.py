@@ -54,7 +54,7 @@ def test_eval_f(nx, nz, direction, spectral_space):
     else:
         raise NotImplementedError
 
-    u = P.u_init_real
+    u = P.u_init_physical
     assert np.allclose(P.eval_f(P.u_init), 0), 'Non-zero time derivative in static 0 configuration'
 
     for i in [iu, iv, iw, iT, ip]:

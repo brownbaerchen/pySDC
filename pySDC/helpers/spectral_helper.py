@@ -916,20 +916,18 @@ class SpectralHelper:
 
         cls.dtype = cupy_mesh
 
-    def __init__(self, comm=None, useGPU=False, slab_decomposition=False, debug=False):
+    def __init__(self, comm=None, useGPU=False, debug=False):
         """
         Constructor
 
         Args:
             comm (mpi4py.Intracomm): MPI communicator
             useGPU (bool): Whether to use GPUs
-            slab_decomposition (bool): Whether to use slab or pencil decomposition
             debug (bool): Perform additional checks at extra computational cost
         """
         self.comm = comm
         self.debug = debug
         self.useGPU = useGPU
-        self.slab_decomposition = slab_decomposition
 
         if useGPU:
             self.setup_GPU()
@@ -963,11 +961,11 @@ class SpectralHelper:
         return self.dtype(self.init_forward)
 
     @property
-    def u_init_real(self):
+    def u_init_physical(self):
         """
-        Get empty data container in spectral space
+        Get empty data container in physical space
         """
-        return self.dtype(self.init_real)
+        return self.dtype(self.init_physical)
 
     @property
     def shape(self):
@@ -1417,14 +1415,6 @@ class SpectralHelper:
         for i in axes:
             transforms[((i + self.ndim) % self.ndim,)] = (self.axes[i].transform, self.axes[i].itransform)
 
-        if self.comm and self.comm.size == 1:
-            grid = None
-        elif self.slab_decomposition:
-            raise NotImplementedError
-            grid = (-1,) + tuple(me.N for me in self.axes[1:])
-        else:
-            grid = (-1,) * (self.ndim - 1) + (1,)
-
         # "transform" all axes to ensure consistent shapes.
         # Transform non-distributable axes last to ensure they are aligned
         _axes = tuple(sorted((axis + self.ndim) % self.ndim for axis in axes))
@@ -1433,7 +1423,6 @@ class SpectralHelper:
             + [axis for axis in range(self.ndim) if axis not in _axes]
         )
 
-        grid = None
         pfft = PFFT(
             comm=self.comm,
             shape=self.global_shape[1:],
@@ -1553,7 +1542,7 @@ class SpectralHelper:
             self.comm,
             np.dtype('float'),
         )
-        self.init_real = (
+        self.init_physical = (
             np.empty(shape=self.global_shape)[
                 (
                     ...,
