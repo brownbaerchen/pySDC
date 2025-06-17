@@ -98,10 +98,8 @@ class SpectralHelper1D:
 
         if useGPU:
             self.setup_GPU()
-        elif useFFTW:
-            self.setup_FFTW()
         else:
-            self.fft_lib = scipy.fft
+            self.setup_CPU(useFFTW=useFFTW)
 
         if useGPU and useFFTW:
             raise ValueError('Please run either on GPUs or with FFTW, not both!')
@@ -121,14 +119,23 @@ class SpectralHelper1D:
         cls.fft_lib = fft_lib
 
     @classmethod
-    def setup_FFTW(cls):
-        """switch to FFTW modules"""
-        from mpi4py_fft import fftw
+    def setup_CPU(cls, useFFTW=False):
+        """switch to CPU modules"""
 
         cls.xp = np
         cls.sparse_lib = scipy.sparse
         cls.linalg = scipy.sparse.linalg
-        cls.fft_lib = fftw
+
+        if useFFTW:
+            from mpi4py_fft import fftw
+            cls.fft_backend = 'fftw'
+            cls.fft_lib = fftw
+        else:
+            cls.fft_backend = 'scipy'
+            cls.fft_lib = scipy.fft
+
+        cls.fft_comm_backend = 'MPI'
+        cls.dtype = mesh
 
     def get_Id(self):
         """
@@ -419,8 +426,9 @@ class ChebychevHelper(SpectralHelper1D):
             Data in spectral space
         """
         axes = axes if axes else tuple(i for i in range(u.ndim))
+        kwargs['s'] = shape
 
-        trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, norm='backward', s=shape, **kwargs)
+        trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, norm='backward', **kwargs)
         for axis in axes:
 
             if self.N < trf.shape[axis]:
@@ -472,6 +480,9 @@ class ChebychevHelper(SpectralHelper1D):
             Data in physical space
         """
         axes = axes if axes else tuple(i for i in range(u.ndim))
+        kwargs['s'] = shape
+        kwargs['norm'] = kwargs.get('norm', 'backward')
+
         for axis in axes:
 
             if self.N == u.shape[axis]:
@@ -507,7 +518,8 @@ class ChebychevHelper(SpectralHelper1D):
             norm = self.get_norm(u.shape[axis]) * _u.shape[axis] / self.N
 
             _u /= norm[(*expansion,)]
-        return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, norm='backward', s=shape, **kwargs)
+
+        return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, **kwargs)
 
     def get_BC(self, kind, **kwargs):
         """
@@ -787,9 +799,9 @@ class FFTHelper(SpectralHelper1D):
             return self.plans[key]
         else:
             if forward:
-                return self.fft_lib.fftn
+                return partial(self.fft_lib.fftn, norm=kwargs.get('norm', 'backward'))
             else:
-                return partial(self.fft_lib.ifftn, norm='forward')
+                return partial(self.fft_lib.ifftn, norm=kwargs.get('norm', 'forward'))
 
     def transform(self, u, *args, axes=None, shape=None, **kwargs):
         """
@@ -803,8 +815,9 @@ class FFTHelper(SpectralHelper1D):
             transformed data
         """
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        plan = self.get_plan(u, *args, forward=True, axes=axes, s=shape, **kwargs)
-        return plan(u, *args, axes=axes, s=shape, **kwargs)
+        kwargs['s'] = shape
+        plan = self.get_plan(u, *args, forward=True, axes=axes, **kwargs)
+        return plan(u, *args, axes=axes, **kwargs)
 
     def itransform(self, u, *args, axes=None, shape=None, **kwargs):
         """
@@ -818,8 +831,9 @@ class FFTHelper(SpectralHelper1D):
             transformed data
         """
         axes = axes if axes else tuple(i for i in range(u.ndim))
-        plan = self.get_plan(u, *args, forward=False, axes=axes, s=shape, **kwargs)
-        return plan(u, *args, axes=axes, s=shape, **kwargs) / np.prod([u.shape[axis] for axis in axes])
+        kwargs['s'] = shape
+        plan = self.get_plan(u, *args, forward=False, axes=axes, **kwargs)
+        return plan(u, *args, axes=axes, **kwargs) / np.prod([u.shape[axis] for axis in axes])
 
     def get_BC(self, kind):
         """
@@ -920,6 +934,25 @@ class SpectralHelper:
 
         cls.dtype = cupy_mesh
 
+    @classmethod
+    def setup_CPU(cls, useFFTW=False):
+        """switch to CPU modules"""
+
+        cls.xp = np
+        cls.sparse_lib = scipy.sparse
+        cls.linalg = scipy.sparse.linalg
+
+        if useFFTW:
+            from mpi4py_fft import fftw
+            cls.fft_backend = 'fftw'
+            cls.fft_lib = fftw
+        else:
+            cls.fft_backend = 'scipy'
+            cls.fft_lib = scipy.fft
+
+        cls.fft_comm_backend = 'MPI'
+        cls.dtype = mesh
+
     def __init__(self, comm=None, useGPU=False, debug=False):
         """
         Constructor
@@ -935,6 +968,8 @@ class SpectralHelper:
 
         if useGPU:
             self.setup_GPU()
+        else:
+            self.setup_CPU()
 
         self.axes = []
         self.components = []
