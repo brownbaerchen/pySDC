@@ -291,6 +291,7 @@ def _test_transform_dealias(
     assert xp.allclose(u2_hat_expect, u2_hat)
     assert not xp.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
 
+
 @pytest.mark.cupy
 @pytest.mark.parametrize('axis', [-1, -2])
 @pytest.mark.parametrize('bx', ['fft'])
@@ -495,7 +496,6 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet', useGPU=False):
 
         assert xp == cupy
 
-
     if kind == 'integral':
         helper.add_BC('u', 'u', 0, v=bc_val, kind='integral')
     else:
@@ -631,7 +631,6 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
 @pytest.mark.parametrize('bc_val', [-2])
 @pytest.mark.parametrize('num_procs', [2, 1])
 def test_tau_method2D_MPI(mpi_ranks, variant, nz, nx, bc_val, num_procs, **kwargs):
-    # run_MPI_test(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau')
     test_tau_method2D(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau', useMPI=True)
 
 

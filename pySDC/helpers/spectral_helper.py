@@ -128,6 +128,7 @@ class SpectralHelper1D:
 
         if useFFTW:
             from mpi4py_fft import fftw
+
             cls.fft_backend = 'fftw'
             cls.fft_lib = fftw
         else:
@@ -948,6 +949,7 @@ class SpectralHelper:
 
         if useFFTW:
             from mpi4py_fft import fftw
+
             cls.fft_backend = 'fftw'
             cls.fft_lib = fftw
         else:
