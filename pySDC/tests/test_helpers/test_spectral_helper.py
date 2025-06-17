@@ -4,9 +4,8 @@ import pytest
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [16])
 @pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
-def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
+def test_integration_matrix2D(nx, nz, axes, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -48,11 +47,10 @@ def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
 @pytest.mark.mpi4py
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
 @pytest.mark.parametrize('bz', ['cheby', 'fft'])
-def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useGPU=False, **kwargs):
+def test_differentiation_matrix2D(nx, nz, axes, bx, bz, useGPU=False, **kwargs):
     from pySDC.helpers.spectral_helper import SpectralHelper
 
     helper = SpectralHelper(debug=True, useGPU=useGPU)
@@ -106,15 +104,14 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useGPU=False, *
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
 @pytest.mark.parametrize('bz', ['cheby', 'fft'])
 def test_differentiation_matrix2D_GPU(bx, bz, axes):
-    test_differentiation_matrix2D(32, 16, variant='T2U', bx=bx, bz=bz, axes=axes, useGPU=True)
+    test_differentiation_matrix2D(32, 16, bx=bx, bz=bz, axes=axes, useGPU=True)
 
 
 @pytest.mark.base
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('nz', [16])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-def test_identity_matrix2D(nx, nz, variant, bx, **kwargs):
+def test_identity_matrix2D(nx, nz, bx, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -542,11 +539,10 @@ def test_tau_method_GPU():
 
 
 @pytest.mark.base
-@pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2, 1.0])
-def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=False, **kwargs):
+def test_tau_method2D(nz, nx, bc_val, bc=-1, plotting=False, useMPI=False, **kwargs):
     '''
     solve u_z - 0.1u_xx -u_x + tau P = 0, u(bc) = sin(bc_val*x) -> space-time discretization of advection-diffusion
     problem. We do FFT in x-direction and Chebychov in z-direction.
@@ -625,13 +621,12 @@ def test_tau_method2D(variant, nz, nx, bc_val, bc=-1, plotting=False, useMPI=Fal
 
 @pytest.mark.mpi4py
 @pytest.mark.mpi(ranks=[2])
-@pytest.mark.parametrize('variant', ['T2T', 'T2U'])
 @pytest.mark.parametrize('nx', [4, 8])
 @pytest.mark.parametrize('nz', [4, 8])
 @pytest.mark.parametrize('bc_val', [-2])
 @pytest.mark.parametrize('num_procs', [2, 1])
-def test_tau_method2D_MPI(mpi_ranks, variant, nz, nx, bc_val, num_procs, **kwargs):
-    test_tau_method2D(variant=variant, nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau', useMPI=True)
+def test_tau_method2D_MPI(mpi_ranks, nz, nx, bc_val, num_procs, **kwargs):
+    test_tau_method2D(nz=nz, nx=nx, bc_val=bc_val, num_procs=num_procs, test='tau', useMPI=True)
 
 
 @pytest.mark.mpi4py
@@ -752,9 +747,8 @@ def test_differentiation_matrix3DMPI(mpi_ranks, nx, ny, nz, bz, axes, useMPI=Tru
 @pytest.mark.parametrize('nx', [32])
 @pytest.mark.parametrize('ny', [0, 16])
 @pytest.mark.parametrize('nz', [8])
-@pytest.mark.parametrize('variant', ['T2U', 'T2T'])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
-def test_identity_matrix_ND(nx, ny, nz, variant, bx, useMPI=False, **kwargs):
+def test_identity_matrix_ND(nx, ny, nz, bx, useMPI=False, **kwargs):
     import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
 
@@ -828,7 +822,6 @@ if __name__ == '__main__':
     parser.add_argument('--bx', type=str, help='Base in x direction')
     parser.add_argument('--bc_val', type=int, help='Value of boundary condition')
     parser.add_argument('--test', type=str, help='type of test', choices=['transform', 'diff', 'int', 'tau', 'dealias'])
-    parser.add_argument('--variant', type=str, help='Chebychev mode', choices=['T2T', 'T2U'], default='T2U')
     parser.add_argument('--useMPI', type=str_to_bool, help='use MPI or not', choices=[True, False], default=True)
     args = parser.parse_args()
 
