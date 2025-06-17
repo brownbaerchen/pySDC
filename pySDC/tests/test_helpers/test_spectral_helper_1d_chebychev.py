@@ -163,6 +163,24 @@ def test_transform(N, d):
     assert np.allclose(cheby.itransform(cheby.transform(u, axes=(-1,)), axes=(-1,)), u)
 
 
+@pytest.mark.cupy
+def test_transform_cupy(N=8):
+    import numpy as np
+    import cupy as cp
+    from pySDC.helpers.spectral_helper import ChebychevHelper
+
+    u = cp.random.random(N).astype('D')
+
+    helper_CPU = ChebychevHelper(N=N, useGPU=False)
+    u_hat_CPU = helper_CPU.transform(u.get())
+
+    helper = ChebychevHelper(N=N, useGPU=True)
+    u_hat = helper.transform(u)
+
+    assert cp.allclose(u, helper.itransform(u_hat))
+    assert np.allclose(u_hat.get(), u_hat_CPU)
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('N', [8, 32])
 def test_integration_BC(N):
@@ -402,4 +420,4 @@ def test_tau_method2D_diffusion(nz, nx, bc_val, plotting=False):
 
 
 if __name__ == '__main__':
-    test_transform(4, 1, 'dct')
+    test_transform_cupy()

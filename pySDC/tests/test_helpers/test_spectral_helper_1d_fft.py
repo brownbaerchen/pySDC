@@ -56,6 +56,24 @@ def test_transform(useFFTW, N=8):
     assert np.allclose(u, helper.itransform(u_hat))
 
 
+@pytest.mark.cupy
+def test_transform_cupy(N=8):
+    import numpy as np
+    import cupy as cp
+    from pySDC.helpers.spectral_helper import FFTHelper
+
+    u = cp.random.random(N).astype('D')
+
+    helper_CPU = FFTHelper(N=N, useGPU=False)
+    u_hat_CPU = helper_CPU.transform(u.get())
+
+    helper = FFTHelper(N=N, useGPU=True)
+    u_hat = helper.transform(u)
+
+    assert np.allclose(u_hat.get(), u_hat_CPU)
+    assert cp.allclose(u, helper.itransform(u_hat))
+
+
 @pytest.mark.base
 @pytest.mark.parametrize('N', [8, 64])
 def test_integration_matrix(N, plot=False):
@@ -120,5 +138,6 @@ if __name__ == '__main__':
     # test_differentiation_matrix(64, 4, 8, True, True)
     # test_integration_matrix(8, True)
     # test_tau_method(6, 1)
-    test_transform(True)
-    test_transform(False)
+    # test_transform(True)
+    # test_transform(False)
+    test_transform_cupy()

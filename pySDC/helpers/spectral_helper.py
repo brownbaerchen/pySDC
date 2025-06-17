@@ -416,7 +416,6 @@ class ChebychevHelper(SpectralHelper1D):
         Returns:
             Data in spectral space
         """
-        assert self.fft_lib == scipy.fft
         axes = axes if axes else tuple(i for i in range(u.ndim))
 
         trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, norm='backward', s=shape, **kwargs)
@@ -459,7 +458,7 @@ class ChebychevHelper(SpectralHelper1D):
             trf *= norm[(*expansion,)]
         return trf
 
-    def itransform(self, u, axes, *args, shape=None, **kwargs):
+    def itransform(self, u, *args, axes=None, shape=None, **kwargs):
         """
         Inverse DCT along axis.
 
@@ -470,7 +469,7 @@ class ChebychevHelper(SpectralHelper1D):
         Returns:
             Data in physical space
         """
-        assert self.fft_lib == scipy.fft
+        axes = axes if axes else tuple(i for i in range(u.ndim))
         for axis in axes:
 
             if self.N == u.shape[axis]:
