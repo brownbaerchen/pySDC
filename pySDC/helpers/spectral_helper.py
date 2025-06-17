@@ -1561,6 +1561,10 @@ class SpectralHelper:
         self.BC_rhs_mask = self.newDistArray().astype(bool)
 
     def newDistArray(self, pfft=None, forward_output=True, val=0, rank=1, view=False):
+        """
+        Get an empty distributed array. This is almost a copy of the function of the same name from mpi4py-fft, but
+        takes care of all the solution components in the tensor.
+        """
         if self.comm is None:
             return self.xp.zeros(self.init[0], dtype=self.init[2])
         from mpi4py_fft.distarray import DistArray
