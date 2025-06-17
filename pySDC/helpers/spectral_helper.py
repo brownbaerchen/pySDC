@@ -427,8 +427,9 @@ class ChebychevHelper(SpectralHelper1D):
         """
         axes = axes if axes else tuple(i for i in range(u.ndim))
         kwargs['s'] = shape
+        kwargs['norm'] = kwargs.get('norm', 'backward')
 
-        trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, norm='backward', **kwargs)
+        trf = self.fft_lib.dctn(u, *args, axes=axes, type=2, **kwargs)
         for axis in axes:
 
             if self.N < trf.shape[axis]:
@@ -482,6 +483,7 @@ class ChebychevHelper(SpectralHelper1D):
         axes = axes if axes else tuple(i for i in range(u.ndim))
         kwargs['s'] = shape
         kwargs['norm'] = kwargs.get('norm', 'backward')
+        kwargs['overwrite_x'] = kwargs.get('overwrite_x', False)
 
         for axis in axes:
 
@@ -519,7 +521,7 @@ class ChebychevHelper(SpectralHelper1D):
 
             _u /= norm[(*expansion,)]
 
-        return self.fft_lib.idctn(_u, *args, overwrite_x=False, axes=axes, type=2, **kwargs)
+        return self.fft_lib.idctn(_u, *args, axes=axes, type=2, **kwargs)
 
     def get_BC(self, kind, **kwargs):
         """
@@ -923,13 +925,15 @@ class SpectralHelper:
         import cupy as cp
         import cupyx.scipy.sparse as sparse_lib
         import cupyx.scipy.sparse.linalg as linalg
+        import cupyx.scipy.fft as fft_lib
         from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
 
         cls.xp = cp
         cls.sparse_lib = sparse_lib
         cls.linalg = linalg
 
-        cls.fft_backend = 'cupy'
+        cls.fft_lib = fft_lib
+        cls.fft_backend = 'cupyx-scipy'
         cls.fft_comm_backend = 'NCCL'
 
         cls.dtype = cupy_mesh

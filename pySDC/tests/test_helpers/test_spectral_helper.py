@@ -176,14 +176,15 @@ def _test_transform_dealias(
     bx,
     bz,
     axis,
-    nx=2**4 + 1,
-    nz=2**2 + 1,
+    nx=2**4,
+    nz=2**2,
     padding=3 / 2,
     useMPI=True,
+    useGPU=False,
     **kwargs,
 ):
-    import numpy as np
     from pySDC.helpers.spectral_helper import SpectralHelper
+    import numpy as np
 
     if useMPI:
         from mpi4py import MPI
@@ -192,11 +193,16 @@ def _test_transform_dealias(
     else:
         comm = None
 
-    helper = SpectralHelper(comm=comm, debug=True)
+    helper = SpectralHelper(comm=comm, debug=True, useGPU=useGPU)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
     xp = helper.xp
+
+    if useGPU:
+        import cupy
+
+        assert xp == cupy
 
     _padding = tuple(
         [
@@ -205,7 +211,7 @@ def _test_transform_dealias(
         * helper.ndim
     )
 
-    helper_pad = SpectralHelper(comm=comm, debug=True)
+    helper_pad = SpectralHelper(comm=comm, debug=True, useGPU=useGPU)
     helper_pad.add_axis(base=bx, N=int(_padding[0] * nx))
     helper_pad.add_axis(base=bz, N=int(_padding[1] * nz))
     helper_pad.setup_fft()
@@ -218,14 +224,26 @@ def _test_transform_dealias(
     X, Z = helper.get_grid()
     X_pad, Z_pad = helper_pad.get_grid()
 
+    if useGPU:
+        X_CPU = X.get()
+        Z_CPU = Z.get()
+        X_pad_CPU = X_pad.get()
+        Z_pad_CPU = Z_pad.get()
+    else:
+        X_CPU = X
+        Z_CPU = Z
+        X_pad_CPU = X_pad
+        Z_pad_CPU = Z_pad
+
     if axis == -2:
         f = nx // 3
         u_hat[0][xp.logical_and(xp.abs(Kx) == f, Kz == 0)] += 1
         u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 2 * f, Kz == 0)] += 1 / nx
         u2_hat_expect[0][xp.logical_and(xp.abs(Kx) == 0, Kz == 0)] += 2 / nx
-        u_expect[0] += np.cos(f * X) * 2 / nx
-        u_expect_pad[0] += np.cos(f * X_pad) * 2 / nx
+        u_expect[0] += xp.cos(f * X) * 2 / nx
+        u_expect_pad[0] += xp.cos(f * X_pad) * 2 / nx
     elif axis == -1:
+
         f = nz // 2 + 1
         u_hat[0][xp.logical_and(xp.abs(Kz) == f, Kx == 0)] += 1
         u2_hat_expect[0][xp.logical_and(Kz == 2 * f, Kx == 0)] += 1 / (2 * nx)
@@ -233,8 +251,8 @@ def _test_transform_dealias(
 
         coef = np.zeros(nz)
         coef[f] = 1 / nx
-        u_expect[0] = np.polynomial.Chebyshev(coef)(Z)
-        u_expect_pad[0] = np.polynomial.Chebyshev(coef)(Z_pad)
+        u_expect[0] = xp.array(np.polynomial.Chebyshev(coef)(Z_CPU))
+        u_expect_pad[0] = xp.array(np.polynomial.Chebyshev(coef)(Z_pad_CPU))
     elif axis in [(-1, -2), (-2, -1)]:
         fx = nx // 3
         fz = nz // 2 + 1
@@ -251,8 +269,8 @@ def _test_transform_dealias(
         coef = np.zeros(nz)
         coef[fz] = 1 / nx
 
-        u_expect[0] = np.cos(fx * X) * 2 / nx + np.polynomial.Chebyshev(coef)(Z)
-        u_expect_pad[0] = np.cos(fx * X_pad) * 2 / nx + np.polynomial.Chebyshev(coef)(Z_pad)
+        u_expect[0] = xp.cos(fx * X) * 2 / nx + xp.array(np.polynomial.Chebyshev(coef)(Z_CPU))
+        u_expect_pad[0] = xp.cos(fx * X_pad) * 2 / nx + xp.array(np.polynomial.Chebyshev(coef)(Z_pad_CPU))
     else:
         raise NotImplementedError
 
@@ -261,17 +279,24 @@ def _test_transform_dealias(
     u_pad = helper.itransform(u_hat, padding=_padding)
     u = helper.itransform(u_hat).real
 
-    assert not np.allclose(u_pad.shape, u.shape) or padding == 1
+    assert not xp.allclose(u_pad.shape, u.shape) or padding == 1
 
     u2 = u**2
     u2_pad = u_pad**2
 
-    assert np.allclose(u, u_expect)
-    assert np.allclose(u_pad, u_expect_pad)
+    assert xp.allclose(u, u_expect)
+    assert xp.allclose(u_pad, u_expect_pad)
 
     u2_hat = helper.transform(u2_pad, padding=_padding)
-    assert np.allclose(u2_hat_expect, u2_hat)
-    assert not np.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
+    assert xp.allclose(u2_hat_expect, u2_hat)
+    assert not xp.allclose(u2_hat_expect, helper.transform(u2)), 'Test is too boring, no dealiasing needed'
+
+@pytest.mark.cupy
+@pytest.mark.parametrize('axis', [-1, -2])
+@pytest.mark.parametrize('bx', ['fft'])
+@pytest.mark.parametrize('bz', ['cheby'])
+def test_dealias_GPU(axis, bx, bz, **kwargs):
+    _test_transform_dealias(axis=axis, bx=bx, bz=bz, **kwargs, useGPU=True)
 
 
 @pytest.mark.base
@@ -444,7 +469,7 @@ def test_tau_method_integral(N, bc_val):
 @pytest.mark.parametrize('bc', [-1, 0, 1])
 @pytest.mark.parametrize('N', [8, 32])
 @pytest.mark.parametrize('bc_val', [-99, 3.1415])
-def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
+def test_tau_method(bc, N, bc_val, kind='Dirichlet', useGPU=False):
     '''
     solve u_x - u + tau P = 0, u(bc) = bc_val
 
@@ -454,13 +479,21 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     The test verifies that the solution satisfies the perturbed equation and the boundary condition.
     '''
     from pySDC.helpers.spectral_helper import SpectralHelper
-    import numpy as np
     import scipy.sparse as sp
 
-    helper = SpectralHelper(debug=True)
+    helper = SpectralHelper(debug=True, useGPU=useGPU)
     helper.add_component('u')
     helper.add_axis(base='cheby', N=N)
     helper.setup_fft()
+
+    np = helper.xp
+    linalg = helper.linalg
+
+    if useGPU:
+        import cupy
+
+        assert np == cupy
+
 
     if kind == 'integral':
         helper.add_BC('u', 'u', 0, v=bc_val, kind='integral')
@@ -480,7 +513,7 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     rhs = helper.put_BCs_in_rhs(np.zeros((1, N)))
     rhs_hat = helper.transform(rhs, axes=(-1,))
 
-    sol_hat = sp.linalg.spsolve(A, rhs_hat.flatten())
+    sol_hat = linalg.spsolve(A, rhs_hat.flatten())
 
     sol_poly = np.polynomial.Chebyshev(sol_hat)
     d_sol_poly = sol_poly.deriv(1)
@@ -496,6 +529,11 @@ def test_tau_method(bc, N, bc_val, kind='Dirichlet'):
     P = np.polynomial.Chebyshev(C @ coef)
     tau = (d_sol_poly(x) - sol_poly(x)) / P(x)
     assert np.allclose(tau, tau[0]), 'Solution does not satisfy perturbed equation'
+
+
+@pytest.mark.cupy
+def test_tau_method_GPU():
+    test_tau_method(-1, 8, 2.77, useGPU=True)
 
 
 @pytest.mark.base
@@ -805,7 +843,8 @@ if __name__ == '__main__':
         # test_differentiation_matrix3D(2, 2, 4, 'cheby', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(2, 2, 4, 'ultraspherical', p=1, axes=(-1, -2, -3), useMPI=True)
         # test_differentiation_matrix3D(32, 32, 32, 'fft', p=2, axes=(-1, -2), useMPI=True)
-        test_transform(4, 4, 8, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
+        # test_transform(4, 4, 8, 'fft', 'fft', 'cheby', axes=(-1,), padding=1.5, useMPI=True)
+        test_dealias_GPU(axis=(-1, -2), bx='fft', bz='cheby', padding=1.5)
         # test_differentiation_matrix2D(2**5, 2**5, 'T2U', bx='cheby', bz='fft', axes=(-2, -1))
         # test_matrix1D(4, 'cheby', 'diff')
         # test_tau_method(-1, 8, 99, kind='Dirichlet')

@@ -57,21 +57,22 @@ def test_transform(useFFTW, N=8):
 
 
 @pytest.mark.cupy
-def test_transform_cupy(N=8):
+@pytest.mark.parametrize('d', [1, 2, 3])
+def test_transform_cupy(d, N=8):
     import numpy as np
     import cupy as cp
     from pySDC.helpers.spectral_helper import FFTHelper
 
-    u = cp.random.random(N).astype('D')
+    u = cp.random.random((d, N)).astype('D')
 
     helper_CPU = FFTHelper(N=N, useGPU=False)
-    u_hat_CPU = helper_CPU.transform(u.get())
+    u_hat_CPU = helper_CPU.transform(u.get(), axes=(-1,))
 
     helper = FFTHelper(N=N, useGPU=True)
-    u_hat = helper.transform(u)
+    u_hat = helper.transform(u, axes=(-1,))
 
     assert np.allclose(u_hat.get(), u_hat_CPU)
-    assert cp.allclose(u, helper.itransform(u_hat))
+    assert cp.allclose(u, helper.itransform(u_hat, axes=(-1,)))
 
 
 @pytest.mark.base
@@ -140,4 +141,4 @@ if __name__ == '__main__':
     # test_tau_method(6, 1)
     # test_transform(True)
     # test_transform(False)
-    test_transform_cupy()
+    test_transform_cupy(4)
