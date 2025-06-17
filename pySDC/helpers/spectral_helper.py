@@ -746,11 +746,14 @@ class FFTHelper(SpectralHelper1D):
         k = self.get_wavenumbers()
 
         if self.useGPU:
-            # Have to raise the matrix to power p on CPU because the GPU equivalent is not implemented in CuPy at the time of writing.
-            import scipy.sparse as sp
+            if p > 1:
+                # Have to raise the matrix to power p on CPU because the GPU equivalent is not implemented in CuPy at the time of writing.
+                from scipy.sparse.linalg import matrix_power
 
-            D = self.sparse_lib.diags(1j * k).get()
-            return self.sparse_lib.csc_matrix(sp.linalg.matrix_power(D, p))
+                D = self.sparse_lib.diags(1j * k).get()
+                return self.sparse_lib.csc_matrix(matrix_power(D, p))
+            else:
+                return self.sparse_lib.diags(1j * k)
         else:
             return self.linalg.matrix_power(self.sparse_lib.diags(1j * k), p)
 

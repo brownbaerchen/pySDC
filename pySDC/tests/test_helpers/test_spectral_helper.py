@@ -52,14 +52,20 @@ def test_integration_matrix2D(nx, nz, variant, axes, useMPI=False, **kwargs):
 @pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
 @pytest.mark.parametrize('bx', ['cheby', 'fft'])
 @pytest.mark.parametrize('bz', ['cheby', 'fft'])
-def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, **kwargs):
-    import numpy as np
+def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, useGPU=False, **kwargs):
     from pySDC.helpers.spectral_helper import SpectralHelper
 
-    helper = SpectralHelper(debug=True)
+    helper = SpectralHelper(debug=True, useGPU=useGPU)
     helper.add_axis(base=bx, N=nx)
     helper.add_axis(base=bz, N=nz)
     helper.setup_fft()
+
+    np = helper.xp
+
+    if useGPU:
+        import cupy
+
+        assert np == cupy
 
     X, Z = helper.get_grid()
     conv = helper.get_basis_change_matrix()
@@ -93,6 +99,14 @@ def test_differentiation_matrix2D(nx, nz, variant, axes, bx, bz, **kwargs):
     D_u = helper.itransform(D_u_hat).real
 
     assert np.allclose(D_u, expect, atol=1e-11)
+
+
+@pytest.mark.cupy
+@pytest.mark.parametrize('axes', [(-2,), (-1,), (-2, -1)])
+@pytest.mark.parametrize('bx', ['cheby', 'fft'])
+@pytest.mark.parametrize('bz', ['cheby', 'fft'])
+def test_differentiation_matrix2D_GPU(bx, bz, axes):
+    test_differentiation_matrix2D(32, 16, variant='T2U', bx=bx, bz=bz, axes=axes, useGPU=True)
 
 
 @pytest.mark.base
