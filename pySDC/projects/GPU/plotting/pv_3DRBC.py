@@ -35,7 +35,7 @@ parser.add_argument("--quality", "-q", default=1, choices=["0", "1", "2"], help=
 parser.add_argument("--noClip", action="store_true", help="don't use the clips in the video (cube only)")
 args = parser.parse_args()
 
-files = sorted(glob.glob(f"3Dvtr/_*.vtr"))
+files = sorted(glob.glob(f"{args.folder}/*.vtr"))
 
 # create a new 'XML Rectilinear Grid Reader'
 data = XMLRectilinearGridReader(registrationName='mouahahaha_[...].vtr', FileName=files)

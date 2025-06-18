@@ -190,7 +190,20 @@ def test_Poisson_problem_w():
         assert np.allclose(u_exact[i], u[i]), f'Unexpected solution in component {comp}'
 
 
+@pytest.mark.mpi4py
+def test_libraries():
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
+    from mpi4py_fft import fftw
+    from scipy import fft
+
+    P = RayleighBenard3D(nx=2, ny=2, nz=2)
+    assert P.axes[0].fft_lib == fftw
+    assert P.axes[1].fft_lib == fftw
+    assert P.axes[2].fft_lib == fft
+
+
 if __name__ == '__main__':
-    test_eval_f(2**2, 2**1, 'x', False)
+    # test_eval_f(2**2, 2**1, 'x', False)
+    test_libraries()
     # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
