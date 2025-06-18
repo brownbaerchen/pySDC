@@ -5,8 +5,6 @@ from scipy.special import factorial
 from functools import partial, wraps
 import logging
 
-# TODO: implement cupy for transforms
-
 
 def cache(func):
     """
