@@ -268,7 +268,9 @@ class GenericSpectralLinear(Problem):
                     to_evict = list(self.cached_factorizations.keys())[0]
                     self.cached_factorizations.pop(to_evict)
                     self.logger.debug(f'Evicted matrix factorization for {to_evict=:.6f} from cache')
-                iLU = self.linalg.spilu(A, **{**self.preconditioner_args, 'drop_tol'=dt * self.preconditioner_args['drop_tol']})
+                iLU = self.linalg.spilu(
+                    A, **{**self.preconditioner_args, 'drop_tol': dt * self.preconditioner_args['drop_tol']}
+                )
                 self.cached_factorizations[dt] = self.linalg.LinearOperator(A.shape, iLU.solve)
                 self.logger.debug(f'Cached incomplete LU factorization for {dt=:.6f}')
                 self.work_counters['factorizations']()

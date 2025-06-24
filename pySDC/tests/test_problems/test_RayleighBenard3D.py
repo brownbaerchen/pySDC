@@ -142,7 +142,10 @@ def test_Poisson_problems(nx, component):
 
 
 @pytest.mark.mpi4py
-def test_Poisson_problem_w():
+@pytest.mark.parametrize(
+    'solver_type', ['cached_direct', 'direct', 'lsqr', 'gmres', 'cg', 'bicgstab', 'gmres+ilu', 'bicgstab+ilu']
+)
+def test_Poisson_problem_w(solver_type):
     """
     Here we don't really solve a Poisson problem. w can only be constant due to the incompressibility, then we have a Possion problem in T with a linear solution and p absorbs all the rest. This is therefore mainly a test for the pressure computation. We don't test that the boundary condition is enforced because the constant pressure offset is entirely irrelevant to anything.
     """
@@ -159,7 +162,7 @@ def test_Poisson_problem_w():
         'T_top': 0,
         'T_bottom': 1,
     }
-    P = RayleighBenard3D(nx=2, ny=2, nz=2**3, BCs=BCs, Rayleigh=1.0)
+    P = RayleighBenard3D(nx=2, ny=2, nz=2**3, BCs=BCs, Rayleigh=1.0, solver_type=solver_type)
     iw = P.index('w')
 
     rhs_real = P.u_init
