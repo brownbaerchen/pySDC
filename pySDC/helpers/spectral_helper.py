@@ -93,6 +93,7 @@ class SpectralHelper1D:
         self.L = x1 - x0
         self.useGPU = useGPU
         self.plans = {}
+        self.logger = logging.getLogger(name=type(self).__name__)
 
         if useGPU:
             self.setup_GPU()
@@ -794,6 +795,7 @@ class FFTHelper(SpectralHelper1D):
             if key in self.plans.keys():
                 return self.plans[key]
             else:
+                self.logger.debug(f'Generating FFT plan for {key=}')
                 transform = self.fft_lib.fftn(u, *args, **kwargs) if forward else self.fft_lib.ifftn(u, *args, **kwargs)
                 self.plans[key] = transform
 
@@ -915,7 +917,7 @@ class SpectralHelper:
     sparse_lib = scipy.sparse
     linalg = scipy.sparse.linalg
     dtype = mesh
-    fft_backend = 'scipy'  #'fftw'
+    fft_backend = 'scipy'
     fft_comm_backend = 'MPI'
 
     @classmethod
