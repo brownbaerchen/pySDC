@@ -63,6 +63,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         Lz=1,
         Lx=1,
         Ly=1,
+        useGPU=False,
         **kwargs,
     ):
         """
@@ -116,12 +117,12 @@ class RayleighBenard3D(GenericSpectralLinear):
         )
 
         bases = [
-            {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx, 'useFFTW': True},
-            {'base': 'fft', 'N': ny, 'x0': 0, 'x1': self.Ly, 'useFFTW': True},
+            {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx, 'useFFTW': not useGPU},
+            {'base': 'fft', 'N': ny, 'x0': 0, 'x1': self.Ly, 'useFFTW': not useGPU},
             {'base': 'ultraspherical', 'N': nz, 'x0': 0, 'x1': self.Lz},
         ]
         components = ['u', 'v', 'w', 'T', 'p']
-        super().__init__(bases, components, comm=comm, **kwargs)
+        super().__init__(bases, components, comm=comm, useGPU=useGPU, **kwargs)
 
         self.X, self.Y, self.Z = self.get_grid()
         self.Kx, self.Ky, self.Kz = self.get_wavenumbers()

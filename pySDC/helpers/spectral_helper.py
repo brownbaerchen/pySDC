@@ -1140,15 +1140,12 @@ class SpectralHelper:
 
             Id = self.get_local_slice_of_1D_matrix(self.axes[axis2].get_Id() @ _Id, axis=axis2)
 
-            if self.useGPU:
-                Id = Id.get()
-
             mats = [
                 None,
             ] * ndim
             mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
             mats[axis2] = Id
-            return self.sparse_lib.csc_matrix(sp.kron(*mats))
+            return self.sparse_lib.csc_matrix(self.sparse_lib.kron(*mats))
         if ndim == 3:
             mats = [
                 None,
@@ -1167,7 +1164,7 @@ class SpectralHelper:
 
             mats[axis] = self.get_local_slice_of_1D_matrix(BC, axis=axis)
 
-            return self.sparse_lib.csc_matrix(sp.kron(mats[0], sp.kron(*mats[1:])))
+            return self.sparse_lib.csc_matrix(self.sparse_lib.kron(mats[0], self.sparse_lib.kron(*mats[1:])))
         else:
             raise NotImplementedError(
                 f'Matrix expansion for boundary conditions not implemented for {ndim} dimensions!'

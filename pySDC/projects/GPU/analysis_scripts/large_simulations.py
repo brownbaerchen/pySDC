@@ -197,12 +197,12 @@ class RBC3DLarge(LargeSim):
         Params for the large run
         """
         self.params = {
-            'procs': [1, 4, 32],
+            'procs': [1, 4, 256],
             'useGPU': False,
-            'tasks_per_node': 32,
+            'tasks_per_node': 16,
             'partition': 'batch',
             'cluster': 'jusuf',
-            'res': 128,
+            'res': 256,
             'time': '12:30:00',
         }
 
