@@ -85,7 +85,7 @@ class GenericSpectralLinear(Problem):
         """
         solver_args = {} if solver_args is None else solver_args
         preconditioner_args = {} if preconditioner_args is None else preconditioner_args
-        preconditioner_args['drop_tol'] = preconditioner_args.get('drop_tol', 1e-4)
+        preconditioner_args['drop_tol'] = preconditioner_args.get('drop_tol', 1e-3)
         preconditioner_args['fill_factor'] = preconditioner_args.get('fill_factor', 100)
         self._makeAttributeAndRegister(
             'max_cached_factorizations',
@@ -234,10 +234,14 @@ class GenericSpectralLinear(Problem):
             rhs_hat = rhs.copy()
             if u0 is not None:
                 u0_hat = self.Pr.T @ u0.copy().flatten()
+            else:
+                u0_hat = None
         else:
             rhs_hat = self.spectral.transform(rhs)
             if u0 is not None:
                 u0_hat = self.Pr.T @ self.spectral.transform(u0).flatten()
+            else:
+                u0_hat = None
 
         if self.useGPU:
             self.xp.cuda.Device().synchronize()
@@ -293,14 +297,6 @@ class GenericSpectralLinear(Problem):
 
         elif self.solver_type.lower() == 'direct':
             _sol_hat = sp.linalg.spsolve(A, rhs_hat)
-        elif self.solver_type.lower() == 'lsqr':
-            lsqr = sp.linalg.lsqr(
-                A,
-                rhs_hat,
-                x0=u0_hat,
-                **self.solver_args,
-            )
-            _sol_hat = lsqr[0]
         elif 'gmres' in self.solver_type.lower():
             _sol_hat, _ = sp.linalg.gmres(
                 A,
