@@ -205,8 +205,8 @@ class CPUConfig(ScalingConfig):
 
 class JurecaCPU(ScalingConfig):
     cluster = 'jureca'
-    # partition = 'dc-cpu'
-    partition = 'dc-cpu-large'
+    partition = 'dc-cpu'
+    # partition = 'dc-cpu-large'
     tasks_per_node = 64
     OMP_NUM_THREADS = 1
 
@@ -310,6 +310,23 @@ class RayleighBenardSpaceScalingGPU(GPUConfig, RBCBaseConfig):
     ]
 
 
+class RayleighBenard3DSpaceScalingIterativeCPU(JurecaCPU):
+    ndim = 3
+    config = 'RBC3DscalingIterative'
+    tasks_time = 4
+    sbatch_options = ['--time=0:18:00']
+    tasks_per_node = 64
+    OMP_NUM_THREADS = 1
+    srun_options = ['--distribution=block:cyclic:cyclic']
+
+    experiments = [
+        Experiment(res=128, PinT=True, start=64, stop=8192, marker='^'),
+        Experiment(res=128, PinT=False, start=64, stop=8192, marker='^'),
+        Experiment(res=256, PinT=False, start=64, stop=16384, marker='.'),
+        Experiment(res=256, PinT=True, start=64, stop=16384, marker='.'),
+    ]
+
+
 class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     ndim = 3
     config = 'RBC3Dscaling'
@@ -332,6 +349,7 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
     config = 'RBC3Dscaling'
     tasks_time = 4
     sbatch_options = ['--time=0:04:00']
+    srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
         # Experiment(res=32, PinT=False, start=4, stop=4, marker='.'),
@@ -416,6 +434,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         configs = [
             RayleighBenard3DSpaceScalingGPU(),
             RayleighBenard3DSpaceScalingCPU(),
+            RayleighBenard3DSpaceScalingIterativeCPU(),
         ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -493,7 +512,7 @@ if __name__ == '__main__':
             config_classes += [RayleighBenardSpaceScalingGPU]
     elif args.problem == 'RBC3D':
         if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU]
+            config_classes += [RayleighBenard3DSpaceScalingCPU, RayleighBenard3DSpaceScalingIterativeCPU]
         else:
             config_classes += [RayleighBenard3DSpaceScalingGPU]
     elif args.problem == 'RBC_dedalus':
