@@ -13,6 +13,8 @@ def get_config(args):
         return RBC3DBenchmarkSDC(args)
     elif name == 'RBC3Dscaling':
         return RBC3Dscaling(args)
+    elif name == 'RBC3DscalingIterative':
+        return RBC3DscalingIterative(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -206,3 +208,93 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         params = super().get_controller_params(*args, **kwargs)
         params['hook_class'] = [LogWork]
         return params
+
+
+class RBC3DscalingIterative(RBC3Dscaling):
+    ic_res = 128
+    ic_time = 12.0
+    Tend = 21e-2 + 12.0
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['dt'] = 1e-2
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['problem_params']['solver_type'] = 'bicgstab+ilu'
+        desc['problem_params']['solver_args'] = {'rtol': 1e-8}
+        return desc
+
+    def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+        from pySDC.helpers.fieldsIO import Rectilinear
+
+        _P = type(P)(nx=self.ic_res, ny=self.ic_res, nz=self.ic_res, comm=P.comm)
+        _P.setUpFieldsIO()
+
+        ic_path = f'{self.base_path}/data/{type(self).__name__}-res{self.ic_res}-ic.pySDC'
+        try:
+            ic_file = Rectilinear.fromFile(ic_path)
+        except FileNotFoundError as err:
+            if self.args['res'] == self.ic_res:
+                from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+
+                _args = self.args
+                _args['o'] = ic_path
+                _args['logger_level'] = 15
+
+                def _get_LogToFile(self, *args, **kwargs):
+                    if self.comms[1].rank > 0:
+                        return None
+                    import numpy as np
+                    from pySDC.implementations.hooks.log_solution import LogToFile
+
+                    LogToFile.filename = ic_path
+                    LogToFile.time_increment = 1e-1
+                    LogToFile.allow_overwriting = True
+
+                    return LogToFile
+
+                RBC3DAdaptivity.get_LogToFile = _get_LogToFile
+
+                config = RBC3DAdaptivity(args=self.args, comm_world=self.comm_world)
+
+                description = config.get_description(
+                    useGPU=_args['useGPU'], MPIsweeper=_args['procs'][1] > 1, res=_args['res']
+                )
+                controller_params = config.get_controller_params(logger_level=_args['logger_level'])
+
+                assert config.comms[0].size == 1
+                controller = controller_nonMPI(
+                    num_procs=1, controller_params=controller_params, description=description
+                )
+                prob = controller.MS[0].levels[0].prob
+
+                u0, t0 = config.get_initial_condition(prob, restart_idx=_args['restart_idx'])
+
+                config.prepare_caches(prob)
+
+                uend, stats = controller.run(u0=u0, t0=t0, Tend=self.ic_time)
+
+                ic_file = Rectilinear.fromFile(ic_path)
+                assert (
+                    self.ic_time in ic_file.times
+                ), f'IC time {self.ic_time} not in recorded times! Got only {ic_file.times}'
+            else:
+                raise (
+                    f'No ICs found for this configuration! Please run once with resolution {self.ic_res} to generate ICs.'
+                ) from err
+
+        # interpolate the solution using padded transforms
+        padding_factor = self.ic_res / self.args['res']
+
+        ic_idx = ic_file.times.index(self.ic_time)
+        _, ics = ic_file.readField(ic_idx)
+
+        ics_hat = _P.transform(ics, padding=(padding_factor,) * (ics.ndim - 1))
+
+        u_hat = P.u_init_forward
+        u_hat[...] = ics_hat
+
+        P.setUpFieldsIO()
+        if not P.spectral_space:
+            return P.itransform(u_hat), self.ic_time
+        else:
+            return u_hat, self.ic_time
