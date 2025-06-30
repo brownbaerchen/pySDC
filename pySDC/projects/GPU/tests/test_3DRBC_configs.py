@@ -35,7 +35,12 @@ def test_ics(tmpdir, res, ic_res=8):
     def get_sol(prob):
         me = prob.u_init
         me[...] = xp.cos(2 * xp.pi * prob.X) * xp.sin(4 * xp.pi * prob.Y) * prob.Z**2
-        return me
+        if prob.spectral_space:
+            res = prob.u_init_forward
+            res[...] = prob.transform(me)
+            return res
+        else:
+            return me
 
     # prepare ICs
     u0 = get_sol(prob)
@@ -46,7 +51,7 @@ def test_ics(tmpdir, res, ic_res=8):
     del prob
 
     # get ICs
-    prob = desc['problem_class'](**{**desc['problem_params'], 'spectral_space': False})
+    prob = desc['problem_class'](**{**desc['problem_params'], 'spectral_space': True})
     prob.setUpFieldsIO()
     ics, _ = config.get_initial_condition(prob)
 
