@@ -212,8 +212,8 @@ class RBC3Dscaling(RayleighBenard3DRegular):
 
 class RBC3DscalingIterative(RBC3Dscaling):
     ic_res = 128
-    ic_time = 12.0
-    Tend = 21e-2 + 12.0
+    ic_time = 10.354437173596336
+    Tend = 21e-2 + 10.354437173596336
 
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
@@ -221,6 +221,7 @@ class RBC3DscalingIterative(RBC3Dscaling):
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['problem_params']['solver_type'] = 'bicgstab+ilu'
         desc['problem_params']['solver_args'] = {'rtol': 1e-8}
+        desc['sweeper_params']['skip_residual_computation'] = ()
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
@@ -235,6 +236,7 @@ class RBC3DscalingIterative(RBC3Dscaling):
         except FileNotFoundError as err:
             if self.args['res'] == self.ic_res:
                 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
+                from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeLimiter
 
                 _args = self.args
                 _args['o'] = ic_path
@@ -259,6 +261,8 @@ class RBC3DscalingIterative(RBC3Dscaling):
                 description = config.get_description(
                     useGPU=_args['useGPU'], MPIsweeper=_args['procs'][1] > 1, res=_args['res']
                 )
+                description['problem_params']['max_cached_factorizations'] = description['sweeper_params']['num_nodes']
+                description['convergence_controllers'][StepSizeLimiter] = {'dt_min': 1e-3}
                 controller_params = config.get_controller_params(logger_level=_args['logger_level'])
 
                 assert config.comms[0].size == 1
@@ -293,6 +297,8 @@ class RBC3DscalingIterative(RBC3Dscaling):
 
         P.setUpFieldsIO()
         if P.spectral_space:
-            return P.transform(ics_large), self.ic_time
+            u0_hat = P.u_init_forward
+            u0_hat[...] = P.transform(ics_large)
+            return u0_hat, self.ic_time
         else:
             return ics_large, self.ic_time
