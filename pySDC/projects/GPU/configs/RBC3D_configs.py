@@ -288,28 +288,11 @@ class RBC3DscalingIterative(RBC3Dscaling):
         ic_idx = ic_file.times.index(self.ic_time)
         _, ics = ic_file.readField(ic_idx)
 
-        ######################
         _ics_hat = _P.transform(ics)
-        _ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
-        breakpoint()
-        ics_hat = P.transform(_ics_large)
-        breakpoint()
-        ######################
-
-        # ics_hat = _P.transform(ics, padding=(padding_factor,) * (ics.ndim - 1))
-
-        # me_hat = P.u_init_forward
-        # print(me_hat.shape, ics.shape, padding_factor)
-        # me = P.itransform(me_hat, padding=(1/padding_factor,) * (ics.ndim - 1))
-        # me[...] = ics[...]
-        # ics_hat = P.transform(me, padding=(1/padding_factor,) * (ics.ndim - 1))
-        # breakpoint()
-
-        u_hat = P.u_init_forward
-        u_hat[...] = ics_hat
+        ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
 
         P.setUpFieldsIO()
         if P.spectral_space:
-            return u_hat, self.ic_time
+            return P.transform(ics_large), self.ic_time
         else:
-            return P.itransform(u_hat), self.ic_time
+            return ics_large, self.ic_time

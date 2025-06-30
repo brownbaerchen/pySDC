@@ -1445,7 +1445,7 @@ class SpectralHelper:
     def get_pfft(self, axes=None, padding=None, grid=None):
         if self.ndim == 1 or self.comm is None:
             return None
-        from mpi4py_fft import PFFT
+        from mpi4py_fft import PFFT, newDistArray
 
         axes = tuple(i for i in range(self.ndim)) if axes is None else axes
         padding = list(padding if padding else [1.0 for _ in range(self.ndim)])
@@ -1477,6 +1477,10 @@ class SpectralHelper:
             transforms=transforms,
             grid=grid,
         )
+
+        # do a transform to do the planning
+        _u = newDistArray(pfft, forward_output=False)
+        pfft.backward(pfft.forward(_u))
         return pfft
 
     def get_fft(self, axes=None, direction='object', padding=None, shape=None):
@@ -1750,10 +1754,8 @@ class SpectralHelper:
 
         for i in range(self.ncomponents):
             _out[i, ...] = pfft.backward(_in[i], _out[i], normalize=True)
-            print(i, _in[i].max(), _out[i].max(), np.prod(padding))
 
         if padding is not None:
-            breakpoint()
             _out *= np.prod(padding)
         return _out
 

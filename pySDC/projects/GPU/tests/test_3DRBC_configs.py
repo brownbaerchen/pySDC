@@ -2,7 +2,8 @@ import pytest
 
 
 @pytest.mark.mpi4py
-def test_ics(tmpdir, res=16, ic_res=8):
+@pytest.mark.parametrize('res', [8, 16, 32])
+def test_ics(tmpdir, res, ic_res=8):
     from pySDC.projects.GPU.configs.RBC3D_configs import RBC3DscalingIterative
     from pySDC.helpers.fieldsIO import FieldsIO
     from mpi4py import MPI
@@ -33,12 +34,11 @@ def test_ics(tmpdir, res=16, ic_res=8):
 
     def get_sol(prob):
         me = prob.u_init
-        me[...] = 1  # xp.sin(2*xp.pi*prob.X) * xp.sin(4*xp.pi*prob.Y) * prob.Z
+        me[...] = xp.cos(2 * xp.pi * prob.X) * xp.sin(4 * xp.pi * prob.Y) * prob.Z**2
         return me
 
     # prepare ICs
     u0 = get_sol(prob)
-    u0_hat = prob.transform(u0)
 
     outfile = prob.getOutputFile(f'{tmpdir}/{type(config).__name__}-res{config.ic_res}-ic.pySDC')
     outfile.addField(0, prob.processSolutionForOutput(u0))
@@ -55,10 +55,9 @@ def test_ics(tmpdir, res=16, ic_res=8):
     ics_hat = prob.transform(ics)
 
     error = abs(ics - expect)
-    print(error)
-    breakpoint()
-    assert xp.allclose(ics, xp.sin(2 * xp.pi * prob.X) * xp.sin(4 * xp.pi * prob.Y) * prob.Z)
+    assert error < 1e-12, f'Got {error=} when interpolating ics'
+    assert xp.allclose(ics_hat.shape[1:], res)
 
 
 if __name__ == '__main__':
-    test_ics('./data', ic_res=4, res=8)
+    test_ics('./data', ic_res=8, res=32)
