@@ -291,8 +291,9 @@ class RBC3DscalingIterative(RBC3Dscaling):
         ######################
         _ics_hat = _P.transform(ics)
         _ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
+        breakpoint()
         ics_hat = P.transform(_ics_large)
-        # breakpoint()
+        breakpoint()
         ######################
 
         # ics_hat = _P.transform(ics, padding=(padding_factor,) * (ics.ndim - 1))

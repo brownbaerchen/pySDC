@@ -1749,9 +1749,11 @@ class SpectralHelper:
             _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
-            pfft.backward(_in[i], _out[i], normalize=True)
+            _out[i, ...] = pfft.backward(_in[i], _out[i], normalize=True)
+            print(i, _in[i].max(), _out[i].max(), np.prod(padding))
 
         if padding is not None:
+            breakpoint()
             _out *= np.prod(padding)
         return _out
 
