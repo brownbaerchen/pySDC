@@ -278,8 +278,8 @@ class RBC3DscalingIterative(RBC3Dscaling):
                     self.ic_time in ic_file.times
                 ), f'IC time {self.ic_time} not in recorded times! Got only {ic_file.times}'
             else:
-                raise (
-                    f'No ICs found for this configuration! Please run once with resolution {self.ic_res} to generate ICs.'
+                raise FileNotFoundError(
+                    f'No ICs found for this configuration at path {ic_path!r}! Please run once with resolution {self.ic_res} to generate ICs.'
                 ) from err
 
         # interpolate the solution using padded transforms
@@ -288,13 +288,27 @@ class RBC3DscalingIterative(RBC3Dscaling):
         ic_idx = ic_file.times.index(self.ic_time)
         _, ics = ic_file.readField(ic_idx)
 
-        ics_hat = _P.transform(ics, padding=(padding_factor,) * (ics.ndim - 1))
+        ######################
+        _ics_hat = _P.transform(ics)
+        _ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
+        ics_hat = P.transform(_ics_large)
+        # breakpoint()
+        ######################
+
+        # ics_hat = _P.transform(ics, padding=(padding_factor,) * (ics.ndim - 1))
+
+        # me_hat = P.u_init_forward
+        # print(me_hat.shape, ics.shape, padding_factor)
+        # me = P.itransform(me_hat, padding=(1/padding_factor,) * (ics.ndim - 1))
+        # me[...] = ics[...]
+        # ics_hat = P.transform(me, padding=(1/padding_factor,) * (ics.ndim - 1))
+        # breakpoint()
 
         u_hat = P.u_init_forward
         u_hat[...] = ics_hat
 
         P.setUpFieldsIO()
-        if not P.spectral_space:
-            return P.itransform(u_hat), self.ic_time
-        else:
+        if P.spectral_space:
             return u_hat, self.ic_time
+        else:
+            return P.itransform(u_hat), self.ic_time
