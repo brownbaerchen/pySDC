@@ -84,9 +84,11 @@ class GenericSpectralLinear(Problem):
             debug (bool): Make additional tests at extra computational cost
         """
         solver_args = {} if solver_args is None else solver_args
+
         preconditioner_args = {} if preconditioner_args is None else preconditioner_args
         preconditioner_args['drop_tol'] = preconditioner_args.get('drop_tol', 1e-3)
         preconditioner_args['fill_factor'] = preconditioner_args.get('fill_factor', 100)
+
         self._makeAttributeAndRegister(
             'max_cached_factorizations',
             'useGPU',
@@ -208,7 +210,7 @@ class GenericSpectralLinear(Problem):
 
             self.Pl = self.spectral.sparse_lib.csc_matrix(R)
 
-        if Dirichlet_recombination and type(self.axes[-1]).__name__ in ['ChebychevHelper, Ultraspherical']:
+        if Dirichlet_recombination and type(self.axes[-1]).__name__ in ['ChebychevHelper', 'UltrasphericalHelper']:
             _Pr = self.spectral.get_Dirichlet_recombination_matrix(axis=-1)
         else:
             _Pr = Id
@@ -233,15 +235,21 @@ class GenericSpectralLinear(Problem):
         if self.spectral_space:
             rhs_hat = rhs.copy()
             if u0 is not None:
-                u0_hat = self.Pr.T @ u0.copy().flatten()
+                u0_hat = u0.copy().flatten()
             else:
                 u0_hat = None
         else:
             rhs_hat = self.spectral.transform(rhs)
             if u0 is not None:
-                u0_hat = self.Pr.T @ self.spectral.transform(u0).flatten()
+                u0_hat = self.spectral.transform(u0).flatten()
             else:
                 u0_hat = None
+
+        # apply inverse right preconditioner to initial guess
+        if u0_hat is not None and 'direct' not in self.solver_type:
+            if not hasattr(self, '_Pr_inv'):
+                self._PR_inv = self.linalg.splu(self.Pr)
+            u0_hat[...] = self._PR_inv.solve(u0_hat)
 
         if self.useGPU:
             self.xp.cuda.Device().synchronize()
