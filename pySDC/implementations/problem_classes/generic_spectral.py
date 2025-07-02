@@ -248,8 +248,8 @@ class GenericSpectralLinear(Problem):
         # apply inverse right preconditioner to initial guess
         if u0_hat is not None and 'direct' not in self.solver_type:
             if not hasattr(self, '_Pr_inv'):
-                self._PR_inv = self.linalg.splu(self.Pr)
-            u0_hat[...] = self._PR_inv.solve(u0_hat)
+                self._PR_inv = self.linalg.splu(self.Pr.astype(complex)).solve
+            u0_hat[...] = self._PR_inv(u0_hat)
 
         if self.useGPU:
             self.xp.cuda.Device().synchronize()
