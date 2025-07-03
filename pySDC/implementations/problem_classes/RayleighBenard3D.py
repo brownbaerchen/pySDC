@@ -225,9 +225,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         iu, iv, iw, iT, ip = self.index(['u', 'v', 'w', 'T', 'p'])
 
         # evaluate implicit terms
-        if not hasattr(self, '_L_T_base'):
-            self._L_T_base = self.base_change @ self.L
-        f_impl_hat = -(self._L_T_base @ u_hat.flatten()).reshape(u_hat.shape)
+        f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
 
         if self.spectral_space:
             f.impl[:] = f_impl_hat
@@ -238,38 +236,27 @@ class RayleighBenard3D(GenericSpectralLinear):
         # treat convection explicitly with dealiasing
 
         # start by computing derivatives
-        if not hasattr(self, '_Dx_expanded') or not hasattr(self, '_Dz_expanded'):
-            Dz = self.Dz
-            Dy = self.Dy
-            Dx = self.Dx
-
-            self._Dx_expanded = self._setup_operator(
-                {'u': {'u': Dx}, 'v': {'v': Dx}, 'w': {'w': Dx}, 'T': {'T': Dx}, 'p': {}}
-            )
-            self._Dy_expanded = self._setup_operator(
-                {'u': {'u': Dy}, 'v': {'v': Dy}, 'w': {'w': Dy}, 'T': {'T': Dy}, 'p': {}}
-            )
-            self._Dz_expanded = self._setup_operator(
-                {'u': {'u': Dz}, 'v': {'v': Dz}, 'w': {'w': Dz}, 'T': {'T': Dz}, 'p': {}}
-            )
-        Dx_u_hat = (self._Dx_expanded @ u_hat.flatten()).reshape(u_hat.shape)
-        Dy_u_hat = (self._Dy_expanded @ u_hat.flatten()).reshape(u_hat.shape)
-        Dz_u_hat = (self._Dz_expanded @ u_hat.flatten()).reshape(u_hat.shape)
-
         padding = (self.dealiasing,) * self.ndim
-        Dx_u_pad = self.itransform(Dx_u_hat, padding=padding).real
-        Dy_u_pad = self.itransform(Dy_u_hat, padding=padding).real
-        Dz_u_pad = self.itransform(Dz_u_hat, padding=padding).real
+        derivatives = []
+        _D_u_hat = self.u_init_forward
+        for D in [self.Dx, self.Dy, self.Dz]:
+            _D_u_hat *= 0
+            for comp in ['u', 'v', 'w', 'T']:
+                i = self.spectral.index(comp)
+                self.xp.copyto(_D_u_hat[i], (D @ u_hat[i].flatten()).reshape(_D_u_hat[i].shape))
+            derivatives.append(self.itransform(_D_u_hat, padding=padding).real)
+        Dx_u_pad, Dy_u_pad, Dz_u_pad = derivatives
+
         u_pad = self.itransform(u_hat, padding=padding).real
 
         fexpl_pad = self.xp.zeros_like(u_pad)
-        fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * Dy_u_pad[iu] + u_pad[iw] * Dz_u_pad[iu])
-        fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dy_u_pad[iv] + u_pad[iw] * Dz_u_pad[iv])
-        fexpl_pad[iw][:] = -(u_pad[iu] * Dx_u_pad[iw] + u_pad[iv] * Dy_u_pad[iw] + u_pad[iw] * Dz_u_pad[iw])
-        fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dy_u_pad[iT] + u_pad[iw] * Dz_u_pad[iT])
+        for comp in ['u', 'v', 'w', 'T']:
+            i = self.spectral.index(comp)
+            for i_vel, iD in zip([self.spectral.index(me) for me in ['u', 'v', 'w']], range(self.ndim)):
+                fexpl_pad[i] -= u_pad[i_vel] * derivatives[iD][i]
 
         if self.spectral_space:
-            f.expl[:] = self.transform(fexpl_pad, padding=padding)
+            self.xp.copyto(f.expl, self.transform(fexpl_pad, padding=padding))
         else:
             f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
 
