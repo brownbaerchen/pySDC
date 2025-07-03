@@ -149,6 +149,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         self.Dyy = Dyy
         self.Dz = S1 @ Dz
         self.Dzz = S2 @ Dzz
+        self.S2 = S2
+        self.S1 = S1
 
         # compute rescaled Rayleigh number to extract viscosity and thermal diffusivity
         Ra = Rayleigh / (max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * self.axes[2].L ** 3)
@@ -168,9 +170,6 @@ class RayleighBenard3D(GenericSpectralLinear):
         # mass matrix
         M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'w', 'T']}
         self.setup_M(M_lhs)
-
-        # Prepare going from second (first for divergence free equation) derivative basis back to Chebychev-T
-        self.base_change = self._setup_operator({**{comp: {comp: S2} for comp in ['u', 'v', 'w', 'T']}, 'p': {'p': S1}})
 
         # BCs
         self.add_BC(
@@ -223,12 +222,16 @@ class RayleighBenard3D(GenericSpectralLinear):
         f_impl_hat = self.u_init_forward
 
         iu, iv, iw, iT, ip = self.index(['u', 'v', 'w', 'T', 'p'])
+        derivative_indices = [iu, iv, iw, iT]
 
         # evaluate implicit terms
-        f_impl_hat = -(self.base_change @ self.L @ u_hat.flatten()).reshape(u_hat.shape)
+        f_impl_hat = -(self.L @ u_hat.flatten()).reshape(u_hat.shape)
+        for i in derivative_indices:
+            f_impl_hat[i] = (self.S2 @ f_impl_hat[i].flatten()).reshape(f_impl_hat[i].shape)
+        f_impl_hat[ip] = (self.S1 @ f_impl_hat[ip].flatten()).reshape(f_impl_hat[ip].shape)
 
         if self.spectral_space:
-            f.impl[:] = f_impl_hat
+            self.xp.copyto(f.impl, f_impl_hat)
         else:
             f.impl[:] = self.itransform(f_impl_hat).real
 
@@ -238,21 +241,20 @@ class RayleighBenard3D(GenericSpectralLinear):
         # start by computing derivatives
         padding = (self.dealiasing,) * self.ndim
         derivatives = []
+        u_hat_flat = [u_hat[i].flatten() for i in derivative_indices]
+
         _D_u_hat = self.u_init_forward
         for D in [self.Dx, self.Dy, self.Dz]:
             _D_u_hat *= 0
-            for comp in ['u', 'v', 'w', 'T']:
-                i = self.spectral.index(comp)
-                self.xp.copyto(_D_u_hat[i], (D @ u_hat[i].flatten()).reshape(_D_u_hat[i].shape))
+            for i in derivative_indices:
+                self.xp.copyto(_D_u_hat[i], (D @ u_hat_flat[i]).reshape(_D_u_hat[i].shape))
             derivatives.append(self.itransform(_D_u_hat, padding=padding).real)
-        Dx_u_pad, Dy_u_pad, Dz_u_pad = derivatives
 
         u_pad = self.itransform(u_hat, padding=padding).real
 
         fexpl_pad = self.xp.zeros_like(u_pad)
-        for comp in ['u', 'v', 'w', 'T']:
-            i = self.spectral.index(comp)
-            for i_vel, iD in zip([self.spectral.index(me) for me in ['u', 'v', 'w']], range(self.ndim)):
+        for i in derivative_indices:
+            for i_vel, iD in zip([iu, iv, iw], range(self.ndim)):
                 fexpl_pad[i] -= u_pad[i_vel] * derivatives[iD][i]
 
         if self.spectral_space:
