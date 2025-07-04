@@ -252,9 +252,6 @@ class GenericSpectralLinear(Problem):
                 self._PR_inv = self.linalg.splu(self.Pr.astype(complex)).solve
             u0_hat[...] = self._PR_inv(u0_hat)
 
-        if self.useGPU:
-            self.xp.cuda.Device().synchronize()
-
         rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
         rhs_hat = self.spectral.put_BCs_in_rhs_hat(rhs_hat)
         rhs_hat = self.Pl @ rhs_hat.flatten()
@@ -337,9 +334,6 @@ class GenericSpectralLinear(Problem):
 
         sol_hat = self.spectral.u_init_forward
         sol_hat[...] = (self.Pr @ _sol_hat).reshape(sol_hat.shape)
-
-        if self.useGPU:
-            self.xp.cuda.Device().synchronize()
 
         if self.spectral_space:
             return sol_hat
