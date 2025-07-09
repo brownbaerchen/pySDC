@@ -257,7 +257,7 @@ class ChebychevHelper(SpectralHelper1D):
     that moves to Chebychev U basis during differentiation, which is sparse. When using this technique, problems need to
     be formulated in first order formulation.
 
-    This implementation is largely based on the Dedalus paper (arXiv:1905.10388).
+    This implementation is largely based on the Dedalus paper (https://doi.org/10.1103/PhysRevResearch.2.023068).
     """
 
     def __init__(self, *args, x0=-1, x1=1, **kwargs):
@@ -1431,7 +1431,10 @@ class SpectralHelper:
             sparse linear operator
         """
         if len(self.components) == 1:
-            return M[0][0]
+            if diag:
+                return M[0]
+            else:
+                return M[0][0]
         elif diag:
             return self.sparse_lib.block_diag(M, format='csc')
         else:
@@ -1766,7 +1769,7 @@ class SpectralHelper:
             _in[...] = self.redistribute(u, axis=_in.alignment, forward_output=True, padding=padding, **kwargs)
 
         for i in range(self.ncomponents):
-            _out[i, ...] = pfft.backward(_in[i], _out[i], normalize=True)
+            pfft.backward(_in[i], _out[i], normalize=True)
 
         if padding is not None:
             _out *= np.prod(padding)
