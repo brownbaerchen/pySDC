@@ -260,17 +260,13 @@ class GenericSpectralLinear(Problem):
             A = self.M + dt * self.L
             A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
 
-        # import numpy as np
-        # if A.shape[0] < 200:
-        #     import matplotlib.pyplot as plt
+            # if A.shape[0] < 200e20:
+            #     import matplotlib.pyplot as plt
 
-        #     # M = self.spectral.put_BCs_in_matrix(self.L.copy())
-        #     M = A  # self.L
-        #     im = plt.imshow((M / abs(M)).real)
-        #     # im = plt.imshow(np.log10(abs(A.toarray())).real)
-        #     # im = plt.imshow(((A.toarray())).real)
-        #     plt.colorbar(im)
-        #     plt.show()
+            #     # M = self.spectral.put_BCs_in_matrix(self.L.copy())
+            #     M = A  # self.L
+            #     im = plt.spy(M)
+            #     plt.show()
 
         if 'ilu' in self.solver_type.lower():
             if dt not in self.cached_factorizations.keys():
