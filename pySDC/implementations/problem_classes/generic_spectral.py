@@ -344,7 +344,7 @@ class GenericSpectralLinear(Problem):
 
     def setUpFieldsIO(self):
         Rectilinear.setupMPI(
-            comm=self.comm,
+            comm=self.comm.commMPI if self.useGPU else self.comm,
             iLoc=[me.start for me in self.local_slice(False)],
             nLoc=[me.stop - me.start for me in self.local_slice(False)],
         )
