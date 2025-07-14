@@ -1272,7 +1272,7 @@ class SpectralHelper:
 
         diags = self.xp.ones(self.BCs.shape[0])
         diags[self.BC_zero_index] = 0
-        self.BC_line_zero_matrix = sp.diags(diags)
+        self.BC_line_zero_matrix = sp.diags(diags).tocsr()
 
         # prepare BCs in spectral space to easily add to the RHS
         rhs_BCs = self.put_BCs_in_rhs(self.u_init)

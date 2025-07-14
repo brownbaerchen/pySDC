@@ -189,31 +189,31 @@ class GenericSpectralLinear(Problem):
             Dirichlet_recombination (bool): Basis conversion for right preconditioner. Useful for Chebychev and Ultraspherical methods. 10/10 would recommend.
             left_preconditioner (bool): If True, it will interleave the variables and reverse the Kronecker product
         """
-        sp = self.spectral.sparse_lib
         N = np.prod(self.init[0][1:])
-
-        Id = sp.eye(N)
-        Pl_lhs = {comp: {comp: Id} for comp in self.components}
-        self.Pl = self._setup_operator(Pl_lhs)
 
         if left_preconditioner:
             # reverse Kronecker product
-
             if self.spectral.useGPU:
-                R = self.Pl.get().tolil() * 0
+                import scipy.spase as sp
             else:
-                R = self.Pl.tolil() * 0
+                sp = self.spectral.sparse_lib
+
+            R = sp.lil_matrix((self.ncomponents * N,) * 2, dtype=int)
 
             for j in range(self.ncomponents):
                 for i in range(N):
-                    R[i * self.ncomponents + j, j * N + i] = 1.0
+                    R[i * self.ncomponents + j, j * N + i] = 1
 
-            self.Pl = self.spectral.sparse_lib.csc_matrix(R)
+            self.Pl = self.spectral.sparse_lib.csr_matrix(R, dtype=complex)
+        else:
+            Id = self.spectral.sparse_lib.eye(N)
+            Pl_lhs = {comp: {comp: Id} for comp in self.components}
+            self.Pl = self._setup_operator(Pl_lhs)
 
         if Dirichlet_recombination and type(self.axes[-1]).__name__ in ['ChebychevHelper', 'UltrasphericalHelper']:
             _Pr = self.spectral.get_Dirichlet_recombination_matrix(axis=-1)
         else:
-            _Pr = Id
+            _Pr = self.spectral.sparse_lib.eye(N)
 
         Pr_lhs = {comp: {comp: _Pr} for comp in self.components}
         self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
@@ -256,8 +256,11 @@ class GenericSpectralLinear(Problem):
         rhs_hat = self.Pl @ rhs_hat.flatten()
 
         if dt not in self.cached_factorizations.keys() or not self.solver_type.lower() == 'cached_direct':
-            A = self.M + dt * self.L
-            A = self.Pl @ self.spectral.put_BCs_in_matrix(A) @ self.Pr
+            A = self.M.copy()
+            A += dt * self.L
+            A = self.spectral.put_BCs_in_matrix(A)
+            A = self.Pl @ A
+            A = A @ self.Pr
 
             # if A.shape[0] < 200e20:
             #     import matplotlib.pyplot as plt
