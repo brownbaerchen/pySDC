@@ -314,16 +314,16 @@ class RayleighBenard3DSpaceScalingIterativeCPU(JurecaCPU):
     ndim = 3
     config = 'RBC3DscalingIterative'
     tasks_time = 4
-    sbatch_options = ['--time=0:18:00']
+    sbatch_options = ['--time=0:25:00']
     tasks_per_node = 64
     OMP_NUM_THREADS = 1
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        Experiment(res=128, PinT=True, start=64, stop=8192, marker='^'),
-        Experiment(res=128, PinT=False, start=64, stop=8192, marker='^'),
-        Experiment(res=256, PinT=False, start=64, stop=16384, marker='.'),
-        Experiment(res=256, PinT=True, start=64, stop=16384, marker='.'),
+        Experiment(res=128, PinT=True, start=64, stop=8192, marker='x'),
+        Experiment(res=128, PinT=False, start=64, stop=8192, marker='x'),
+        Experiment(res=256, PinT=False, start=128, stop=16384, marker='o'),
+        Experiment(res=256, PinT=True, start=256, stop=16384, marker='o'),
     ]
 
 
@@ -337,8 +337,8 @@ class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        Experiment(res=128, PinT=True, start=128, stop=8192, marker='^'),
-        Experiment(res=128, PinT=False, start=128, stop=8192, marker='^'),
+        # Experiment(res=128, PinT=True, start=128, stop=8192, marker='^'),
+        # Experiment(res=128, PinT=False, start=128, stop=8192, marker='^'),
         Experiment(res=256, PinT=False, start=2048, stop=16384, marker='.'),
         Experiment(res=256, PinT=True, start=2048, stop=16384, marker='.'),
     ]
@@ -353,8 +353,23 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
 
     experiments = [
         # Experiment(res=32, PinT=False, start=4, stop=4, marker='.'),
-        Experiment(res=128, PinT=False, start=32, stop=128, marker='.'),
-        Experiment(res=128, PinT=True, start=128, stop=512, marker='.'),
+        # Experiment(res=128, PinT=False, start=32, stop=128, marker='.'),
+        # Experiment(res=128, PinT=True, start=128, stop=512, marker='.'),
+        Experiment(res=256, PinT=False, start=512, stop=2048, marker='o'),
+        Experiment(res=256, PinT=True, start=512, stop=2048, marker='o'),
+    ]
+
+class RayleighBenard3DSpaceScalingIterativeGPU(GPUConfig):
+    ndim = 3
+    config = 'RBC3DscalingIterative'
+    tasks_time = 4
+    sbatch_options = ['--time=0:04:00']
+    srun_options = ['--distribution=block:cyclic:cyclic']
+
+    experiments = [
+        Experiment(res=128, PinT=False, start=32, stop=128, marker='x'),
+        Experiment(res=128, PinT=True, start=32, stop=512, marker='x'),
+        Experiment(res=256, PinT=False, start=512, stop=512, marker='o'),
     ]
 
 
@@ -433,8 +448,9 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
     elif problem == 'RBC3D':
         configs = [
             RayleighBenard3DSpaceScalingGPU(),
+            # RayleighBenard3DSpaceScalingIterativeGPU(),
             RayleighBenard3DSpaceScalingCPU(),
-            RayleighBenard3DSpaceScalingIterativeCPU(),
+            # RayleighBenard3DSpaceScalingIterativeCPU(),
         ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -450,7 +466,8 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         ('GS3D', 'time'): {'x': [0.25, 400], 'y': [80, 5e-2]},
         ('RBC', 'throughput'): {'x': [1 / 10, 64], 'y': [2e4, 2e4 * 640]},
         ('RBC', 'time'): {'x': [1 / 10, 64], 'y': [60, 60 / 640]},
-        ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
+        # ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
+        ('RBC3D', 'time_filtered'): {'x': [32, 32*8], 'y': [6, 6 / 8]},
         ('RBC', 'time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time'): {'x': [1, 640], 'y': [60, 60 / 640]},
@@ -514,7 +531,7 @@ if __name__ == '__main__':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenard3DSpaceScalingCPU, RayleighBenard3DSpaceScalingIterativeCPU]
         else:
-            config_classes += [RayleighBenard3DSpaceScalingGPU]
+            config_classes += [RayleighBenard3DSpaceScalingGPU, RayleighBenard3DSpaceScalingIterativeGPU]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]

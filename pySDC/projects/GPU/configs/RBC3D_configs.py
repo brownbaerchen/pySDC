@@ -178,7 +178,7 @@ class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
         return desc
 
 
-class RBC3Dscaling(RayleighBenard3DRegular):
+class RBC3DscalingOld(RayleighBenard3DRegular):
     Tend = 21e-2
 
     def get_description(self, *args, res=-1, **kwargs):
@@ -209,25 +209,61 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         params['hook_class'] = [LogWork]
         return params
 
+class RBC3Dscaling(RayleighBenard3DRegular):
+    Tend = 13e-2
+
+    def get_description(self, *args, res=-1, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+
+        desc['level_params']['dt'] = 1e-2
+        desc['level_params']['restol'] = -1
+        desc['level_params']['nsweeps'] = 4
+
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['QE'] = 'PIC'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+
+        desc['problem_params']['Rayleigh'] = 1e8
+        desc['problem_params']['nx'] = 64 if res == -1 else res
+        desc['problem_params']['ny'] = desc['problem_params']['nx']
+        desc['problem_params']['nz'] = desc['problem_params']['nx']
+        desc['problem_params']['max_cached_factorizations'] = 4
+
+        desc['step_params']['maxiter'] = 1
+        return desc
+
+    def get_controller_params(self, *args, **kwargs):
+        from pySDC.implementations.hooks.log_work import LogWork
+
+        params = super().get_controller_params(*args, **kwargs)
+        params['hook_class'] = [LogWork]
+        return params
+
 
 class RBC3DscalingIterative(RBC3Dscaling):
     ic_res = 128
     ic_time = 10.354437173596336
-    Tend = 21e-2 + 10.354437173596336
+    Tend = 9e-2 + 10.354437173596336
 
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['dt'] = 1e-2
+        # desc['level_params']['nsweeps'] = 1
+        # desc['level_params']['restol'] = 1e-5
+        # desc['level_params']['e_tol'] = 1e-5
+        # desc['step_params']['maxiter'] = 99
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
-        desc['problem_params']['solver_type'] = 'bicgstab+ilu'
-        desc['problem_params']['solver_args'] = {'rtol': 1e-8}
+        desc['problem_params']['solver_type'] = 'gmres+ilu'#'bicgstab+ilu'
+        desc['problem_params']['solver_args'] = {'atol': 1e-8, 'rtol': 1e-8, 'maxiter': 1000}
+        desc['problem_params']['preconditioner_args'] = {'fill_factor': 5, 'drop_tol': 1e-2}
         desc['sweeper_params']['skip_residual_computation'] = ()
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
         from pySDC.helpers.fieldsIO import Rectilinear
 
-        _P = type(P)(nx=self.ic_res, ny=self.ic_res, nz=self.ic_res, comm=P.comm)
+        _P = type(P)(nx=self.ic_res, ny=self.ic_res, nz=self.ic_res, comm=P.comm, useGPU=P.useGPU)
         _P.setUpFieldsIO()
 
         ic_path = f'{self.base_path}/data/{type(self).__name__}-res{self.ic_res}-ic.pySDC'
@@ -292,6 +328,7 @@ class RBC3DscalingIterative(RBC3Dscaling):
         ic_idx = ic_file.times.index(self.ic_time)
         _, ics = ic_file.readField(ic_idx)
 
+        ics = _P.xp.array(ics)
         _ics_hat = _P.transform(ics)
         ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
 
