@@ -194,7 +194,7 @@ class GenericSpectralLinear(Problem):
         if left_preconditioner:
             # reverse Kronecker product
             if self.spectral.useGPU:
-                import scipy.spase as sp
+                import scipy.sparse as sp
             else:
                 sp = self.spectral.sparse_lib
 
