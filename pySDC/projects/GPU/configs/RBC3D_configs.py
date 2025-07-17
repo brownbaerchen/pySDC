@@ -209,6 +209,7 @@ class RBC3DscalingOld(RayleighBenard3DRegular):
         params['hook_class'] = [LogWork]
         return params
 
+
 class RBC3Dscaling(RayleighBenard3DRegular):
     Tend = 13e-2
 
@@ -254,7 +255,7 @@ class RBC3DscalingIterative(RBC3Dscaling):
         # desc['level_params']['e_tol'] = 1e-5
         # desc['step_params']['maxiter'] = 99
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
-        desc['problem_params']['solver_type'] = 'gmres+ilu'#'bicgstab+ilu'
+        desc['problem_params']['solver_type'] = 'gmres+ilu'  #'bicgstab+ilu'
         desc['problem_params']['solver_args'] = {'atol': 1e-8, 'rtol': 1e-8, 'maxiter': 1000}
         desc['problem_params']['preconditioner_args'] = {'fill_factor': 5, 'drop_tol': 1e-2}
         desc['sweeper_params']['skip_residual_computation'] = ()

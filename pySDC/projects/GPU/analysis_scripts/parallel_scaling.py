@@ -359,6 +359,7 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
         Experiment(res=256, PinT=True, start=512, stop=2048, marker='o'),
     ]
 
+
 class RayleighBenard3DSpaceScalingIterativeGPU(GPUConfig):
     ndim = 3
     config = 'RBC3DscalingIterative'
@@ -467,7 +468,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         ('RBC', 'throughput'): {'x': [1 / 10, 64], 'y': [2e4, 2e4 * 640]},
         ('RBC', 'time'): {'x': [1 / 10, 64], 'y': [60, 60 / 640]},
         # ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
-        ('RBC3D', 'time_filtered'): {'x': [32, 32*8], 'y': [6, 6 / 8]},
+        ('RBC3D', 'time_filtered'): {'x': [32, 32 * 8], 'y': [6, 6 / 8]},
         ('RBC', 'time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time_per_task'): {'x': [1, 640], 'y': [60, 60 / 640]},
         ('RBC', 'min_time'): {'x': [1, 640], 'y': [60, 60 / 640]},
