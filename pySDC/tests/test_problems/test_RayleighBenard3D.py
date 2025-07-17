@@ -273,10 +273,20 @@ def test_banded_matrix(preconditioning):
         ), 'One-sided bandwidth of LU decomposition is larger than that of the full matrix!'
 
 
+@pytest.mark.cupy
+def test_heterogeneous_implementation():
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D, RayleighBenard3DHeterogenous
+
+    params = {'nx': 2, 'ny': 2, 'nz': 2, 'useGPU': True}
+    gpu = RayleighBenard3D(**params)
+    het = RayleighBenard3DHeterogenous(**params)
+
+
 if __name__ == '__main__':
     # test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
     # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
-    test_solver_convergence('bicgstab+ilu', 32, False, True)
-    test_banded_matrix(False)
+    # test_solver_convergence('bicgstab+ilu', 32, False, True)
+    # test_banded_matrix(False)
+    test_heterogeneous_implementation()

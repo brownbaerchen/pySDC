@@ -357,3 +357,28 @@ class RayleighBenard3D(GenericSpectralLinear):
         axs[1].set_ylabel(r'$z$')
         fig.colorbar(imT, self.cax[0])
         fig.colorbar(imV, self.cax[1])
+
+
+class RayleighBenard3DHeterogenous(RayleighBenard3D):
+
+    def setup_GPU(self):
+        """switch to GPU modules"""
+        super().setup_GPU()
+        import scipy.sparse as cpu_sparse
+        import cupyx.scipy.sparse as gpu_sparse_lib
+        import cupyx.scipy.sparse.linalg as gpu_linalg
+
+        self.gpu_sparse_lib = gpu_sparse_lib
+        self.gpu_linalg = gpu_linalg
+
+        self.spectral.sparse_lib = cpu_sparse
+        self.spectral.linalg = cpu_sparse.linalg
+
+    def __init__(self, *args, **kwargs):
+        kwargs['useGPU'] = True
+        super().__init__(*args, **kwargs)
+
+        self.L_CPU = self.L.copy()
+
+        for key in ['L', 'S2', 'S1', 'Dx', 'Dy', 'Dz']:
+            setattr(self, key, self.gpu_sparse_lib.csr_matrix(getattr(self, key)))
