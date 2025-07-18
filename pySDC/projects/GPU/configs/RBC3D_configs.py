@@ -82,6 +82,7 @@ class RayleighBenard3DRegular(Config):
         desc['problem_params']['Lx'] = 1
         desc['problem_params']['Ly'] = 1
         desc['problem_params']['Lz'] = 1
+        desc['problem_params']['heterogeneous'] = True
 
         desc['step_params']['maxiter'] = 3
 

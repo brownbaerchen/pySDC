@@ -139,7 +139,7 @@ class ScalingConfig(object):
                         timing_step = get_sorted(stats, type='timing_step')
 
                     t_mean = np.mean([me[1] for me in timing_step])
-                    t_mean_filtered = np.mean([me[1] for me in timing_step[1:]])
+                    t_mean_filtered = np.mean([me[1] for me in timing_step if me[0] > 0])
                     t_min = np.min([me[1] for me in timing_step][1:])
 
                     if quantity == 'throughput':
@@ -225,6 +225,10 @@ class GPUConfig(ScalingConfig):
     useGPU = True
     OMP_NUM_THREADS = 12
     srun_options = ['--cpu-bind=sockets']
+
+
+class Jupiter(GPUConfig):
+    cluster = 'jupiter'
 
 
 class GrayScottSpaceScalingCPU3D(CPUConfig, ScalingConfig):
@@ -337,10 +341,10 @@ class RayleighBenard3DSpaceScalingCPU(JurecaCPU):
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        # Experiment(res=128, PinT=True, start=128, stop=8192, marker='^'),
-        # Experiment(res=128, PinT=False, start=128, stop=8192, marker='^'),
-        Experiment(res=256, PinT=False, start=2048, stop=16384, marker='.'),
-        Experiment(res=256, PinT=True, start=2048, stop=16384, marker='.'),
+        Experiment(res=128, PinT=True, start=128, stop=8192, marker='.'),
+        Experiment(res=128, PinT=False, start=128, stop=8192, marker='.'),
+        Experiment(res=256, PinT=False, start=2048, stop=16384, marker='^'),
+        Experiment(res=256, PinT=True, start=2048, stop=16384, marker='^'),
     ]
 
 
@@ -352,25 +356,23 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        # Experiment(res=32, PinT=False, start=4, stop=4, marker='.'),
-        # Experiment(res=128, PinT=False, start=32, stop=128, marker='.'),
-        # Experiment(res=128, PinT=True, start=128, stop=512, marker='.'),
-        Experiment(res=256, PinT=False, start=512, stop=2048, marker='o'),
-        Experiment(res=256, PinT=True, start=512, stop=2048, marker='o'),
+        Experiment(res=128, PinT=False, start=4, stop=16, marker='.'),
+        Experiment(res=128, PinT=True, start=8, stop=64, marker='.'),
+        Experiment(res=256, PinT=False, start=16, stop=256, marker='^'),
+        Experiment(res=256, PinT=True, start=64, stop=512, marker='^'),
+        Experiment(res=512, PinT=False, start=128, stop=256, marker='x'),
     ]
 
 
-class RayleighBenard3DSpaceScalingIterativeGPU(GPUConfig):
+class RayleighBenard3DJupiter(Jupiter):
     ndim = 3
-    config = 'RBC3DscalingIterative'
+    config = 'RBC3Dscaling'
     tasks_time = 4
     sbatch_options = ['--time=0:04:00']
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
-        Experiment(res=128, PinT=False, start=32, stop=128, marker='x'),
-        Experiment(res=128, PinT=True, start=32, stop=512, marker='x'),
-        Experiment(res=256, PinT=False, start=512, stop=512, marker='o'),
+        Experiment(res=128, PinT=False, start=4, stop=4, marker='.'),
     ]
 
 
@@ -530,9 +532,9 @@ if __name__ == '__main__':
             config_classes += [RayleighBenardSpaceScalingGPU]
     elif args.problem == 'RBC3D':
         if args.XPU == 'CPU':
-            config_classes += [RayleighBenard3DSpaceScalingCPU, RayleighBenard3DSpaceScalingIterativeCPU]
+            config_classes += [RayleighBenard3DSpaceScalingCPU]
         else:
-            config_classes += [RayleighBenard3DSpaceScalingGPU, RayleighBenard3DSpaceScalingIterativeGPU]
+            config_classes += [RayleighBenard3DSpaceScalingGPU, RayleighBenard3DJupiter]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]

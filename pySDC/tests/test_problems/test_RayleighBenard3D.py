@@ -275,11 +275,21 @@ def test_banded_matrix(preconditioning):
 
 @pytest.mark.cupy
 def test_heterogeneous_implementation():
-    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D, RayleighBenard3DHeterogenous
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
     params = {'nx': 2, 'ny': 2, 'nz': 2, 'useGPU': True}
     gpu = RayleighBenard3D(**params)
-    het = RayleighBenard3DHeterogenous(**params)
+    het = RayleighBenard3D(**params, heterogeneous=True)
+
+    xp = gpu.xp
+
+    u0 = gpu.u_exact()
+
+    f = [me.eval_f(u0) for me in [gpu, het]]
+    assert xp.allclose(*f)
+
+    un = [me.solve_system(u0, 1e-3) for me in [gpu, het]]
+    assert xp.allclose(*un)
 
 
 if __name__ == '__main__':
