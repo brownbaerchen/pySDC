@@ -29,7 +29,7 @@ class TestImexSweeper(unittest.TestCase):
     #
     def setUp(self):
         from pySDC.implementations.problem_classes.FastWaveSlowWave_0D import swfw_scalar
-        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as imex
+        from pySDC.implementations.sweeper_classes import imex_1st_order as imex
 
         self.pparams = {}
         self.pparams['lambda_s'] = np.array([-0.1 * 1j], dtype='complex')
@@ -57,7 +57,7 @@ class TestImexSweeper(unittest.TestCase):
     #
     def test_caninstantiate(self):
         from pySDC.core import step as stepclass
-        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order as imex
+        from pySDC.implementations.sweeper_classes import imex_1st_order as imex
 
         for node_type, quad_type in zip(node_types, quad_types):
             self.swparams['node_type'] = node_type
