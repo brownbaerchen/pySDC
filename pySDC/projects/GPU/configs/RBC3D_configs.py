@@ -95,6 +95,7 @@ class RayleighBenard3DRegular(Config):
         if restart_idx == 0:
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
             u0_with_pressure = P.solve_system(u0, 1e-9, u0)
+            P.cached_factorizations.pop(1e-9)
             return u0_with_pressure, 0
         else:
             from pySDC.helpers.fieldsIO import FieldsIO
