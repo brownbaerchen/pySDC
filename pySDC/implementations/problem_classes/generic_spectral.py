@@ -134,6 +134,8 @@ class GenericSpectralLinear(Problem):
 
     def heterogeneous_setup(self):
         if self.heterogeneous and not self.__heterogeneous_setup:
+            self.__fill_factor = None
+
             CPU_only = ['BC_line_zero_matrix', 'BCs']
             both = ['Pl', 'Pr', 'L', 'M']
 
@@ -330,13 +332,11 @@ class GenericSpectralLinear(Problem):
                     import scipy.sparse as sp
 
                     if self.Dirichlet_recombination and self.left_preconditioner:
-                        bandwidth = sp.linalg.spbandwidth(A)
-                        max_mem = (sum(bandwidth) + 1) * A.shape[0]
-                        fill_bound = max_mem / A.nnz
-                        self.logger.debug(
-                            f'Computed upper bound on fill_factor of {fill_bound} based on bandwidth {bandwidth}'
-                        )
-                        cpu_decomp = sp.linalg.spilu(A, drop_tol=0.0, fill_factor=fill_bound)
+                        if self.__fill_factor is None:
+                            self.__fill_factor = get_fill_factor(A)
+                            self.logger.debug(f'Inferred fill factor {self.__fill_factor} for spilu')
+                            print(f'Inferred fill factor {self.__fill_factor} for spilu')
+                        cpu_decomp = sp.linalg.spilu(A, drop_tol=0.0, fill_factor=self.__fill_factor)
                     else:
                         cpu_decomp = sp.linalg.splu(A)
 
@@ -526,6 +526,30 @@ def compute_residual_DAE_MPI(self, stage=None):
     L.status.updated = False
 
     return None
+
+
+def get_fill_factor(A, b=None, tol=1e-12, max_tries=99):
+    import scipy.sparse as sp
+    import numpy as np
+
+    fill_factor = 10.0
+    done = False
+
+    for _ in range(max_tries):
+        try:
+            iLU = sp.linalg.spilu(A, drop_tol=0.0, fill_factor=fill_factor)
+            b = np.random.random(A.shape[0]).astype(A.dtype) if b is None else b
+            x = iLU.solve(b)
+            error = np.linalg.norm(A @ x - b) / np.linalg.norm(x)
+            if error < tol:
+                done = True
+                break
+            else:
+                fill_factor *= 2
+        except RuntimeError:
+            fill_factor += 1
+    assert done
+    return fill_factor
 
 
 def get_extrapolated_error_DAE(self, S, **kwargs):
