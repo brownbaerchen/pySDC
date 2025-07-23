@@ -329,7 +329,17 @@ class GenericSpectralLinear(Problem):
                 if self.heterogeneous:
                     import scipy.sparse as sp
 
-                    cpu_decomp = sp.linalg.splu(A)
+                    if self.Dirichlet_recombination and self.left_preconditioner:
+                        bandwidth = sp.linalg.spbandwidth(A)
+                        max_mem = (sum(bandwidth) + 1) * A.shape[0]
+                        fill_bound = max_mem / A.nnz
+                        self.logger.debug(
+                            f'Computed upper bound on fill_factor of {fill_bound} based on bandwidth {bandwidth}'
+                        )
+                        cpu_decomp = sp.linalg.spilu(A, drop_tol=0.0, fill_factor=fill_bound)
+                    else:
+                        cpu_decomp = sp.linalg.splu(A)
+
                     if self.useGPU:
                         from cupyx.scipy.sparse.linalg import SuperLU
 

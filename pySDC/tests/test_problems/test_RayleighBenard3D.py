@@ -274,10 +274,10 @@ def test_banded_matrix(preconditioning):
 
 
 @pytest.mark.cupy
-def test_heterogeneous_implementation():
+def test_heterogeneous_implementation(N=8, useGPU=True):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
-    params = {'nx': 2, 'ny': 2, 'nz': 2, 'useGPU': True}
+    params = {'nx': N, 'ny': N, 'nz': N, 'useGPU': useGPU}
     gpu = RayleighBenard3D(**params)
     het = RayleighBenard3D(**params, heterogeneous=True)
 
@@ -299,4 +299,4 @@ if __name__ == '__main__':
     # test_Poisson_problem_w()
     # test_solver_convergence('bicgstab+ilu', 32, False, True)
     # test_banded_matrix(False)
-    test_heterogeneous_implementation()
+    test_heterogeneous_implementation(useGPU=False)
