@@ -360,7 +360,10 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
         Experiment(res=128, PinT=True, start=8, stop=64, marker='.'),
         Experiment(res=256, PinT=False, start=16, stop=256, marker='^'),
         Experiment(res=256, PinT=True, start=64, stop=512, marker='^'),
-        Experiment(res=512, PinT=False, start=128, stop=256, marker='x'),
+        Experiment(res=512, PinT=False, start=128, stop=1024, marker='x'),
+        Experiment(res=512, PinT=True, start=512, stop=2048, marker='x'),
+        Experiment(res=900, PinT=False, start=900, stop=3600, marker='o'),
+        Experiment(res=900, PinT=True, start=1800, stop=3600, marker='o'),
     ]
 
 
@@ -449,12 +452,15 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
                 RayleighBenardSpaceScalingCPU(),
             ]
     elif problem == 'RBC3D':
-        configs = [
-            RayleighBenard3DSpaceScalingGPU(),
-            # RayleighBenard3DSpaceScalingIterativeGPU(),
-            RayleighBenard3DSpaceScalingCPU(),
-            # RayleighBenard3DSpaceScalingIterativeCPU(),
-        ]
+        configs = []
+        if XPU in ['CPU', 'both']:
+            configs += [
+                RayleighBenard3DSpaceScalingCPU(),
+            ]
+        elif XPU in ['GPU', 'both']:
+            configs += [
+                RayleighBenard3DSpaceScalingGPU(),
+            ]
     elif problem == 'RBC_dedalus':
         configs = [
             RayleighBenardDedalusComparison(),
