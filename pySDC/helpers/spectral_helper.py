@@ -983,7 +983,6 @@ class SpectralHelper:
         self.BCs = None
 
         self.fft_cache = {}
-        self.fft_dealias_shape_cache = {}
 
         self.logger = logging.getLogger(name='Spectral Discretization')
         if debug:
@@ -1274,7 +1273,8 @@ class SpectralHelper:
 
         # prepare BCs in spectral space to easily add to the RHS
         rhs_BCs = self.put_BCs_in_rhs(self.u_init)
-        self.rhs_BCs_hat = self.transform(rhs_BCs)
+        self.rhs_BCs_hat = self.transform(rhs_BCs).view(self.xp.ndarray)
+        del self.BC_rhs_mask
 
     def check_BCs(self, u):
         """
@@ -1327,7 +1327,7 @@ class SpectralHelper:
             Generate a mask where we need to set values in the rhs in spectral space to zero, such that can replace them
             by the boundary conditions. The mask is then cached.
             """
-            self._rhs_hat_zero_mask = self.newDistArray().astype(bool)
+            self._rhs_hat_zero_mask = self.newDistArray(forward_output=True).astype(bool).view(self.xp.ndarray)
 
             for axis in range(self.ndim):
                 for bc in self.full_BCs:
