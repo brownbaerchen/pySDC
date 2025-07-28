@@ -95,6 +95,7 @@ def test_heat2d_chebychev(a, b, c, fx, fy, base_x, base_y, nx=2**5 + 1, ny=2**5 
     assert np.allclose(u0[0], u02[0], atol=1e-4), 'Error in eval_f'
 
 
+@pytest.mark.base
 def test_SDC():
     import numpy as np
     from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
@@ -149,7 +150,41 @@ def test_SDC():
     assert all(me[1] > 0 for me in k)
 
 
+@pytest.mark.base
+def test_heat_time_dep_BCs():
+    from pySDC.implementations.problem_classes.HeatEquation_Chebychev import Heat1DUltrasphericalTimeDepBCs
+    import numpy as np
+
+    prob = Heat1DUltrasphericalTimeDepBCs()
+    dts = np.logspace(-2, -5, 12)
+    errors = []
+    u0 = prob.u_exact(0)
+
+    def get_order(dts, errors):
+        return [np.log(errors[i + 1] / errors[i]) / np.log(dts[i + 1] / dts[i]) for i in range(len(dts) - 1)]
+
+    for dt in dts:
+        f = prob.eval_f(u0, 0)
+        u1 = prob.solve_system(u0, dt, u0, dt) + dt * f.expl
+
+        u1_exact = prob.u_exact(dt)
+        errors.append(abs(u1 - u1_exact))
+
+    order = get_order(dts, errors)
+    assert np.isclose(np.mean(order), 2, atol=0.3)
+
+    dt = 1e-2
+    f = prob.eval_f(u0, 0)
+    u1 = prob.solve_system(u0, dt, u0, dt) + dt * f.expl
+    f1 = prob.eval_f(u1, dt)
+    u02 = u1 - dt * (f1.impl + f1.expl)
+    u03 = u1 - dt * (f1.expl)
+
+    assert abs(u02 - u0) < abs(u03 - u0)
+
+
 if __name__ == '__main__':
     # test_SDC()
-    test_heat1d_chebychev(1, 0, 1, 0e-3, True, True, 'bicgstab', 2**4)
+    # test_heat1d_chebychev(1, 0, 1, 0e-3, True, True, 'bicgstab', 2**4)
     # test_heat2d_chebychev(0, 0, 0, 2, 2, 'ultraspherical', 'fft', 2**6, 2**6)
+    test_heat_time_dep_BCs()

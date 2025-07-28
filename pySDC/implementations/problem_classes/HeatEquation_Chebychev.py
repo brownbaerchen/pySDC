@@ -2,8 +2,9 @@ import numpy as np
 from scipy import sparse as sp
 
 from pySDC.core.problem import Problem
-from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
+from pySDC.helpers.spectral_helper import BoundaryCondition
 
 
 class Heat1DChebychev(GenericSpectralLinear):
@@ -227,6 +228,120 @@ class Heat1DUltraspherical(GenericSpectralLinear):
             return self.transform(u)
         else:
             return u
+
+
+class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
+    dtype_u = mesh
+    dtype_f = imex_mesh
+
+    class RightBC(BoundaryCondition):
+        time_dependent = True
+
+        def __call__(self, t, *args, **kwargs):
+            return np.cos(t)
+
+    def __init__(self, nvars=128, nu=1.0, **kwargs):
+        """
+        Constructor. `kwargs` are forwarded to parent class constructor.
+
+        Args:
+            nvars (int): Resolution
+            nu (float): Diffusion parameter
+        """
+        self._makeAttributeAndRegister('nvars', 'nu', localVars=locals(), readOnly=True)
+
+        bases = [{'base': 'ultraspherical', 'N': nvars, 'x0': 0.0, 'x1': 1.0}]
+        components = ['u']
+
+        GenericSpectralLinear.__init__(self, bases, components, **kwargs)
+
+        self.x = self.get_grid()[0]
+
+        I = self.get_Id()
+        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
+
+        S2 = self.get_basis_change_matrix(p_in=2, p_out=0)
+        U2 = self.get_basis_change_matrix(p_in=0, p_out=2)
+
+        self.Dxx = S2 @ Dxx
+
+        L_lhs = {
+            'u': {'u': -nu * Dxx},
+        }
+        self.setup_L(L_lhs)
+
+        M_lhs = {'u': {'u': U2 @ I}}
+        self.setup_M(M_lhs)
+
+        self.add_BC(component='u', equation='u', axis=0, x=-1, v=0, kind="Dirichlet", line=-1)
+        self.add_BC(component='u', equation='u', axis=0, x=1, v=self.RightBC(), kind="Dirichlet", line=-2)
+        self.setup_BCs()
+
+    def eval_f(self, u, t, **kwargs):
+        f = self.f_init
+        iu = self.index('u')
+        xp = self.xp
+
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        # Laplacian
+        u_hat[iu] = (self.nu * (self.Dxx @ u_hat[iu].flatten())).reshape(u_hat[iu].shape)
+
+        # forcing
+        f.expl[iu, ...] = (self.nu**2 * xp.pi**2 - 1) * xp.exp(-t) * xp.sin(xp.pi * self.x) + self.x * xp.sin(t)
+
+        if self.spectral_space:
+            me = u_hat
+            f.expl[...] = self.transform(f.expl)
+        else:
+            me = self.itransform(u_hat).real
+
+        f.impl[iu, ...] = me[iu]
+        return f
+
+    def solve_system(self, rhs, dt, u0, t, **kwargs):
+        rhs_BCs = self.put_BCs_in_rhs(self.u_init, t=t)
+        self.spectral.rhs_BCs_hat = self.transform(rhs_BCs)
+        return super().solve_system(rhs, dt, u0, t, **kwargs)
+
+    def u_exact(self, t):
+        """
+        Get exact solution at time `t`
+
+        Args:
+            t (float): When you want the exact solution
+
+        Returns:
+            Heat1DUltraspherical.dtype_u: Exact solution
+        """
+        xp = self.xp
+        iu = self.index('u')
+        u = self.spectral.u_init
+
+        u[iu] = xp.exp(-t) * xp.sin(xp.pi * self.x) + self.x * xp.cos(t)
+
+        if self.spectral_space:
+            return self.transform(u)
+        else:
+            return u
+
+    def plot(self, u, ax=None, **kwargs):  # pragma: no cover
+        if ax is None:
+            import matplotlib.pyplot as plt
+
+            _, ax = plt.subplots()
+
+        iu = self.index('u')
+
+        if self.spectral_space:
+            _u = self.itransform(u)[iu].real
+        else:
+            _u = u[iu].real
+        ax.plot(self.x, _u, **kwargs)
+        return ax
 
 
 class Heat2DChebychev(GenericSpectralLinear):
