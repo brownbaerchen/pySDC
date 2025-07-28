@@ -160,12 +160,13 @@ def test_heat_time_dep_BCs():
     errors = []
     u0 = prob.u_exact(0)
 
+    # check order
     def get_order(dts, errors):
         return [np.log(errors[i + 1] / errors[i]) / np.log(dts[i + 1] / dts[i]) for i in range(len(dts) - 1)]
 
     for dt in dts:
         f = prob.eval_f(u0, 0)
-        u1 = prob.solve_system(u0, dt, u0, dt) + dt * f.expl
+        u1 = prob.solve_system(u0 + dt * f.expl, dt, u0, dt)
 
         u1_exact = prob.u_exact(dt)
         errors.append(abs(u1 - u1_exact))
@@ -173,14 +174,22 @@ def test_heat_time_dep_BCs():
     order = get_order(dts, errors)
     assert np.isclose(np.mean(order), 2, atol=0.3)
 
-    dt = 1e-2
+    # check eval_f
+    dt = 1e-1
     f = prob.eval_f(u0, 0)
-    u1 = prob.solve_system(u0, dt, u0, dt) + dt * f.expl
+    u1 = prob.solve_system(u0 + dt * f.expl, dt, u0, dt)
     f1 = prob.eval_f(u1, dt)
     u02 = u1 - dt * (f1.impl + f1.expl)
     u03 = u1 - dt * (f1.expl)
 
     assert abs(u02 - u0) < abs(u03 - u0)
+
+    # check time dependent BCs
+    dt = np.pi
+    f = prob.eval_f(u0, 0)
+    u1 = prob.solve_system(u0, dt, u0, dt)
+
+    assert np.isclose(prob.itransform(u1)[0, 0], -1, atol=1e-4)
 
 
 if __name__ == '__main__':

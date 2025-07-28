@@ -302,11 +302,6 @@ class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
         f.impl[iu, ...] = me[iu]
         return f
 
-    def solve_system(self, rhs, dt, u0, t, **kwargs):
-        rhs_BCs = self.put_BCs_in_rhs(self.u_init, t=t)
-        self.spectral.rhs_BCs_hat = self.transform(rhs_BCs)
-        return super().solve_system(rhs, dt, u0, t, **kwargs)
-
     def u_exact(self, t):
         """
         Get exact solution at time `t`

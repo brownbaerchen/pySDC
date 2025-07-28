@@ -1,5 +1,5 @@
 from pySDC.core.problem import Problem, WorkCounter
-from pySDC.helpers.spectral_helper import SpectralHelper
+from pySDC.helpers.spectral_helper import SpectralHelper, BoundaryCondition
 import numpy as np
 from pySDC.core.errors import ParameterError
 from pySDC.helpers.fieldsIO import Rectilinear
@@ -241,7 +241,24 @@ class GenericSpectralLinear(Problem):
         Pr_lhs = {comp: {comp: _Pr} for comp in self.components}
         self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
 
-    def solve_system(self, rhs, dt, u0=None, *args, skip_itransform=False, **kwargs):
+    def update_BCs(self, t, u):
+        update = False
+        for BC in self.spectral.full_BCs:
+            if isinstance(BC['v'], BoundaryCondition):
+                if BC['v'].time_dependent or BC['v'].solution_dependent:
+                    update = True
+                    break
+        if update:
+            if self.spectral_space:
+                _u = self.itransform(u)
+            else:
+                _u = u
+
+            rhs_BCs = self.put_BCs_in_rhs(self.u_init, t=t, u=_u)
+            self.spectral.rhs_BCs_hat = self.transform(rhs_BCs)
+            self.logger.debug('Updated boundary conditions')
+
+    def solve_system(self, rhs, dt, u0=None, t=0, *args, skip_itransform=False, **kwargs):
         """
         Do an implicit Euler step to solve M u_t + Lu = rhs, with M the mass matrix and L the linear operator as setup by
         ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``.
@@ -252,6 +269,7 @@ class GenericSpectralLinear(Problem):
         Note that by putting M rhs on the right hand side, this function can only solve algebraic conditions equal to
         zero. If you want something else, it should be easy to overload this function.
         """
+        self.update_BCs(t, u0)
 
         sp = self.spectral.sparse_lib
 
