@@ -311,15 +311,3 @@ def test_apply_BCs():
     u = P.itransform(u_hat)
 
     P.check_BCs(u)
-
-
-if __name__ == '__main__':
-    # test_eval_f(2**0, 2**2, 'z', True)
-    # test_Poisson_problem(1, 'T')
-    # test_Poisson_problem_v()
-    # test_apply_BCs()
-    test_Nusselt_numbers(3.14)
-    # test_buoyancy_computation()
-    # test_viscous_dissipation()
-    # test_CFL()
-    # test_Nyquist_mode_elimination()

@@ -21,6 +21,8 @@ def get_config(args):
         return RayleighBenard_scaling(args)
     elif name == 'RBC_large':
         return RayleighBenard_large(args)
+    elif name == 'RBC_time_dep':
+        return RayleighBenard_time_dep(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -45,7 +47,7 @@ class RayleighBenardRegular(Config):
 
             data = {
                 't': L.time + L.dt,
-                'local_slice': P.local_slice,
+                'local_slice': P.local_slice(False),
                 'shape': P.global_shape,
             }
 
@@ -61,6 +63,7 @@ class RayleighBenardRegular(Config):
                 if L.time == 0:
                     data['X'] = L.prob.X
                     data['Z'] = L.prob.Z
+
             return data
 
         def logging_condition(L):
@@ -129,7 +132,7 @@ class RayleighBenardRegular(Config):
             return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
         else:
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
-            u0_with_pressure = P.solve_system(u0, 1e-9, u0)
+            u0_with_pressure = P.solve_system(u0, 1e-9, u0, 0)
             return u0_with_pressure, 0
 
     def prepare_caches(self, prob):
@@ -430,4 +433,24 @@ class RayleighBenard_large(RayleighBenardRegular):
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
             for _ in range(self.relaxation_steps):
                 u0 = P.solve_system(u0, 1e-1, u0)
+            return u0, 0
+
+
+class RayleighBenard_time_dep(RayleighBenard_dt_adaptivity):
+    relaxation_steps = 5
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardTimeDepBCs
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_class'] = RayleighBenardTimeDepBCs
+        return desc
+
+    def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+        if restart_idx > 0:
+            return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+        else:
+            u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
+            for _ in range(self.relaxation_steps):
+                u0 = P.solve_system(u0, 1e-1, u0, 0)
             return u0, 0

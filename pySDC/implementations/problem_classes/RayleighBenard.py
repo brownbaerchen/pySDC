@@ -7,6 +7,7 @@ from pySDC.core.convergence_controller import ConvergenceController
 from pySDC.core.hooks import Hooks
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
 from pySDC.core.problem import WorkCounter
+from pySDC.helpers.spectral_helper import BoundaryCondition
 
 
 class RayleighBenard(GenericSpectralLinear):
@@ -132,7 +133,7 @@ class RayleighBenard(GenericSpectralLinear):
         self.Dzz = S2 @ Dzz
 
         # compute rescaled Rayleigh number to extract viscosity and thermal diffusivity
-        Ra = Rayleigh / (max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * self.axes[1].L ** 3)
+        Ra = Rayleigh / (max([abs(float(BCs['T_top']) - BCs['T_bottom']), np.finfo(float).eps]) * self.axes[1].L ** 3)
         self.kappa = (Ra * Prandtl) ** (-1 / 2.0)
         self.nu = (Ra / Prandtl) ** (-1 / 2.0)
 
@@ -247,8 +248,8 @@ class RayleighBenard(GenericSpectralLinear):
 
         # linear temperature gradient
         for comp in ['T', 'v', 'u']:
-            a = (self.BCs[f'{comp}_top'] - self.BCs[f'{comp}_bottom']) / 2
-            b = (self.BCs[f'{comp}_top'] + self.BCs[f'{comp}_bottom']) / 2
+            a = (float(self.BCs[f'{comp}_top']) - self.BCs[f'{comp}_bottom']) / 2
+            b = (float(self.BCs[f'{comp}_top']) + self.BCs[f'{comp}_bottom']) / 2
             me[self.index(comp)] = a * self.Z + b
 
         # perturb slightly
@@ -460,6 +461,59 @@ class RayleighBenard(GenericSpectralLinear):
             u = self.itransform(u)
         iv, iT = self.index(['v', 'T'])
         return abs(u[iv] * self.Rayleigh * u[iT])
+
+
+class RayleighBenardTimeDepBCs(RayleighBenard):
+
+    class BC_T_top(BoundaryCondition):
+        time_dependent = True
+        solution_dependent = True
+        v = 0.0
+        x = None
+        vel = 2 * np.pi / 50
+
+        def get_peak_pos(self, helper, t):
+            off = 1 / 4 * helper.axes[0].L
+            x0 = helper.axes[0].x0
+            L = helper.axes[0].L
+            return x0 + off + (L - 2 * off) * (helper.xp.sin(self.vel * t) + 1) / 2
+
+        def __call__(self, helper, t=0, *args, **kwargs):
+            xp = helper.xp
+
+            if self.x is None:
+                self.x = helper.axes[0].get_1dgrid()[helper.local_slice(True)[0]]
+
+            x = self.x
+
+            peak_pos = self.get_peak_pos(helper, t)
+
+            left = xp.exp(3 * (x - peak_pos))
+            right = xp.exp(-3 * (x - peak_pos))
+
+            return xp.minimum(left, right) * 2.0
+
+        def __float__(self):
+            return float(self.v)
+
+    def __init__(self, *args, BCs=None, **kwargs):
+        BCs = {} if BCs is None else BCs
+        BCs = {
+            'T_top': self.BC_T_top(),
+            'T_bottom': 2,
+            'v_top': 0,
+            'v_bottom': 0,
+            'u_top': 0,
+            'u_bottom': 0,
+            'p_integral': 0,
+            **BCs,
+        }
+        super().__init__(*args, BCs=BCs, **kwargs)
+
+    def solve_system(self, rhs, dt, u0, t, **kwargs):
+        rhs_BCs = self.put_BCs_in_rhs(self.u_init, t=t)
+        self.spectral.rhs_BCs_hat = self.transform(rhs_BCs)
+        return super().solve_system(rhs, dt, u0, t, **kwargs)
 
 
 class CFLLimit(ConvergenceController):

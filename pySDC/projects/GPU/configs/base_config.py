@@ -184,9 +184,9 @@ class LogStats(ConvergenceController):
     def setup(self, controller, params, *args, **kwargs):
         params['control_order'] = 999
         if 'hook' not in params.keys():
-            from pySDC.implementations.hooks.log_solution import LogToFileAfterXs
+            from pySDC.implementations.hooks.log_solution import LogToPickleFileAfterXS
 
-            params['hook'] = LogToFileAfterXs
+            params['hook'] = LogToPickleFileAfterXS
 
         self.counter = params['hook'].counter
 

@@ -53,6 +53,21 @@ def cache(func):
     return wrapper
 
 
+class BoundaryCondition:
+    """
+    Base class for BCs
+    """
+
+    time_dependent = True
+    solution_dependent = True
+    # def __init__(self, time_dependent, solution_dependent):
+    #     self.time_dependent = time_dependent
+    #     self.solution_dependent = solution_dependent
+
+    def __call__(self, *args, **kwargs):
+        raise NotImplementedError('BC not implemented')
+
+
 class SpectralHelper1D:
     """
     Abstract base class for 1D spectral discretizations. Defines a common interface with parameters and functions that
@@ -1342,7 +1357,7 @@ class SpectralHelper:
         rhs_hat[self._rhs_hat_zero_mask] = 0
         return rhs_hat + self.rhs_BCs_hat
 
-    def put_BCs_in_rhs(self, rhs):
+    def put_BCs_in_rhs(self, rhs, u=None, t=0):
         """
         Put the BCs in the right hand side for solving.
         This function will transform along each axis individually and add all BCs in that axis.
@@ -1350,6 +1365,8 @@ class SpectralHelper:
 
         Args:
             rhs: Right hand side in physical space
+            u: current solution in physical space
+            t (float): current time
 
         Returns:
             rhs in physical space with BCs
@@ -1370,7 +1387,11 @@ class SpectralHelper:
                     line = bc['line']
                     if (N + line) % N in self.get_indices(True)[axis]:
                         _slice[axis + 1] = (N + line) % N - self.local_slice()[axis].start
-                        _rhs_hat[(*_slice,)] = bc['v']
+                        if isinstance(bc['v'], BoundaryCondition):
+                            value = bc['v'](helper=self, base=self.axes[axis], u=u, t=t)
+                        else:
+                            value = bc['v']
+                        _rhs_hat[(*_slice,)] = value
 
             rhs = self.itransform(_rhs_hat, axes=(axis - ndim,))
 
