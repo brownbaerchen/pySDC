@@ -135,7 +135,7 @@ class RBC3DAdaptivity(RayleighBenard3DRegular):
 
 
 class RBC3DBenchmarkRK(RayleighBenard3DRegular):
-    def get_description(self, *args, res=-1, **kwargs):
+    def get_description(self, *args, **kwargs):
         from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK3
 
         desc = super().get_description(*args, **kwargs)
@@ -148,9 +148,6 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
         desc['sweeper_params'] = {}
 
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = desc['problem_params']['nx']
-        desc['problem_params']['nz'] = desc['problem_params']['nx']
 
         desc['step_params']['maxiter'] = 1
         return desc
@@ -159,7 +156,7 @@ class RBC3DBenchmarkRK(RayleighBenard3DRegular):
 class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
     Tend = 200
 
-    def get_description(self, *args, res=-1, **kwargs):
+    def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
         desc['level_params']['dt'] = 5e-3
@@ -171,9 +168,6 @@ class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
         desc['sweeper_params']['QE'] = 'PIC'
 
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = desc['problem_params']['nx']
-        desc['problem_params']['nz'] = desc['problem_params']['nx']
         desc['problem_params']['max_cached_factorizations'] = 16
 
         desc['step_params']['maxiter'] = 1
@@ -183,7 +177,7 @@ class RBC3DBenchmarkSDC(RayleighBenard3DRegular):
 class RBC3DscalingOld(RayleighBenard3DRegular):
     Tend = 21e-2
 
-    def get_description(self, *args, res=-1, **kwargs):
+    def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
         desc['level_params']['dt'] = self.Tend / 21
@@ -196,9 +190,6 @@ class RBC3DscalingOld(RayleighBenard3DRegular):
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
 
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = desc['problem_params']['nx']
-        desc['problem_params']['nz'] = desc['problem_params']['nx']
         desc['problem_params']['max_cached_factorizations'] = 16
 
         desc['step_params']['maxiter'] = 1
@@ -215,7 +206,7 @@ class RBC3DscalingOld(RayleighBenard3DRegular):
 class RBC3Dscaling(RayleighBenard3DRegular):
     Tend = 13e-2
 
-    def get_description(self, *args, res=-1, **kwargs):
+    def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
 
         desc['level_params']['dt'] = 1e-2
@@ -228,9 +219,6 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
 
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = desc['problem_params']['nx']
-        desc['problem_params']['nz'] = desc['problem_params']['nx']
         desc['problem_params']['max_cached_factorizations'] = 4
 
         desc['step_params']['maxiter'] = 1

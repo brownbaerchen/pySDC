@@ -215,6 +215,10 @@ class GenericSpectralLinear(Problem):
             left_preconditioner (bool): If True, it will interleave the variables and reverse the Kronecker product
         """
         N = np.prod(self.init[0][1:])
+        if self.useGPU:
+            from cupy_backends.cuda.libs.cusparse import CuSparseError as MemError
+        else:
+            MemError = MemoryError
 
         if left_preconditioner:
             # reverse Kronecker product
@@ -241,7 +245,12 @@ class GenericSpectralLinear(Problem):
             _Pr = self.spectral.sparse_lib.eye(N)
 
         Pr_lhs = {comp: {comp: _Pr} for comp in self.components}
-        self.Pr = self._setup_operator(Pr_lhs) @ self.Pl.T
+        operator = self._setup_operator(Pr_lhs)
+
+        try:
+            self.Pr = operator @ self.Pl.T
+        except MemError:
+            self.Pr = self.spectral.sparse_lib.csc_matrix(operator.get() @ self.Pl.T.get())
 
     def solve_system(self, rhs, dt, u0=None, *args, skip_itransform=False, **kwargs):
         """
