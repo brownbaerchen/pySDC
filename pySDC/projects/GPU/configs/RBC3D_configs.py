@@ -106,10 +106,12 @@ class RayleighBenard3DRegular(Config):
             t0, solution = outfile.readField(restart_idx)
 
             u0 = P.u_init
-            u0[...] = solution[:]
 
             if P.spectral_space:
-                u0[...] = P.transform(u0)
+                u0[...] = P.transform(solution)
+            else:
+                u0[...] = solution
+
             return u0, t0
 
     def prepare_caches(self, prob):
