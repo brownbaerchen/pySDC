@@ -256,7 +256,7 @@ class GenericSpectralLinear(Problem):
 
             rhs_BCs = self.put_BCs_in_rhs(self.u_init, t=t, u=_u)
             self.spectral.rhs_BCs_hat = self.transform(rhs_BCs)
-            self.logger.debug('Updated boundary conditions')
+            self.logger.debug(f'Updated boundary conditions to {t=:.4f}')
 
     def solve_system(self, rhs, dt, u0=None, t=0, *args, skip_itransform=False, **kwargs):
         """

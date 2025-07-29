@@ -236,11 +236,12 @@ class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
 
     class RightBC(BoundaryCondition):
         time_dependent = True
+        gamma = 1
 
         def __call__(self, t, *args, **kwargs):
-            return np.cos(t)
+            return np.cos(self.gamma * t)
 
-    def __init__(self, nvars=128, nu=1.0, **kwargs):
+    def __init__(self, nvars=128, nu=1.0, gamma=1, **kwargs):
         """
         Constructor. `kwargs` are forwarded to parent class constructor.
 
@@ -248,7 +249,8 @@ class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
             nvars (int): Resolution
             nu (float): Diffusion parameter
         """
-        self._makeAttributeAndRegister('nvars', 'nu', localVars=locals(), readOnly=True)
+        self._makeAttributeAndRegister('nvars', 'nu', 'gamma', localVars=locals(), readOnly=True)
+        self.RightBC.gamma = self.gamma
 
         bases = [{'base': 'ultraspherical', 'N': nvars, 'x0': 0.0, 'x1': 1.0}]
         components = ['u']
@@ -291,7 +293,7 @@ class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
         u_hat[iu] = (self.nu * (self.Dxx @ u_hat[iu].flatten())).reshape(u_hat[iu].shape)
 
         # forcing
-        f.expl[iu, ...] = (self.nu**2 * xp.pi**2 - 1) * xp.exp(-t) * xp.sin(xp.pi * self.x) + self.x * xp.sin(t)
+        f.expl[iu, ...] = -self.x * self.gamma * xp.sin(self.gamma * t)
 
         if self.spectral_space:
             me = u_hat
@@ -314,12 +316,16 @@ class Heat1DUltrasphericalTimeDepBCs(GenericSpectralLinear):
         """
         xp = self.xp
         iu = self.index('u')
-        u = self.spectral.u_init
+        u = self.spectral.u_init_physical
 
-        u[iu] = xp.exp(-t) * xp.sin(xp.pi * self.x) + self.x * xp.cos(t)
+        u[iu] = xp.exp(-self.nu * xp.pi**2 * t) * xp.sin(xp.pi / np.sqrt(self.nu) * self.x) + self.x * xp.cos(
+            self.gamma * t
+        )
 
         if self.spectral_space:
-            return self.transform(u)
+            me = self.spectral.u_init_forward
+            me[...] = self.transform(u)
+            return me
         else:
             return u
 
