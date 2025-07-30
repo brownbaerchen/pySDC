@@ -122,17 +122,20 @@ class RayleighBenard3DRegular(Config):
 
 
 class RBC3DAdaptivity(RayleighBenard3DRegular):
+    Tend = 100
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1}
+        # desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.1, 'dt_min': 1e-2}
         desc['level_params']['restol'] = -1
+        desc['level_params']['dt'] = 2e-2
         desc['sweeper_params']['num_nodes'] = 4
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['step_params']['maxiter'] = 4
+        desc['problem_params']['Rayleigh'] = 1e6
         return desc
 
 
