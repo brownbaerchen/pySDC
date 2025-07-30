@@ -54,8 +54,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         self,
         Prandtl=1,
         Rayleigh=2e6,
-        nx=256,
-        ny=256,
+        nx=64,
+        ny=64,
         nz=64,
         BCs=None,
         dealiasing=1.5,
@@ -79,7 +79,6 @@ class RayleighBenard3D(GenericSpectralLinear):
             comm (mpi4py.Intracomm): Space communicator
             Lx (float): Horizontal length of the domain
         """
-        # TODO: documentation
         BCs = {} if BCs is None else BCs
         BCs = {
             'T_top': 0,
@@ -328,7 +327,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         _me[0] = u_pad[iw] * u_pad[iT]
         wT_hat = self.transform(_me, padding=padding)[0]
 
-        nusselt_hat = wT_hat - DzT_hat
+        nusselt_hat = (wT_hat / self.kappa - DzT_hat) * self.axes[-1].L
 
         if not hasattr(self, '_zInt'):
             self._zInt = zAxis.get_integration_matrix()
@@ -354,3 +353,18 @@ class RayleighBenard3D(GenericSpectralLinear):
             't': Nusselt_t,
             'b': Nusselt_b,
         }
+
+    def get_vertical_temperature_profile(self, u):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        iT = self.index('T')
+
+        _u_hat = self.axes[-1].itransform(u_hat, axes=(-1,))
+
+        avg = self.xp.ascontiguousarray(_u_hat[iT, 0, 0, :].real) / self.axes[0].N / self.axes[1].N
+        self.comm.Bcast(avg, root=0)
+
+        return avg

@@ -5,16 +5,8 @@ def get_config(args):
     name = args['config']
     if name == 'RBC3D':
         return RayleighBenard3DRegular(args)
-    elif name == 'RBC3DAdaptivity':
-        return RBC3DAdaptivity(args)
-    elif name == 'RBC3DBenchmarkRK':
-        return RBC3DBenchmarkRK(args)
-    elif name == 'RBC3DBenchmarkSDC':
-        return RBC3DBenchmarkSDC(args)
-    elif name == 'RBC3Dscaling':
-        return RBC3Dscaling(args)
-    elif name == 'RBC3DscalingIterative':
-        return RBC3DscalingIterative(args)
+    elif name in globals().keys():
+        return globals()[name](args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -34,7 +26,7 @@ class RayleighBenard3DRegular(Config):
         from pySDC.implementations.hooks.log_solution import LogToFile
 
         LogToFile.filename = self.get_file_name()
-        LogToFile.time_increment = 1e-1
+        LogToFile.time_increment = 5e-1
         # LogToFile.allow_overwriting = True
 
         return LogToFile
@@ -335,3 +327,80 @@ class RBC3DscalingIterative(RBC3Dscaling):
             return u0_hat, self.ic_time
         else:
             return ics_large, self.ic_time
+
+
+class RBC3Dverification(RayleighBenard3DRegular):
+    converged = 0
+    dt = 1e-2
+    ic_config = None
+    res = None
+    Ra = None
+    Tend = 100
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['dt'] = self.dt
+        desc['level_params']['nsweeps'] = 1
+        desc['level_params']['restol'] = -1
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['problem_params']['Rayleigh'] = self.Ra
+        desc['problem_params']['nx'] = self.res
+        desc['problem_params']['ny'] = self.res
+        desc['problem_params']['nz'] = self.res
+        return desc
+
+    def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+        if self.ic_config is None or restart_idx > 0:
+            return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+
+        # read initial conditions
+        from pySDC.helpers.fieldsIO import FieldsIO
+
+        ic_config = self.ic_config(args=self.args)
+        desc = ic_config.get_description()
+        ic_res = desc['problem_params']['nz']
+
+        _P = type(P)(nx=ic_res, ny=ic_res, nz=ic_res, comm=P.comm, useGPU=P.useGPU)
+        _P.setUpFieldsIO()
+        ic_file = FieldsIO.fromFile(ic_config.get_file_name())
+        t0, ics = ic_file.readField(-1)
+
+        # interpolate the initial conditions using padded transforms
+        padding_factor = ic_res / self.res
+
+        ics = _P.xp.array(ics)
+        _ics_hat = _P.transform(ics)
+        ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
+
+        self.get_LogToFile()
+
+        P.setUpFieldsIO()
+        if P.spectral_space:
+            u0_hat = P.u_init_forward
+            u0_hat[...] = P.transform(ics_large)
+            return u0_hat, 0
+        else:
+            return ics_large, 0
+
+
+class RBC3DRa1e4(RBC3Dverification):
+    converged = 60
+    dt = 5e-2
+    ic_config = None
+    res = 32
+    Ra = 1e4
+
+
+class RBC3DRa1e5(RBC3Dverification):
+    dt = 5e-2
+    ic_config = RBC3DRa1e4
+    res = 64
+    Ra = 1e4
+
+
+class RBC3DRa1e7(RBC3Dverification):
+    dt = 5e-2
+    ic_config = RBC3DRa1e5
+    res = 128
+    Ra = 1e7
