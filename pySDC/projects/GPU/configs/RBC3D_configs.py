@@ -346,6 +346,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
         desc['step_params']['maxiter'] = 1
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['sweeper_params']['num_nodes'] = 4
         Ra = int(type(self).__name__[-3]) * 10 ** int(type(self).__name__[-1])
         desc['problem_params']['Rayleigh'] = Ra
         desc['problem_params']['nx'] = self.res
