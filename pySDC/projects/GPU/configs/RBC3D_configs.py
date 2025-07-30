@@ -395,13 +395,19 @@ class RBC3DRa1e4(RBC3Dverification):
 
 
 class RBC3DRa1e5(RBC3Dverification):
-    # converged = 40
+    converged = 40
     dt = 5e-2
     ic_config = RBC3DRa1e4
-    res = 64
+    res = 32
+
+
+class RBC3DRa1e6(RBC3Dverification):
+    dt = 5e-2
+    ic_config = RBC3DRa1e5
+    res = 32
 
 
 class RBC3DRa1e7(RBC3Dverification):
     dt = 5e-2
-    ic_config = RBC3DRa1e5
-    res = 128
+    ic_config = RBC3DRa1e6
+    res = 64
