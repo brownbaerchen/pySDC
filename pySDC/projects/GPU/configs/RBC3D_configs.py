@@ -115,6 +115,7 @@ class RayleighBenard3DRegular(Config):
 
 class RBC3DAdaptivity(RayleighBenard3DRegular):
     Tend = 100
+
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
@@ -340,11 +341,13 @@ class RBC3Dverification(RayleighBenard3DRegular):
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['dt'] = self.dt
-        desc['level_params']['nsweeps'] = 1
+        desc['level_params']['nsweeps'] = 4
         desc['level_params']['restol'] = -1
+        desc['step_params']['maxiter'] = 1
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
-        desc['problem_params']['Rayleigh'] = self.Ra
+        Ra = int(type(self).__name__[-3]) * 10 ** int(type(self).__name__[-1])
+        desc['problem_params']['Rayleigh'] = Ra
         desc['problem_params']['nx'] = self.res
         desc['problem_params']['ny'] = self.res
         desc['problem_params']['nz'] = self.res
@@ -389,18 +392,16 @@ class RBC3DRa1e4(RBC3Dverification):
     dt = 5e-2
     ic_config = None
     res = 32
-    Ra = 1e4
 
 
 class RBC3DRa1e5(RBC3Dverification):
+    # converged = 40
     dt = 5e-2
     ic_config = RBC3DRa1e4
     res = 64
-    Ra = 1e4
 
 
 class RBC3DRa1e7(RBC3Dverification):
     dt = 5e-2
     ic_config = RBC3DRa1e5
     res = 128
-    Ra = 1e7
