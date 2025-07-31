@@ -338,9 +338,13 @@ class RBC3Dverification(RayleighBenard3DRegular):
     Ra = None
     Tend = 100
 
-    def get_description(self, *args, **kwargs):
+    def get_file_name(self):
+        res = self.args['res']
+        dt = self.args['dt']
+        return f'{self.base_path}/data/{type(self).__name__}-res{res}-dt{dt:.0e}.pySDC'
+
+    def get_description(self, *args, res=-1, dt=-1, **kwargs):
         desc = super().get_description(*args, **kwargs)
-        desc['level_params']['dt'] = self.dt
         desc['level_params']['nsweeps'] = 4
         desc['level_params']['restol'] = -1
         desc['step_params']['maxiter'] = 1
@@ -349,9 +353,14 @@ class RBC3Dverification(RayleighBenard3DRegular):
         desc['sweeper_params']['num_nodes'] = 4
         Ra = int(type(self).__name__[-3]) * 10 ** int(type(self).__name__[-1])
         desc['problem_params']['Rayleigh'] = Ra
-        desc['problem_params']['nx'] = self.res
-        desc['problem_params']['ny'] = self.res
-        desc['problem_params']['nz'] = self.res
+
+        _res = self.res if res == -1 else res
+        desc['problem_params']['nx'] = _res
+        desc['problem_params']['ny'] = _res
+        desc['problem_params']['nz'] = _res
+
+        _dt = self.dt if dt == -1 else dt
+        desc['level_params']['dt'] = _dt
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
