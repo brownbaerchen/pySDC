@@ -380,7 +380,8 @@ class RBC3Dverification(RayleighBenard3DRegular):
         t0, ics = ic_file.readField(-1)
 
         # interpolate the initial conditions using padded transforms
-        padding_factor = ic_res / self.res
+        res = P.nz
+        padding_factor = ic_res / res
 
         ics = _P.xp.array(ics)
         _ics_hat = _P.transform(ics)
@@ -398,7 +399,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
 
 
 class RBC3DRa1e4(RBC3Dverification):
-    converged = 60
+    # converged = 60
     dt = 5e-2
     ic_config = None
     res = 32
