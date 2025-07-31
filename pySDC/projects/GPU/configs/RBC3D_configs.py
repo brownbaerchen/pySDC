@@ -399,6 +399,22 @@ class RBC3Dverification(RayleighBenard3DRegular):
             return ics_interpolated, 0
 
 
+class RBC3DverificationRK(RBC3Dverification):
+
+    def get_description(self, *args, res=-1, dt=-1, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK3
+
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 1
+        desc['level_params']['restol'] = -1
+        desc['step_params']['maxiter'] = 1
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['sweeper_params'].pop('QI')
+        desc['sweeper_params'].pop('num_nodes')
+        desc['sweeper_class'] = ARK3
+        return desc
+
+
 class RBC3DRa1e4(RBC3Dverification):
     # converged = 60
     dt = 5e-2
@@ -408,7 +424,13 @@ class RBC3DRa1e4(RBC3Dverification):
 
 class RBC3DRa1e5(RBC3Dverification):
     # converged = 40
-    dt = 5e-2
+    dt = 1e-1
+    ic_config = RBC3DRa1e4
+    res = 32
+
+
+class RBC3DRKRa1e5(RBC3DverificationRK):
+    dt = 1e-1
     ic_config = RBC3DRa1e4
     res = 32
 
