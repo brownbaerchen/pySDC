@@ -93,7 +93,7 @@ def test_ics_verification(mpi_ranks, tmpdir, spectral_space, res_fac):
         base_path = tmpdir
 
     class High1e1(RBC3Dverification):
-        res = Low1e0.res * res_fac
+        res = Low1e0.res
         ic_config = Low1e0
         base_path = tmpdir
 
@@ -132,13 +132,14 @@ def test_ics_verification(mpi_ranks, tmpdir, spectral_space, res_fac):
     # interpolate solution
     config = High1e1(args, comm_world=comm)
 
-    desc = config.get_description()
+    desc = config.get_description(res=Low1e0.res * res_fac)
     prob = desc['problem_class'](**{**desc['problem_params'], 'spectral_space': spectral_space})
     prob.setUpFieldsIO()
     xp = prob.xp
 
     u0, _ = config.get_initial_condition(prob)
     u0_expect = get_sol(prob)
+    assert Low1e0.res * res_fac in u0.shape[1:]
     assert xp.allclose(u0, u0_expect)
 
 

@@ -370,7 +370,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
         # read initial conditions
         from pySDC.helpers.fieldsIO import FieldsIO
 
-        ic_config = self.ic_config(args=self.args)
+        ic_config = self.ic_config(args={**self.args, 'res': -1, 'dt': -1})
         desc = ic_config.get_description()
         ic_res = desc['problem_params']['nz']
 
