@@ -297,7 +297,7 @@ def test_heterogeneous_implementation(N=8, useGPU=True):
 def test_Nusselt_number_computation(w, N=4):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
-    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False)
+    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
     xp = prob.xp
     iw, iT = prob.index(['w', 'T'])
 

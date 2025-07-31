@@ -376,26 +376,27 @@ class RBC3Dverification(RayleighBenard3DRegular):
 
         _P = type(P)(nx=ic_res, ny=ic_res, nz=ic_res, comm=P.comm, useGPU=P.useGPU)
         _P.setUpFieldsIO()
-        ic_file = FieldsIO.fromFile(ic_config.get_file_name())
+        filename = ic_config.get_file_name()
+        ic_file = FieldsIO.fromFile(filename)
         t0, ics = ic_file.readField(-1)
+        P.logger.info(f'Loaded initial conditions from {filename!r} at t={t0}.')
 
         # interpolate the initial conditions using padded transforms
-        res = P.nz
-        padding_factor = ic_res / res
+        padding_factor = ic_res / P.nz
 
         ics = _P.xp.array(ics)
         _ics_hat = _P.transform(ics)
-        ics_large = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
+        ics_interpolated = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
 
         self.get_LogToFile()
 
         P.setUpFieldsIO()
         if P.spectral_space:
             u0_hat = P.u_init_forward
-            u0_hat[...] = P.transform(ics_large)
+            u0_hat[...] = P.transform(ics_interpolated)
             return u0_hat, 0
         else:
-            return ics_large, 0
+            return ics_interpolated, 0
 
 
 class RBC3DRa1e4(RBC3Dverification):
