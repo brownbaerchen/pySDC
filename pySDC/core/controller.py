@@ -91,7 +91,20 @@ class Controller(object):
             file_handler = None
 
         std_formatter = logging.Formatter(fmt='%(name)s - %(levelname)s: %(message)s')
-        std_handler = logging.StreamHandler(sys.stdout)
+
+        class StreamFlushingHandler(logging.StreamHandler):
+            """
+            This will immediately flush any messages to the output.
+            """
+
+            def emit(self, record):
+                super().emit(record)
+                self.flush()
+
+        if level <= logging.DEBUG:
+            std_handler = StreamFlushingHandler(sys.stdout)
+        else:
+            std_handler = logging.StreamHandler(sys.stdout)
         std_handler.setFormatter(std_formatter)
 
         # instantiate logger

@@ -97,6 +97,7 @@ class SpectralHelper1D:
 
         if useGPU:
             self.setup_GPU()
+            self.logger.debug('Set up for GPU')
         else:
             self.setup_CPU(useFFTW=useFFTW)
 
@@ -1866,6 +1867,7 @@ class SpectralHelper:
             _D = self.axes[axis].get_differentiation_matrix(**kwargs)
             D = D @ self.expand_matrix_ND(_D, axis)
 
+        self.logger.debug(f'Set up differentiation matrix along axes {axes} with kwargs {kwargs}')
         return D
 
     def get_integration_matrix(self, axes):
@@ -1929,4 +1931,5 @@ class SpectralHelper:
             _C = self.axes[axis].get_basis_change_matrix(**kwargs)
             C = C @ self.expand_matrix_ND(_C, axis)
 
+        self.logger.debug(f'Set up basis change matrix along axes {axes} with kwargs {kwargs}')
         return C
