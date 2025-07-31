@@ -27,7 +27,7 @@ class RayleighBenard3DRegular(Config):
 
         LogToFile.filename = self.get_file_name()
         LogToFile.time_increment = 5e-1
-        # LogToFile.allow_overwriting = True
+        LogToFile.allow_overwriting = True
 
         return LogToFile
 
@@ -404,7 +404,7 @@ class RBC3DverificationRK(RBC3Dverification):
     def get_description(self, *args, res=-1, dt=-1, **kwargs):
         from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK3
 
-        desc = super().get_description(*args, **kwargs)
+        desc = super().get_description(*args, res=res, dt=dt, **kwargs)
         desc['level_params']['nsweeps'] = 1
         desc['level_params']['restol'] = -1
         desc['step_params']['maxiter'] = 1
@@ -417,7 +417,14 @@ class RBC3DverificationRK(RBC3Dverification):
 
 class RBC3DRa1e4(RBC3Dverification):
     # converged = 60
-    dt = 5e-2
+    dt = 1.0
+    ic_config = None
+    res = 32
+
+
+class RBC3DRKRa1e4(RBC3DverificationRK):
+    # converged = 60
+    dt = 1.0
     ic_config = None
     res = 32
 
@@ -436,7 +443,7 @@ class RBC3DRKRa1e5(RBC3DverificationRK):
 
 
 class RBC3DRa1e6(RBC3Dverification):
-    dt = 5e-2
+    dt = 1e-1
     ic_config = RBC3DRa1e5
     res = 32
 
