@@ -364,7 +364,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
-        if self.ic_config is None or restart_idx > 0:
+        if self.ic_config is None or restart_idx != 0:
             return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
 
         # read initial conditions
@@ -443,8 +443,15 @@ class RBC3DRKRa1e5(RBC3DverificationRK):
 
 
 class RBC3DRa1e6(RBC3Dverification):
+    Tend = 500
     dt = 1e-1
     ic_config = RBC3DRa1e5
+    res = 32
+
+class RBC3D2Ra1e6(RBC3Dverification):
+    Tend = 500
+    dt = 1e-1
+    ic_config = None
     res = 32
 
 

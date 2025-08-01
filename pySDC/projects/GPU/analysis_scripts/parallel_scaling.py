@@ -352,7 +352,7 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
     ndim = 3
     config = 'RBC3Dscaling'
     tasks_time = 4
-    sbatch_options = ['--time=0:04:00']
+    sbatch_options = ['--time=0:08:00']
     srun_options = ['--distribution=block:cyclic:cyclic']
 
     experiments = [
