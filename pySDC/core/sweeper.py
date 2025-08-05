@@ -44,16 +44,15 @@ class Sweeper(object):
         coll (pySDC.Collocation.CollBase): collocation object
     """
 
-    def __init__(self, params):
+    def __init__(self, params, level):
         """
         Initialization routine for the base sweeper
 
         Args:
             params (dict): parameter object
-
+            level (pySDC.Level.level): the level that uses this sweeper
         """
 
-        # set up logger
         self.logger = logging.getLogger('sweeper')
 
         essential_keys = ['num_nodes']
@@ -81,9 +80,7 @@ class Sweeper(object):
             )
             self.params.do_coll_update = True
 
-        # This will be set as soon as the sweeper is instantiated at the level
-        self.__level = None
-
+        self.__level = level
         self.parallelizable = False
 
     def setupGenerator(self, qd_type):
@@ -192,14 +189,14 @@ class Sweeper(object):
 
         # build QF(u)
         res_norm = []
-        res = self.integrate()
+        L.residual = self.integrate()
         for m in range(self.coll.num_nodes):
-            res[m] += L.u[0] - L.u[m + 1]
+            L.residual[m] += L.u[0] - L.u[m + 1]
             # add tau if associated
             if L.tau[m] is not None:
-                res[m] += L.tau[m]
+                L.residual[m] += L.tau[m]
             # use abs function from data type here
-            res_norm.append(abs(res[m]))
+            res_norm.append(abs(L.residual[m]))
 
         # find maximal residual over the nodes
         if L.params.residual_type == 'full_abs':
