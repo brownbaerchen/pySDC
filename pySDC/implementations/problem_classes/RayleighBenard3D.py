@@ -368,3 +368,51 @@ class RayleighBenard3D(GenericSpectralLinear):
         self.comm.Bcast(avg, root=0)
 
         return avg
+
+    def get_Reynolds_number(self, u):
+        if self.spectral_space:
+            u = self.itransform(u)
+        else:
+            u = u.copy()
+
+        indices = list(self.index(['u', 'v', 'w']))
+        vels = u[indices, ...]
+        vels *= vels
+        vels_mean = self.xp.sum(vels, axis=(1, 2, 3)) / self.xp.prod(self.spectral.global_shape[1:])
+        vels_mean = self.comm.allreduce(vels_mean, MPI.SUM)
+        v_RMS = (self.xp.sum(vels_mean)) ** (1 / 2)
+
+        Re = v_RMS * self.axes[-1].L / self.nu
+        return Re
+
+    def get_frequency_spectrum(self, u):
+        xp = self.xp
+        indices = tuple(self.index(['u', 'v']))
+        indices = slice(0, 2)
+
+        if self.spectral_space:
+            u_hat = self.itransform(u, axes=(-1,))
+        else:
+            u_hat = self.transform(
+                u,
+                axes=(
+                    -2,
+                    -3,
+                ),
+            )
+
+        energy = (u_hat * xp.conjugate(u_hat)).real / (self.axes[0].N ** 2 * self.axes[1].N ** 2)
+        k_x = self.axes[0].get_wavenumbers()
+        k_y = self.axes[1].get_wavenumbers()
+        k_grid = xp.meshgrid(xp.abs(k_x), xp.abs(k_y))
+
+        assert len(k_x) == len(k_y)
+        n = len(xp.unique(xp.abs(k_x)))
+        spectrum = self.xp.empty(shape=(2, self.axes[2].N, n))
+
+        ks = xp.unique(abs(k_x))
+        for i, k in zip(range(n), ks):
+            mask = xp.logical_or(xp.abs(k_grid[0]) == k, xp.abs(k_grid[1]) == k)
+            spectrum[..., i] = xp.sum(energy[indices, mask, :], axis=1)
+
+        return ks, spectrum

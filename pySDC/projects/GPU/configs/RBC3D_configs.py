@@ -372,9 +372,11 @@ class RBC3Dverification(RayleighBenard3DRegular):
 
         ic_config = self.ic_config(args={**self.args, 'res': -1, 'dt': -1})
         desc = ic_config.get_description()
-        ic_res = desc['problem_params']['nz']
+        ic_nx = desc['problem_params']['nx']
+        ic_ny = desc['problem_params']['ny']
+        ic_nz = desc['problem_params']['nz']
 
-        _P = type(P)(nx=ic_res, ny=ic_res, nz=ic_res, comm=P.comm, useGPU=P.useGPU)
+        _P = type(P)(nx=ic_nx, ny=ic_ny, nz=ic_nz, comm=P.comm, useGPU=P.useGPU)
         _P.setUpFieldsIO()
         filename = ic_config.get_file_name()
         ic_file = FieldsIO.fromFile(filename)
@@ -382,11 +384,11 @@ class RBC3Dverification(RayleighBenard3DRegular):
         P.logger.info(f'Loaded initial conditions from {filename!r} at t={t0}.')
 
         # interpolate the initial conditions using padded transforms
-        padding_factor = ic_res / P.nz
+        padding = (P.nx / ic_nx, P.ny / ic_ny, P.nz / ic_nz)
 
         ics = _P.xp.array(ics)
         _ics_hat = _P.transform(ics)
-        ics_interpolated = _P.itransform(_ics_hat, padding=(1 / padding_factor,) * (ics.ndim - 1))
+        ics_interpolated = _P.itransform(_ics_hat, padding=padding)
 
         self.get_LogToFile()
 
@@ -416,21 +418,21 @@ class RBC3DverificationRK(RBC3Dverification):
 
 
 class RBC3DRa1e4(RBC3Dverification):
-    # converged = 60
+    converged = 60
     dt = 1.0
     ic_config = None
     res = 32
 
 
 class RBC3DRKRa1e4(RBC3DverificationRK):
-    # converged = 60
-    dt = 1.0
+    converged = 60
+    dt = 0.8
     ic_config = None
     res = 32
 
 
 class RBC3DRa1e5(RBC3Dverification):
-    # converged = 40
+    converged = 40
     dt = 1e-1
     ic_config = RBC3DRa1e4
     res = 32
@@ -448,7 +450,9 @@ class RBC3DRa1e6(RBC3Dverification):
     ic_config = RBC3DRa1e5
     res = 32
 
+
 class RBC3D2Ra1e6(RBC3Dverification):
+    converged = 40
     Tend = 500
     dt = 1e-1
     ic_config = None

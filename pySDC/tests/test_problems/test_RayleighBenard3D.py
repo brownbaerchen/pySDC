@@ -341,6 +341,55 @@ def test_Nusselt_number_computation(w, N=4):
         assert xp.isclose(Nu[key], w), f'Expected Nu_{key}={w}, but got {Nu[key]} with constant T and perturbed w!'
 
 
+@pytest.mark.mpi4py
+def test_spectrum_computation():
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
+
+    N = 6
+    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
+    xp = prob.xp
+
+    u = prob.u_exact()
+    u[prob.index('u')] = xp.sin(prob.X * 4 * xp.pi / prob.axes[0].L) * xp.sin(prob.Y * 2 * xp.pi / prob.axes[1].L)
+    # u[prob.index('u')] = 1
+    # u[prob.index('v')] = 1
+
+    ks, spectrum = prob.get_frequency_spectrum(u)
+    print(ks)
+    print(spectrum[0, 0])
+    breakpoint()
+
+
+@pytest.mark.mpi4py
+@pytest.mark.mpi(ranks=[1, 4])
+def test_Reynolds_number_computation(mpi_ranks):
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
+
+    N = 4
+    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
+    xp = prob.xp
+    iu, iv, iw = prob.index(['u', 'v', 'w'])
+
+    u = prob.u_exact()
+    u[iu] = 1
+    u[iv] = 1
+    u[iw] = 1
+    Re = prob.get_Reynolds_number(u)
+    assert xp.isclose(Re, xp.sqrt(3))
+
+    u = prob.u_exact()
+    u[iv] = (2 * prob.Z) ** (1 / 2)
+    Re = prob.get_Reynolds_number(u)
+    assert xp.isclose(Re, 1)
+
+    u = prob.u_exact()
+    u[iv] = (2 * prob.Z) ** (1 / 2)
+    u[iu] = (2 * prob.Z) ** (1 / 2)
+    u[iw] = (2 * prob.Z) ** (1 / 2)
+    Re = prob.get_Reynolds_number(u)
+    assert xp.isclose(Re, xp.sqrt(3))
+
+
 if __name__ == '__main__':
     # test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
@@ -349,4 +398,6 @@ if __name__ == '__main__':
     # test_solver_convergence('bicgstab+ilu', 32, False, True)
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
-    test_Nusselt_number_computation(N=4, w=3.14)
+    # test_Nusselt_number_computation(N=4, w=3.14)
+    test_spectrum_computation()
+    # test_Reynolds_number_computation(None)
