@@ -366,7 +366,6 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
         Experiment(res=900, PinT=True, start=1800, stop=3600, marker='o'),
         Experiment(res=860, PinT=False, start=860, stop=3440, marker='o'),
         Experiment(res=860, PinT=True, start=3440, stop=3440, marker='o'),
-        Experiment(res=800, PinT=False, start=800, stop=3200, marker='o'),
     ]
 
 

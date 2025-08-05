@@ -401,6 +401,17 @@ class RBC3Dverification(RayleighBenard3DRegular):
             return ics_interpolated, 0
 
 
+class RBC3DverificationGamma4(RBC3Dverification):
+    def get_description(self, *args, **kwargs):
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['Lx'] = 4
+        desc['problem_params']['Ly'] = 4
+        desc['problem_params']['nx'] = 2*desc['problem_params']['nz']
+        desc['problem_params']['ny'] = 2*desc['problem_params']['nz']
+        return desc
+
+
 class RBC3DverificationRK(RBC3Dverification):
 
     def get_description(self, *args, res=-1, dt=-1, **kwargs):
@@ -414,6 +425,17 @@ class RBC3DverificationRK(RBC3Dverification):
         desc['sweeper_params'].pop('QI')
         desc['sweeper_params'].pop('num_nodes')
         desc['sweeper_class'] = ARK3
+        return desc
+
+
+class RBC3DverificationRKGamma4(RBC3DverificationRK):
+    def get_description(self, *args, **kwargs):
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['Lx'] = 4
+        desc['problem_params']['Ly'] = 4
+        desc['problem_params']['nx'] = 2*desc['problem_params']['nz']
+        desc['problem_params']['ny'] = 2*desc['problem_params']['nz']
         return desc
 
 
@@ -455,6 +477,19 @@ class RBC3D2Ra1e6(RBC3Dverification):
     converged = 40
     Tend = 500
     dt = 1e-1
+    ic_config = None
+    res = 32
+
+class RBC3DG4Ra1e6(RBC3DverificationGamma4):
+    Tend = 300
+    dt = 5e-2
+    ic_config = None
+    res = 32
+
+
+class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
+    Tend = 300
+    dt = 5e-2
     ic_config = None
     res = 32
 
