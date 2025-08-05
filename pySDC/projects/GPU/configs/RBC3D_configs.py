@@ -482,14 +482,14 @@ class RBC3D2Ra1e6(RBC3Dverification):
 
 class RBC3DG4Ra1e6(RBC3DverificationGamma4):
     Tend = 300
-    dt = 5e-2
+    dt = 7e-2  # limit
     ic_config = None
     res = 32
 
 
 class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
     Tend = 300
-    dt = 5e-2
+    dt = 5e-2  # limit
     ic_config = None
     res = 32
 
