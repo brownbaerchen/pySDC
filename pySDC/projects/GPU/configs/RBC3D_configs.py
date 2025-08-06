@@ -353,6 +353,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
         desc['sweeper_params']['num_nodes'] = 4
         Ra = int(type(self).__name__[-3]) * 10 ** int(type(self).__name__[-1])
         desc['problem_params']['Rayleigh'] = Ra
+        desc['problem_params']['Prandtl'] = 0.7
 
         _res = self.res if res == -1 else res
         desc['problem_params']['nx'] = _res
@@ -496,8 +497,15 @@ class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
     ic_config = None
     res = 32
 
+class RBC3DG4Ra1e7(RBC3DverificationGamma4):
+    Tend = 300
+    dt = 7e-2  # limit
+    ic_config = RBC3DG4Ra1e6
+    res = 32
 
-class RBC3DRa1e7(RBC3Dverification):
-    dt = 5e-2
-    ic_config = RBC3DRa1e6
-    res = 64
+
+class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
+    Tend = 300
+    dt = 4e-2  # limit
+    ic_config = RBC3DG4Ra1e6
+    res = 32
