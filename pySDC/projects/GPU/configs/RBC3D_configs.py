@@ -407,8 +407,8 @@ class RBC3DverificationGamma4(RBC3Dverification):
         desc = super().get_description(*args, **kwargs)
         desc['problem_params']['Lx'] = 4
         desc['problem_params']['Ly'] = 4
-        desc['problem_params']['nx'] = 2*desc['problem_params']['nz']
-        desc['problem_params']['ny'] = 2*desc['problem_params']['nz']
+        desc['problem_params']['nx'] = 2 * desc['problem_params']['nz']
+        desc['problem_params']['ny'] = 2 * desc['problem_params']['nz']
         return desc
 
 
@@ -434,8 +434,8 @@ class RBC3DverificationRKGamma4(RBC3DverificationRK):
         desc = super().get_description(*args, **kwargs)
         desc['problem_params']['Lx'] = 4
         desc['problem_params']['Ly'] = 4
-        desc['problem_params']['nx'] = 2*desc['problem_params']['nz']
-        desc['problem_params']['ny'] = 2*desc['problem_params']['nz']
+        desc['problem_params']['nx'] = 2 * desc['problem_params']['nz']
+        desc['problem_params']['ny'] = 2 * desc['problem_params']['nz']
         return desc
 
 
@@ -480,7 +480,9 @@ class RBC3D2Ra1e6(RBC3Dverification):
     ic_config = None
     res = 32
 
+
 class RBC3DG4Ra1e6(RBC3DverificationGamma4):
+    converged = 35
     Tend = 300
     dt = 7e-2  # limit
     ic_config = None
@@ -488,6 +490,7 @@ class RBC3DG4Ra1e6(RBC3DverificationGamma4):
 
 
 class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
+    converged = 35
     Tend = 300
     dt = 5e-2  # limit
     ic_config = None

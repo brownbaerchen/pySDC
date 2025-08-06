@@ -357,7 +357,6 @@ def test_spectrum_computation():
     ks, spectrum = prob.get_frequency_spectrum(u)
     print(ks)
     print(spectrum[0, 0])
-    breakpoint()
 
 
 @pytest.mark.mpi4py
@@ -390,6 +389,40 @@ def test_Reynolds_number_computation(mpi_ranks):
     assert xp.isclose(Re, xp.sqrt(3))
 
 
+@pytest.mark.mpi4py
+def test_CFL():
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
+
+    N = 16
+    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
+    import logging
+
+    prob.logger.setLevel(logging.DEBUG)
+    xp = prob.xp
+    iu, iv, iw = prob.index(['u', 'v', 'w'])
+
+    u = prob.u_exact()
+    for i in [iu, iv, iw]:
+        u *= 0
+        u_max = xp.pi
+        u[i] = u_max * xp.sin(prob.X * xp.pi / prob.axes[0].L)
+        CFL = prob.get_CFL_limit(u)
+        if i == iw:
+            expect = 1 / prob.axes[i].N ** 2 / u_max
+        else:
+            expect = 1 / prob.axes[i].N / u_max
+        assert xp.isclose(CFL, expect), f'Expected {expect}, got {CFL}'
+
+    u *= 0
+    u_max = xp.pi
+    u[iu] = u_max * xp.sin(prob.X * 2 * xp.pi / prob.axes[0].L)
+    u[iv] = 2 * u_max * xp.sin(prob.Y * 2 * xp.pi / prob.axes[1].L)
+    u[iw] = 3 * u_max
+    CFL = prob.get_CFL_limit(u)
+    expect = 1 / (prob.axes[iw].N ** 2 * u_max * 3)
+    assert xp.isclose(CFL, expect), f'Expected {expect}, got {CFL}'
+
+
 if __name__ == '__main__':
     # test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
@@ -399,5 +432,6 @@ if __name__ == '__main__':
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
     # test_Nusselt_number_computation(N=4, w=3.14)
-    test_spectrum_computation()
+    # test_spectrum_computation()
     # test_Reynolds_number_computation(None)
+    test_CFL()

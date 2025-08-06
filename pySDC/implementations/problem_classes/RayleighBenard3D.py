@@ -416,3 +416,22 @@ class RayleighBenard3D(GenericSpectralLinear):
             spectrum[..., i] = xp.sum(energy[indices, mask, :], axis=1)
 
         return ks, spectrum
+
+    def get_CFL_limit(self, u):
+        if self.spectral_space:
+            u = self.itransform(u)
+        else:
+            u = u.copy()
+
+        max_vel = self.xp.zeros(3)
+        for i, j in zip(range(3), self.index(['u', 'v', 'w'])):
+            max_vel[i] = self.xp.max([self.xp.max(self.xp.abs(u[j])), 1e-12])
+
+        max_vel = self.comm.allreduce(max_vel, op=MPI.MAX)
+
+        CFL = [1 / (max_vel[i] * self.axes[i].N) for i in range(self.ndim)]
+        CFL[-1] /= self.axes[-1].N
+
+        self.logger.debug(f'CFL stability limit on dt: x: {CFL[0]:.2e} y: {CFL[1]:.2e} z: {CFL[2]:.2e}')
+
+        return min(CFL)
