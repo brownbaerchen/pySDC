@@ -337,6 +337,8 @@ class RBC3Dverification(RayleighBenard3DRegular):
     res = None
     Ra = None
     Tend = 100
+    res_ratio = 1
+    gamma = 1
 
     def get_file_name(self):
         res = self.args['res']
@@ -356,12 +358,16 @@ class RBC3Dverification(RayleighBenard3DRegular):
         desc['problem_params']['Prandtl'] = 0.7
 
         _res = self.res if res == -1 else res
-        desc['problem_params']['nx'] = _res
-        desc['problem_params']['ny'] = _res
+        desc['problem_params']['nx'] = _res * self.res_ratio
+        desc['problem_params']['ny'] = _res * self.res_ratio
         desc['problem_params']['nz'] = _res
 
         _dt = self.dt if dt == -1 else dt
         desc['level_params']['dt'] = _dt
+
+        desc['problem_params']['Lx'] = float(self.gamma)
+        desc['problem_params']['Ly'] = float(self.gamma)
+        desc['problem_params']['Lz'] = 1.
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
@@ -403,15 +409,8 @@ class RBC3Dverification(RayleighBenard3DRegular):
 
 
 class RBC3DverificationGamma4(RBC3Dverification):
-    def get_description(self, *args, **kwargs):
-
-        desc = super().get_description(*args, **kwargs)
-        desc['problem_params']['Lx'] = 4
-        desc['problem_params']['Ly'] = 4
-        desc['problem_params']['nx'] = 2 * desc['problem_params']['nz']
-        desc['problem_params']['ny'] = 2 * desc['problem_params']['nz']
-        return desc
-
+    gamma = 4
+    res_ratio = 2
 
 class RBC3DverificationRK(RBC3Dverification):
 
@@ -430,15 +429,8 @@ class RBC3DverificationRK(RBC3Dverification):
 
 
 class RBC3DverificationRKGamma4(RBC3DverificationRK):
-    def get_description(self, *args, **kwargs):
-
-        desc = super().get_description(*args, **kwargs)
-        desc['problem_params']['Lx'] = 4
-        desc['problem_params']['Ly'] = 4
-        desc['problem_params']['nx'] = 2 * desc['problem_params']['nz']
-        desc['problem_params']['ny'] = 2 * desc['problem_params']['nz']
-        return desc
-
+    gamma = 4
+    res_ratio = 2
 
 class RBC3DRa1e4(RBC3Dverification):
     converged = 60
@@ -506,6 +498,21 @@ class RBC3DG4Ra1e7(RBC3DverificationGamma4):
 
 class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
     Tend = 300
+    res_ratio = 4
     dt = 4e-2  # limit
     ic_config = RBC3DG4Ra1e6
+    res = 32
+
+
+class RBC3DG4Ra1e8(RBC3DverificationGamma4):
+    Tend = 300
+    dt = 7e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 32
+
+
+class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
+    Tend = 300
+    dt = 8e-2
+    ic_config = RBC3DG4Ra1e7
     res = 32
