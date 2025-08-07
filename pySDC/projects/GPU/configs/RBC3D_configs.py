@@ -468,9 +468,8 @@ class RBC3DRa1e6(RBC3Dverification):
     res = 32
 
 
-class RBC3D2Ra1e6(RBC3Dverification):
-    converged = 40
-    Tend = 500
+class RBC3DG4Ra1e5(RBC3DverificationGamma4):
+    Tend = 300
     dt = 1e-1
     ic_config = None
     res = 32
@@ -522,4 +521,4 @@ class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
     res_ratio = 4
     dt = 2e-2  # limit
     ic_config = RBC3DG4Ra1e7
-    res = 32
+    res = 64
