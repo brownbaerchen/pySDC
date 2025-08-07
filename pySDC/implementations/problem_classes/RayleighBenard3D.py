@@ -427,7 +427,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         for i, j in zip(range(3), self.index(['u', 'v', 'w'])):
             max_vel[i] = self.xp.max([self.xp.max(self.xp.abs(u[j])), 1e-12])
 
-        max_vel = self.comm.allreduce(max_vel, op=MPI.MAX)
+        buf = max_vel.copy()
+        self.comm.Allreduce(buf, max_vel, op=MPI.MAX)
 
         CFL = [1 / (max_vel[i] * self.axes[i].N) for i in range(self.ndim)]
         CFL[-1] /= self.axes[-1].N

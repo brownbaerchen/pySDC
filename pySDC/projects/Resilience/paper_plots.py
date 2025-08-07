@@ -596,7 +596,7 @@ def plot_RBC_solution(setup='resilience'):  # pragma: no cover
     def _plot(t, ax, cax):
         u_hat = prob.u_exact(t)
         u = prob.itransform(u_hat)
-        im = ax.pcolormesh(prob.X, prob.Z, u[prob.index('T')], rasterized=True, cmap='plasma')
+        im = ax.pcolormesh(prob.X, prob.Z, u[prob.index('T')].real, rasterized=True, cmap='plasma')
         fig.colorbar(im, cax, label=f'$T(t={{{t}}})$')
 
     if setup == 'resilience':
