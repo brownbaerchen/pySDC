@@ -27,7 +27,7 @@ class RayleighBenard3DRegular(Config):
 
         LogToFile.filename = self.get_file_name()
         LogToFile.time_increment = 5e-1
-        # LogToFile.allow_overwriting = True
+        LogToFile.allow_overwriting = True
 
         return LogToFile
 
@@ -508,9 +508,18 @@ class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
     ic_config = RBC3DG4Ra1e6
     res = 32
 
-class RBC3DG42RKRa1e7(RBC3DverificationRKGamma4):
+
+class RBC3DG4Ra1e8(RBC3DverificationGamma4):
+    res_ratio = 4
     Tend = 300
-    res_ratio = 2
-    dt = 1e-2
-    ic_config = RBC3DG4Ra1e6
-    res = 64
+    dt = 4e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 32
+
+
+class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
+    Tend = 300
+    res_ratio = 4
+    dt = 2e-2  # limit
+    ic_config = RBC3DG4Ra1e7
+    res = 32
