@@ -473,6 +473,7 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
     dt = 8e-2  # I think limit..?
     ic_config = None
     res = 32
+    converged = 50
 
 
 class RBC3DG4Ra1e6(RBC3DverificationGamma4):
