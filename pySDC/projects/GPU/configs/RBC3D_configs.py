@@ -514,7 +514,7 @@ class RBC3DG4Ra1e8(RBC3DverificationGamma4):
     Tend = 300
     dt = 1e-2  # limit
     ic_config = RBC3DG4Ra1e7
-    res = 48
+    res = 52
 
 
 class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
