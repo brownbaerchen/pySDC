@@ -37,8 +37,8 @@ Nu = {'V': [], 'b': [], 't': []}
 t = []
 T = []
 spectrum = []
-Re = []
-CFL = []
+# Re = []
+# CFL = []
 
 X, Y = P.X[:, :, -1], P.Y[:, :, -1]
 
@@ -73,8 +73,8 @@ for i in r:
         plt.pause(1e-9)
 
     T.append(P.get_vertical_temperature_profile(u))
-    Re.append(P.get_Reynolds_number(u))
-    CFL.append(P.get_CFL_limit(u))
+    # Re.append(P.get_Reynolds_number(u))
+    # CFL.append(P.get_CFL_limit(u))
 
     k, s = P.get_frequency_spectrum(u)
     spectrum.append(s[0, 0])
@@ -87,8 +87,6 @@ for i in r:
 t = xp.array(t)
 
 
-# plt.plot(t, Re)
-# plt.show()
 fig, axs = plt.subplots(1, 3, figsize=(14, 4))
 for key in Nu.keys():
     axs[0].plot(t, Nu[key], label=f'$Nu_{{{key}}}$')
@@ -105,12 +103,12 @@ for key in Nu.keys():
     _Nu = [Nu[key][i] for i in range(len(Nu[key])) if t[i] > config.converged]
     avg_Nu[key] = xp.mean(_Nu)
     std_Nu[key] = xp.std(_Nu)
-avg_Re = xp.mean([Re[i] for i in range(len(Re)) if t[i] > config.converged])
+# avg_Re = xp.mean([Re[i] for i in range(len(Re)) if t[i] > config.converged])
 
 rel_error = {key: abs(avg_Nu[key] - avg_Nu['V']) / avg_Nu['V'] for key in ['t', 'b']}
 if comm.rank == 0:
     print(
-        f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with error at top of {rel_error["t"]:.2e} and {rel_error["b"]:.2e} at the bottom and Re={avg_Re:.2e}'
+        f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with error at top of {rel_error["t"]:.2e} and {rel_error["b"]:.2e} at the bottom'  # and Re={avg_Re:.2e}'
     )
 
 
@@ -145,5 +143,5 @@ if P.comm.rank == 0:
         print(f'Wrote data to file {path!r}')
 
     fig.tight_layout()
-    fig.save_fig(f'{BASE_PATH}/{fname[start + 5:-6]}.pdf')
+    fig.savefig(f'{BASE_PATH}/{fname[start + 5:-6]}.pdf')
     plt.show()

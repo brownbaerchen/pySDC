@@ -370,6 +370,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         return avg
 
     def get_Reynolds_number(self, u):
+        raise  # compute RMS velocity incorrectly
         if self.spectral_space:
             u = self.itransform(u)
         else:
@@ -387,35 +388,55 @@ class RayleighBenard3D(GenericSpectralLinear):
 
     def get_frequency_spectrum(self, u):
         xp = self.xp
-        indices = tuple(self.index(['u', 'v']))
         indices = slice(0, 2)
 
+        # transform the solution to be in frequency space in x and y, but real space in z
         if self.spectral_space:
             u_hat = self.itransform(u, axes=(-1,))
         else:
             u_hat = self.transform(
                 u,
                 axes=(
-                    -2,
                     -3,
+                    -2,
                 ),
             )
+        u_hat = self.spectral.redistribute(u_hat, axis=2, forward_output=False)
 
-        energy = (u_hat * xp.conjugate(u_hat)).real / (self.axes[0].N ** 2 * self.axes[1].N ** 2)
-        k_x = self.axes[0].get_wavenumbers()
-        k_y = self.axes[1].get_wavenumbers()
-        k_grid = xp.meshgrid(xp.abs(k_x), xp.abs(k_y))
+        # compute "energy density" as absolute square of the velocity modes
+        energy = (u_hat[indices] * xp.conjugate(u_hat[indices])).real / (self.axes[0].N ** 2 * self.axes[1].N ** 2)
 
-        assert len(k_x) == len(k_y)
-        n = len(xp.unique(xp.abs(k_x)))
-        spectrum = self.xp.empty(shape=(2, self.axes[2].N, n))
+        # prepare wave numbers at which to compute the spectrum
+        abs_kx = xp.abs(self.Kx[:, :, 0])
+        abs_ky = xp.abs(self.Ky[:, :, 0])
 
-        ks = xp.unique(abs(k_x))
-        for i, k in zip(range(n), ks):
-            mask = xp.logical_or(xp.abs(k_grid[0]) == k, xp.abs(k_grid[1]) == k)
-            spectrum[..., i] = xp.sum(energy[indices, mask, :], axis=1)
+        unique_k = xp.unique(xp.append(xp.unique(abs_kx), xp.unique(abs_ky)))
+        n_k = len(unique_k)
 
-        return ks, spectrum
+        # compute local spectrum
+        local_spectrum = self.xp.empty(shape=(2, energy.shape[3], n_k))
+        for i, k in zip(range(n_k), unique_k):
+            mask = xp.logical_or(abs_kx == k, abs_ky == k)
+            local_spectrum[..., i] = xp.sum(energy[indices, mask, :], axis=1)
+
+        # assemble global spectrum from local spectra
+        k_all = self.comm.allgather(unique_k)
+        unique_k_all = []
+        for k in k_all:
+            unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
+        n_k_all = len(unique_k_all)
+
+        spectra = self.comm.allgather(local_spectrum)
+        spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
+        for ks, _spectrum in zip(k_all, spectra):
+            ks = list(ks)
+            unique_k_all = list(unique_k_all)
+            for k in ks:
+                index_global = unique_k_all.index(k)
+                index_local = ks.index(k)
+                spectrum[..., index_global] += _spectrum[..., index_local]
+
+        return xp.array(unique_k_all), spectrum
 
     def get_CFL_limit(self, u):
         if self.spectral_space:
