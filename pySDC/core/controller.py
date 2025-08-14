@@ -245,7 +245,6 @@ class Controller(object):
         self.logger.info(out)
         out = 'Setup overview (--> user-defined, -> dependency) -- END\n'
         self.logger.info(out)
-        print('Flushing...', flush=True)
 
     def run(self, u0, t0, Tend):
         """

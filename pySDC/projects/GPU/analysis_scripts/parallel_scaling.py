@@ -369,6 +369,22 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
     ]
 
 
+class RayleighBenard3DSpaceScalingGPUG4(RayleighBenard3DSpaceScalingGPU):
+    config = 'RBC3DscalingG4'
+
+    experiments = [
+        # Experiment(res=32, PinT=False, start=4, stop=8, marker='.'),
+        # Experiment(res=32, PinT=True, start=4, stop=16, marker='.'),
+        # Experiment(res=64, PinT=False, start=4, stop=32, marker='^'),
+        # Experiment(res=64, PinT=True, start=16, stop=128, marker='^'),
+        # Experiment(res=128, PinT=False, start=32, stop=256, marker='x'),
+        # Experiment(res=128, PinT=True, start=128, stop=1024, marker='x'),
+        # Experiment(res=256, PinT=False, start=256, stop=1024, marker='o'),
+        Experiment(res=256, PinT=True, start=1024, stop=2048, marker='x'),
+        # Experiment(res=384, PinT=False, start=864, stop=864, marker='o'),
+    ]
+
+
 class RayleighBenard3DJupiter(Jupiter):
     ndim = 3
     config = 'RBC3Dscaling'
@@ -461,7 +477,8 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
             ]
         elif XPU in ['GPU', 'both']:
             configs += [
-                RayleighBenard3DSpaceScalingGPU(),
+                # RayleighBenard3DSpaceScalingGPU(),
+                RayleighBenard3DSpaceScalingGPUG4(),
             ]
     elif problem == 'RBC_dedalus':
         configs = [
@@ -485,7 +502,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         ('RBC', 'throughput_per_task'): {'x': [1 / 1, 640], 'y': [2e4, 2e4 * 640]},
     }
 
-    for quantity in ['time', 'throughput', 'time_per_task', 'time_filtered', 'min_time_per_task', 'efficiency'][::-1]:
+    for quantity in ['time', 'throughput', 'time_per_task', 'min_time_per_task', 'efficiency', 'time_filtered'][::-1]:
         fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
         for config in configs:
             config.plot_scaling_test(ax=ax, quantity=quantity, space_time=space_time)
@@ -542,7 +559,8 @@ if __name__ == '__main__':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenard3DSpaceScalingCPU]
         else:
-            config_classes += [RayleighBenard3DSpaceScalingGPU, RayleighBenard3DJupiter]
+            # config_classes += [RayleighBenard3DSpaceScalingGPU, RayleighBenard3DJupiter]
+            config_classes += [RayleighBenard3DSpaceScalingGPUG4]
     elif args.problem == 'RBC_dedalus':
         if args.XPU == 'CPU':
             config_classes += [RayleighBenardDedalusComparison]

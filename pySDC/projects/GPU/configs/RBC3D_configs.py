@@ -14,6 +14,7 @@ def get_config(args):
 class RayleighBenard3DRegular(Config):
     sweeper_type = 'IMEX'
     Tend = 50
+    gamma = 1
 
     def get_file_name(self):
         res = self.args['res']
@@ -67,12 +68,13 @@ class RayleighBenard3DRegular(Config):
         desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['QE'] = 'PIC'
 
+        res = 64 if res == -1 else res
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = 64 if res == -1 else res
-        desc['problem_params']['ny'] = desc['problem_params']['nx']
-        desc['problem_params']['nz'] = desc['problem_params']['nx']
-        desc['problem_params']['Lx'] = 1
-        desc['problem_params']['Ly'] = 1
+        desc['problem_params']['nx'] = self.gamma * res
+        desc['problem_params']['ny'] = self.gamma * res
+        desc['problem_params']['nz'] = res
+        desc['problem_params']['Lx'] = self.gamma
+        desc['problem_params']['Ly'] = self.gamma
         desc['problem_params']['Lz'] = 1
         desc['problem_params']['heterogeneous'] = True
 
@@ -228,6 +230,10 @@ class RBC3Dscaling(RayleighBenard3DRegular):
         params = super().get_controller_params(*args, **kwargs)
         params['hook_class'] = [LogWork]
         return params
+
+
+class RBC3DscalingG4(RBC3Dscaling):
+    gamma = 4
 
 
 class RBC3DscalingIterative(RBC3Dscaling):
@@ -413,6 +419,51 @@ class RBC3DverificationGamma4(RBC3Dverification):
     res_ratio = 2
 
 
+class RBC3DverificationGamma4FLEX(RBC3DverificationGamma4):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['sweeper_params']['QI'] = 'MIN-SR-FLEX'
+        return desc
+
+
+class RBC3DverificationGamma4Iterative(RBC3DverificationGamma4):
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 1
+        desc['level_params']['restol'] = 1e-5
+        desc['level_params']['e_tol'] = 1e-3
+        desc['step_params']['maxiter'] = 16
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['skip_residual_computation'] = ()
+        desc['sweeper_params']['num_nodes'] = 4
+        return desc
+
+
+class RBC3DverificationGamma4EE(RBC3DverificationGamma4):
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['sweeper_params']['QE'] = 'PIC'
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['step_params']['maxiter'] = 1
+        desc['level_params']['nsweeps'] = 3
+        return desc
+
+
+class RBC3DverificationGamma4Equid(RBC3DverificationGamma4):
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['sweeper_params']['QE'] = 'PIC'
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['num_nodes'] = 4
+        desc['sweeper_params']['node_type'] = 'EQUID'
+        desc['step_params']['maxiter'] = 1
+        desc['level_params']['nsweeps'] = 4
+        return desc
+
+
 class RBC3DverificationRK(RBC3Dverification):
 
     def get_description(self, *args, res=-1, dt=-1, **kwargs):
@@ -484,6 +535,14 @@ class RBC3DG4Ra1e6(RBC3DverificationGamma4):
     res = 32
 
 
+class RBC3DG4FLEXRa1e6(RBC3DverificationGamma4FLEX):
+    converged = 35
+    Tend = 300
+    dt = 7e-2  # limit
+    ic_config = None
+    res = 32
+
+
 class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
     converged = 35
     Tend = 300
@@ -510,16 +569,52 @@ class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
 
 
 class RBC3DG4Ra1e8(RBC3DverificationGamma4):
+    # at res=256x256x64, dt=1e-2 seems stable, 2e-2 blow up fast
     res_ratio = 4
     Tend = 300
     dt = 1e-2  # limit
     ic_config = RBC3DG4Ra1e7
     res = 52
+    # converged = 20  # TODO: actually, this converges only much later!
+
+
+class RBC3DG4IRa1e8(RBC3DverificationGamma4Iterative):
+    res_ratio = 4
+    Tend = 300
+    dt = 1e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 52
+
+
+class RBC3DG4FLEXRa1e8(RBC3DverificationGamma4FLEX):
+    res_ratio = 4
+    Tend = 300
+    dt = 2e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 52
+
+
+class RBC3DG4EERa1e8(RBC3DverificationGamma4EE):
+    res_ratio = 4
+    Tend = 300
+    dt = 2e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 52
+
+
+class RBC3DG4EqRa1e8(RBC3DverificationGamma4Equid):
+    res_ratio = 4
+    Tend = 300
+    dt = 2e-2
+    ic_config = RBC3DG4Ra1e7
+    res = 52
 
 
 class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
+    # at res=256x256x64, dt=8e-3 seems stable, 9e-3 and 1e-2 blow up before t=1
+    # actually, with dt=8e-3, it blows up at t=53.9
     Tend = 300
     res_ratio = 4
-    dt = 2e-2
+    dt = 1e-2  # limit
     ic_config = RBC3DG4Ra1e7
-    res = 48
+    res = 52

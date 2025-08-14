@@ -73,6 +73,16 @@ for i in r:
 
     t.append(_t)
 
+    u_mean = P.xp.mean(u[0])
+    v_mean = P.xp.mean(u[1])
+    w_mean = P.xp.mean(u[P.index('w')])
+    u_max = P.xp.max(u[0].real)
+    v_max = P.xp.max(u[1].real)
+    w_max = P.xp.max(u[P.index('w')].real)
+    u_min = P.xp.min(u[0].real)
+    v_min = P.xp.min(u[1].real)
+    w_min = P.xp.min(u[P.index('w')].real)
+    # print(f'Mean/max/min velocity at t={t[-1]:.2f}: u:{u_mean:.1e}/{u_max:.1e}/{u_min:.1e} v:{v_mean:.1e}/{v_max:.1e}/{v_min:.1e} w:{w_mean:.1e}/{w_max:.1e}/{w_min:.1e}', flush=True)
     if PLOT:
         if PADDING != 1:
             u_hat = P.transform(u)
