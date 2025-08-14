@@ -36,11 +36,27 @@ data = FieldsIO.fromFile(fname)
 Nu = {'V': [], 'b': [], 't': []}
 t = []
 T = []
+profiles = {key: [] for key in ['T', 'u', 'v', 'w']}
+rms_profiles = {key: [] for key in profiles.keys()}
 spectrum = []
 # Re = []
 # CFL = []
 
 X, Y = P.X[:, :, -1], P.Y[:, :, -1]
+
+
+# try to load time averaged values
+mean_profiles = {key: xp.zeros(P.nz) for key in ['T', 'u', 'v', 'w']}
+u_mean = P.u_init_physical
+if os.path.isfile(path):
+    with open(path, 'rb') as file:
+        avg_data = pickle.load(file)
+        if comm.rank == 0:
+            print(f'Read data from file {path!r}')
+    for key in mean_profiles.keys():
+        if f'profile_{key}' in avg_data.keys():
+            u_mean[P.index(key)] = avg_data[f'profile_{key}'][P.local_slice(False)[-1]]
+            mean_profiles[key] = avg_data[f'profile_{key}']
 
 r = range(args['restart_idx'], data.nFields)
 if P.comm.rank == 0:
@@ -72,7 +88,14 @@ for i in r:
         plt.ylabel('y')
         plt.pause(1e-9)
 
-    T.append(P.get_vertical_temperature_profile(u))
+    _profiles = P.get_vertical_profiles(u, list(profiles.keys()))
+    # _rms_profiles = P.get_vertical_profiles(u, list(profiles.keys()))
+    _rms_profiles = P.get_vertical_profiles(xp.sqrt((u - u_mean) ** 2), list(profiles.keys()))
+    # print('Average in space only after subtracting the mean, maybe')
+    for key in profiles.keys():
+        profiles[key].append(_profiles[key])
+        # rms_profiles[key].append(xp.sqrt((_profiles[key] - mean_profiles[key])**2))
+        rms_profiles[key].append(_rms_profiles[key])
     # Re.append(P.get_Reynolds_number(u))
     # CFL.append(P.get_CFL_limit(u))
 
@@ -85,9 +108,10 @@ for i in r:
 
 
 t = xp.array(t)
+z = P.axes[-1].get_1dgrid()
 
 
-fig, axs = plt.subplots(1, 3, figsize=(14, 4))
+fig, axs = plt.subplots(1, 4, figsize=(18, 4))
 for key in Nu.keys():
     axs[0].plot(t, Nu[key], label=f'$Nu_{{{key}}}$')
     if config.converged > 0:
@@ -112,20 +136,44 @@ if comm.rank == 0:
     )
 
 
+# compute average profiles
+avg_profiles = {}
+for key, values in profiles.items():
+    values_from_convergence = [values[i] for i in range(len(values)) if t[i] >= config.converged]
+
+    avg_profiles[key] = xp.mean(values_from_convergence, axis=0)
+
+avg_rms_profiles = {}
+for key, values in rms_profiles.items():
+    values_from_convergence = [values[i] for i in range(len(values)) if t[i] >= config.converged]
+    avg_rms_profiles[key] = xp.mean(values_from_convergence, axis=0)
+
+
 # average T
-_T = [T[i] for i in range(len(T)) if t[i] >= config.converged]
-avg_T = P.xp.mean(_T, axis=0)
+avg_T = avg_profiles['T']
 axs[1].axvline(0.5, color='black')
-axs[1].plot(avg_T, P.axes[-1].get_1dgrid())
+axs[1].plot(avg_T, z)
 axs[1].set_xlabel('$T$')
 axs[1].set_ylabel('$z$')
+
+# rms profiles
+avg_T = avg_rms_profiles['T']
+max_idx = xp.argmax(avg_T)
+res_in_boundary_layer = max_idx if max_idx < len(z) / 2 else len(z) - max_idx
+boundary_layer = z[max_idx] if max_idx > len(z) / 2 else P.axes[-1].L - z[max_idx]
+if comm.rank == 0:
+    print(f'Thermal boundary layer of thickness {boundary_layer:.2f} is resolved with {res_in_boundary_layer} points')
+axs[2].axhline(z[max_idx], color='black')
+axs[2].plot(avg_T, z)
+axs[2].set_xlabel(r'$T_\text{rms}$')
+axs[2].set_ylabel('$z$')
 
 # spectrum
 _s = xp.array(spectrum)
 avg_spectrum = xp.mean(_s[t >= config.converged], axis=0)
-axs[2].loglog(k[avg_spectrum > 1e-15], avg_spectrum[avg_spectrum > 1e-15])
-axs[2].set_xlabel('$k$')
-axs[2].set_ylabel(r'$\|\hat{u}_x\|$')
+axs[3].loglog(k[avg_spectrum > 1e-15], avg_spectrum[avg_spectrum > 1e-15])
+axs[3].set_xlabel('$k$')
+axs[3].set_ylabel(r'$\|\hat{u}_x\|$')
 
 if P.comm.rank == 0:
     write_data = {
@@ -133,11 +181,15 @@ if P.comm.rank == 0:
         'Nu': Nu,
         'avg_Nu': avg_Nu,
         'std_Nu': std_Nu,
-        'T_vertical': avg_T,
         'z': P.axes[-1].get_1dgrid(),
         'k': k,
         'spectrum': avg_spectrum,
     }
+    for key, values in avg_profiles.items():
+        write_data[f'profile_{key}'] = values
+    for key, values in avg_rms_profiles.items():
+        write_data[f'rms_profile_{key}'] = values
+
     with open(path, 'wb') as file:
         pickle.dump(write_data, file)
         print(f'Wrote data to file {path!r}')

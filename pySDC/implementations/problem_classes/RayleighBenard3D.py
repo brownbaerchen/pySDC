@@ -354,20 +354,22 @@ class RayleighBenard3D(GenericSpectralLinear):
             'b': Nusselt_b,
         }
 
-    def get_vertical_temperature_profile(self, u):
+    def get_vertical_profiles(self, u, components):
         if self.spectral_space:
             u_hat = u.copy()
         else:
             u_hat = self.transform(u)
 
-        iT = self.index('T')
-
         _u_hat = self.axes[-1].itransform(u_hat, axes=(-1,))
 
-        avg = self.xp.ascontiguousarray(_u_hat[iT, 0, 0, :].real) / self.axes[0].N / self.axes[1].N
-        self.comm.Bcast(avg, root=0)
+        avgs = {}
+        for c in components:
+            i = self.index(c)
+            avg = self.xp.ascontiguousarray(_u_hat[i, 0, 0, :].real) / self.axes[0].N / self.axes[1].N
+            self.comm.Bcast(avg, root=0)
+            avgs[c] = avg
 
-        return avg
+        return avgs
 
     def get_Reynolds_number(self, u):
         raise  # compute RMS velocity incorrectly
