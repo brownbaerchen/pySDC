@@ -170,7 +170,7 @@ if comm.rank == 0:
     print(f'Thermal boundary layer of thickness {boundary_layer:.2f} is resolved with {res_in_boundary_layer} points')
 axs[2].axhline(z[max_idx], color='black')
 axs[2].plot(avg_T, z)
-axs[2].scatter(avg_T, z)
+axs[2].scatter(avg_T, z) 
 axs[2].set_xlabel(r'$T_\text{rms}$')
 axs[2].set_ylabel('$z$')
 

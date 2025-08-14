@@ -551,7 +551,8 @@ class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
     res = 32
 
 
-class RBC3DG4Ra1e7(RBC3DverificationGamma4):
+class RBC3DG44Ra1e7(RBC3DverificationGamma4):
+    # actually, this resolution seems too low!
     res_ratio = 4
     Tend = 300
     dt = 4e-2  # limit
@@ -559,10 +560,16 @@ class RBC3DG4Ra1e7(RBC3DverificationGamma4):
     res = 32
     converged = 30
 
+class RBC3DG4Ra1e7(RBC3DverificationGamma4):
+    Tend = 100
+    dt = 4e-2
+    ic_config = RBC3DG4Ra1e6
+    res = 48
+
 
 class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
-    Tend = 300
-    res_ratio = 4
+    Tend = 100
+    # res_ratio = 4
     dt = 2e-2  # limit
     ic_config = RBC3DG4Ra1e6
     res = 32
