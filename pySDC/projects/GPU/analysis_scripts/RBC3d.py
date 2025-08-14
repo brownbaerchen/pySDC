@@ -46,7 +46,7 @@ X, Y = P.X[:, :, -1], P.Y[:, :, -1]
 
 
 # try to load time averaged values
-u_mean = P.u_init_physical
+u_mean_profile = P.u_init_physical
 if os.path.isfile(path):
     with open(path, 'rb') as file:
         avg_data = pickle.load(file)
@@ -54,7 +54,7 @@ if os.path.isfile(path):
             print(f'Read data from file {path!r}')
     for key in profiles.keys():
         if f'profile_{key}' in avg_data.keys():
-            u_mean[P.index(key)] = avg_data[f'profile_{key}'][P.local_slice(False)[-1]]
+            u_mean_profile[P.index(key)] = avg_data[f'profile_{key}'][P.local_slice(False)[-1]]
 
 r = range(args['restart_idx'], data.nFields)
 if P.comm.rank == 0:
@@ -97,7 +97,7 @@ for i in r:
         plt.pause(1e-9)
 
     _profiles = P.get_vertical_profiles(u, list(profiles.keys()))
-    _rms_profiles = P.get_vertical_profiles(xp.sqrt((u - u_mean) ** 2), list(profiles.keys()))
+    _rms_profiles = P.get_vertical_profiles(xp.sqrt((u - u_mean_profile) ** 2), list(profiles.keys()))
     for key in profiles.keys():
         profiles[key].append(_profiles[key])
         rms_profiles[key].append(_rms_profiles[key])
