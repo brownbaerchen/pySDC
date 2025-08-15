@@ -11,6 +11,7 @@ import os
 
 PADDING = 1
 LIVE = False
+IDX = -12
 
 
 args = parse_args()
@@ -31,7 +32,7 @@ desc = config.get_description(**args)
 P = desc['problem_class'](**{**desc['problem_params'], 'spectral_space': False, 'comm': comm})
 P.setUpFieldsIO()
 xp = P.xp
-X, Y = P.X[:, :, -1], P.Y[:, :, -1]
+X, Y = P.X[:, :, IDX], P.Y[:, :, IDX]
 
 
 fname = config.get_file_name()
@@ -59,9 +60,9 @@ for i in r:
         x = P.xp.linspace(0, P.axes[0].L, u_pad.shape[1])
         y = P.xp.linspace(0, P.axes[1].L, u_pad.shape[2])
         X, Y = xp.meshgrid(x, y)
-        im = ax.pcolormesh(X, Y, u_pad[P.index('T'), :, :, -1], cmap='inferno', rasterized=True)
+        im = ax.pcolormesh(X, Y, u_pad[P.index('T'), :, :, IDX], cmap='inferno', rasterized=True)
     else:
-        im = ax.pcolormesh(X, Y, u[P.index('T'), :, :, -1], cmap='inferno', rasterized=True)
+        im = ax.pcolormesh(X, Y, u[P.index('T'), :, :, IDX], cmap='inferno', rasterized=True)
     ax.set_title(f't={_t:.2f}')
     ax.set_xlabel('x')
     ax.set_ylabel('y')

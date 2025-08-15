@@ -15,6 +15,7 @@ class RayleighBenard3DRegular(Config):
     sweeper_type = 'IMEX'
     Tend = 50
     gamma = 1
+    res_ratio = 1
 
     def get_file_name(self):
         res = self.args['res']
@@ -70,8 +71,8 @@ class RayleighBenard3DRegular(Config):
 
         res = 64 if res == -1 else res
         desc['problem_params']['Rayleigh'] = 1e8
-        desc['problem_params']['nx'] = self.gamma * res
-        desc['problem_params']['ny'] = self.gamma * res
+        desc['problem_params']['nx'] = self.res_ratio * res
+        desc['problem_params']['ny'] = self.res_ratio * res
         desc['problem_params']['nz'] = res
         desc['problem_params']['Lx'] = self.gamma
         desc['problem_params']['Ly'] = self.gamma
@@ -233,6 +234,11 @@ class RBC3Dscaling(RayleighBenard3DRegular):
 
 
 class RBC3DscalingG4(RBC3Dscaling):
+    res_ratio = 4
+    gamma = 4
+
+class RBC3DscalingG4R2(RBC3Dscaling):
+    res_ratio = 2
     gamma = 4
 
 
@@ -417,6 +423,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
 class RBC3DverificationGamma4(RBC3Dverification):
     gamma = 4
     res_ratio = 2
+    Tend = 100
 
 
 class RBC3DverificationGamma4FLEX(RBC3DverificationGamma4):
@@ -528,27 +535,19 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
 
 
 class RBC3DG4Ra1e6(RBC3DverificationGamma4):
-    converged = 35
-    Tend = 300
-    dt = 7e-2  # limit
+    Tend = 120
+    converged = 50
+    dt = 4e-2  # limit
     ic_config = None
-    res = 32
-
-
-class RBC3DG4FLEXRa1e6(RBC3DverificationGamma4FLEX):
-    converged = 35
-    Tend = 300
-    dt = 7e-2  # limit
-    ic_config = None
-    res = 32
-
+    res = 48
 
 class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
+    # at res48 with dt4e-2 crash at t=15
     converged = 35
-    Tend = 300
-    dt = 5e-2  # limit
+    Tend = 120
+    dt = 3e-2  # limit
     ic_config = None
-    res = 32
+    res = 48
 
 
 class RBC3DG44Ra1e7(RBC3DverificationGamma4):
@@ -561,15 +560,17 @@ class RBC3DG44Ra1e7(RBC3DverificationGamma4):
     converged = 30
 
 class RBC3DG4Ra1e7(RBC3DverificationGamma4):
+    # at res=96: with dt=1e-2 blows up at t=93
     Tend = 100
-    dt = 4e-2
+    dt = 6e-3
     ic_config = RBC3DG4Ra1e6
-    res = 48
+    res = 96
+    converged=15
 
 
 class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
+    # at res=96: with dt=1e-2 blows up at t=67.5
     Tend = 100
-    # res_ratio = 4
     dt = 2e-2  # limit
     ic_config = RBC3DG4Ra1e6
     res = 32
