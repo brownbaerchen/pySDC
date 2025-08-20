@@ -237,6 +237,7 @@ class RBC3DscalingG4(RBC3Dscaling):
     res_ratio = 4
     gamma = 4
 
+
 class RBC3DscalingG4R2(RBC3Dscaling):
     res_ratio = 2
     gamma = 4
@@ -527,26 +528,35 @@ class RBC3DRa1e6(RBC3Dverification):
 
 
 class RBC3DG4Ra1e5(RBC3DverificationGamma4):
-    Tend = 300
-    dt = 8e-2  # I think limit..?
+    Tend = 200
+    dt = 8e-2
     ic_config = None
     res = 32
     converged = 50
 
 
+class RBC3DG4RKRa1e5(RBC3DverificationRKGamma4):
+    Tend = 200
+    dt = 7e-2
+    ic_config = None
+    res = 32
+    # converged = 50
+
+
 class RBC3DG4Ra1e6(RBC3DverificationGamma4):
     Tend = 120
-    converged = 50
+    converged = 40
     dt = 4e-2  # limit
-    ic_config = None
+    ic_config = RBC3DG4Ra1e5
     res = 48
+
 
 class RBC3DG4RKRa1e6(RBC3DverificationRKGamma4):
     # at res48 with dt4e-2 crash at t=15
-    converged = 35
+    converged = 30
     Tend = 120
     dt = 3e-2  # limit
-    ic_config = None
+    ic_config = RBC3DG4Ra1e5
     res = 48
 
 
@@ -559,17 +569,18 @@ class RBC3DG44Ra1e7(RBC3DverificationGamma4):
     res = 32
     converged = 30
 
+
 class RBC3DG4Ra1e7(RBC3DverificationGamma4):
     # at res=96: with dt=1e-2 blows up at t=93
     Tend = 100
-    dt = 6e-3
+    dt = 9e-3  # limit
     ic_config = RBC3DG4Ra1e6
     res = 96
-    converged=15
+    converged = 15
 
 
 class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
-    # at res=96: with dt=1e-2 blows up at t=67.5
+    # at res=96: with dt=8e-3 blows up at t=67.5
     Tend = 100
     dt = 2e-2  # limit
     ic_config = RBC3DG4Ra1e6
@@ -577,52 +588,60 @@ class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
 
 
 class RBC3DG4Ra1e8(RBC3DverificationGamma4):
-    # at res=256x256x64, dt=1e-2 seems stable, 2e-2 blow up fast
-    res_ratio = 4
-    Tend = 300
-    dt = 1e-2  # limit
+    Tend = 100
+    dt = 9e-3
     ic_config = RBC3DG4Ra1e7
-    res = 52
-    # converged = 20  # TODO: actually, this converges only much later!
+    res = 96
+    # converged=15
 
 
-class RBC3DG4IRa1e8(RBC3DverificationGamma4Iterative):
-    res_ratio = 4
-    Tend = 300
-    dt = 1e-2
-    ic_config = RBC3DG4Ra1e7
-    res = 52
-
-
-class RBC3DG4FLEXRa1e8(RBC3DverificationGamma4FLEX):
-    res_ratio = 4
-    Tend = 300
-    dt = 2e-2
-    ic_config = RBC3DG4Ra1e7
-    res = 52
-
-
-class RBC3DG4EERa1e8(RBC3DverificationGamma4EE):
-    res_ratio = 4
-    Tend = 300
-    dt = 2e-2
-    ic_config = RBC3DG4Ra1e7
-    res = 52
-
-
-class RBC3DG4EqRa1e8(RBC3DverificationGamma4Equid):
-    res_ratio = 4
-    Tend = 300
-    dt = 2e-2
-    ic_config = RBC3DG4Ra1e7
-    res = 52
-
-
-class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
-    # at res=256x256x64, dt=8e-3 seems stable, 9e-3 and 1e-2 blow up before t=1
-    # actually, with dt=8e-3, it blows up at t=53.9
-    Tend = 300
-    res_ratio = 4
-    dt = 1e-2  # limit
-    ic_config = RBC3DG4Ra1e7
-    res = 52
+# class RBC3DG4Ra1e8(RBC3DverificationGamma4):
+#     # at res=256x256x64, dt=1e-2 seems stable, 2e-2 blow up fast
+#     res_ratio = 4
+#     Tend = 300
+#     dt = 1e-2  # limit
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52
+#     # converged = 20  # TODO: actually, this converges only much later!
+#
+#
+# class RBC3DG4IRa1e8(RBC3DverificationGamma4Iterative):
+#     res_ratio = 4
+#     Tend = 300
+#     dt = 1e-2
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52
+#
+#
+# class RBC3DG4FLEXRa1e8(RBC3DverificationGamma4FLEX):
+#     res_ratio = 4
+#     Tend = 300
+#     dt = 2e-2
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52
+#
+#
+# class RBC3DG4EERa1e8(RBC3DverificationGamma4EE):
+#     res_ratio = 4
+#     Tend = 300
+#     dt = 2e-2
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52
+#
+#
+# class RBC3DG4EqRa1e8(RBC3DverificationGamma4Equid):
+#     res_ratio = 4
+#     Tend = 300
+#     dt = 2e-2
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52
+#
+#
+# class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
+#     # at res=256x256x64, dt=8e-3 seems stable, 9e-3 and 1e-2 blow up before t=1
+#     # actually, with dt=8e-3, it blows up at t=53.9
+#     Tend = 300
+#     res_ratio = 4
+#     dt = 1e-2  # limit
+#     ic_config = RBC3DG4Ra1e7
+#     res = 52

@@ -39,6 +39,7 @@ T = []
 profiles = {key: [] for key in ['T', 'u', 'v', 'w']}
 rms_profiles = {key: [] for key in profiles.keys()}
 spectrum = []
+spectrum_all = []
 # Re = []
 # CFL = []
 
@@ -46,7 +47,7 @@ X, Y = P.X[:, :, -1], P.Y[:, :, -1]
 
 
 # try to load time averaged values
-u_mean_profile = P.u_init_physical
+u_mean_profile = P.u_exact()
 if os.path.isfile(path):
     with open(path, 'rb') as file:
         avg_data = pickle.load(file)
@@ -71,15 +72,15 @@ for i in r:
 
     t.append(_t)
 
-    u_mean = P.xp.mean(u[0])
-    v_mean = P.xp.mean(u[1])
-    w_mean = P.xp.mean(u[P.index('w')])
-    u_max = P.xp.max(u[0].real)
-    v_max = P.xp.max(u[1].real)
-    w_max = P.xp.max(u[P.index('w')].real)
-    u_min = P.xp.min(u[0].real)
-    v_min = P.xp.min(u[1].real)
-    w_min = P.xp.min(u[P.index('w')].real)
+    # u_mean = P.xp.mean(u[0])
+    # v_mean = P.xp.mean(u[1])
+    # w_mean = P.xp.mean(u[P.index('w')])
+    # u_max = P.xp.max(u[0].real)
+    # v_max = P.xp.max(u[1].real)
+    # w_max = P.xp.max(u[P.index('w')].real)
+    # u_min = P.xp.min(u[0].real)
+    # v_min = P.xp.min(u[1].real)
+    # w_min = P.xp.min(u[P.index('w')].real)
     # print(f'Mean/max/min velocity at t={t[-1]:.2f}: u:{u_mean:.1e}/{u_max:.1e}/{u_min:.1e} v:{v_mean:.1e}/{v_max:.1e}/{v_min:.1e} w:{w_mean:.1e}/{w_max:.1e}/{w_min:.1e}', flush=True)
     if PLOT:
         if PADDING != 1:
@@ -97,7 +98,7 @@ for i in r:
         plt.pause(1e-9)
 
     _profiles = P.get_vertical_profiles(u, list(profiles.keys()))
-    _rms_profiles = P.get_vertical_profiles(xp.sqrt((u - u_mean_profile) ** 2), list(profiles.keys()))
+    _rms_profiles = P.get_vertical_profiles((u - u_mean_profile) ** 2, list(profiles.keys()))
     for key in profiles.keys():
         profiles[key].append(_profiles[key])
         rms_profiles[key].append(_rms_profiles[key])
@@ -106,6 +107,7 @@ for i in r:
 
     k, s = P.get_frequency_spectrum(u)
     spectrum.append(s[0, 0])
+    spectrum_all.append(s)
     # plt.loglog(k[s[0,0]>1e-15], s[0,0][s[0,0]>1e-15])
     # # plt.ylim(1e-10, 1e1)
     # plt.pause(1e-9)
@@ -114,6 +116,9 @@ for i in r:
 
 t = xp.array(t)
 z = P.axes[-1].get_1dgrid()
+
+if config.converged == 0:
+    print('Warning: no convergence has been set for this configuration!')
 
 
 fig, axs = plt.subplots(1, 4, figsize=(18, 4))
@@ -151,7 +156,7 @@ for key, values in profiles.items():
 avg_rms_profiles = {}
 for key, values in rms_profiles.items():
     values_from_convergence = [values[i] for i in range(len(values)) if t[i] >= config.converged]
-    avg_rms_profiles[key] = xp.mean(values_from_convergence, axis=0)
+    avg_rms_profiles[key] = xp.sqrt(xp.mean(values_from_convergence, axis=0))
 
 
 # average T
@@ -170,7 +175,7 @@ if comm.rank == 0:
     print(f'Thermal boundary layer of thickness {boundary_layer:.2f} is resolved with {res_in_boundary_layer} points')
 axs[2].axhline(z[max_idx], color='black')
 axs[2].plot(avg_T, z)
-axs[2].scatter(avg_T, z) 
+axs[2].scatter(avg_T, z)
 axs[2].set_xlabel(r'$T_\text{rms}$')
 axs[2].set_ylabel('$z$')
 
@@ -189,7 +194,10 @@ if P.comm.rank == 0:
         'std_Nu': std_Nu,
         'z': P.axes[-1].get_1dgrid(),
         'k': k,
-        'spectrum': avg_spectrum,
+        'spectrum': spectrum_all,
+        'avg_spectrum': avg_spectrum,
+        'boundary_layer_thickness': boundary_layer,
+        'res_in_boundary_layer': res_in_boundary_layer,
     }
     for key, values in avg_profiles.items():
         write_data[f'profile_{key}'] = values

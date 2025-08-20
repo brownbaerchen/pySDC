@@ -293,6 +293,10 @@ class RayleighBenard3D(GenericSpectralLinear):
         if self.spectral_space:
             me_hat = self.spectral.u_init_forward
             me_hat[:] = self.transform(me)
+            print(
+                f'{self.comm.rank} has {me.size} dofs in physical space and {me_hat.size} dofs in spectral space',
+                flush=True,
+            )
             return me_hat
         else:
             return me

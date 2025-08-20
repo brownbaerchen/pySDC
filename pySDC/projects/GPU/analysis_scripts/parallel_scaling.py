@@ -372,14 +372,17 @@ class RayleighBenard3DSpaceScalingGPU(GPUConfig):
 class RayleighBenard3DSpaceScalingGPUG4(RayleighBenard3DSpaceScalingGPU):
     config = 'RBC3DscalingG4R2'
     experiments = [
-        Experiment(res=64, PinT=False, start=4, stop=16, marker='.'),
-        Experiment(res=64, PinT=True, start=4, stop=32, marker='.'),
-        Experiment(res=128, PinT=False, start=8, stop=128, marker='^'),
-        Experiment(res=128, PinT=True, start=32, stop=256, marker='^'),
-        Experiment(res=256, PinT=False, start=64, stop=512, marker='x'),
-        Experiment(res=256, PinT=True, start=256, stop=1024, marker='x'),
-        Experiment(res=384, PinT=False, start=216, stop=864, marker='o'),
-        Experiment(res=384, PinT=True, start=864, stop=3456, marker='o'),
+        # Experiment(res=64, PinT=False, start=4, stop=16, marker='.'),
+        # Experiment(res=64, PinT=True, start=4, stop=32, marker='.'),
+        # Experiment(res=128, PinT=False, start=8, stop=128, marker='^'),
+        # Experiment(res=128, PinT=True, start=32, stop=256, marker='^'),
+        # Experiment(res=256, PinT=False, start=64, stop=512, marker='x'),
+        # Experiment(res=256, PinT=True, start=256, stop=1024, marker='x'),
+        # Experiment(res=384, PinT=False, start=216, stop=864, marker='o'),
+        # Experiment(res=384, PinT=True, start=864, stop=3456, marker='o'),
+        Experiment(res=378, PinT=False, start=216, stop=216, marker='o'),
+        # Experiment(res=384, PinT=False, start=216, stop=864, marker='o'),
+        # Experiment(res=384, PinT=True, start=864, stop=3456, marker='o'),
     ]
 
     # config = 'RBC3DscalingG4'
