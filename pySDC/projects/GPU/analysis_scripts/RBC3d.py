@@ -106,7 +106,7 @@ for i in r:
     # CFL.append(P.get_CFL_limit(u))
 
     k, s = P.get_frequency_spectrum(u)
-    spectrum.append(s[0, 0])
+    spectrum.append(s[0, xp.argmax(_rms_profiles['T'])])
     spectrum_all.append(s)
     # plt.loglog(k[s[0,0]>1e-15], s[0,0][s[0,0]>1e-15])
     # # plt.ylim(1e-10, 1e1)
