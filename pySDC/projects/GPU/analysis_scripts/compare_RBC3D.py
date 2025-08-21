@@ -4,12 +4,13 @@ import numpy as np
 from scipy import integrate
 
 
-def get_pySDC_data(Ra, RK=False, res=-1, dt=-1):
+def get_pySDC_data(Ra, RK=False, res=-1, dt=-1, config_name='RBC3DG4'):
     assert type(Ra) == str
 
     base_path = 'data/RBC_time_averaged'
 
-    config_name = 'RBC3DG4RK' if RK else 'RBC3DG4'
+    if RK:
+        config_name = f'{config_name}RK'
 
     path = f'{base_path}/{config_name}Ra{Ra}-res{res}-dt{dt:.0e}.pickle'
     with open(path, 'rb') as file:
@@ -93,12 +94,13 @@ def get_Nek5000_Data(Ra):
 
 
 def plot_Ra_Nusselt_scaling():
-    fig, axs = plt.subplots(1, 3, figsize=(10, 3))
+    fig, axs = plt.subplots(1, 4, figsize=(13, 3))
     NuRa_ax = axs[0]
     prof_ax = axs[1]
     rms_ax = axs[2]
+    spectrum_ax = axs[3]
 
-    for Ra, Ra_str in zip([1e5, 1e6, 1e7], ['1e5', '1e6', '1e7', '1e8']):
+    for Ra, Ra_str in zip([1e5, 1e6, 1e7, 1e8], ['1e5', '1e6', '1e7', '1e8']):
         data_pySDC = get_pySDC_data(Ra_str)
         data_Nek5000 = get_Nek5000_Data(Ra_str)
 
@@ -112,10 +114,18 @@ def plot_Ra_Nusselt_scaling():
         rms_ax.plot(data_Nek5000['rms_profile_T'], data_Nek5000['z'], label=f'Nek5000 Ra={Ra:.0e}')
         # rms_ax.axhline(data_Nek5000['z'][np.argmax(data_Nek5000['rms_profile_T'][:int(len(data_Nek5000['z'])/2)])])
 
-        # rms_ax.scatter(data_pySDC['rms_profile_T']*1.2, data_pySDC['z'], label=f'pySDC Ra={Ra:.0e}')
-        rms_ax.scatter(data_pySDC['rms_profile_T'] * 1.0, data_pySDC['z'], label=f'pySDC Ra={Ra:.0e}')
+        rms_ax.scatter(data_pySDC['rms_profile_T'], data_pySDC['z'], label=f'pySDC Ra={Ra:.0e}')
         # shift = int(len(data_pySDC['z']) / 2)
         # rms_ax.axhline(data_pySDC['z'][shift + np.argmax(data_pySDC['rms_profile_T'][shift:])], ls='--', color='red')
+
+        k = data_pySDC['k'] + 1
+        spectrum = np.array(data_pySDC['spectrum'])
+        u_spectrum = np.mean(spectrum, axis=0)[1]
+        idx = data_pySDC['res_in_boundary_layer']
+        _s = u_spectrum[idx]
+        spectrum_ax.loglog(
+            k[_s > 1e-16], _s[_s > 1e-16]  # , color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
 
     NuRa_ax.errorbar([], [], color='red', fmt='.', label='pySDC')
     NuRa_ax.scatter([], [], color='black', label='Nek5000')
@@ -128,17 +138,21 @@ def plot_Ra_Nusselt_scaling():
     prof_ax.set_xlabel('T')
     prof_ax.set_ylabel('z')
     prof_ax.set_xlim((0.47, 1.03))
-    prof_ax.set_ylim((-0.03, 0.53))
+    prof_ax.set_ylim((-0.01, 0.30))
 
     rms_ax.set_xlabel(r'$T_\text{rms}$')
     rms_ax.set_ylabel('z')
-    rms_ax.set_xlim((-0.03, 0.18))
-    rms_ax.set_ylim((-0.03, 0.53))
+    rms_ax.set_xlim((-0.01, 0.177))
+    rms_ax.set_ylim((-0.01, 0.23))
 
     NuRa_ax.set_xlabel('Ra')
     NuRa_ax.set_ylabel('Nu')
     NuRa_ax.set_yscale('log')
     NuRa_ax.set_xscale('log')
+
+    spectrum_ax.set_xlabel('$k$')
+    spectrum_ax.set_ylabel(r'$\|\hat{u}_x\|$')
+
     for ax in axs:
         ax.set_box_aspect(1)
 
@@ -146,7 +160,7 @@ def plot_Ra_Nusselt_scaling():
     fig.savefig('./data/RBC_time_averaged/Nek5000_pySDC_comparison.pdf')
 
 
-def compare_Nusselt_over_time1e7():
+def compare_Nusselt_over_time1e7_old():
     fig, ax = plt.subplots()
     Ra = '1e7'
 
@@ -254,9 +268,23 @@ def compare_Nusselt_over_time1e5():
     axs[1].set_ylabel('Error in Nu')
 
 
+def interpolate_NuV_to_reference_times(data, reference_data, order=12):
+    from qmat.lagrange import getSparseInterpolationMatrix
+
+    t_in = np.array(data['t'])
+    t_out = np.array([me for me in reference_data['t'] if me <= max(t_in)])
+
+    interpolation_matrix = getSparseInterpolationMatrix(t_in, t_out, order=order)
+    return interpolation_matrix @ t_in, interpolation_matrix @ data['Nu']['V']
+
+
 def compare_Nusselt_over_time1e6():
-    fig, ax = plt.subplots(1, 1)
-    _fig, _ax = plt.subplots()
+    fig, Nu_ax = plt.subplots()
+    _, axs = plt.subplots(1, 3, figsize=(10, 3))
+    prof_ax = axs[0]
+    rms_ax = axs[1]
+    spectrum_ax = axs[2]
+
     Ra = '1e6'
     res = 48
 
@@ -268,7 +296,7 @@ def compare_Nusselt_over_time1e6():
 
     for dt in [0.04, 0.02, 0.01, 0.005, 0.002]:
         data.append(get_pySDC_data(Ra, res=res, dt=dt))
-        labels.append(f'SDC, dt={dt:.3f}')
+        labels.append(f'SDC, dt={dt:.4f}')
         linestyles.append('-')
 
     # # ----------------- RK ------------------------
@@ -278,12 +306,16 @@ def compare_Nusselt_over_time1e6():
         labels.append(f'RK, dt={dt:.3f}')
         linestyles.append('--')
 
+    data.append(get_pySDC_data(Ra, res=res, dt=0.02, config_name='RBC3DG4R4'))
+    labels.append(f'SDC, R4, dt={0.02:.4f}')
+    linestyles.append(':')
+
     for dat, label, linestyle in zip(data, labels, linestyles):
         Nu = np.array(dat['Nu']['V'])
         t = dat['t']
         Nu_ref = np.array(ref_data['Nu']['V'])
         t_i, Nu_i = interpolate_NuV_to_reference_times(dat, ref_data)
-        ax.plot(t, Nu, label=label, ls=linestyle)
+        Nu_ax.plot(t, Nu, label=label, ls=linestyle)
 
         error = np.maximum.accumulate(np.abs(Nu_ref[: Nu_i.shape[0]] - Nu_i) / np.abs(Nu_ref[: Nu_i.shape[0]]))
 
@@ -292,43 +324,224 @@ def compare_Nusselt_over_time1e6():
         Nu_mean = np.mean(Nu[mask])
         Nu_std = np.std(Nu[mask])
 
-        last_line = ax.get_lines()[-1]
+        last_line = Nu_ax.get_lines()[-1]
         if any(error > 1e-2):
             deviates = min(t_i[error > 1e-2])
-            ax.axvline(deviates, color=last_line.get_color(), ls=last_line.get_linestyle())
+            Nu_ax.axvline(deviates, color=last_line.get_color(), ls=last_line.get_linestyle())
             print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}, deviates more than 1% from t={deviates:.2f}')
         else:
             print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}')
 
-        if 'res_in_boundary_layer' in dat.keys():
-            k = dat['k']
-            spectrum = np.array(dat['spectrum'])
+        k = dat['k']
+        spectrum = np.array(dat['spectrum'])
+        u_spectrum = np.mean(spectrum, axis=0)[1]
+        idx = dat['res_in_boundary_layer']
+        _s = u_spectrum[idx]
+        spectrum_ax.loglog(
+            k[_s > 1e-16], _s[_s > 1e-16], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+        prof_ax.plot(dat['profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label)
+        rms_ax.plot(
+            dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+    Nu_ax.legend(frameon=True)
+    Nu_ax.set_xlabel('t')
+    Nu_ax.set_ylabel('Nu')
+
+    spectrum_ax.legend(frameon=False)
+    spectrum_ax.set_xlabel('$k$')
+    spectrum_ax.set_ylabel(r'$\|\hat{u}_x\|$')
+
+
+def compare_Nusselt_over_time1e7():
+    fig, Nu_ax = plt.subplots()
+    _, axs = plt.subplots(1, 3, figsize=(10, 3))
+    prof_ax = axs[0]
+    rms_ax = axs[1]
+    spectrum_ax = axs[2]
+
+    Ra = '1e7'
+    res = 96
+
+    data = []
+    labels = []
+    linestyles = []
+
+    ref_data = get_pySDC_data(Ra, res=res, dt=0.009)
+
+    for dt in [0.01, 0.009]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt))
+        labels.append(f'SDC, dt={dt:.4f}')
+        linestyles.append('-')
+
+    # # ----------------- RK ------------------------
+
+    for dt in [0.008, 0.006, 0.003]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt, RK=True))
+        labels.append(f'RK, dt={dt:.3f}')
+        linestyles.append('--')
+
+    for dat, label, linestyle in zip(data, labels, linestyles):
+        Nu = np.array(dat['Nu']['V'])
+        t = dat['t']
+        Nu_ref = np.array(ref_data['Nu']['V'])
+        t_i, Nu_i = interpolate_NuV_to_reference_times(dat, ref_data)
+        Nu_ax.plot(t, Nu, label=label, ls=linestyle)
+
+        error = np.maximum.accumulate(np.abs(Nu_ref[: Nu_i.shape[0]] - Nu_i) / np.abs(Nu_ref[: Nu_i.shape[0]]))
+
+        # compute mean Nu
+        mask = np.logical_and(t >= 20, t <= 200)
+        Nu_mean = np.mean(Nu[mask])
+        Nu_std = np.std(Nu[mask])
+
+        last_line = Nu_ax.get_lines()[-1]
+        if any(error > 1e-2):
+            deviates = min(t_i[error > 1e-2])
+            Nu_ax.axvline(deviates, color=last_line.get_color(), ls=last_line.get_linestyle())
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}, deviates more than 1% from t={deviates:.2f}')
+        else:
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}')
+
+        k = dat['k']
+        spectrum = np.array(dat['spectrum'])
+        try:
             u_spectrum = np.mean(spectrum, axis=0)[1]
+            # u_spectrum = spectrum[0][1]
             idx = dat['res_in_boundary_layer']
             _s = u_spectrum[idx]
-            _ax.loglog(
+            spectrum_ax.loglog(
                 k[_s > 1e-16], _s[_s > 1e-16], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
             )
-            _ax.legend(frameon=False)
-            _ax.set_xlabel('$k$')
-            _ax.set_ylabel(r'$\|\hat{u}_x\|$')
+        except:
+            pass
 
-    ax.legend(frameon=True)
+        prof_ax.plot(dat['profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label)
+        rms_ax.plot(
+            dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+    Nu_ax.legend(frameon=True)
+    Nu_ax.set_xlabel('t')
+    Nu_ax.set_ylabel('Nu')
+
+    spectrum_ax.legend(frameon=False)
+    spectrum_ax.set_xlabel('$k$')
+    spectrum_ax.set_ylabel(r'$\|\hat{u}_x\|$')
+
+
+def compare_Nusselt_over_time1e8():
+    fig, axs = plt.subplots(1, 4, figsize=(13, 3))
+    Nu_ax = axs[0]
+    prof_ax = axs[1]
+    rms_ax = axs[2]
+    spectrum_ax = axs[3]
+
+    Ra = '1e8'
+    res = 96
+
+    data = []
+    labels = []
+    linestyles = []
+
+    ref_data = get_pySDC_data(Ra, res=res, dt=6e-3)
+
+    for dt in [6e-3]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt))
+        labels.append(f'SDC, dt={dt:.4f}')
+        linestyles.append('-')
+
+    # # ----------------- RK ------------------------
+
+    for dt in [0.005]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt, RK=True))
+        labels.append(f'RK, dt={dt:.3f}')
+        linestyles.append('--')
+
+    for dat, label, linestyle in zip(data, labels, linestyles):
+        Nu = np.array(dat['Nu']['V'])
+        t = dat['t']
+        Nu_ref = np.array(ref_data['Nu']['V'])
+        t_i, Nu_i = interpolate_NuV_to_reference_times(dat, ref_data)
+        Nu_ax.plot(t, Nu, label=label, ls=linestyle)
+
+        error = np.maximum.accumulate(np.abs(Nu_ref[: Nu_i.shape[0]] - Nu_i) / np.abs(Nu_ref[: Nu_i.shape[0]]))
+
+        # compute mean Nu
+        mask = np.logical_and(t >= 20, t <= 200)
+        Nu_mean = np.mean(Nu[mask])
+        Nu_std = np.std(Nu[mask])
+
+        last_line = Nu_ax.get_lines()[-1]
+        if any(error > 1e-2):
+            deviates = min(t_i[error > 1e-2])
+            Nu_ax.axvline(deviates, color=last_line.get_color(), ls=last_line.get_linestyle())
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}, deviates more than 1% from t={deviates:.2f}')
+        else:
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}')
+
+        k = dat['k']
+        spectrum = np.array(dat['spectrum'])
+        u_spectrum = np.mean(spectrum, axis=0)[1]
+        # u_spectrum = spectrum[0, 0, :]
+        idx = dat['res_in_boundary_layer']
+        _s = u_spectrum[idx]
+        spectrum_ax.loglog(
+            k[_s > 1e-16], _s[_s > 1e-16], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+        prof_ax.plot(dat['profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label)
+        rms_ax.plot(
+            dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+    Nu_ax.legend(frameon=True)
+    Nu_ax.set_xlabel('t')
+    Nu_ax.set_ylabel('Nu')
+
+    spectrum_ax.legend(frameon=False)
+    spectrum_ax.set_xlabel('$k$')
+    spectrum_ax.set_ylabel(r'$\|\hat{u}_x\|$')
+
+
+def plot_thibaut_stuff():
+    fig, ax = plt.subplots()
+
+    data = get_pySDC_data('1e7', res=96, dt=0.009)
+
+    Nu = data['Nu']['V']
+    t = data['t']
+    avg_Nu = np.array([np.mean(Nu[40 : 40 + i + 1]) for i in range(len(Nu[40:]))])
+    Delta_Nu = np.array([abs(avg_Nu[i + 1] - avg_Nu[i]) for i in range(len(avg_Nu) - 1)])
+    # ax.plot(data['t'][40:-1], Delta_Nu / avg_Nu[:-1])
+    # ax.plot(data['t'], np.abs(avg_Nu - avg_Nu[-1]) / avg_Nu[-1])
+    ax.plot(t[40:], avg_Nu)
+    ax.plot(t[40:], Nu[40:])
     ax.set_xlabel('t')
-    ax.set_ylabel('Nu')
+    # ax.set_ylabel('Delta Nu / Nu')
 
 
-def interpolate_NuV_to_reference_times(data, reference_data, order=12):
-    from qmat.lagrange import getSparseInterpolationMatrix
+def plot_spectrum_over_time1e6R4():
+    fig, ax = plt.subplots()
 
-    t_in = np.array(data['t'])
-    t_out = np.array([me for me in reference_data['t'] if me <= max(t_in)])
+    # data = get_pySDC_data('1e6', res=48, dt=0.02, config_name='RBC3DG4')
+    # data = get_pySDC_data('1e7', res=96, dt=0.009, config_name='RBC3DG4')
+    data = get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4')
 
-    interpolation_matrix = getSparseInterpolationMatrix(t_in, t_out, order=order)
-    return interpolation_matrix @ t_in, interpolation_matrix @ data['Nu']['V']
+    s = data['spectrum']
+    t = data['t']
+    k = data['k']
 
-
-# def compare_accross_Ra():
+    # for i in range(len(s)):
+    # for i in [0, 3, 10, 20, 40, 80, -1]:
+    for i in [0, 3, 10, -1]:
+        print(i, t[i])
+        _s = s[i][0, data['res_in_boundary_layer']]
+        _s = np.max(s[i][0], axis=0)
+        ax.loglog(k[_s > 1e-20], _s[_s > 1e-20], label=f't={t[i]:.1f}')
+    ax.legend(frameon=False)
 
 
 if __name__ == '__main__':
@@ -337,5 +550,8 @@ if __name__ == '__main__':
     # compare_Nusselt_over_time1e5()
     # compare_Nusselt_over_time1e6()
     # compare_Nusselt_over_time1e7()
+    # compare_Nusselt_over_time1e8()
+    # plot_thibaut_stuff()
+    plot_spectrum_over_time1e6R4()
 
     plt.show()
