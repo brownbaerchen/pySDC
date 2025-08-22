@@ -32,6 +32,7 @@ def parse_args():
         '--logger_level', type=int, help='Logger level on the first rank in space and in the sweeper', default=15
     )
     parser.add_argument('--tasks_per_node', type=int)
+    parser.add_argument('--time', type=int)
     parser.add_argument('--partition', type=str, default='batch')
     parser.add_argument('--cluster', type=str, default='JUSUF')
     parser.add_argument('-o', type=str, help='output path', default='./')
@@ -42,7 +43,7 @@ def parse_args():
 def run(args, **kwargs):
     res = args['res']
     config = args['config']
-    dt = args['config']
+    dt = args['dt']
     procs = args['procs']
     tasks_per_node = args['tasks_per_node']
     OMP_NUM_THREADS = 1
@@ -51,6 +52,7 @@ def run(args, **kwargs):
         f'-n {np.prod(procs)}',
         f'-p {args["partition"]}',
         f'--tasks-per-node={tasks_per_node}',
+        f'--time={args["time"]}:00:00',
     ]
     srun_options = [f'--tasks-per-node={tasks_per_node}']
     if args['useGPU']:
@@ -58,7 +60,10 @@ def run(args, **kwargs):
         sbatch_options += [f'--cpus-per-task={OMP_NUM_THREADS}', '--gpus-per-task=1']
 
     procs = (''.join(f'{me}/' for me in procs))[:-1]
-    command = f'run_experiment.py --mode=run --res={res} --config={args["config"]} --procs={procs}'
+    command = f'run_experiment.py --mode=run --res={res} --dt={dt} --config={args["config"]} --procs={procs}'
+
+    if args['restart_idx'] != 0:
+        command += f' --restart_idx={args["restart_idx"]}'
 
     if args["useGPU"]:
         command += ' --useGPU=True'
@@ -68,7 +73,7 @@ def run(args, **kwargs):
         srun_options,
         command,
         args['cluster'],
-        name=f'run_{args["config"]}_{res}_{dt}',
+        name=f'{args["config"]}_{res}_{dt}',
         OMP_NUM_THREADS=OMP_NUM_THREADS,
         **kwargs,
     )

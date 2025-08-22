@@ -592,9 +592,9 @@ class RBC3DG4Ra1e7(RBC3DverificationGamma4):
 class RBC3DG4R4Ra1e7(RBC3DverificationGamma4):
     res_ratio = 4
     Tend = 40
-    dt = 9e-3
+    dt = 5e-3
     ic_config = RBC3DG4Ra1e6
-    res = 96
+    res = 64
     converged = 11
 
 
@@ -625,6 +625,16 @@ class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
 
 
 class RBC3DG4R4Ra1e8(RBC3DverificationGamma4):
+    # nz=128: dt=5e-3 crash at t=0.9
+    Tend = 60
+    dt = 6e-3
+    ic_config = RBC3DG4R4Ra1e7
+    res = 96
+    # converged=20
+
+
+class RBC3DG4R4Ra1e8(RBC3DverificationGamma4):
+    res_ratio = 4
     Tend = 60
     dt = 6e-3
     ic_config = RBC3DG4R4Ra1e7
