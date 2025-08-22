@@ -28,9 +28,9 @@ class RayleighBenard3D(GenericSpectralLinear):
 
     The domain, vertical boundary conditions and pressure gauge are
 
-        Omega = [0, 8) x (-1, 1)
+        Omega = [0, Lx) x [0, Ly] x (0, Lz)
         T(z=+1) = 0
-        T(z=-1) = 2
+        T(z=-1) = Lz
         u(z=+-1) = v(z=+-1) = 0
         integral over p = 0
 
@@ -53,16 +53,16 @@ class RayleighBenard3D(GenericSpectralLinear):
     def __init__(
         self,
         Prandtl=1,
-        Rayleigh=2e6,
+        Rayleigh=1e6,
         nx=64,
         ny=64,
-        nz=64,
+        nz=32,
         BCs=None,
         dealiasing=1.5,
         comm=None,
         Lz=1,
-        Lx=1,
-        Ly=1,
+        Lx=4,
+        Ly=4,
         useGPU=False,
         **kwargs,
     ):
@@ -375,24 +375,22 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         return avgs
 
-    def get_Reynolds_number(self, u):
-        raise  # compute RMS velocity incorrectly
-        if self.spectral_space:
-            u = self.itransform(u)
-        else:
-            u = u.copy()
-
-        indices = list(self.index(['u', 'v', 'w']))
-        vels = u[indices, ...]
-        vels *= vels
-        vels_mean = self.xp.sum(vels, axis=(1, 2, 3)) / self.xp.prod(self.spectral.global_shape[1:])
-        vels_mean = self.comm.allreduce(vels_mean, MPI.SUM)
-        v_RMS = (self.xp.sum(vels_mean)) ** (1 / 2)
-
-        Re = v_RMS * self.axes[-1].L / self.nu
-        return Re
-
     def get_frequency_spectrum(self, u):
+        """
+        Compute the frequency spectrum of the velocities in x and y direction in the horizontal plane for every point in
+        z. If the problem is well resolved, the coefficients will decay quickly with the wave number, and the reverse
+        indicates that the resolution is too low.
+
+        The returned spectrum has three dimensions. The first is for component (i.e. u or v), the second is for every
+        point in z and the third is the energy in every wave number.
+
+        Args:
+            u: The solution you want to compute the spectrum of
+
+        Returns:
+            RayleighBenard3D.xp.ndarray: wave numbers
+            RayleighBenard3D.xp.ndarray: spectrum
+        """
         xp = self.xp
         indices = slice(0, 2)
 

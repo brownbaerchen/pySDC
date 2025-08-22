@@ -11,7 +11,7 @@ def test_eval_f(nx, nz, direction, spectral_space):
     import numpy as np
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
-    P = RayleighBenard3D(nx=nx, ny=nx, nz=nz, Rayleigh=1, spectral_space=spectral_space)
+    P = RayleighBenard3D(nx=nx, ny=nx, nz=nz, Rayleigh=1, spectral_space=spectral_space, Lx=1, Ly=1, Lz=1)
     iu, iv, iw, ip, iT = P.index(['u', 'v', 'w', 'p', 'T'])
     X, Y, Z = P.X, P.Y, P.Z
     cos, sin = np.cos, np.sin
@@ -297,7 +297,7 @@ def test_heterogeneous_implementation(N=8, useGPU=True):
 def test_Nusselt_number_computation(w, N=4):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
-    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
+    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0, Prandtl=1.0)
     xp = prob.xp
     iw, iT = prob.index(['w', 'T'])
 
@@ -339,36 +339,6 @@ def test_Nusselt_number_computation(w, N=4):
 
     for key in ['t', 'b', 'V']:
         assert xp.isclose(Nu[key], w), f'Expected Nu_{key}={w}, but got {Nu[key]} with constant T and perturbed w!'
-
-
-@pytest.mark.mpi4py
-@pytest.mark.mpi(ranks=[1, 4])
-def test_Reynolds_number_computation(mpi_ranks):
-    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
-
-    N = 4
-    prob = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
-    xp = prob.xp
-    iu, iv, iw = prob.index(['u', 'v', 'w'])
-
-    u = prob.u_exact()
-    u[iu] = 1
-    u[iv] = 1
-    u[iw] = 1
-    Re = prob.get_Reynolds_number(u)
-    assert xp.isclose(Re, xp.sqrt(3))
-
-    u = prob.u_exact()
-    u[iv] = (2 * prob.Z) ** (1 / 2)
-    Re = prob.get_Reynolds_number(u)
-    assert xp.isclose(Re, 1)
-
-    u = prob.u_exact()
-    u[iv] = (2 * prob.Z) ** (1 / 2)
-    u[iu] = (2 * prob.Z) ** (1 / 2)
-    u[iw] = (2 * prob.Z) ** (1 / 2)
-    Re = prob.get_Reynolds_number(u)
-    assert xp.isclose(Re, xp.sqrt(3))
 
 
 @pytest.mark.mpi4py
@@ -452,7 +422,7 @@ def test_spectrum_computation(mpi_ranks):
 
 
 if __name__ == '__main__':
-    # test_eval_f(2**2, 2**1, 'x', False)
+    test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
     # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
@@ -461,5 +431,4 @@ if __name__ == '__main__':
     # test_heterogeneous_implementation()
     # test_Nusselt_number_computation(N=4, w=3.14)
     test_spectrum_computation(None)
-    # test_Reynolds_number_computation(None)
     # test_CFL()
