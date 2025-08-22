@@ -528,15 +528,16 @@ def plot_spectrum_over_time1e6R4():
 
     # data = get_pySDC_data('1e6', res=48, dt=0.02, config_name='RBC3DG4')
     # data = get_pySDC_data('1e7', res=96, dt=0.009, config_name='RBC3DG4')
-    data = get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4')
+    # data = get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4')
+    data = get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4')
 
     s = data['spectrum']
     t = data['t']
     k = data['k']
 
-    # for i in range(len(s)):
-    # for i in [0, 3, 10, 20, 40, 80, -1]:
-    for i in [0, 3, 10, -1]:
+    for i in range(len(s)):
+        # for i in [0, 3, 10, 20, 40, 80, -1]:
+        # for i in [0, -1]:
         print(i, t[i])
         _s = s[i][0, data['res_in_boundary_layer']]
         _s = np.max(s[i][0], axis=0)
@@ -545,7 +546,7 @@ def plot_spectrum_over_time1e6R4():
 
 
 if __name__ == '__main__':
-    plot_Ra_Nusselt_scaling()
+    # plot_Ra_Nusselt_scaling()
 
     # compare_Nusselt_over_time1e5()
     # compare_Nusselt_over_time1e6()
