@@ -101,7 +101,10 @@ def plot_Ra_Nusselt_scaling():
     spectrum_ax = axs[3]
 
     for Ra, Ra_str in zip([1e5, 1e6, 1e7, 1e8], ['1e5', '1e6', '1e7', '1e8']):
-        data_pySDC = get_pySDC_data(Ra_str)
+        if Ra > 1e6:
+            data_pySDC = get_pySDC_data(Ra_str, config_name='RBC3DG4R4')
+        else:
+            data_pySDC = get_pySDC_data(Ra_str)
         data_Nek5000 = get_Nek5000_Data(Ra_str)
 
         # NuRa_ax.scatter(Ra, data_Nek5000['Nu'], color='black')
@@ -535,9 +538,9 @@ def plot_spectrum_over_time1e6R4():
     t = data['t']
     k = data['k']
 
-    for i in range(len(s)):
-        # for i in [0, 3, 10, 20, 40, 80, -1]:
-        # for i in [0, -1]:
+    # for i in range(len(s)):
+    # for i in [0, 3, 10, 20, 40, 80, -1]:
+    for i in [0, 5, 10, 20, 30, 40, -1]:
         print(i, t[i])
         _s = s[i][0, data['res_in_boundary_layer']]
         _s = np.max(s[i][0], axis=0)
@@ -546,13 +549,13 @@ def plot_spectrum_over_time1e6R4():
 
 
 if __name__ == '__main__':
-    # plot_Ra_Nusselt_scaling()
+    plot_Ra_Nusselt_scaling()
 
     # compare_Nusselt_over_time1e5()
     # compare_Nusselt_over_time1e6()
     # compare_Nusselt_over_time1e7()
     # compare_Nusselt_over_time1e8()
     # plot_thibaut_stuff()
-    plot_spectrum_over_time1e6R4()
+    # plot_spectrum_over_time1e6R4()
 
     plt.show()
