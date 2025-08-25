@@ -90,7 +90,7 @@ def plot_experiment(args, config):  # pragma: no cover
     for idx in range(args['restart_idx'], 9999, comm.size):
         try:
             fig = config.plot(P=P, idx=idx + comm.rank, n_procs_list=args['procs'])
-        except FileNotFoundError:
+        except (FileNotFoundError, AssertionError):
             break
 
         path = f'simulation_plots/{config.get_path(ranks=[0,0,0])}-{idx+comm.rank:06d}.png'

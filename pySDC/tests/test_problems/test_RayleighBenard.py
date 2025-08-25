@@ -328,6 +328,20 @@ def test_apply_BCs():
     P.check_BCs(u)
 
 
+@pytest.mark.mpi4py
+def test_tracers():
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    P = RayleighBenard(nx=128, nz=64, use_tracer=True)
+
+    u0 = P.u_exact()
+    P.plot(u0, quantity='C')
+    # plt.spy(P.M)
+    plt.show()
+
+
 if __name__ == '__main__':
     # test_eval_f(2**0, 2**2, 'z', True)
     # test_Poisson_problems(1, 'T')
@@ -336,5 +350,6 @@ if __name__ == '__main__':
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
     # test_viscous_dissipation()
-    test_CFL()
+    # test_CFL()
+    test_tracers()
     # test_Nyquist_mode_elimination()

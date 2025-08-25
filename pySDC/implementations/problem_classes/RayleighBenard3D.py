@@ -289,7 +289,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         noise = self.spectral.u_init
         noise[iT] = rng.random(size=me[iT].shape)
 
-        me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z + 1)
+        me[iT] += noise[iT].real * noise_level * (self.Z - 1) * (self.Z)
 
         if self.spectral_space:
             me_hat = self.spectral.u_init_forward

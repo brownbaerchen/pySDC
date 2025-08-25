@@ -21,6 +21,8 @@ def get_config(args):
         return RayleighBenard_scaling(args)
     elif name == 'RBC_large':
         return RayleighBenard_large(args)
+    elif name == 'RBC_tracer':
+        return RayleighBenard_tracer(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -90,7 +92,7 @@ class RayleighBenardRegular(Config):
         """
         prob.eval_f(prob.u_init)
 
-    def plot(self, P, idx, n_procs_list, quantitiy='T', quantitiy2='vorticity'):
+    def plot(self, P, idx, n_procs_list, quantitiy='C', quantitiy2='vorticity'):
         from pySDC.helpers.fieldsIO import FieldsIO
         import numpy as np
 
@@ -207,6 +209,22 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
         desc['sweeper_params']['num_nodes'] = 3
         desc['sweeper_params']['skip_residual_computation'] = ('IT_CHECK', 'IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
         desc['step_params']['maxiter'] = 5
+        return desc
+
+
+class RayleighBenard_tracer(RayleighBenard_dt_adaptivity):
+    logging_time_increment = 0.5
+    Tend = 200
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['convergence_controllers'].pop(Adaptivity)
+        desc['level_params']['dt'] = 1e-2
+        desc['problem_params']['use_tracer'] = True
+        desc['problem_params']['Rayleigh'] = 1e5
         return desc
 
 

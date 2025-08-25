@@ -61,6 +61,7 @@ class RayleighBenard(GenericSpectralLinear):
         Lx=4,
         Lz=1,
         z0=0,
+        use_tracer=False,
         **kwargs,
     ):
         """
@@ -77,6 +78,7 @@ class RayleighBenard(GenericSpectralLinear):
             Lx (float): Horizontal length of the domain
             Lz (float): Vertical length of the domain
             z0 (float): Position of lower boundary
+            use_tracer (bool): Whether to include tracers
         """
         BCs = {} if BCs is None else BCs
         BCs = {
@@ -107,6 +109,7 @@ class RayleighBenard(GenericSpectralLinear):
             'Lx',
             'Lz',
             'z0',
+            'use_tracer',
             localVars=locals(),
             readOnly=True,
         )
@@ -116,6 +119,8 @@ class RayleighBenard(GenericSpectralLinear):
             {'base': 'ultraspherical', 'N': nz, 'x0': self.z0, 'x1': self.Lz},
         ]
         components = ['u', 'v', 'T', 'p']
+        if use_tracer:
+            components += ['C']
         super().__init__(bases, components, comm=comm, **kwargs)
 
         self.X, self.Z = self.get_grid()
@@ -152,10 +157,14 @@ class RayleighBenard(GenericSpectralLinear):
             'v': {'p': U12 @ Dz, 'v': -self.nu * (U02 @ Dxx + Dzz), 'T': -U02 @ Id},
             'T': {'T': -self.kappa * (U02 @ Dxx + Dzz)},
         }
+        if use_tracer:
+            L_lhs['C'] = {'C': -self.kappa * 1e-2 * (U02 @ Dxx + Dzz)}
         self.setup_L(L_lhs)
 
         # mass matrix
         M_lhs = {i: {i: U02 @ Id} for i in ['u', 'v', 'T']}
+        if use_tracer:
+            M_lhs['C'] = {'C': U02 @ Id}
         self.setup_M(M_lhs)
 
         # Prepare going from second (first for divergence free equation) derivative basis back to Chebychov-T
@@ -180,6 +189,9 @@ class RayleighBenard(GenericSpectralLinear):
             kind='Dirichlet',
             line=-1,
         )
+        if use_tracer:
+            self.add_BC(component='C', equation='C', axis=1, x=-1, v=0, kind='Neumann', line=-1)
+            self.add_BC(component='C', equation='C', axis=1, x=1, v=0, kind='Neumann', line=-2)
 
         # eliminate Nyquist mode if needed
         if nx % 2 == 0:
@@ -222,8 +234,16 @@ class RayleighBenard(GenericSpectralLinear):
 
         # start by computing derivatives
         if not hasattr(self, '_Dx_expanded') or not hasattr(self, '_Dz_expanded'):
-            self._Dx_expanded = self._setup_operator({'u': {'u': Dx}, 'v': {'v': Dx}, 'T': {'T': Dx}, 'p': {}})
-            self._Dz_expanded = self._setup_operator({'u': {'u': Dz}, 'v': {'v': Dz}, 'T': {'T': Dz}, 'p': {}})
+            if self.use_tracer:
+                self._Dx_expanded = self._setup_operator(
+                    {'u': {'u': Dx}, 'v': {'v': Dx}, 'T': {'T': Dx}, 'p': {}, 'C': {'C': Dx}}
+                )
+                self._Dz_expanded = self._setup_operator(
+                    {'u': {'u': Dz}, 'v': {'v': Dz}, 'T': {'T': Dz}, 'p': {}, 'C': {'C': Dz}}
+                )
+            else:
+                self._Dx_expanded = self._setup_operator({'u': {'u': Dx}, 'v': {'v': Dx}, 'T': {'T': Dx}, 'p': {}})
+                self._Dz_expanded = self._setup_operator({'u': {'u': Dz}, 'v': {'v': Dz}, 'T': {'T': Dz}, 'p': {}})
         Dx_u_hat = (self._Dx_expanded @ u_hat.flatten()).reshape(u_hat.shape)
         Dz_u_hat = (self._Dz_expanded @ u_hat.flatten()).reshape(u_hat.shape)
 
@@ -236,6 +256,9 @@ class RayleighBenard(GenericSpectralLinear):
         fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * Dz_u_pad[iu])
         fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dz_u_pad[iv])
         fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dz_u_pad[iT])
+        if self.use_tracer:
+            iC = self.index('C')
+            fexpl_pad[iC][:] = -(u_pad[iu] * Dx_u_pad[iC] + u_pad[iv] * Dz_u_pad[iC])
 
         if self.spectral_space:
             f.expl[:] = self.transform(fexpl_pad, padding=padding)
@@ -267,6 +290,13 @@ class RayleighBenard(GenericSpectralLinear):
         noise[iT] = rng.random(size=me[iT].shape)
 
         me[iT] += noise[iT].real * noise_level * (self.Z - self.z0) * (self.Z - self.z0 + self.Lz)
+
+        if self.use_tracer:
+
+            def gaussian_2d(x, y, x0, y0, sigma_x, sigma_y, amplitude=1):
+                return amplitude * np.exp(-(((x - x0) ** 2) / (2 * sigma_x**2) + ((y - y0) ** 2) / (2 * sigma_y**2)))
+
+            me[self.index('C')] = gaussian_2d(self.X, self.Z, self.Lx / 2, self.Lz / 2 + self.z0, 0.1, 0.1, 1)
 
         if self.spectral_space:
             me_hat = self.spectral.u_init_forward
