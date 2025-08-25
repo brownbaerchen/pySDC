@@ -23,6 +23,8 @@ def get_config(args):
         return RayleighBenard_large(args)
     elif name == 'RBC_tracer':
         return RayleighBenard_tracer(args)
+    elif name == 'RBC_tracer2':
+        return RayleighBenard_tracer2(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -92,11 +94,11 @@ class RayleighBenardRegular(Config):
         """
         prob.eval_f(prob.u_init)
 
-    def plot(self, P, idx, n_procs_list, quantitiy='C', quantitiy2='vorticity'):
+    def plot(self, P, idx, n_procs_list, quantitiy='T', quantitiy2='C'):
         from pySDC.helpers.fieldsIO import FieldsIO
         import numpy as np
 
-        cmaps = {'vorticity': 'bwr', 'p': 'bwr'}
+        cmaps = {'vorticity': 'bwr', 'p': 'bwr', 'T': 'plasma'}
 
         fig = P.get_fig()
         cax = P.cax
@@ -115,11 +117,17 @@ class RayleighBenardRegular(Config):
             data[P.index(quantitiy)].real,
             cmap=cmaps.get(quantitiy, 'plasma'),
         )
+        # print(np.sum(data[P.index(quantitiy)].real), np.sum(np.abs(data[P.index(quantitiy)].real)))
+
+        if quantitiy2 in P.components:
+            data2 = data[P.index(quantitiy2)].real
+        else:
+            data2 = (data[-1].real,)
 
         im2 = axs[1].pcolormesh(
             X,
             Z,
-            data[-1].real,
+            data2,
             cmap=cmaps.get(quantitiy2, None),
         )
 
@@ -214,17 +222,27 @@ class RayleighBenard_dt_adaptivity(RayleighBenardRegular):
 
 class RayleighBenard_tracer(RayleighBenard_dt_adaptivity):
     logging_time_increment = 0.5
-    Tend = 200
+    Tend = 500
 
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.convergence_controller_classes.adaptivity import Adaptivity
 
         desc = super().get_description(*args, **kwargs)
 
-        desc['convergence_controllers'].pop(Adaptivity)
-        desc['level_params']['dt'] = 1e-2
+        # desc['convergence_controllers'].pop(Adaptivity)
+        desc['level_params']['dt'] = 1e-3
         desc['problem_params']['use_tracer'] = True
         desc['problem_params']['Rayleigh'] = 1e5
+        return desc
+
+
+class RayleighBenard_tracer2(RayleighBenard_tracer):
+    logging_time_increment = 0.1
+
+    def get_description(self, *args, **kwargs):
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['Rayleigh'] = 1e6
         return desc
 
 
