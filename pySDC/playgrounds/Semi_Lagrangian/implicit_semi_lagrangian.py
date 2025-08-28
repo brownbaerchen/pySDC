@@ -19,16 +19,11 @@ class implicit_SL(generic_implicit):
 
         # prepare right hand side with everything known from previous iteration
         integral = []
-
-        integral = [P.u_init for _ in range(M)]
-        departure_points = P.get_departure_points(L.u[1], nodes[0])
-        integral[0] += P.interpolate(L.u[0], departure_points)
-        for m in range(1, M):
-            departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[m - 1])
-            integral[m] += P.interpolate(L.u[m], departure_points)
-
         for m in range(0, M):
-            integral[m] -= L.u[0]
+            integral.append(P.u_init)
+
+            departure_points = P.get_departure_points(L.u[m + 1], nodes[m])
+            integral[m] += P.interpolate(L.u[0], departure_points) - L.u[0]
 
             for j in range(M):
                 departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
@@ -54,12 +49,12 @@ class implicit_SL(generic_implicit):
         assert L.status.unlocked
 
         # prepare right hand side with everything known from previous iteration
-        rhs = [P.u_init for _ in range(M)]
-        departure_points = P.get_departure_points(L.u[1], nodes[0])
-        rhs[0] += P.interpolate(L.u[0], departure_points)
-        for m in range(1, M):
-            departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[m - 1])
-            rhs[m] += P.interpolate(L.u[m], departure_points)
+        rhs = []
+        for m in range(0, M):
+            rhs.append(P.u_init)
+
+            departure_points = P.get_departure_points(L.u[m + 1], nodes[m])
+            rhs[m] += P.interpolate(L.u[0], departure_points)
 
         for m in range(0, M):
             for j in range(M):

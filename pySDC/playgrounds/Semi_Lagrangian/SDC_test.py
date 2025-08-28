@@ -19,14 +19,14 @@ def run(dt=1e-1, nsteps=1):
     problem_params = {}
 
     step_params = {}
-    step_params['maxiter'] = 16
+    step_params['maxiter'] = 4
 
     controller_params = {}
     controller_params['logger_level'] = 15
     controller_params['hook_class'] = [LogSolution, LogGlobalErrorPostStep]
 
     description = {}
-    description['problem_class'] = AdvectionDiffusion1DSL
+    description['problem_class'] = Burgers1DSL
     description['problem_params'] = problem_params
     description['sweeper_class'] = implicit_SL
     description['sweeper_params'] = sweeper_params
@@ -54,7 +54,7 @@ for me in u:
 u_exact = P.u_exact(u[-1][0])
 P.plot(u_exact, t=u[-1][0], fig=fig, ls='--')
 
-# dts = [8e-1, 7e-1, 6e-1, 5e-1, 4e-1, 3e-1, 2e-1, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 1e-2, 5e-3, 1e-3]
+# dts = [4e-1, 3e-1, 2e-1, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 1e-2, 5e-3, 1e-3]
 # errors = []
 # for dt in dts:
 #     stats, _ = run(dt)
