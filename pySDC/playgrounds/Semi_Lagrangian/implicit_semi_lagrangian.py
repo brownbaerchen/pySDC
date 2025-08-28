@@ -56,7 +56,6 @@ class implicit_SL(generic_implicit):
             departure_points = P.get_departure_points(L.u[m + 1], nodes[m])
             rhs[m] += P.interpolate(L.u[0], departure_points)
 
-        for m in range(0, M):
             for j in range(M):
                 departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
                 rhs[m] += P.interpolate((Q - Qd)[m + 1, j + 1] * L.f[j + 1], departure_points)
@@ -66,8 +65,9 @@ class implicit_SL(generic_implicit):
 
             # add forward substitution part to right hand side
             for j in range(0, m):
-                departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
-                rhs[m] += P.interpolate(Qd[m + 1, j + 1] * L.f[j + 1], departure_points)
+                if Qd[m + 1, j + 1] != 0:
+                    departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
+                    rhs[m] += P.interpolate(Qd[m + 1, j + 1] * L.f[j + 1], departure_points)
 
             # implicit solve
             alpha = L.dt * self.QI[m + 1, m + 1]
