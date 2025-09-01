@@ -158,7 +158,7 @@ class RayleighBenard(GenericSpectralLinear):
             'T': {'T': -self.kappa * (U02 @ Dxx + Dzz)},
         }
         if use_tracer:
-            L_lhs['C'] = {'C': -self.kappa * 1e-2 * (U02 @ Dxx + Dzz)}
+            L_lhs['C'] = {'C': -self.kappa * 14/19 * (U02 @ Dxx + Dzz)}
         self.setup_L(L_lhs)
 
         # mass matrix
