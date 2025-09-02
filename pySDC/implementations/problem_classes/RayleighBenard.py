@@ -585,7 +585,7 @@ class RayleighBenardSL(RayleighBenard):
         x = self.axes[0].get_1dgrid()
         for j in range(self.X.shape[1]):
             Ix = getSparseInterpolationMatrix(
-                x, deps[0, :, j].real, order=min([order, self.X.shape[0]]), grid_period=self.Lx
+                x, deps[0, :, j].real, order=min([order, self.X.shape[0]]), gridPeriod=self.Lx
             )
             for i in range(self.ncomponents):
                 u[i, :, j] = Ix @ u[i, :, j].flatten()

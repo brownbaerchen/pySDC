@@ -9,7 +9,7 @@ class implicit_SL(generic_implicit):
         QI: lower triangular matrix
     """
 
-    def integrate(self, Q=None):
+    def integrate2(self, Q=None):
         """This is hacky. It does not actually compute the integral, but we need this for the residual!"""
         L = self.level
         P = L.prob
@@ -30,7 +30,7 @@ class implicit_SL(generic_implicit):
                 integral[m] += P.interpolate(Q[m + 1, j + 1] * L.f[j + 1], departure_points)
         return integral
 
-    def integrate2(self, Q=None):
+    def integrate(self, Q=None):
         """This is hacky. It does not actually compute the integral, but we need this for the residual!"""
         L = self.level
         P = L.prob

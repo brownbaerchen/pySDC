@@ -23,6 +23,8 @@ def get_config(args):
         return RayleighBenard_large(args)
     elif name == 'RBC_SL':
         return RayleighBenard_SL(args)
+    elif name == 'RBC_NSL':
+        return RayleighBenard_NSL(args)
     else:
         raise NotImplementedError(f'There is no configuration called {name!r}!')
 
@@ -320,7 +322,6 @@ class RayleighBenard_scaling(RayleighBenardRegular):
 class RayleighBenard_SL(RayleighBenardRegular):
     def get_description(self, *args, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardSL
-        from pySDC.implementations.sweeper_classes.generic_implicit_semi_lagranian import generic_implicit_SL
         from pySDC.playgrounds.Semi_Lagrangian.implicit_semi_lagrangian import implicit_SL
         from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 
@@ -339,11 +340,37 @@ class RayleighBenard_SL(RayleighBenardRegular):
         desc['problem_params']['dealiasing'] = 3 / 2
         desc['problem_params']['spectral_space'] = False
 
-        desc['step_params']['maxiter'] = 8
+        desc['step_params']['maxiter'] = 4
         desc['convergence_controllers'] = {}
 
         desc['problem_class'] = RayleighBenardSL
         desc['sweeper_class'] = implicit_SL
+        return desc
+
+
+class RayleighBenard_NSL(RayleighBenard_SL):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenard
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+
+        desc = super().get_description(*args, **kwargs)
+
+        desc['level_params']['dt'] = 1e-2
+        desc['level_params']['restol'] = 1e-5
+        desc['level_params']['e_tol'] = 5e-6
+
+        desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['QE'] = 'PIC'
+
+        desc['problem_params']['spectral_space'] = True
+
+        desc['step_params']['maxiter'] = 4
+        desc['convergence_controllers'] = {}
+
+        desc['problem_class'] = RayleighBenard
+        desc['sweeper_class'] = imex_1st_order
         return desc
 
 
