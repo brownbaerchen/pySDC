@@ -9,25 +9,52 @@ class implicit_SL(generic_implicit):
         QI: lower triangular matrix
     """
 
-    def integrate(self):
-        """This is hacky. If does not actually compute the integral, but we need this for the residual!"""
+    def integrate(self, Q=None):
+        """This is hacky. It does not actually compute the integral, but we need this for the residual!"""
         L = self.level
         P = L.prob
         nodes = L.dt * self.coll.nodes
         M = self.coll.num_nodes
-        Q = L.dt * self.coll.Qmat
+        Q = L.dt * self.coll.Qmat if Q is None else Q
 
-        # prepare right hand side with everything known from previous iteration
         integral = []
         for m in range(0, M):
             integral.append(P.u_init)
 
             departure_points = P.get_departure_points(L.u[m + 1], nodes[m])
-            integral[m] += P.interpolate(L.u[0], departure_points) - L.u[0]
+            integral[m] += P.interpolate(L.u[0], departure_points)
+            integral[m] -= L.u[0]
 
             for j in range(M):
                 departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
-                integral[m] += P.interpolate((Q)[m + 1, j + 1] * L.f[j + 1], departure_points)
+                integral[m] += P.interpolate(Q[m + 1, j + 1] * L.f[j + 1], departure_points)
+        return integral
+
+    def integrate2(self, Q=None):
+        """This is hacky. It does not actually compute the integral, but we need this for the residual!"""
+        L = self.level
+        P = L.prob
+        nodes = L.dt * self.coll.nodes
+        M = self.coll.num_nodes
+        Q = L.dt * self.coll.Qmat if Q is None else Q
+
+        integral = []
+
+        integral.append(P.u_init)
+        departure_points = P.get_departure_points(L.u[1], nodes[0])
+        integral[0] += P.interpolate(L.u[0], departure_points)
+        for m in range(1, M):
+            integral.append(P.u_init)
+
+            departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[m - 1])
+            integral[m] += P.interpolate(integral[m - 1], departure_points)
+
+        for m in range(0, M):
+            integral[m] -= L.u[0]
+
+            for j in range(M):
+                departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
+                integral[m] += P.interpolate(Q[m + 1, j + 1] * L.f[j + 1], departure_points)
         return integral
 
     def update_nodes(self):
@@ -49,16 +76,9 @@ class implicit_SL(generic_implicit):
         assert L.status.unlocked
 
         # prepare right hand side with everything known from previous iteration
-        rhs = []
+        rhs = self.integrate(Q=Q - Qd)
         for m in range(0, M):
-            rhs.append(P.u_init)
-
-            departure_points = P.get_departure_points(L.u[m + 1], nodes[m])
-            rhs[m] += P.interpolate(L.u[0], departure_points)
-
-            for j in range(M):
-                departure_points = P.get_departure_points(L.u[m + 1], nodes[m] - nodes[j])
-                rhs[m] += P.interpolate((Q - Qd)[m + 1, j + 1] * L.f[j + 1], departure_points)
+            rhs[m] += L.u[0]
 
         # do the sweep
         for m in range(0, M):

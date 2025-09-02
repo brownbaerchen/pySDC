@@ -492,6 +492,131 @@ class RayleighBenard(GenericSpectralLinear):
         return abs(u[iv] * self.Rayleigh * u[iT])
 
 
+class RayleighBenardSL(RayleighBenard):
+    dtype_f = mesh
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        f_hat = self.u_init_forward
+
+        iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
+
+        # evaluate implicit terms
+        if not hasattr(self, '_L_T_base'):
+            self._L_T_base = self.base_change @ self.L
+        f_hat = -(self._L_T_base @ u_hat.flatten()).reshape(u_hat.shape)
+
+        if self.spectral_space:
+            f[:] = f_hat
+        else:
+            f[:] = self.itransform(f_hat).real
+
+        self.work_counters['rhs']()
+        return f
+
+    def get_departure_points_highOrder(self, us, dts, t):
+        from qmat.lagrange import LagrangeApproximation
+
+        L = LagrangeApproximation(points=dts)
+        S = L.getIntegrationMatrix([[0, t]])
+
+        if self.spectral_space:
+            for i in range(len(us)):
+                us[i] = self.itransform(us[i])
+
+        X_depart = self.X.copy()
+        Z_depart = self.Z.copy()
+        iu, iv = self.index(['u', 'v'])
+
+        for i in range(len(us)):
+            X_depart -= S[0, i] * us[i][iu].real
+            Z_depart -= S[0, i] * us[i][iv].real
+
+        Z_depart[Z_depart < self.axes[-1].x0] = self.axes[-1].x0
+        Z_depart[Z_depart > self.axes[-1].x1] = self.axes[-1].x1
+        # if self.xp.min(Z_depart) < self.axes[-1].x0:
+        #     breakpoint()
+        # if self.xp.max(Z_depart) > self.axes[-1].x1:
+        #     breakpoint()
+
+        return {'X': X_depart, 'Z': Z_depart}
+
+    def get_departure_points(self, u, dt):
+
+        if self.spectral_space:
+            u = self.itransform(u)
+
+        X_depart = self.X.copy()
+        Z_depart = self.Z.copy()
+        iu, iv = self.index(['u', 'v'])
+
+        X_depart -= dt * u[iu].real
+        Z_depart -= dt * u[iv].real
+
+        Z_depart[Z_depart < self.axes[-1].x0] = self.axes[-1].x0
+        Z_depart[Z_depart > self.axes[-1].x1] = self.axes[-1].x1
+        # if self.xp.min(Z_depart) < self.axes[-1].x0:
+        #     breakpoint()
+        # if self.xp.max(Z_depart) > self.axes[-1].x1:
+        #     breakpoint()
+
+        return {'X': X_depart, 'Z': Z_depart}
+
+    def interpolate(self, u, departure_points, order=5):
+        from qmat.lagrange import getSparseInterpolationMatrix
+
+        if self.spectral_space:
+            u = self.itransform(u)
+        else:
+            u = u.copy()
+
+        deps = self.u_init_physical
+        deps[0] = departure_points['X']
+        deps[1] = departure_points['Z']
+
+        u = self.spectral.redistribute(u, axis=0, forward_output=True)
+        deps = self.spectral.redistribute(deps, axis=0, forward_output=True)
+        x = self.axes[0].get_1dgrid()
+        for j in range(self.X.shape[1]):
+            Ix = getSparseInterpolationMatrix(
+                x, deps[0, :, j].real, order=min([order, self.X.shape[0]]), grid_period=self.Lx
+            )
+            for i in range(self.ncomponents):
+                u[i, :, j] = Ix @ u[i, :, j].flatten()
+
+        u = self.spectral.redistribute(u, axis=1, forward_output=True)
+        deps = self.spectral.redistribute(deps, axis=1, forward_output=True)
+        z = self.axes[-1].get_1dgrid()
+        for j in range(deps[1].shape[0]):
+            Iz = getSparseInterpolationMatrix(z, deps[1, j, :], order=min([order, self.Z.shape[1]]))
+            for i in range(self.ncomponents):
+                u[i, j, :] = Iz @ u[i, j, :]
+
+        if self.spectral_space:
+            u = self.spectral.redistribute(u, axis=1, forward_output=True)
+            u = self.transform(u)
+        else:
+            u = self.spectral.redistribute(u, axis=0, forward_output=True)
+
+        me = self.spectral.u_init
+        me[...] = u
+        return me
+
+    # def solve_system(self, rhs, dt, u0, *args, **kwargs):
+    #     me = super().solve_system(rhs, dt, u0, *args, **kwargs)
+
+    #     departure_points = self.get_departure_points([me], [dt], dt)
+    #     me = self.interpolate(me, departure_points)
+
+    #     return me
+
+
 class CFLLimit(ConvergenceController):
 
     def dependencies(self, controller, *args, **kwargs):

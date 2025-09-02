@@ -1,6 +1,6 @@
 from pySDC.core.problem import Problem
 from pySDC.helpers.problem_helper import get_finite_difference_matrix, get_1d_grid
-from pySDC.implementations.datatype_classes.mesh import mesh
+from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 from scipy.sparse.linalg import spsolve
 import scipy.sparse as sp
 from qmat.lagrange import getSparseInterpolationMatrix
@@ -19,15 +19,15 @@ class Burgers1DSL(Problem):
 
         h, self.grid = get_1d_grid(N, 'periodic', 0, L)
         self.Id = sp.eye(N)
-        self.dx, _ = get_finite_difference_matrix(1, 4, stencil_type='center', bc='periodic', dx=h, dim=1, size=N)
-        self.dxx, _ = get_finite_difference_matrix(2, 4, stencil_type='center', bc='periodic', dx=h, dim=1, size=N)
+        self.dx, _ = get_finite_difference_matrix(1, 8, stencil_type='center', bc='periodic', dx=h, dim=1, size=N)
+        self.dxx, _ = get_finite_difference_matrix(2, 8, stencil_type='center', bc='periodic', dx=h, dim=1, size=N)
 
     def get_departure_points(self, u, dt):
         return self.grid - u * dt
 
-    def interpolate(self, u, departure_points, order=12):
+    def interpolate(self, u, departure_points, order=8):
         me = self.u_init
-        I = getSparseInterpolationMatrix(self.grid, departure_points, order=order)
+        I = getSparseInterpolationMatrix(self.grid, departure_points, order=order, gridPeriod=self.L)
         me[...] = I @ u
         return me
 
@@ -60,6 +60,18 @@ class Burgers1DSL(Problem):
         ax.legend(frameon=False)
 
 
+class Burgers1DIMEX(Burgers1DSL):
+    dtype_f = imex_mesh
+
+    def eval_f(self, u, *args):
+        f = self.f_init
+
+        f.impl[...] = self.nu * self.dxx @ u
+        f.expl[...] = -u * (self.dx @ u)
+
+        return f
+
+
 class AdvectionDiffusion1DSL(Burgers1DSL):
     c = 1
 
@@ -70,3 +82,30 @@ class AdvectionDiffusion1DSL(Burgers1DSL):
         me = self.u_init
         me[...] = np.sin((self.grid - self.c * t) * 2 * np.pi / self.L) * np.exp(-self.nu * t)
         return me
+
+
+class AdvectionDiffusion1D(AdvectionDiffusion1DSL):
+    def eval_f(self, u, *args):
+        f = self.f_init
+
+        f[...] = (-self.c * self.dx + self.nu * self.dxx) @ u
+
+        return f
+
+    def solve_system(self, rhs, dt, u0=None, t=None):
+        me = self.u_init
+
+        me[...] = spsolve(self.Id - dt * (-self.c * self.dx + self.nu * self.dxx), rhs)
+        return me
+
+
+class AdvectionDiffusion1DIMEX(AdvectionDiffusion1DSL):
+    dtype_f = imex_mesh
+
+    def eval_f(self, u, *args):
+        f = self.f_init
+
+        f.impl[...] = self.nu * self.dxx @ u
+        f.expl[...] = -self.c * self.dx @ u
+
+        return f

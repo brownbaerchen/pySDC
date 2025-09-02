@@ -328,6 +328,61 @@ def test_apply_BCs():
     P.check_BCs(u)
 
 
+def test_SL():
+    from pySDC.implementations.problem_classes.RayleighBenard import RayleighBenardSL, RayleighBenard
+
+    BCs = {'T_top': 0, 'T_bottom': 1}
+
+    P = RayleighBenardSL(nx=64, nz=2**2, spectral_space=False, dealiasing=1.0, BCs=BCs)
+    PE = RayleighBenard(nx=P.nz, nz=P.nz, spectral_space=False, dealiasing=1.0, BCs=BCs)
+    xp = P.xp
+
+    iu, iv, iT = P.index(['u', 'v', 'T'])
+
+    u = P.u_init
+    u[iT] = xp.sin(P.X * xp.pi)
+    dt = 1
+
+    departure_points = P.get_departure_points(u, dt)
+    un = P.interpolate(u, departure_points, order=2)
+    assert xp.allclose(un, u)
+
+    u = P.u_init
+    dt = 1e0
+    u[iu] = 1e-1
+
+    u[iT] = xp.sin(P.X * xp.pi)
+
+    departure_points = P.get_departure_points(u, dt)
+    un = P.interpolate(u, departure_points, order=4)
+
+    un_expect = P.u_init
+    un_expect[iu] = 1e-1
+    un_expect[iT] = xp.sin(P.X * xp.pi - u[iu] * dt * xp.pi)
+    assert xp.allclose(un_expect, un, atol=1e-3), abs(un_expect - un)
+
+    u = P.u_exact(0)
+    dt = 1e-2
+    for i in range(1):
+        un2 = P.solve_system(u, dt, u)
+        fE = PE.eval_f(u)
+        un22 = PE.solve_system(u + dt * fE.expl, dt, u)
+        print('oyyy', i * dt, abs(un2), abs(un22), abs(un2 - un22))
+        u = un2
+    exit()
+    # print(un2[iv])
+
+    # print(u[iT])
+    # print(un[iT])
+
+    import matplotlib.pyplot as plt
+
+    plt.plot(P.X[:, 0], u[iT, :, 0])
+    plt.plot(P.X[:, 0], un2[iT, :, 0])
+    plt.plot(P.X[:, 0], (un_expect)[iT, :, 3])
+    plt.show()
+
+
 if __name__ == '__main__':
     # test_eval_f(2**0, 2**2, 'z', True)
     # test_Poisson_problems(1, 'T')
@@ -336,5 +391,6 @@ if __name__ == '__main__':
     # test_Nusselt_numbers(1)
     # test_buoyancy_computation()
     # test_viscous_dissipation()
-    test_CFL()
+    # test_CFL()
+    test_SL()
     # test_Nyquist_mode_elimination()
