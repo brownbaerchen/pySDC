@@ -548,8 +548,37 @@ def plot_spectrum_over_time1e6R4():
     ax.legend(frameon=False)
 
 
+def compare_spectra1e8():
+    fig, ax = plt.subplots()
+
+    runs = []
+    labels = []
+    runs.append(get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4'))
+    labels.append(r'$N=384^2\times96$')
+    runs.append(get_pySDC_data('1e8', res=128, dt=0.005, config_name='RBC3DG4R4'))
+    labels.append(r'$N=512^2\times128$')
+    runs.append(get_pySDC_data('1e8', res=96, dt=0.006, config_name='RBC3DG4'))
+    labels.append(r'$N=192^2\times96$')
+
+    for data, label in zip(runs, labels):
+        s = data['spectrum']
+        t = data['t']
+        k = data['k']
+
+        k = data['k'] + 1
+        spectrum = np.array(data['spectrum'])
+        u_spectrum = np.mean(spectrum, axis=0)[1]
+        idx = data['res_in_boundary_layer']
+        _s = u_spectrum[idx]
+        ax.loglog(k[_s > 1e-20], _s[_s > 1e-20], label=label)
+
+    ax.legend(frameon=False)
+    ax.set_xlabel('$k$')
+    ax.set_ylabel(r'$\|\hat{u}_x\|$')
+
+
 if __name__ == '__main__':
-    plot_Ra_Nusselt_scaling()
+    # plot_Ra_Nusselt_scaling()
 
     # compare_Nusselt_over_time1e5()
     # compare_Nusselt_over_time1e6()
@@ -557,5 +586,6 @@ if __name__ == '__main__':
     # compare_Nusselt_over_time1e8()
     # plot_thibaut_stuff()
     # plot_spectrum_over_time1e6R4()
+    compare_spectra1e8()
 
     plt.show()
