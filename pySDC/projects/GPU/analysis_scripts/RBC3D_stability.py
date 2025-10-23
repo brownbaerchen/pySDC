@@ -3,7 +3,7 @@ import numpy as np
 from pySDC.helpers.fieldsIO import FieldsIO
 from pySDC.projects.GPU.configs.base_config import get_config
 
-step_sizes = {'RBC3DG4Ra1e5': [1e3, 1e0, 1e-1, 8e-2, 6e-2], 'RBC3DG4R4Ra1e5': [2e0, 1e0, 1e-1, 5e-2]}
+step_sizes = {'RBC3DG4Ra1e5': [1e3, 1e0, 1e-1, 8e-2, 6e-2], 'RBC3DG4R4Ra1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2]}
 n_freefall_times = {}
 
 
@@ -19,7 +19,7 @@ def get_stability(args, dt):
     t, u = file.readField(-1)
 
     reachedTend = t >= n_freefall_times.get(type(config).__name__, 3)
-    isfinite = np.all(np.isfinite(u))
+    isfinite = u.max() <= 1e9
     if not reachedTend:
         print(f'Did not reach Tend with {dt=:.2e}')
     elif not isfinite:
@@ -29,6 +29,7 @@ def get_stability(args, dt):
 
 def compute_stability(args, dt):
     from pySDC.projects.GPU.run_experiment import run_experiment
+    from pySDC.core.errors import ConvergenceError
 
     args['mode'] = 'run'
     args['dt'] = dt
@@ -37,7 +38,10 @@ def compute_stability(args, dt):
     config.Tend = n_freefall_times.get(type(config).__name__, 3)
     config.ic_config = type(config)
 
-    run_experiment(args, config)
+    try:
+        run_experiment(args, config)
+    except ConvergenceError:
+        pass
 
 
 if __name__ == '__main__':
@@ -51,4 +55,4 @@ if __name__ == '__main__':
 
     for i in range(len(dts)):
         stability[i] = get_stability(args, dts[i])
-    print(stability)
+    print([(dts[i], stability[i]) for i in range(len(dts))])
