@@ -22,7 +22,15 @@ comm = MPI.COMM_WORLD
 config = get_config(args)
 
 desc = config.get_description(**args)
-P = desc['problem_class'](**{**desc['problem_params'], 'spectral_space': False, 'comm': comm})
+P = desc['problem_class'](
+    **{
+        **desc['problem_params'],
+        'spectral_space': False,
+        'comm': comm,
+        'Dirichlet_recombination': False,
+        'left_preconditioner': False,
+    }
+)
 P.setUpFieldsIO()
 xp = P.xp
 

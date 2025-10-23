@@ -141,6 +141,10 @@ class RayleighBenard3D(GenericSpectralLinear):
         U01 = self.get_basis_change_matrix(p_in=0, p_out=1)
         U12 = self.get_basis_change_matrix(p_in=1, p_out=2)
         U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
+        self.eliminate_zeros(S1)
+        self.eliminate_zeros(S2)
+        self.eliminate_zeros(Dz)
+        self.eliminate_zeros(Dzz)
 
         self.Dx = Dx
         self.Dxx = Dxx
@@ -158,13 +162,12 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         # construct operators
         _D = U02 @ (Dxx + Dyy) + Dzz
-        L_lhs = {
-            'p': {'u': U01 @ Dx, 'v': U01 @ Dy, 'w': Dz},  # divergence free constraint
-            'u': {'p': U02 @ Dx, 'u': -self.nu * _D},
-            'v': {'p': U02 @ Dy, 'v': -self.nu * _D},
-            'w': {'p': U12 @ Dz, 'w': -self.nu * _D, 'T': -U02 @ Id},
-            'T': {'T': -self.kappa * _D},
-        }
+        L_lhs = {}
+        L_lhs['p'] = {'u': U01 @ Dx, 'v': U01 @ Dy, 'w': Dz}  # divergence free constraint
+        L_lhs['u'] = {'p': U02 @ Dx, 'u': -self.nu * _D}
+        L_lhs['v'] = {'p': U02 @ Dy, 'v': -self.nu * _D}
+        L_lhs['w'] = {'p': U12 @ Dz, 'w': -self.nu * _D, 'T': -U02 @ Id}
+        L_lhs['T'] = {'T': -self.kappa * _D}
         self.setup_L(L_lhs)
 
         # mass matrix

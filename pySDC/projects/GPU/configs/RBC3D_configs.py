@@ -16,6 +16,7 @@ class RayleighBenard3DRegular(Config):
     Tend = 50
     gamma = 1
     res_ratio = 1
+    dealiasing = 3.0 / 2.0
 
     def get_file_name(self):
         res = self.args['res']
@@ -78,6 +79,7 @@ class RayleighBenard3DRegular(Config):
         desc['problem_params']['Ly'] = self.gamma
         desc['problem_params']['Lz'] = 1
         desc['problem_params']['heterogeneous'] = True
+        desc['problem_params']['dealiasing'] = self.dealiasing
 
         desc['step_params']['maxiter'] = 3
 
@@ -535,6 +537,15 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
     converged = 50
 
 
+class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
+    res_ratio = 4
+    Tend = 100
+    dt = 8e-2
+    ic_config = None
+    res = 32
+    converged = 50
+
+
 class RBC3DG4RKRa1e5(RBC3DverificationRKGamma4):
     Tend = 200
     dt = 7e-2
@@ -595,13 +606,48 @@ class RBC3DG4R4Ra1e7(RBC3DverificationGamma4):
     dt = 5e-3
     ic_config = RBC3DG4Ra1e6
     res = 64
-    converged = 11
+    # converged = 11
+
+
+class RBC3DG4R4D2Ra1e7(RBC3DverificationGamma4):
+    res_ratio = 4
+    Tend = 40
+    dt = 5e-3
+    ic_config = RBC3DG4Ra1e6
+    res = 64
+    dealiasing = 1
+
+
+class RBC3DG4R4D4Ra1e7(RBC3DverificationGamma4):
+    res_ratio = 4
+    Tend = 40
+    dt = 5e-3
+    ic_config = RBC3DG4Ra1e6
+    res = 64
+    dealiasing = 2
+
+
+class RBC3DG4R4D42Ra1e7(RBC3DverificationGamma4):
+    res_ratio = 4
+    Tend = 40
+    dt = 5e-3
+    ic_config = RBC3DG4R4Ra1e6
+    res = 64
+    dealiasing = 2
 
 
 class RBC3DG4RKRa1e7(RBC3DverificationRKGamma4):
     # at res=96: with dt=8e-3 blows up at t=67.5
     Tend = 100
     dt = 2e-2  # limit
+    ic_config = RBC3DG4Ra1e6
+    res = 96
+
+
+class RBC3DG4R4RKRa1e7(RBC3DverificationRKGamma4):
+    res_ratio = 4
+    Tend = 100
+    dt = 2e-2
     ic_config = RBC3DG4Ra1e6
     res = 96
 
@@ -624,7 +670,7 @@ class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
     converged = 20
 
 
-class RBC3DG4R4Ra1e8(RBC3DverificationGamma4):
+class RBC3DG4Ra1e8(RBC3DverificationGamma4):
     # nz=128: dt=5e-3 crash at t=0.9
     Tend = 60
     dt = 6e-3
@@ -633,13 +679,31 @@ class RBC3DG4R4Ra1e8(RBC3DverificationGamma4):
     # converged=20
 
 
+class RBC3DG4R42Ra1e8(RBC3DverificationGamma4):
+    Tend = 60
+    res_ratio = 4
+    dt = 6e-3
+    ic_config = None
+    res = 96
+    # converged=20
+
+
 class RBC3DG4R4Ra1e8(RBC3DverificationGamma4):
     res_ratio = 4
     Tend = 60
-    dt = 6e-3
+    dt = 5e-3
     ic_config = RBC3DG4R4Ra1e7
     res = 96
-    # converged=20
+    # converged=14
+
+
+class RBC3DG4R4RKRa1e8(RBC3DverificationRKGamma4):
+    res_ratio = 4
+    Tend = 40
+    dt = 3e-3  # limit
+    ic_config = RBC3DG4R4Ra1e7
+    res = 256
+    # converged = 20
 
 
 # class RBC3DG4Ra1e8(RBC3DverificationGamma4):
