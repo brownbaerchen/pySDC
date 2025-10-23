@@ -3,7 +3,11 @@ import numpy as np
 from pySDC.helpers.fieldsIO import FieldsIO
 from pySDC.projects.GPU.configs.base_config import get_config
 
-step_sizes = {'RBC3DG4Ra1e5': [1e3, 1e0, 1e-1, 8e-2, 6e-2], 'RBC3DG4R4Ra1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2]}
+step_sizes = {
+    'RBC3DG4Ra1e5': [3, 1e0, 1e-1, 8e-2, 6e-2],
+    'RBC3DG4RKRa1e5': [1e3, 5, 4, 1e0, 1e-1, 8e-2, 6e-2],
+    'RBC3DG4R4Ra1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2],
+}
 n_freefall_times = {}
 
 
@@ -36,7 +40,9 @@ def compute_stability(args, dt):
 
     config = get_config(args)
     config.Tend = n_freefall_times.get(type(config).__name__, 3)
-    config.ic_config = type(config)
+
+    ic_config_name = type(config).__name__.replace('RK', '')
+    config.ic_config = type(get_config({**args, 'config': ic_config_name}))
 
     try:
         run_experiment(args, config)
