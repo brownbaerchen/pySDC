@@ -531,16 +531,17 @@ def plot_spectrum_over_time1e6R4():
 
     # data = get_pySDC_data('1e6', res=48, dt=0.02, config_name='RBC3DG4')
     # data = get_pySDC_data('1e7', res=96, dt=0.009, config_name='RBC3DG4')
-    # data = get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4')
-    data = get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4')
+    data = get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4D42')
+    # data = get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4')
+    # data = get_pySDC_data('1e8', res=256, dt=0.002, config_name='RBC3DG4R4RK')
 
     s = data['spectrum']
     t = data['t']
     k = data['k']
 
-    # for i in range(len(s)):
-    # for i in [0, 3, 10, 20, 40, 80, -1]:
-    for i in [0, 5, 10, 20, 30, 40, -1]:
+    for i in range(len(s)):
+        # for i in [0, 3, 10, 20, 40, 80, -1]:
+        # for i in [0, 5, 10, 20, 30, 40, -1]:
         print(i, t[i])
         _s = s[i][0, data['res_in_boundary_layer']]
         _s = np.max(s[i][0], axis=0)
@@ -548,33 +549,63 @@ def plot_spectrum_over_time1e6R4():
     ax.legend(frameon=False)
 
 
-def compare_spectra1e8():
+def compare_spectra(Ra=1e8):
     fig, ax = plt.subplots()
 
     runs = []
     labels = []
-    runs.append(get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4'))
-    labels.append(r'$N=384^2\times96$')
-    runs.append(get_pySDC_data('1e8', res=128, dt=0.005, config_name='RBC3DG4R4'))
-    labels.append(r'$N=512^2\times128$')
-    runs.append(get_pySDC_data('1e8', res=96, dt=0.006, config_name='RBC3DG4'))
-    labels.append(r'$N=192^2\times96$')
+    if Ra == 1e8:
+        runs.append(get_pySDC_data('1e8', res=96, dt=0.005, config_name='RBC3DG4R4'))
+        labels.append(r'$N=384^2\times96$')
+        runs.append(get_pySDC_data('1e8', res=128, dt=0.005, config_name='RBC3DG4R4'))
+        labels.append(r'$N=512^2\times128$')
+        runs.append(get_pySDC_data('1e8', res=96, dt=0.006, config_name='RBC3DG4'))
+        labels.append(r'$N=192^2\times96$')
+        runs.append(get_pySDC_data('1e8', res=256, dt=0.002, config_name='RBC3DG4R4RK'))
+        labels.append(r'$N=1024^2\times256$')
+    elif Ra == 1e7:
+        runs.append(get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4'))
+        labels.append(r'$N=264^2\times64$')
+        runs.append(get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4D2'))
+        labels.append(r'$N=264^2\times64$, no dealiasing')
+        runs.append(get_pySDC_data('1e7', res=64, dt=0.005, config_name='RBC3DG4R4D4'))
+        labels.append(r'$N=264^2\times64$, dealiasing 2')
+        runs.append(get_pySDC_data('1e7', res=96, dt=0.009, config_name='RBC3DG4'))
+        labels.append(r'$N=192^2\times96$')
+        runs.append(get_pySDC_data('1e7', res=96, dt=0.005, config_name='RBC3DG4R4'))
+        labels.append(r'$N=384^2\times96$')
+        runs.append(get_pySDC_data('1e7', res=128, dt=0.005, config_name='RBC3DG4R4'))
+        labels.append(r'$N=512^2\times128$')
+    elif Ra == 1e5:
+        runs.append(get_pySDC_data('1e5', res=32, dt=0.06, config_name='RBC3DG4'))
+        labels.append(r'$N=64^2\times32$')
+        runs.append(get_pySDC_data('1e5', res=32, dt=0.06, config_name='RBC3DG4R4'))
+        labels.append(r'$N=128^2\times32$')
+    else:
+        raise NotImplementedError
 
     for data, label in zip(runs, labels):
-        s = data['spectrum']
-        t = data['t']
+        s_all = data['spectrum']
         k = data['k']
 
-        k = data['k'] + 1
-        spectrum = np.array(data['spectrum'])
-        u_spectrum = np.mean(spectrum, axis=0)[1]
-        idx = data['res_in_boundary_layer']
-        _s = u_spectrum[idx]
-        ax.loglog(k[_s > 1e-20], _s[_s > 1e-20], label=label)
+        from pySDC.helpers.spectral_helper import ChebychevHelper
+
+        helper = ChebychevHelper(N=s_all[0].shape[1], x0=0, x1=1)
+        weights = helper.get_integration_weights()
+        s = np.array([weights @ helper.transform(me[0], axes=(0,)) for me in s_all]).mean(axis=0)
+
+        ax.loglog(k[s > 1e-20], s[s > 1e-20], label=label)
+
+        # spectrum = np.array(data['spectrum'])
+        # u_spectrum = np.mean(spectrum, axis=0)[1]
+        # idx = data['res_in_boundary_layer']
+        # _s = u_spectrum[idx]
+        # ax.loglog(k[_s > 1e-20], _s[_s > 1e-20], label=label)
 
     ax.legend(frameon=False)
     ax.set_xlabel('$k$')
     ax.set_ylabel(r'$\|\hat{u}_x\|$')
+    ax.set_title(f'Ra = {Ra:.1e}')
 
 
 if __name__ == '__main__':
@@ -586,6 +617,6 @@ if __name__ == '__main__':
     # compare_Nusselt_over_time1e8()
     # plot_thibaut_stuff()
     # plot_spectrum_over_time1e6R4()
-    compare_spectra1e8()
+    compare_spectra(Ra=1e5)
 
     plt.show()
