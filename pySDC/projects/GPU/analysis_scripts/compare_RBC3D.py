@@ -204,7 +204,7 @@ def compare_Nusselt_over_time1e7_old():
     ax.set_ylabel('Nu')
 
 
-def compare_Nusselt_over_time1e5():
+def compare_Nusselt_over_time1e5_old():
     fig, axs = plt.subplots(2, 1, sharex=True)
     Ra = '1e5'
     res = 32
@@ -279,6 +279,79 @@ def interpolate_NuV_to_reference_times(data, reference_data, order=12):
 
     interpolation_matrix = getSparseInterpolationMatrix(t_in, t_out, order=order)
     return interpolation_matrix @ t_in, interpolation_matrix @ data['Nu']['V']
+
+
+def compare_Nusselt_over_time1e5():
+    fig, Nu_ax = plt.subplots()
+    _, axs = plt.subplots(1, 3, figsize=(10, 3))
+    prof_ax = axs[0]
+    rms_ax = axs[1]
+    spectrum_ax = axs[2]
+
+    Ra = '1e5'
+    res = 32
+
+    data = []
+    labels = []
+    linestyles = []
+
+    ref_data = get_pySDC_data(Ra, res=res, dt=0.01, config_name='RBC3DG4R4')
+
+    for dt in [0.06, 0.02, 0.01]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt, config_name='RBC3DG4R4'))
+        labels.append(f'SDC, dt={dt:.4f}')
+        linestyles.append('-')
+
+    # # ----------------- RK ------------------------
+
+    for dt in [0.05, 0.04, 0.02, 0.01, 0.005]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt, RK=True, config_name='RBC3DG4R4'))
+        labels.append(f'RK, dt={dt:.3f}')
+        linestyles.append('--')
+
+    for dat, label, linestyle in zip(data, labels, linestyles):
+        Nu = np.array(dat['Nu']['V'])
+        t = dat['t']
+        Nu_ref = np.array(ref_data['Nu']['V'])
+        t_i, Nu_i = interpolate_NuV_to_reference_times(dat, ref_data)
+        Nu_ax.plot(t, Nu, label=label, ls=linestyle)
+
+        error = np.maximum.accumulate(np.abs(Nu_ref[: Nu_i.shape[0]] - Nu_i) / np.abs(Nu_ref[: Nu_i.shape[0]]))
+
+        # compute mean Nu
+        mask = np.logical_and(t >= 20, t <= 200)
+        Nu_mean = np.mean(Nu[mask])
+        Nu_std = np.std(Nu[mask])
+
+        last_line = Nu_ax.get_lines()[-1]
+        if any(error > 1e-2):
+            deviates = min(t_i[error > 1e-2])
+            Nu_ax.axvline(deviates, color=last_line.get_color(), ls=last_line.get_linestyle())
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}, deviates more than 1% from t={deviates:.2f}')
+        else:
+            print(f'{label} Nu={Nu_mean:.3f}+={Nu_std:.3f}')
+
+        k = dat['k']
+        spectrum = np.array(dat['spectrum'])
+        u_spectrum = np.mean(spectrum, axis=0)[1]
+        idx = dat['res_in_boundary_layer']
+        _s = u_spectrum[idx]
+        spectrum_ax.loglog(
+            k[_s > 1e-16], _s[_s > 1e-16], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+        prof_ax.plot(dat['profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label)
+        rms_ax.plot(
+            dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
+        )
+
+    Nu_ax.legend(frameon=True)
+    Nu_ax.set_xlabel('t')
+    Nu_ax.set_ylabel('Nu')
+
+    spectrum_ax.legend(frameon=False)
+    spectrum_ax.set_xlabel('$k$')
+    spectrum_ax.set_ylabel(r'$\|\hat{u}_x\|$')
 
 
 def compare_Nusselt_over_time1e6():
@@ -611,12 +684,12 @@ def compare_spectra(Ra=1e8):
 if __name__ == '__main__':
     # plot_Ra_Nusselt_scaling()
 
-    # compare_Nusselt_over_time1e5()
+    compare_Nusselt_over_time1e5()
     # compare_Nusselt_over_time1e6()
     # compare_Nusselt_over_time1e7()
     # compare_Nusselt_over_time1e8()
     # plot_thibaut_stuff()
     # plot_spectrum_over_time1e6R4()
-    compare_spectra(Ra=1e5)
+    # compare_spectra(Ra=1e5)
 
     plt.show()
