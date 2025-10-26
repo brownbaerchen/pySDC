@@ -207,7 +207,7 @@ class LogStats(ConvergenceController):
                 with open(self.get_stats_path(index=i), 'rb') as file:
                     _stats = pickle.load(file)
                     stats = {**stats, **_stats}
-            except FileNotFoundError:
+            except (FileNotFoundError, EOFError):
                 print(f'Warning: No stats found at path {self.get_stats_path(index=i)}')
 
         stats = {**stats, **controller.return_stats()}

@@ -7,6 +7,7 @@ step_sizes = {
     'RBC3DG4Ra1e5': [3, 1e0, 1e-1, 8e-2, 6e-2],
     'RBC3DG4RKRa1e5': [1e3, 5, 4, 1e0, 1e-1, 8e-2, 6e-2],
     'RBC3DG4R4Ra1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2],
+    'RBC3DG4R4RKRa1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2],
 }
 n_freefall_times = {}
 

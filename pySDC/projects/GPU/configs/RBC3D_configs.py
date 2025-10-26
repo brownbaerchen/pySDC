@@ -490,9 +490,24 @@ class RBC3DverificationRK(RBC3Dverification):
         return desc
 
 
+class RBC3DverificationEuler(RBC3DverificationRK):
+
+    def get_description(self, *args, res=-1, dt=-1, **kwargs):
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import IMEXEuler
+
+        desc = super().get_description(*args, res=res, dt=dt, **kwargs)
+        desc['sweeper_class'] = IMEXEuler
+        return desc
+
+
 class RBC3DverificationRKGamma4(RBC3DverificationRK):
     gamma = 4
     res_ratio = 2
+
+
+class RBC3DverificationEulerG4R4(RBC3DverificationEuler):
+    gamma = 4
+    res_ratio = 4
 
 
 class RBC3DRa1e4(RBC3Dverification):
@@ -539,7 +554,24 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
 
 class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
     res_ratio = 4
-    Tend = 100
+    Tend = 200
+    dt = 8e-2
+    ic_config = None
+    res = 32
+    converged = 50
+
+
+class RBC3DG4R4RKRa1e5(RBC3DverificationRKGamma4):
+    res_ratio = 4
+    Tend = 200
+    dt = 8e-2
+    ic_config = None
+    res = 32
+    converged = 50
+
+
+class RBC3DG4R4EulerRa1e5(RBC3DverificationEulerG4R4):
+    Tend = 200
     dt = 8e-2
     ic_config = None
     res = 32
