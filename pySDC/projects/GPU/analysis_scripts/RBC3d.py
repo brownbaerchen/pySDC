@@ -44,6 +44,7 @@ data = FieldsIO.fromFile(fname)
 Nu = {'V': [], 'b': [], 't': []}
 t = []
 T = []
+dissipation = []
 profiles = {key: [] for key in ['T', 'u', 'v', 'w']}
 rms_profiles = {key: [] for key in profiles.keys()}
 spectrum = []
@@ -79,6 +80,8 @@ for i in r:
         Nu[key].append(_Nu[key])
 
     t.append(_t)
+
+    dissipation.append(P.get_kinetic_energy_dissipation(u))
 
     # u_mean = P.xp.mean(u[0])
     # v_mean = P.xp.mean(u[1])
@@ -206,6 +209,7 @@ if P.comm.rank == 0:
         'avg_spectrum': avg_spectrum,
         'boundary_layer_thickness': boundary_layer,
         'res_in_boundary_layer': res_in_boundary_layer,
+        'dissipation': dissipation,
     }
     for key, values in avg_profiles.items():
         write_data[f'profile_{key}'] = values

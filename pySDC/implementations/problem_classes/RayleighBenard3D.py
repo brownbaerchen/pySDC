@@ -407,7 +407,7 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         dissipation = self.comm.allreduce(dissipation, op=MPI.SUM)
         total = self.comm.allreduce(total, op=MPI.SUM)
-        return dissipation / total
+        return (dissipation, total)
 
     def get_vertical_profiles(self, u, components):
         if self.spectral_space:
