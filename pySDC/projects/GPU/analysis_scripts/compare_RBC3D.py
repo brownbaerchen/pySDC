@@ -297,6 +297,8 @@ def compare_Nusselt_over_time1e5():
 
     ref_data = get_pySDC_data(Ra, res=res, dt=0.01, config_name='RBC3DG4R4')
 
+    _, ting_ax = plt.subplots()
+
     for dt in [0.06, 0.02, 0.01]:
         data.append(get_pySDC_data(Ra, res=res, dt=dt, config_name='RBC3DG4R4'))
         labels.append(f'SDC, dt={dt:.4f}')
@@ -351,6 +353,15 @@ def compare_Nusselt_over_time1e5():
         rms_ax.plot(
             dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
         )
+        if 'dissipation' in dat.keys():
+
+            mean_ke = np.mean([me[1] for me in dat['dissipation']])
+            print(
+                f'Energy error: {(dat["dissipation"][-1][1] - np.sum([me[0] for me in dat["dissipation"]])/2)/mean_ke:.2e}'
+            )
+            ting_ax.plot(t, np.cumsum([me[0] for me in dat['dissipation']]) / 2, label=label)
+            ting_ax.plot(t, [me[1] for me in dat['dissipation']], label=label, ls='--')
+            ting_ax.legend()
 
     Nu_ax.legend(frameon=True)
     Nu_ax.set_xlabel('t')

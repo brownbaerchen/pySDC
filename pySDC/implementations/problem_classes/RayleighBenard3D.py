@@ -325,6 +325,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         else:
             u_hat = self.transform(u)
 
+        DxT_hat = (self.Dx @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
+        DyT_hat = (self.Dy @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
         DzT_hat = (self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
 
         # compute wT with dealiasing
@@ -336,22 +338,25 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         nusselt_hat = (wT_hat / self.kappa - DzT_hat) * self.axes[-1].L
 
+        thermal_dissipation = 1 / self.kappa * (DxT_hat + DyT_hat + DzT_hat)
+
         if not hasattr(self, '_zInt'):
-            self._zInt = zAxis.get_integration_matrix()
+            self._zInt = zAxis.get_integration_weights()
 
         # get coefficients for evaluation on the boundary
         top = zAxis.get_BC(kind='Dirichlet', x=1)
         bot = zAxis.get_BC(kind='Dirichlet', x=-1)
 
         integral_V = 0
+        integral_V_th = 0
         if self.comm.rank == 0:
 
-            integral_z = (self._zInt @ nusselt_hat[0, 0]).real
-            integral_z[0] = zAxis.get_integration_constant(integral_z, axis=-1)
-            integral_V = ((top - bot) * integral_z).sum() * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+            integral_V = (self._zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+            integral_V_th = (
+                (self._zInt @ thermal_dissipation[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+            )
 
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
-
         Nusselt_t = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0, :] * top, axis=-1) / self.nx / self.ny, root=0)
         Nusselt_b = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0] * bot / self.nx / self.ny, axis=-1), root=0)
 
@@ -359,6 +364,7 @@ class RayleighBenard3D(GenericSpectralLinear):
             'V': Nusselt_V,
             't': Nusselt_t,
             'b': Nusselt_b,
+            'thermal': self.kappa * integral_V_th,
         }
 
     def get_viscous_dissipation(self, u):
