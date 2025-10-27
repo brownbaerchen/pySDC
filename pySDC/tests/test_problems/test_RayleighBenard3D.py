@@ -306,7 +306,6 @@ def test_Nusselt_number_computation(w, N=6):
     u[iT, ...] = 3 * prob.Z**2 + 1
     u[iw] = w * (1 + xp.sin(prob.Y / prob.axes[1].L * 2 * xp.pi))
     Nu = prob.compute_Nusselt_numbers(u)
-    print(Nu)
 
     for key, expect in zip(['t', 'b', 'V', 'thermal'], [prob.Lz * (3 + 1) * w - 6, w, w * (1 + 1) - 3, 12]):
         assert xp.isclose(Nu[key], expect), f'Expected Nu_{key}={expect}, but got {Nu[key]}'

@@ -362,23 +362,19 @@ class RayleighBenard3D(GenericSpectralLinear):
 
             integral_V = (self._zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             integral_V_th = (
-                (self._zInt @ thermal_dissipation_hat[0, 0]).real
-                * self.axes[0].L
-                * self.axes[1].L
-                / self.nx
-                / self.ny
-                / 16
+                (self._zInt @ thermal_dissipation_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             )
 
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
         Nusselt_t = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0, :] * top, axis=-1) / self.nx / self.ny, root=0)
         Nusselt_b = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0] * bot / self.nx / self.ny, axis=-1), root=0)
+        Nusselt_thermal = self.comm.bcast(self.kappa * integral_V_th / self.spectral.V, root=0)
 
         return {
             'V': Nusselt_V,
             't': Nusselt_t,
             'b': Nusselt_b,
-            'thermal': self.kappa * integral_V_th,
+            'thermal': Nusselt_thermal,
         }
 
     def get_viscous_dissipation(self, u):
