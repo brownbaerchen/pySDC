@@ -421,8 +421,26 @@ def test_spectrum_computation(mpi_ranks):
     assert xp.allclose(spectrum[iu, :, 0], 0)
 
 
+def test_kinetic_energy_dissipation(N=16):
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
+
+    P = RayleighBenard3D(nx=N, ny=N, nz=N, dealiasing=1.5, spectral_space=False, Rayleigh=1.0, Prandtl=1.0)
+    xp = P.xp
+
+    X, Y, Z = P.X, P.Y, P.Z
+    iu, iv, iw, ip, iT = P.index(['u', 'v', 'w', 'p', 'T'])
+
+    u = P.u_init
+    f = 2 * xp.pi
+    u[iu] = xp.sin(f * X)
+
+    expect = xp.sum(2 * xp.sin(f * X) * (-(f**2) * xp.sin(f * X) - f * xp.sin(f * X) * xp.cos(f * X)))
+    dissipation = P.get_kinetic_energy_dissipation(u)
+    assert xp.isclose(dissipation, expect), f'Expected {expect:.2e}, got {dissipation:.2e}'
+
+
 if __name__ == '__main__':
-    test_eval_f(2**2, 2**1, 'x', False)
+    # test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
     # test_Poisson_problems(4, 'u')
     # test_Poisson_problem_w()
@@ -430,5 +448,6 @@ if __name__ == '__main__':
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
     # test_Nusselt_number_computation(N=4, w=3.14)
-    test_spectrum_computation(None)
+    # test_spectrum_computation(None)
+    test_kinetic_energy_dissipation()
     # test_CFL()

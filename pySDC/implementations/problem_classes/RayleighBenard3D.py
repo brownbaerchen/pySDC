@@ -361,6 +361,44 @@ class RayleighBenard3D(GenericSpectralLinear):
             'b': Nusselt_b,
         }
 
+    def get_viscous_dissipation(self, u):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        padding = (1,) * self.ndim
+
+        u_real = self.itransform(u, padding=padding)
+
+        _D_u_hat = self.u_init_forward
+        for D, c in zip([self.Dxx, self.Dyy, self.Dzz], ['u', 'v', 'w'], strict=True):
+            i = self.index(c)
+            self.xp.copyto(_D_u_hat[i], (D @ u_hat[i].flatten()).reshape(_D_u_hat[i].shape))
+        lap_u = self.itransform(_D_u_hat, padding=padding).real
+        dissipation = (u_real * lap_u).sum(axis=0)
+
+        iw, iT = self.index(['w', 'T'])
+        P = u_real[iw] * u_real[iT]
+
+        print(dissipation.shape, P.shape)
+        raise
+
+    def get_kinetic_energy_dissipation(self, u):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        f = self.eval_f(u)
+
+        dissipation = 0
+        for i in self.index(['u', 'v', 'w']):
+            dissipation += self.xp.sum((2 * u[i] * (f.impl[i] + f.expl[i])).real)
+
+        dissipation = self.comm.allreduce(dissipation, op=MPI.SUM)
+        return dissipation
+
     def get_vertical_profiles(self, u, components):
         if self.spectral_space:
             u_hat = u.copy()
