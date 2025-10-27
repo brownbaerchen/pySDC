@@ -317,7 +317,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         Returns:
             dict: Nusselt number averaged over the entire volume and horizontally averaged at the top and bottom.
         """
-        iw, iT = self.index(['w', 'T'])
+        iu, iv, iw, iT = self.index(['u', 'v', 'w', 'T'])
         zAxis = self.spectral.axes[-1]
 
         if self.spectral_space:
@@ -346,8 +346,16 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         thermal_dissipation = self.u_init_physical
         thermal_dissipation[0, ...] = 1 / self.kappa * (DT.sum(axis=0).real) ** 2
-
         thermal_dissipation_hat = self.transform(thermal_dissipation)[0]
+
+        grad_u_hat = self.u_init_forward
+        grad_u_hat[0] = (self.Dx @ u_hat[iu].flatten()).reshape(u_hat[iT].shape)
+        grad_u_hat[1] = (self.Dy @ u_hat[iv].flatten()).reshape(u_hat[iT].shape)
+        grad_u_hat[2] = (self.Dz @ u_hat[iw].flatten()).reshape(u_hat[iT].shape)
+        grad_u = self.itransform(grad_u_hat)
+        kinetic_energy_dissipation = self.u_init_physical
+        kinetic_energy_dissipation[0, ...] = self.kappa * (grad_u.sum(axis=0).real) ** 2
+        kinetic_energy_dissipation_hat = self.transform(kinetic_energy_dissipation)[0]
 
         if not hasattr(self, '_zInt'):
             self._zInt = zAxis.get_integration_weights()
@@ -364,17 +372,26 @@ class RayleighBenard3D(GenericSpectralLinear):
             integral_V_th = (
                 (self._zInt @ thermal_dissipation_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             )
+            integral_V_kin = (
+                (self._zInt @ kinetic_energy_dissipation_hat[0, 0]).real
+                * self.axes[0].L
+                * self.axes[1].L
+                / self.nx
+                / self.ny
+            )
 
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
         Nusselt_t = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0, :] * top, axis=-1) / self.nx / self.ny, root=0)
         Nusselt_b = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0] * bot / self.nx / self.ny, axis=-1), root=0)
         Nusselt_thermal = self.comm.bcast(self.kappa * integral_V_th / self.spectral.V, root=0)
+        Nusselt_kinetic = self.comm.bcast(1 + self.kappa * integral_V_kin / self.spectral.V, root=0)
 
         return {
             'V': Nusselt_V,
             't': Nusselt_t,
             'b': Nusselt_b,
             'thermal': Nusselt_thermal,
+            'kinetic': Nusselt_kinetic,
         }
 
     def get_viscous_dissipation(self, u):
