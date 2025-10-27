@@ -393,11 +393,15 @@ class RayleighBenard3D(GenericSpectralLinear):
         f = self.eval_f(u)
 
         dissipation = 0
+        total = 0
+
         for i in self.index(['u', 'v', 'w']):
             dissipation += self.xp.sum((2 * u[i] * (f.impl[i] + f.expl[i])).real)
+            total += self.xp.sum(u[i] * self.xp.conj(u[i]))
 
         dissipation = self.comm.allreduce(dissipation, op=MPI.SUM)
-        return dissipation
+        total = self.comm.allreduce(total, op=MPI.SUM)
+        return dissipation / total
 
     def get_vertical_profiles(self, u, components):
         if self.spectral_space:

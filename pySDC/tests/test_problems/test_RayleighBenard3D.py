@@ -434,8 +434,11 @@ def test_kinetic_energy_dissipation(N=16):
     f = 2 * xp.pi
     u[iu] = xp.sin(f * X)
 
-    expect = xp.sum(2 * xp.sin(f * X) * (-(f**2) * xp.sin(f * X) - f * xp.sin(f * X) * xp.cos(f * X)))
+    expect = xp.sum(2 * xp.sin(f * X) * (-(f**2) * xp.sin(f * X) - f * xp.sin(f * X) * xp.cos(f * X))) / xp.sum(
+        xp.sin(f * X) ** 2
+    )
     dissipation = P.get_kinetic_energy_dissipation(u)
+
     assert xp.isclose(dissipation, expect), f'Expected {expect:.2e}, got {dissipation:.2e}'
 
 
