@@ -306,8 +306,9 @@ def test_Nusselt_number_computation(w, N=6):
     u[iT, ...] = 3 * prob.Z**2 + 1
     u[iw] = w * (1 + xp.sin(prob.Y / prob.axes[1].L * 2 * xp.pi))
     Nu = prob.compute_Nusselt_numbers(u)
+    print(Nu)
 
-    for key, expect in zip(['t', 'b', 'V'], [prob.Lz * (3 + 1) * w - 6, w, w * (1 + 1) - 3]):
+    for key, expect in zip(['t', 'b', 'V', 'thermal'], [prob.Lz * (3 + 1) * w - 6, w, w * (1 + 1) - 3, 12]):
         assert xp.isclose(Nu[key], expect), f'Expected Nu_{key}={expect}, but got {Nu[key]}'
 
     # zero
@@ -320,7 +321,7 @@ def test_Nusselt_number_computation(w, N=6):
     u[iT] = prob.Z**2 + 1
     Nu = prob.compute_Nusselt_numbers(u)
 
-    for key, expect in zip(['t', 'b', 'V'], [-prob.Lz * 2, 0, -1]):
+    for key, expect in zip(['t', 'b', 'V', 'thermal'], [-prob.Lz * 2, 0, -1, 4 / 3]):
         assert xp.isclose(Nu[key], expect), f'Expected Nu_{key}={expect}, but got {Nu[key]} with T=z**2!'
 
     # gradient plus fluctuations
@@ -450,7 +451,7 @@ if __name__ == '__main__':
     # test_solver_convergence('bicgstab+ilu', 32, False, True)
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
-    test_Nusselt_number_computation(N=4, w=3.14)
+    test_Nusselt_number_computation(N=6, w=3.14)
     # test_spectrum_computation(None)
     # test_kinetic_energy_dissipation()
     # test_CFL()

@@ -338,7 +338,16 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         nusselt_hat = (wT_hat / self.kappa - DzT_hat) * self.axes[-1].L
 
-        thermal_dissipation = 1 / self.kappa * (DxT_hat + DyT_hat + DzT_hat)
+        DT_hat = self.u_init_forward
+        DT_hat[0, ...] = DxT_hat
+        DT_hat[1, ...] = DyT_hat
+        DT_hat[2, ...] = DzT_hat
+        DT = self.itransform(DT_hat)
+
+        thermal_dissipation = self.u_init_physical
+        thermal_dissipation[0, ...] = 1 / self.kappa * (DT.sum(axis=0).real) ** 2
+
+        thermal_dissipation_hat = self.transform(thermal_dissipation)[0]
 
         if not hasattr(self, '_zInt'):
             self._zInt = zAxis.get_integration_weights()
@@ -353,7 +362,12 @@ class RayleighBenard3D(GenericSpectralLinear):
 
             integral_V = (self._zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             integral_V_th = (
-                (self._zInt @ thermal_dissipation[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+                (self._zInt @ thermal_dissipation_hat[0, 0]).real
+                * self.axes[0].L
+                * self.axes[1].L
+                / self.nx
+                / self.ny
+                / 16
             )
 
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
