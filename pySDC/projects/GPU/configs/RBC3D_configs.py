@@ -493,10 +493,10 @@ class RBC3DverificationRK(RBC3Dverification):
 class RBC3DverificationEuler(RBC3DverificationRK):
 
     def get_description(self, *args, res=-1, dt=-1, **kwargs):
-        from pySDC.implementations.sweeper_classes.Runge_Kutta import IMEXEuler
+        from pySDC.implementations.sweeper_classes.Runge_Kutta import IMEXEulerStifflyAccurate
 
         desc = super().get_description(*args, res=res, dt=dt, **kwargs)
-        desc['sweeper_class'] = IMEXEuler
+        desc['sweeper_class'] = IMEXEulerStifflyAccurate
         return desc
 
 

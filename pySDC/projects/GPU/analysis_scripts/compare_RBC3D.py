@@ -302,12 +302,19 @@ def compare_Nusselt_over_time1e5():
         labels.append(f'SDC, dt={dt:.4f}')
         linestyles.append('-')
 
-    # # ----------------- RK ------------------------
+    # ----------------- RK ------------------------
 
     for dt in [0.05, 0.04, 0.02, 0.01, 0.005]:
         data.append(get_pySDC_data(Ra, res=res, dt=dt, RK=True, config_name='RBC3DG4R4'))
         labels.append(f'RK, dt={dt:.3f}')
         linestyles.append('--')
+
+    # ----------------- Euler ---------------------
+
+    for dt in [0.02, 0.005]:
+        data.append(get_pySDC_data(Ra, res=res, dt=dt, config_name='RBC3DG4R4Euler'))
+        labels.append(f'Euler, dt={dt:.3f}')
+        linestyles.append('-.')
 
     for dat, label, linestyle in zip(data, labels, linestyles):
         Nu = np.array(dat['Nu']['V'])
