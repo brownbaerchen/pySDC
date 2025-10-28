@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 step_sizes = {
     'RBC3DG4Ra1e5': [3, 1e0, 1e-1, 8e-2, 6e-2],
     'RBC3DG4RKRa1e5': [1e3, 5, 4, 1e0, 1e-1, 8e-2, 6e-2],
-    'RBC3DG4R4Ra1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2],
-    'RBC3DG4R4RKRa1e5': [1e0, 1e-1, 9e-2, 8e-2, 7e-2, 6e-2, 5e-2],
+    'RBC3DG4R4Ra1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
+    'RBC3DG4R4RKRa1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
 }
 n_freefall_times = {}
 
@@ -88,9 +88,6 @@ if __name__ == '__main__':
     args = parse_args()
     config = get_config(args)
 
-    # run(args, 1e-3, 1e-2)
-    # compute_errors(args, [8e-2, 4e-2, 2e-2, 1e-2, 5e-3], 8e-2)
+    dts = step_sizes[type(config).__name__]
+    compute_errors(args, dts, max(dts))
     plot_errors(args)
-
-    # dts = step_sizes[type(config).__name__]
-    # stability = [None for _ in dts]
