@@ -41,7 +41,13 @@ path = f'{BASE_PATH}/{fname[start + 5:-6]}.pickle'
 
 data = FieldsIO.fromFile(fname)
 
-Nu = {'V': [], 'b': [], 't': []}
+Nu = {
+    'V': [],
+    'b': [],
+    't': [],
+    'thermal': [],
+    'kinetic': [],
+}
 t = []
 T = []
 dissipation = []

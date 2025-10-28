@@ -356,9 +356,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         DT = self.itransform(DT_hat)
 
         thermal_dissipation = self.u_init_physical
-        thermal_dissipation[0, ...] = 1 / self.kappa * (DT.sum(axis=0).real) ** 2
         thermal_dissipation[0, ...] = (
-            1 / self.kappa * (derivatives[0][iT].real + derivatives[1][iT].real + derivatives[2][iT].real) ** 2
+            self.kappa * (derivatives[0][iT].real + derivatives[1][iT].real + derivatives[2][iT].real) ** 2
         )
         thermal_dissipation_hat = self.transform(thermal_dissipation)[0]
 
@@ -368,13 +367,11 @@ class RayleighBenard3D(GenericSpectralLinear):
         grad_u_hat[2] = (self.Dz @ u_hat[iw].flatten()).reshape(u_hat[iw].shape)
         grad_u = self.itransform(grad_u_hat)
         kinetic_energy_dissipation = self.u_init_physical
-        # kinetic_energy_dissipation[0, ...] = self.kappa * (grad_u.sum(axis=0).real) ** 2
         for i in [iu, iv, iw]:
             kinetic_energy_dissipation[0, ...] += (
-                self.kappa * (derivatives[0][i].real + derivatives[1][i].real + derivatives[2][i].real) ** 2
+                self.nu * (derivatives[0][i].real + derivatives[1][i].real + derivatives[2][i].real) ** 2
             )
         kinetic_energy_dissipation_hat = self.transform(kinetic_energy_dissipation)[0]
-        print(self.xp.max(u_hat[iv]))
 
         if not hasattr(self, '_zInt'):
             self._zInt = zAxis.get_integration_weights()
@@ -403,8 +400,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
         Nusselt_t = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0, :] * top, axis=-1) / self.nx / self.ny, root=0)
         Nusselt_b = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0] * bot / self.nx / self.ny, axis=-1), root=0)
-        Nusselt_thermal = self.comm.bcast(self.kappa * integral_V_th / self.spectral.V, root=0)
-        Nusselt_kinetic = self.comm.bcast(1 + self.kappa * integral_V_kin / self.spectral.V, root=0)
+        Nusselt_thermal = self.comm.bcast(1 / self.kappa * integral_V_th / self.spectral.V, root=0)
+        Nusselt_kinetic = self.comm.bcast(1 + 1 / self.kappa * integral_V_kin / self.spectral.V, root=0)
 
         return {
             'V': Nusselt_V,
