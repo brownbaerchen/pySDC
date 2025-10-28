@@ -156,10 +156,18 @@ for key in Nu.keys():
     std_Nu[key] = xp.std(_Nu)
 # avg_Re = xp.mean([Re[i] for i in range(len(Re)) if t[i] > config.converged])
 
-rel_error = {key: abs(avg_Nu[key] - avg_Nu['V']) / avg_Nu['V'] for key in ['t', 'b']}
+rel_error = {
+    key: abs(avg_Nu[key] - avg_Nu['V']) / avg_Nu['V']
+    for key in [
+        't',
+        'b',
+        'thermal',
+        'kinetic',
+    ]
+}
 if comm.rank == 0:
     print(
-        f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with error at top of {rel_error["t"]:.2e} and {rel_error["b"]:.2e} at the bottom'  # and Re={avg_Re:.2e}'
+        f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with errors: Top {rel_error["t"]:.2e}, bottom: {rel_error["b"]:.2e}, thermal: {rel_error["thermal"]:.2e}, kinetic: {rel_error["kinetic"]:.2e}'  # and Re={avg_Re:.2e}'
     )
 
 
