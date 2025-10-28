@@ -338,6 +338,17 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         nusselt_hat = (wT_hat / self.kappa - DzT_hat) * self.axes[-1].L
 
+        derivatives = []
+        derivative_indices = [iu, iv, iw, iT]
+        u_hat_flat = [u_hat[i].flatten() for i in derivative_indices]
+        _D_u_hat = self.u_init_forward
+        padding = (1,) * self.ndim
+        for D in [self.Dx, self.Dy, self.Dz]:
+            _D_u_hat *= 0
+            for i in derivative_indices:
+                self.xp.copyto(_D_u_hat[i], (D @ u_hat_flat[i]).reshape(_D_u_hat[i].shape))
+            derivatives.append(self.itransform(_D_u_hat, padding=padding).real)
+
         DT_hat = self.u_init_forward
         DT_hat[0, ...] = DxT_hat
         DT_hat[1, ...] = DyT_hat
@@ -346,16 +357,24 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         thermal_dissipation = self.u_init_physical
         thermal_dissipation[0, ...] = 1 / self.kappa * (DT.sum(axis=0).real) ** 2
+        thermal_dissipation[0, ...] = (
+            1 / self.kappa * (derivatives[0][iT].real + derivatives[1][iT].real + derivatives[2][iT].real) ** 2
+        )
         thermal_dissipation_hat = self.transform(thermal_dissipation)[0]
 
         grad_u_hat = self.u_init_forward
-        grad_u_hat[0] = (self.Dx @ u_hat[iu].flatten()).reshape(u_hat[iT].shape)
-        grad_u_hat[1] = (self.Dy @ u_hat[iv].flatten()).reshape(u_hat[iT].shape)
-        grad_u_hat[2] = (self.Dz @ u_hat[iw].flatten()).reshape(u_hat[iT].shape)
+        grad_u_hat[0] = (self.Dx @ u_hat[iu].flatten()).reshape(u_hat[iu].shape)
+        grad_u_hat[1] = (self.Dy @ u_hat[iv].flatten()).reshape(u_hat[iv].shape)
+        grad_u_hat[2] = (self.Dz @ u_hat[iw].flatten()).reshape(u_hat[iw].shape)
         grad_u = self.itransform(grad_u_hat)
         kinetic_energy_dissipation = self.u_init_physical
-        kinetic_energy_dissipation[0, ...] = self.kappa * (grad_u.sum(axis=0).real) ** 2
+        # kinetic_energy_dissipation[0, ...] = self.kappa * (grad_u.sum(axis=0).real) ** 2
+        for i in [iu, iv, iw]:
+            kinetic_energy_dissipation[0, ...] += (
+                self.kappa * (derivatives[0][i].real + derivatives[1][i].real + derivatives[2][i].real) ** 2
+            )
         kinetic_energy_dissipation_hat = self.transform(kinetic_energy_dissipation)[0]
+        print(self.xp.max(u_hat[iv]))
 
         if not hasattr(self, '_zInt'):
             self._zInt = zAxis.get_integration_weights()
@@ -366,6 +385,7 @@ class RayleighBenard3D(GenericSpectralLinear):
 
         integral_V = 0
         integral_V_th = 0
+        integral_V_kin = 0
         if self.comm.rank == 0:
 
             integral_V = (self._zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
