@@ -8,8 +8,6 @@ from mpi4py import MPI
 import matplotlib.pyplot as plt
 
 step_sizes = {
-    'RBC3DG4Ra1e5': [3, 1e0, 1e-1, 8e-2, 6e-2],
-    'RBC3DG4RKRa1e5': [1e3, 5, 4, 1e0, 1e-1, 8e-2, 6e-2],
     'RBC3DG4R4Ra1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
     'RBC3DG4R4RKRa1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
 }
@@ -23,7 +21,6 @@ def no_logging_hook(*args, **kwargs):
 def get_path(args):
     config = get_config(args)
     fname = config.get_file_name()
-    print(fname.index('dt'))
     return f'{fname[:fname.index('dt')]}order.pickle'
 
 
@@ -42,25 +39,54 @@ def compute_errors(args, dts, Tend):
             e_comp = MPI.COMM_WORLD.allreduce(e_comp, op=MPI.MAX)
             errors[comp].append(e_comp)
         errors['dt'].append(dt)
-        print(errors)
 
     path = get_path(args)
-    with open(path, 'wb') as file:
-        pickle.dump(errors, file)
-        print(f'Saved errors to {path}', config.get_file_name())
+    if MPI.COMM_WORLD.rank == 0:
+        with open(path, 'wb') as file:
+            pickle.dump(errors, file)
+            print(f'Saved errors to {path}', flush=True)
 
 
-def plot_errors(args):
+def plot_error_all_components(args):
+    fig, ax = plt.subplots()
+    print(get_path(args))
     with open(get_path(args), 'rb') as file:
         errors = pickle.load(file)
 
-    for comp in errors.keys():
-        plt.loglog(errors['dt'], errors[comp], label=comp)
+    for comp in ['u', 'v', 'w', 'T', 'p']:
+        e = np.array(errors[comp])
+        dt = np.array(errors['dt'])
+        order = np.log(e[1:] / e[:-1]) / np.log(dt[1:] / dt[:-1])
+        ax.loglog(errors['dt'], errors[comp], label=f'{comp} order {np.mean(order):.1f}')
 
-    plt.loglog(errors['dt'], np.array(errors['dt']) ** 4, label='Order 4')
-    plt.loglog(errors['dt'], np.array(errors['dt']) ** 2, label='Order 2')
-    plt.legend()
-    plt.show()
+    ax.loglog(errors['dt'], np.array(errors['dt']) ** 4, label='Order 4', ls='--')
+    ax.loglog(errors['dt'], np.array(errors['dt']) ** 2, label='Order 2', ls='--')
+    ax.legend()
+    ax.set_xlabel(r'$\Delta t$')
+    ax.set_ylabel(r'$e$')
+
+
+def compare_order(Ra):
+    fig, ax = plt.subplots()
+    ls = {'SDC': '-', 'RK': '--', 'Euler': '-.'}
+    if Ra == 1e5:
+        paths = [f'./data/RBC3DG4R4{me}Ra1e5-res-1-order.pickle' for me in ['', 'RK', 'Euler']]
+        labels = ['SDC', 'RK', 'Euler']
+    else:
+        raise NotImplementedError
+
+    for path, label in zip(paths, labels):
+        with open(path, 'rb') as file:
+            errors = pickle.load(file)
+
+        e = np.array(errors['T'])
+        dt = np.array(errors['dt'])
+        order = np.log(e[1:] / e[:-1]) / np.log(dt[1:] / dt[:-1])
+        ax.loglog(dt, e, label=f'{label} order {np.mean(order):.1f}', ls=ls[label])
+
+    ax.legend(frameon=False)
+    ax.set_xlabel(r'$\Delta t$')
+    ax.set_ylabel(r'$e$')
 
 
 def run(args, dt, Tend):
@@ -89,5 +115,10 @@ if __name__ == '__main__':
     config = get_config(args)
 
     dts = step_sizes[type(config).__name__]
-    compute_errors(args, dts, max(dts))
-    plot_errors(args)
+    if args['mode'] == 'run':
+        compute_errors(args, dts, max(dts))
+
+    plot_error_all_components(args)
+    compare_order(1e5)
+    if MPI.COMM_WORLD.rank == 0:
+        plt.show()

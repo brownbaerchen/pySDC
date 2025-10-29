@@ -353,15 +353,24 @@ def compare_Nusselt_over_time1e5():
         rms_ax.plot(
             dat['rms_profile_T'], dat['z'], color=last_line.get_color(), ls=last_line.get_linestyle(), label=label
         )
-        if 'dissipation' in dat.keys():
 
-            mean_ke = np.mean([me[1] for me in dat['dissipation']])
-            print(
-                f'Energy error: {(dat["dissipation"][-1][1] - np.sum([me[0] for me in dat["dissipation"]])/2)/mean_ke:.2e}'
-            )
-            ting_ax.plot(t, np.cumsum([me[0] for me in dat['dissipation']]) / 2, label=label)
-            ting_ax.plot(t, [me[1] for me in dat['dissipation']], label=label, ls='--')
-            ting_ax.legend()
+        print(dat['avg_Nu'])
+        try:
+            ting_ax.scatter(abs(dat['avg_Nu']['V'] - dat['avg_Nu']['thermal']), dat['avg_Nu']['b'], label=label)
+        except:
+            pass
+        ting_ax.set_xscale('log')
+        ting_ax.legend()
+
+        # if 'dissipation' in dat.keys():
+
+        #     mean_ke = np.mean([me[1] for me in dat['dissipation']])
+        #     print(
+        #         f'Energy error: {(dat["dissipation"][-1][1] - np.sum([me[0] for me in dat["dissipation"]])/2)/mean_ke:.2e}'
+        #     )
+        #     ting_ax.plot(t, np.cumsum([me[0] for me in dat['dissipation']]) / 2, label=label)
+        #     ting_ax.plot(t, [me[1] for me in dat['dissipation']], label=label, ls='--')
+        #     ting_ax.legend()
 
     Nu_ax.legend(frameon=True)
     Nu_ax.set_xlabel('t')
