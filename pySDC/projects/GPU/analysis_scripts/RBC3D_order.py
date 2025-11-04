@@ -9,7 +9,10 @@ import matplotlib.pyplot as plt
 
 step_sizes = {
     'RBC3DG4R4Ra1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
+    'RBC3DG4R4O3Ra1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
+    'RBC3DG4R4O4Ra1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
     'RBC3DG4R4RKRa1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
+    'RBC3DG4R4EulerRa1e5': [8e-2, 4e-2, 2e-2, 1e-2, 5e-3],
 }
 n_freefall_times = {}
 
@@ -98,7 +101,10 @@ def run(args, dt, Tend):
 
     config = get_config(args)
     config.Tend = n_freefall_times.get(type(config).__name__, 3)
-    ic_config_name = type(config).__name__.replace('RK', '')
+
+    ic_config_name = type(config).__name__
+    for name in ['RK', 'Euler', 'O3', 'O4',]:
+        ic_config_name = ic_config_name.replace(name, '')
     config.ic_config = type(get_config({**args, 'config': ic_config_name}))
 
     config.get_LogToFile = no_logging_hook

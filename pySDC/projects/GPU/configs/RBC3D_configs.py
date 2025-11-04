@@ -428,6 +428,26 @@ class RBC3DverificationGamma4(RBC3Dverification):
     res_ratio = 2
     Tend = 100
 
+class RBC3DverificationOrder3(RBC3DverificationGamma4):
+    res_ratio = 4
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 3
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['num_nodes'] = 2
+        return desc
+
+class RBC3DverificationOrder4(RBC3DverificationGamma4):
+    res_ratio = 4
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 4
+        desc['sweeper_params']['QI'] = 'MIN-SR-S'
+        desc['sweeper_params']['num_nodes'] = 3
+        return desc
+
 
 class RBC3DverificationGamma4FLEX(RBC3DverificationGamma4):
     def get_description(self, *args, **kwargs):
@@ -555,7 +575,21 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
 class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
     res_ratio = 4
     Tend = 200
-    dt = 8e-2
+    dt = 6e-2
+    ic_config = None
+    res = 32
+    converged = 50
+
+class RBC3DG4R4O3Ra1e5(RBC3DverificationOrder3):
+    Tend = 200
+    dt = 6e-2
+    ic_config = None
+    res = 32
+    converged = 50
+
+class RBC3DG4R4O4Ra1e5(RBC3DverificationOrder4):
+    Tend = 200
+    dt = 6e-2
     ic_config = None
     res = 32
     converged = 50
