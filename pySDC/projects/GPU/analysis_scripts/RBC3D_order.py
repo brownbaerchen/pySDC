@@ -73,12 +73,13 @@ def compare_order(Ra):
     fig, ax = plt.subplots()
     ls = {'SDC': '-', 'RK': '--', 'Euler': '-.'}
     if Ra == 1e5:
-        paths = [f'./data/RBC3DG4R4{me}Ra1e5-res-1-order.pickle' for me in ['', 'RK', 'Euler']]
-        labels = ['SDC', 'RK', 'Euler']
+        paths = [f'./data/RBC3DG4R4{me}Ra1e5-res-1-order.pickle' for me in ['', 'RK', 'Euler', 'O3']]
+        labels = ['SDC', 'RK', 'Euler', 'SDC']
+
     else:
         raise NotImplementedError
 
-    for path, label in zip(paths, labels):
+    for path, label in zip(paths, labels, strict=True):
         with open(path, 'rb') as file:
             errors = pickle.load(file)
 
