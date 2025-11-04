@@ -315,7 +315,8 @@ class RayleighBenard3D(GenericSpectralLinear):
             u: The solution you want to compute the Nusselt numbers of
 
         Returns:
-            dict: Nusselt number averaged over the entire volume and horizontally averaged at the top and bottom.
+            dict: Nusselt number averaged over the entire volume and horizontally averaged at the top and bottom as well
+                  as computed from thermal and kinetic dissipation.
         """
         iu, iv, iw, iT = self.index(['u', 'v', 'w', 'T'])
         zAxis = self.spectral.axes[-1]
@@ -325,8 +326,19 @@ class RayleighBenard3D(GenericSpectralLinear):
         else:
             u_hat = self.transform(u)
 
-        DxT_hat = (self.Dx @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
-        DyT_hat = (self.Dy @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
+        # evaluate derivatives in x, y, and z for u, v, w, and T
+        derivatives = []
+        derivative_indices = [iu, iv, iw, iT]
+        u_hat_flat = [u_hat[i].flatten() for i in derivative_indices]
+        _D_u_hat = self.u_init_forward
+        for D in [self.Dx, self.Dy, self.Dz]:
+            _D_u_hat *= 0
+            for i in derivative_indices:
+                self.xp.copyto(_D_u_hat[i], (D @ u_hat_flat[i]).reshape(_D_u_hat[i].shape))
+            derivatives.append(
+                self.itransform(_D_u_hat).real
+            )  # derivatives[0] contains x derivatives, [2] is y and [3] is z
+
         DzT_hat = (self.Dz @ u_hat[iT].flatten()).reshape(u_hat[iT].shape)
 
         # compute wT with dealiasing
@@ -336,36 +348,17 @@ class RayleighBenard3D(GenericSpectralLinear):
         _me[0] = u_pad[iw] * u_pad[iT]
         wT_hat = self.transform(_me, padding=padding)[0]
 
+        # compute Nusselt number
         nusselt_hat = (wT_hat / self.kappa - DzT_hat) * self.axes[-1].L
 
-        derivatives = []
-        derivative_indices = [iu, iv, iw, iT]
-        u_hat_flat = [u_hat[i].flatten() for i in derivative_indices]
-        _D_u_hat = self.u_init_forward
-        padding = (1,) * self.ndim
-        for D in [self.Dx, self.Dy, self.Dz]:
-            _D_u_hat *= 0
-            for i in derivative_indices:
-                self.xp.copyto(_D_u_hat[i], (D @ u_hat_flat[i]).reshape(_D_u_hat[i].shape))
-            derivatives.append(self.itransform(_D_u_hat, padding=padding).real)
-
-        DT_hat = self.u_init_forward
-        DT_hat[0, ...] = DxT_hat
-        DT_hat[1, ...] = DyT_hat
-        DT_hat[2, ...] = DzT_hat
-        DT = self.itransform(DT_hat)
-
+        # compute thermal dissipation
         thermal_dissipation = self.u_init_physical
         thermal_dissipation[0, ...] = (
             self.kappa * (derivatives[0][iT].real + derivatives[1][iT].real + derivatives[2][iT].real) ** 2
         )
         thermal_dissipation_hat = self.transform(thermal_dissipation)[0]
 
-        grad_u_hat = self.u_init_forward
-        grad_u_hat[0] = (self.Dx @ u_hat[iu].flatten()).reshape(u_hat[iu].shape)
-        grad_u_hat[1] = (self.Dy @ u_hat[iv].flatten()).reshape(u_hat[iv].shape)
-        grad_u_hat[2] = (self.Dz @ u_hat[iw].flatten()).reshape(u_hat[iw].shape)
-        grad_u = self.itransform(grad_u_hat)
+        # compute kinetic energy dissipation
         kinetic_energy_dissipation = self.u_init_physical
         for i in [iu, iv, iw]:
             kinetic_energy_dissipation[0, ...] += (
@@ -373,30 +366,26 @@ class RayleighBenard3D(GenericSpectralLinear):
             )
         kinetic_energy_dissipation_hat = self.transform(kinetic_energy_dissipation)[0]
 
-        if not hasattr(self, '_zInt'):
-            self._zInt = zAxis.get_integration_weights()
-
-        # get coefficients for evaluation on the boundary
+        # get coefficients for evaluation on the boundary and vertical integration
+        zInt = zAxis.get_integration_weights()
         top = zAxis.get_BC(kind='Dirichlet', x=1)
         bot = zAxis.get_BC(kind='Dirichlet', x=-1)
 
+        # compute volume averages
         integral_V = 0
         integral_V_th = 0
         integral_V_kin = 0
         if self.comm.rank == 0:
 
-            integral_V = (self._zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+            integral_V = (zInt @ nusselt_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             integral_V_th = (
-                (self._zInt @ thermal_dissipation_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
+                (zInt @ thermal_dissipation_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             )
             integral_V_kin = (
-                (self._zInt @ kinetic_energy_dissipation_hat[0, 0]).real
-                * self.axes[0].L
-                * self.axes[1].L
-                / self.nx
-                / self.ny
+                (zInt @ kinetic_energy_dissipation_hat[0, 0]).real * self.axes[0].L * self.axes[1].L / self.nx / self.ny
             )
 
+        # communicate result across all tasks
         Nusselt_V = self.comm.bcast(integral_V / self.spectral.V, root=0)
         Nusselt_t = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0, :] * top, axis=-1) / self.nx / self.ny, root=0)
         Nusselt_b = self.comm.bcast(self.xp.sum(nusselt_hat.real[0, 0] * bot / self.nx / self.ny, axis=-1), root=0)
