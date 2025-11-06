@@ -348,12 +348,16 @@ class RBC3DscalingIterative(RBC3Dscaling):
 class RBC3Dverification(RayleighBenard3DRegular):
     converged = 0
     dt = 1e-2
-    ic_config = None
+    ic_config = {
+        'config': None,
+        'res': -1,
+        'dt': -1,
+    }
     res = None
     Ra = None
     Tend = 100
-    res_ratio = 1
-    gamma = 1
+    res_ratio = 4
+    gamma = 4
 
     def get_file_name(self):
         res = self.args['res']
@@ -386,14 +390,16 @@ class RBC3Dverification(RayleighBenard3DRegular):
         return desc
 
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
-        if self.ic_config is None or restart_idx != 0:
+        if self.ic_config['config'] is None or restart_idx != 0:
             return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
 
         # read initial conditions
         from pySDC.helpers.fieldsIO import FieldsIO
 
-        ic_config = self.ic_config(args={**self.args, 'res': -1, 'dt': -1})
-        desc = ic_config.get_description()
+        ic_config = self.ic_config['config'](
+            args={**self.args, 'res': self.ic_config['res'], 'dt': self.ic_config['dt']}
+        )
+        desc = ic_config.get_description(res=self.ic_config['res'], dt=self.ic_config['dt'])
         ic_nx = desc['problem_params']['nx']
         ic_ny = desc['problem_params']['ny']
         ic_nz = desc['problem_params']['nz']
@@ -407,6 +413,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
 
         # interpolate the initial conditions using padded transforms
         padding = (P.nx / ic_nx, P.ny / ic_ny, P.nz / ic_nz)
+        P.logger.info(f'Interpolating initial conditions from {ic_nx}x{ic_ny}x{ic_nz} to {P.nx}x{P.ny}x{P.nz}')
 
         ics = _P.xp.array(ics)
         _ics_hat = _P.transform(ics)
@@ -428,23 +435,20 @@ class RBC3DverificationGamma4(RBC3Dverification):
     res_ratio = 2
     Tend = 100
 
-class RBC3DverificationOrder3(RBC3DverificationGamma4):
-    res_ratio = 4
+
+class RBC3DM2K3(RBC3Dverification):
 
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['nsweeps'] = 3
-        desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['num_nodes'] = 2
-        return desc
 
-class RBC3DverificationOrder4(RBC3DverificationGamma4):
-    res_ratio = 4
+
+class RBC3DM3K4(RBC3Dverification):
 
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['nsweeps'] = 4
-        desc['sweeper_params']['QI'] = 'MIN-SR-S'
         desc['sweeper_params']['num_nodes'] = 3
         return desc
 
@@ -580,6 +584,7 @@ class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
     res = 32
     converged = 50
 
+
 class RBC3DG4R4O3Ra1e5(RBC3DverificationOrder3):
     Tend = 200
     dt = 6e-2
@@ -587,10 +592,30 @@ class RBC3DG4R4O3Ra1e5(RBC3DverificationOrder3):
     res = 32
     converged = 50
 
+
 class RBC3DG4R4O4Ra1e5(RBC3DverificationOrder4):
     Tend = 200
     dt = 6e-2
     ic_config = None
+
+
+class RBC3DG4R4Ra1e5(RBC3Dverification):
+    Tend = 200
+    dt = 6e-2
+    res = 32
+    converged = 50
+
+
+class RBC3DG4R4SDC23Ra1e5(RBC3DM2K3):
+    Tend = 200
+    dt = 6e-2
+    res = 32
+    converged = 50
+
+
+class RBC3DG4R4SDC34Ra1e5(RBC3DM3K4):
+    Tend = 200
+    dt = 6e-2
     res = 32
     converged = 50
 
@@ -600,6 +625,11 @@ class RBC3DG4R4RKRa1e5(RBC3DverificationRKGamma4):
     Tend = 200
     dt = 8e-2
     ic_config = None
+
+
+class RBC3DG4R4RKRa1e5(RBC3DverificationRK):
+    Tend = 200
+    dt = 8e-2
     res = 32
     converged = 50
 
@@ -822,3 +852,8 @@ class RBC3DG4R4RKRa1e8(RBC3DverificationRKGamma4):
 #     dt = 1e-2  # limit
 #     ic_config = RBC3DG4Ra1e7
 #     res = 52
+class RBC3DG4R4EulerRa1e5(RBC3DverificationEuler):
+    Tend = 200
+    dt = 8e-2
+    res = 32
+    converged = 50

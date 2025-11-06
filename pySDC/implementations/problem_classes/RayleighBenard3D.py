@@ -400,23 +400,6 @@ class RayleighBenard3D(GenericSpectralLinear):
             'kinetic': Nusselt_kinetic,
         }
 
-    def get_vertical_profiles(self, u, components):
-        if self.spectral_space:
-            u_hat = u.copy()
-        else:
-            u_hat = self.transform(u)
-
-        _u_hat = self.axes[-1].itransform(u_hat, axes=(-1,))
-
-        avgs = {}
-        for c in components:
-            i = self.index(c)
-            avg = self.xp.ascontiguousarray(_u_hat[i, 0, 0, :].real) / self.axes[0].N / self.axes[1].N
-            self.comm.Bcast(avg, root=0)
-            avgs[c] = avg
-
-        return avgs
-
     def get_frequency_spectrum(self, u):
         """
         Compute the frequency spectrum of the velocities in x and y direction in the horizontal plane for every point in
@@ -503,3 +486,20 @@ class RayleighBenard3D(GenericSpectralLinear):
         self.logger.debug(f'CFL stability limit on dt: x: {CFL[0]:.2e} y: {CFL[1]:.2e} z: {CFL[2]:.2e}')
 
         return min(CFL)
+
+    def get_vertical_profiles(self, u, components):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        _u_hat = self.axes[-1].itransform(u_hat, axes=(-1,))
+
+        avgs = {}
+        for c in components:
+            i = self.index(c)
+            avg = self.xp.ascontiguousarray(_u_hat[i, 0, 0, :].real) / self.axes[0].N / self.axes[1].N
+            self.comm.Bcast(avg, root=0)
+            avgs[c] = avg
+
+        return avgs
