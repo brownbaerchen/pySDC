@@ -442,6 +442,7 @@ class RBC3DM2K3(RBC3Dverification):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['nsweeps'] = 3
         desc['sweeper_params']['num_nodes'] = 2
+        return desc
 
 
 class RBC3DM3K4(RBC3Dverification):
