@@ -576,8 +576,7 @@ class RBC3DG4Ra1e5(RBC3DverificationGamma4):
     converged = 50
 
 
-class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
-    res_ratio = 4
+class RBC3DG4R4O3Ra1e5(RBC3DM2K3):
     Tend = 200
     dt = 6e-2
     ic_config = None
@@ -585,15 +584,7 @@ class RBC3DG4R4Ra1e5(RBC3DverificationGamma4):
     converged = 50
 
 
-class RBC3DG4R4O3Ra1e5(RBC3DverificationOrder3):
-    Tend = 200
-    dt = 6e-2
-    ic_config = None
-    res = 32
-    converged = 50
-
-
-class RBC3DG4R4O4Ra1e5(RBC3DverificationOrder4):
+class RBC3DG4R4O4Ra1e5(RBC3DM3K4):
     Tend = 200
     dt = 6e-2
     ic_config = None
@@ -620,24 +611,9 @@ class RBC3DG4R4SDC34Ra1e5(RBC3DM3K4):
     converged = 50
 
 
-class RBC3DG4R4RKRa1e5(RBC3DverificationRKGamma4):
-    res_ratio = 4
-    Tend = 200
-    dt = 8e-2
-    ic_config = None
-
-
 class RBC3DG4R4RKRa1e5(RBC3DverificationRK):
     Tend = 200
-    dt = 8e-2
-    res = 32
-    converged = 50
-
-
-class RBC3DG4R4EulerRa1e5(RBC3DverificationEulerG4R4):
-    Tend = 200
-    dt = 8e-2
-    ic_config = None
+    dt = 4e-2
     res = 32
     converged = 50
 
@@ -746,15 +722,6 @@ class RBC3DG4R4RKRa1e7(RBC3DverificationRKGamma4):
     dt = 2e-2
     ic_config = RBC3DG4Ra1e6
     res = 96
-
-
-class RBC3DG4Ra1e8(RBC3DverificationGamma4):
-    # 8e-3 crashes at t=2
-    Tend = 100
-    dt = 6e-3
-    ic_config = RBC3DG4Ra1e7
-    res = 96
-    converged = 20
 
 
 class RBC3DG4RKRa1e8(RBC3DverificationRKGamma4):
