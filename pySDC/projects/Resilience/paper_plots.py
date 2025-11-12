@@ -596,7 +596,7 @@ def plot_RBC_solution(setup='resilience'):  # pragma: no cover
     def _plot(t, ax, cax):
         u_hat = prob.u_exact(t)
         u = prob.itransform(u_hat)
-        im = ax.pcolormesh(prob.X, prob.Z, u[prob.index('T')], rasterized=True, cmap='plasma')
+        im = ax.pcolormesh(prob.X, prob.Z, u[prob.index('T')].real, rasterized=True, cmap='plasma')
         fig.colorbar(im, cax, label=f'$T(t={{{t}}})$')
 
     if setup == 'resilience':
@@ -976,13 +976,196 @@ def make_plots_for_TUHH_seminar():  # pragma: no cover
     plot_recovery_rate_detailed_Lorenz(target='talk')
 
 
+def make_plots_for_defense():  # pragma: no cover
+    global JOURNAL
+    JOURNAL = 'JSC_beamer'
+
+    from pySDC.projects.Resilience.work_precision import (
+        all_problems,
+    )
+
+    all_params = {
+        'record': False,
+        'work_key': 't',
+        'precision_key': 'e_global_rel',
+        'plotting': True,
+        'base_path': 'data/paper',
+        'target': 'talk',
+    }
+
+    compare_recovery_rate_problems(target='talk', num_procs=1, strategy_type='SDC')
+    _fig = plt.figure(plt.get_fignums()[-1])
+    _ax = _fig.get_axes()[1]
+    fig, ax = plt.subplots(figsize=figsize_by_journal(JOURNAL, 0.6, 0.6))
+    for line in _ax.get_lines():
+        ax.plot(
+            line._x, line._y, label=line.get_label(), color=line.get_color(), ls=line.get_ls(), marker=line.get_marker()
+        )
+    plt.close(_fig)
+    ax.legend(frameon=False)
+    ax.axvline(1, color='black', ls=':')
+    ax.axvline(11, color='black', ls=':')
+    fig.savefig('data/paper/recovery_rate_Lorenz_bit_defense.pdf', bbox_inches='tight', transparent=True, dpi=200)
+
+    # plot PinT speedup
+    fig, axs = plt.subplots(1, 3, figsize=figsize_by_journal('JSC_beamer', 1, 0.5))
+
+    for mode in ['parallel_efficiency_dt_k', 'parallel_efficiency_dt']:
+        all_problems(**all_params, mode=mode)
+        _fig = plt.figure(plt.get_fignums()[-1])
+        _axs = _fig.get_axes()
+
+        for old_ax, new_ax in zip([_axs[0]] + _axs[2:], axs):
+            lines = old_ax.get_lines()
+            title = old_ax.get_title()
+            for line in lines:
+                label = line.get_label()
+
+                if title == 'Van der Pol':
+                    if mode == 'parallel_efficiency_dt_k':
+                        if '4x3' in label or '4x1' in label:
+                            continue
+                    elif mode == 'parallel_efficiency_dt':
+                        if '4x3' in label or '1x3' in label:
+                            continue
+                elif title == 'Gray-Scott':
+                    if mode == 'parallel_efficiency_dt_k':
+                        if '4x3' in label or '4x1' in label:
+                            continue
+                    elif mode == 'parallel_efficiency_dt':
+                        if '4x3' in label or '1x3' in label:
+                            continue
+                elif title == 'Rayleigh-Benard':
+                    if mode == 'parallel_efficiency_dt_k':
+                        if '4x3' in label or '4x1' in label:
+                            continue
+                    elif mode == 'parallel_efficiency_dt':
+                        if '4x3' in label or '4x1' in label:
+                            continue
+
+                new_ax.loglog(
+                    line._x,
+                    line._y,
+                    label=line.get_label(),
+                    color=line.get_color(),
+                    ls=line.get_ls(),
+                    marker=line.get_marker(),
+                )
+
+            if title == 'Van der Pol':
+                new_ax.set_xticks([0.4, 2], minor=True)
+
+            new_ax.set_box_aspect(1.0)
+            new_ax.set_title(old_ax.get_title())
+            new_ax.set_xlabel(old_ax.get_xlabel())
+        axs[0].set_ylabel(_axs[0].get_ylabel())
+        plt.close(_fig)
+
+    fig.tight_layout()
+    fig.subplots_adjust(bottom=0.04 if mode == 'compare_strategies' else 0.1, top=1.0)
+
+    # legend
+    handles = []
+    labels = []
+    for ax in fig.get_axes():
+        h, l = ax.get_legend_handles_labels()
+        handles += [h[i] for i in range(len(h)) if l[i] not in labels]
+        labels += [me for me in l if me not in labels]
+    order = np.arange(len(labels))
+
+    fig.legend(
+        [handles[i] for i in order],
+        [labels[i] for i in order],
+        loc='outside lower center',
+        ncols=4 if mode == 'compare_strategies' else 3,
+        frameon=False,
+        fancybox=True,
+        handlelength=2.2,
+    )
+
+    path = './data/paper/wp-PinT-defense.pdf'
+    fig.savefig(path, bbox_inches='tight', transparent=True, dpi=200)
+
+    # plot work-precision
+    for mode in ['compare_strategies', 'RK_comp']:
+        all_problems(**all_params, mode=mode)
+
+        _fig = plt.figure(plt.get_fignums()[-1])
+        _axs = _fig.get_axes()
+        fig, axs = plt.subplots(1, 3, figsize=figsize_by_journal('JSC_beamer', 1, 0.5))
+
+        for old_ax, new_ax in zip([_axs[0]] + _axs[2:], axs):
+            lines = old_ax.get_lines()
+            for line in lines:
+                new_ax.loglog(
+                    line._x,
+                    line._y,
+                    label=line.get_label(),
+                    color=line.get_color(),
+                    ls=line.get_ls(),
+                    marker=line.get_marker(),
+                )
+            new_ax.set_box_aspect(1.0)
+            new_ax.set_title(old_ax.get_title())
+            new_ax.set_xlabel(old_ax.get_xlabel())
+        axs[0].set_ylabel(_axs[0].get_ylabel())
+
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=0.04 if mode == 'compare_strategies' else 0.1, top=1.0)
+
+        # legend
+        handles = []
+        labels = []
+        for ax in fig.get_axes():
+            h, l = ax.get_legend_handles_labels()
+            handles += [h[i] for i in range(len(h)) if l[i] not in labels]
+            labels += [me for me in l if me not in labels]
+        order = np.arange(len(labels))
+
+        fig.legend(
+            [handles[i] for i in order],
+            [labels[i] for i in order],
+            loc='outside lower center',
+            ncols=4 if mode == 'compare_strategies' else 3,
+            frameon=False,
+            fancybox=True,
+            handlelength=2.2,
+        )
+
+        plt.close(_fig)
+        path = f'./data/paper/wp-{mode}-defense.pdf'
+        fig.savefig(path, bbox_inches='tight', transparent=True, dpi=200)
+
+    for bit in [0, 20]:
+        plot_fault_Lorenz(bit, target='talk')
+
+    plot_GS_solution()
+    for setup in ['resilience_thesis', 'work_precision']:
+        plot_RBC_solution(setup)
+    for setup in ['resilience', 'adaptivity']:
+        plot_vdp_solution(setup=setup)
+
+    plot_adaptivity_stuff()
+
+    plot_recovery_rate_per_acceptance_threshold(run_Lorenz, target='talk')
+
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--target',
-        choices=['adaptivity', 'resilience', 'thesis', 'notes', 'SIAM_CSE23', 'TIME_X_website', 'TUHH_seminar'],
+        choices=[
+            'adaptivity',
+            'resilience',
+            'thesis',
+            'notes',
+            'SIAM_CSE23',
+            'TIME_X_website',
+            'TUHH_seminar',
+            'defense',
+        ],
         type=str,
     )
     args = parser.parse_args()
@@ -1001,5 +1184,7 @@ if __name__ == "__main__":
         make_plots_for_TIME_X_website()
     elif args.target == 'TUHH_seminar':
         make_plots_for_TUHH_seminar()
+    elif args.target == 'defense':
+        make_plots_for_defense()
     else:
         raise NotImplementedError(f'Don\'t know how to make plots for target {args.target}')
