@@ -516,7 +516,8 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
         ('RBC', 'throughput_per_task'): {'x': [1 / 1, 640], 'y': [2e4, 2e4 * 640]},
     }
 
-    for quantity in ['time', 'throughput', 'time_per_task', 'min_time_per_task', 'efficiency', 'time_filtered'][::-1]:
+    # for quantity in ['time', 'throughput', 'time_per_task', 'min_time_per_task', 'efficiency', 'time_filtered'][::-1]:
+    for quantity in ['time', 'efficiency']:
         fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
         for config in configs:
             config.plot_scaling_test(ax=ax, quantity=quantity, space_time=space_time)
@@ -526,6 +527,49 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
             ax.axhline(1, color='black', ls=':', label='ideal')
             ax.set_yscale('linear')
             ax.set_ylim(0, 1.1)
+        if problem == 'GS3D' and space_time in [None, True]:
+            ax.axvline(896, color='black', ls='-.', label='Full JUWELS booster')
+
+        if quantity == 'time' and space_time == None:
+            from matplotlib.patches import FancyArrowPatch
+
+            lines = ax.get_lines()
+            labels = [line.get_label() for line in lines]
+            PinT_labels = [label for label in labels if 'PinT' in label]
+
+            ax.plot(
+                [None],
+                [None],
+                marker=r'$\rightarrow$',
+                color='black',
+                markersize=12,
+                markeredgecolor='black',
+                label='PinT speedup',
+            )
+
+            for label in PinT_labels:
+                non_PinT_label = f'{label[:label.index('PinT')]}{label[label.index('PinT')+5:]}'
+                PinT_line = lines[labels.index(label)]
+                non_PinT_line = lines[labels.index(non_PinT_label)]
+
+                x1 = non_PinT_line._x[-1]
+                y1 = non_PinT_line._y[-1]
+                x2 = PinT_line._x[-1]
+                y2 = PinT_line._y[-1]
+                # ax.arrow(x1, y1, x2-x1, y2-y1, linewidth=2, head_width=1, length_includes_head=True, head_length=3)#, head_width=0.1, head_length=0.2, linewidth=2)
+
+                arrow = FancyArrowPatch(
+                    (x1, y1),
+                    (x2, y2),
+                    arrowstyle='-|>',
+                    mutation_scale=20,  # head size in pixels (constant in log scale)
+                    linewidth=2,
+                    color='black',
+                    transform=ax.transData,
+                )
+
+                ax.add_patch(arrow)
+
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
