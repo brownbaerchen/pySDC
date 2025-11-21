@@ -121,7 +121,7 @@ class Sweeper(object):
 
     def predict(self):
         """
-        Predictor to fill values at nodes before first sweep
+        Predictor to fill values at nodes before first sweep.
 
         Default prediction for the sweepers, only copies the values to all collocation nodes
         and evaluates the RHS of the ODE there
@@ -131,16 +131,13 @@ class Sweeper(object):
         L = self.level
         P = L.prob
 
-        # evaluate RHS at left point
-        L.f[0] = 0 * P.eval_f(L.u[0], L.time)
-
         for m in range(1, self.coll.num_nodes + 1):
             # copy u[0] to all collocation nodes, evaluate RHS
             if self.params.initial_guess == 'spread':
                 L.u[m] = P.dtype_u(L.u[0])
                 L.f[m] = P.eval_f(L.u[m], L.time + L.dt * self.coll.nodes[m - 1])
-            # copy u[0] and RHS evaluation to all collocation nodes
             elif self.params.initial_guess == 'copy':
+                L.f[0] = P.eval_f(L.u[0], L.time)
                 L.u[m] = P.dtype_u(L.u[0])
                 L.f[m] = P.dtype_f(L.f[0])
             # start with zero everywhere
