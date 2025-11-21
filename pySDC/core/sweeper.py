@@ -132,7 +132,7 @@ class Sweeper(object):
         P = L.prob
 
         # evaluate RHS at left point
-        L.f[0] = P.eval_f(L.u[0], L.time)
+        L.f[0] = 0 * P.eval_f(L.u[0], L.time)
 
         for m in range(1, self.coll.num_nodes + 1):
             # copy u[0] to all collocation nodes, evaluate RHS

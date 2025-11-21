@@ -133,7 +133,7 @@ class SweeperMPI(Sweeper):
         P = L.prob
 
         # evaluate RHS at left point
-        L.f[0] = P.eval_f(L.u[0], L.time)
+        L.f[0] = 0 * P.eval_f(L.u[0], L.time)
 
         m = self.rank
 
