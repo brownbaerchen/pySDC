@@ -270,7 +270,7 @@ def plot_recovery_rate_detailed_Lorenz(target='resilience'):  # pragma: no cover
         savefig(fig, f'recovery_rate_Lorenz_{x}')
 
 
-def plot_adaptivity_stuff():  # pragma: no cover
+def plot_adaptivity_stuff(target='any'):  # pragma: no cover
     """
     Plot the solution for a van der Pol problem as well as the local error and cost associated with the base scheme and
     adaptivity in k and dt in order to demonstrate that adaptivity is useful.
@@ -284,8 +284,11 @@ def plot_adaptivity_stuff():  # pragma: no cover
     import pickle
 
     my_setup_mpl()
-    scale = 0.5 if JOURNAL == 'JSC_beamer' else 1.0
-    fig, axs = plt.subplots(3, 1, figsize=figsize_by_journal(JOURNAL, scale, 1), sharex=True, sharey=False)
+    if target == 'defense':
+        scale = 0.75
+    else:
+        scale = 0.5 if JOURNAL == 'JSC_beamer' else 1.0
+    fig, axs = plt.subplots(3, 1, figsize=figsize_by_journal(JOURNAL, scale, 1.0), sharex=True, sharey=False)
 
     def plot_error(stats, ax, iter_ax, strategy, **kwargs):
         """
@@ -358,6 +361,7 @@ def plot_adaptivity_stuff():  # pragma: no cover
     axs[1].legend(frameon=True)
     axs[2].set_yscale('log')
     savefig(fig, 'adaptivity')
+    plt.show()
 
 
 def plot_fault_vdp(bit=0):  # pragma: no cover
@@ -979,6 +983,8 @@ def make_plots_for_TUHH_seminar():  # pragma: no cover
 def make_plots_for_defense():  # pragma: no cover
     global JOURNAL
     JOURNAL = 'JSC_beamer'
+
+    plot_adaptivity_stuff(target='defense')
 
     from pySDC.projects.Resilience.work_precision import (
         all_problems,
