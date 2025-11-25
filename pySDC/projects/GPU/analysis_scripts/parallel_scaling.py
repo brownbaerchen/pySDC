@@ -154,6 +154,14 @@ class ScalingConfig(object):
                         timings[np.prod(procs) / self.tasks_per_node] = (
                             experiment.res**self.ndim / t_mean / np.prod(procs) / norm
                         )
+                    elif quantity == 'efficiency_per_task':
+                        if type(config).__name__ == 'GrayScottScaling3D':
+                            norm = 13216322.909
+                        else:
+                            norm = 1
+                        timings[np.prod(procs)] = (
+                            experiment.res**self.ndim / t_mean / np.prod(procs) / norm
+                        )
                     elif quantity == 'time':
                         timings[np.prod(procs) / self.tasks_per_node] = t_mean
                     elif quantity == 'time_filtered':
@@ -192,6 +200,7 @@ class ScalingConfig(object):
             'min_time_per_task': r'minimal $t_\mathrm{step}$ / s',
             'min_time': r'minimal $t_\mathrm{step}$ / s',
             'efficiency': r'parallel efficiency / \%',
+            'efficiency_per_task': r'parallel efficiency / \%',
         }
         ax.set_ylabel(labels[quantity])
 
@@ -517,8 +526,9 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
     }
 
     # for quantity in ['time', 'throughput', 'time_per_task', 'min_time_per_task', 'efficiency', 'time_filtered'][::-1]:
-    for quantity in ['time', 'efficiency']:
-        fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
+    for quantity in ['time_per_task', 'efficiency_per_task']:
+        # fig, ax = plt.subplots(figsize=figsize_by_journal('TUHH_thesis', 1, 0.6))
+        fig, ax = plt.subplots(figsize=figsize_by_journal('JSC_beamer', 0.64, 0.6))
         for config in configs:
             config.plot_scaling_test(ax=ax, quantity=quantity, space_time=space_time)
         if (problem, quantity) in ideal_lines.keys():
@@ -528,7 +538,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
             ax.set_yscale('linear')
             ax.set_ylim(0, 1.1)
         if problem == 'GS3D' and space_time in [None, True]:
-            ax.axvline(896, color='black', ls='-.', label='Full JUWELS booster')
+            ax.axvline(896*4, color='black', ls='-.', label='Full booster')
 
         if quantity == 'time' and space_time == None:
             from matplotlib.patches import FancyArrowPatch
