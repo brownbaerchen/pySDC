@@ -159,9 +159,7 @@ class ScalingConfig(object):
                             norm = 13216322.909
                         else:
                             norm = 1
-                        timings[np.prod(procs)] = (
-                            experiment.res**self.ndim / t_mean / np.prod(procs) / norm
-                        )
+                        timings[np.prod(procs)] = experiment.res**self.ndim / t_mean / np.prod(procs) / norm
                     elif quantity == 'time':
                         timings[np.prod(procs) / self.tasks_per_node] = t_mean
                     elif quantity == 'time_filtered':
@@ -515,6 +513,7 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
     ideal_lines = {
         ('GS3D', 'throughput'): {'x': [0.25, 400], 'y': [5e6, 8e9]},
         ('GS3D', 'time'): {'x': [0.25, 400], 'y': [80, 5e-2]},
+        ('GS3D', 'time_per_task'): {'x': [30, 3000], 'y': [10, 0.1]},
         ('RBC', 'throughput'): {'x': [1 / 10, 64], 'y': [2e4, 2e4 * 640]},
         ('RBC', 'time'): {'x': [1 / 10, 64], 'y': [60, 60 / 640]},
         # ('RBC3D', 'time_filtered'): {'x': [2, 16], 'y': [6, 6 / 8]},
@@ -533,14 +532,14 @@ def plot_scalings(problem, XPU=None, space_time=None, **kwargs):  # pragma: no c
             config.plot_scaling_test(ax=ax, quantity=quantity, space_time=space_time)
         if (problem, quantity) in ideal_lines.keys():
             ax.loglog(*ideal_lines[(problem, quantity)].values(), color='black', ls=':', label='ideal')
-        elif quantity == 'efficiency':
+        elif quantity in ['efficiency', 'efficiency_per_task']:
             ax.axhline(1, color='black', ls=':', label='ideal')
             ax.set_yscale('linear')
             ax.set_ylim(0, 1.1)
         if problem == 'GS3D' and space_time in [None, True]:
-            ax.axvline(896*4, color='black', ls='-.', label='Full booster')
+            ax.axvline(896 * 4, color='black', ls='-.', label='Full booster')
 
-        if quantity == 'time' and space_time == None:
+        if quantity in ['time', 'time_per_task'] and space_time == None:
             from matplotlib.patches import FancyArrowPatch
 
             lines = ax.get_lines()
