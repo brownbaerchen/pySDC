@@ -305,3 +305,11 @@ class RBC3DG4R4EulerRa1e5(RBC3DverificationEuler):
     dt = 8e-2
     res = 32
     converged = 50
+
+
+class RBC3DG4R4SDC34Ra1e6(RBC3DM3K4):
+    Tend = 100
+    dt = 6e-2
+    res = 64
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+    # converged = 50
