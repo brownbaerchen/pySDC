@@ -30,7 +30,7 @@ class RayleighBenard3DRegular(Config):
 
         LogToFile.filename = self.get_file_name()
         LogToFile.time_increment = 5e-1
-        # LogToFile.allow_overwriting = True
+        LogToFile.allow_overwriting = True
 
         return LogToFile
 
@@ -101,6 +101,7 @@ class RayleighBenard3DRegular(Config):
             outfile = FieldsIO.fromFile(self.get_file_name())
 
             t0, solution = outfile.readField(restart_idx)
+            solution = solution[: P.spectral.ncomponents, ...]
 
             u0 = P.u_init
 
@@ -182,6 +183,7 @@ class RBC3Dverification(RayleighBenard3DRegular):
         filename = ic_config.get_file_name()
         ic_file = FieldsIO.fromFile(filename)
         t0, ics = ic_file.readField(-1)
+        ics = ics[: P.spectral.ncomponents, ...]
         P.logger.info(f'Loaded initial conditions from {filename!r} at t={t0}.')
 
         # interpolate the initial conditions using padded transforms
@@ -313,3 +315,89 @@ class RBC3DG4R4SDC34Ra1e6(RBC3DM3K4):
     res = 64
     ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
     # converged = 50
+
+
+class RBC2Dverification(RBC3Dverification):
+    def get_description(self, *args, MPIsweeper=False, res=-1, **kwargs):
+        from pySDC.implementations.problem_classes.RayleighBenard import (
+            RayleighBenard,
+        )
+        from pySDC.implementations.problem_classes.generic_spectral import (
+            compute_residual_DAE,
+            compute_residual_DAE_MPI,
+        )
+        from pySDC.implementations.convergence_controller_classes.step_size_limiter import StepSizeSlopeLimiter
+        from pySDC.implementations.convergence_controller_classes.crash import StopAtNan
+
+        desc = super().get_description(*args, MPIsweeper=MPIsweeper, **kwargs)
+        desc['problem_class'] = RayleighBenard
+        for param in ['ny', 'Ly']:
+            desc['problem_params'].pop(param)
+        desc['problem_params']['Rayleigh'] = 1e6
+
+        return desc
+
+    def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
+        if self.ic_config['config'] is None:
+            return super().get_initial_condition(P, *args, restart_idx=restart_idx, **kwargs)
+
+        # read initial conditions
+        from pySDC.helpers.fieldsIO import FieldsIO
+
+        ic_config = self.ic_config['config'](
+            args={**self.args, 'res': self.ic_config['res'], 'dt': self.ic_config['dt']}
+        )
+        desc = ic_config.get_description(res=self.ic_config['res'], dt=self.ic_config['dt'])
+        ic_nx = desc['problem_params']['nx']
+        ic_nz = desc['problem_params']['nz']
+
+        _P = type(P)(nx=ic_nx, nz=ic_nz, comm=P.comm, useGPU=P.useGPU)
+        _P.setUpFieldsIO()
+        filename = ic_config.get_file_name()
+        ic_file = FieldsIO.fromFile(filename)
+        t0, ics = ic_file.readField(-1)
+        ics = ics[: P.spectral.ncomponents, ...]
+        P.logger.info(f'Loaded initial conditions from {filename!r} at t={t0}.')
+
+        # interpolate the initial conditions using padded transforms
+        padding = (P.nx / ic_nx, P.nz / ic_nz)
+        P.logger.info(f'Interpolating initial conditions from {ic_nx}x{ic_nz} to {P.nx}x{P.nz}')
+
+        ics = _P.xp.array(ics)
+        _ics_hat = _P.transform(ics)
+        ics_interpolated = _P.itransform(_ics_hat, padding=padding)
+
+        self.get_LogToFile()
+
+        P.setUpFieldsIO()
+        if P.spectral_space:
+            u0_hat = P.u_init_forward
+            u0_hat[...] = P.transform(ics_interpolated)
+            return u0_hat, 0
+        else:
+            return ics_interpolated, 0
+
+
+class RBC2DM2K3(RBC2Dverification):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 3
+        desc['sweeper_params']['num_nodes'] = 2
+        return desc
+
+
+class RBC2DG4R4SDC23Ra1e5(RBC2DM2K3):
+    Tend = 10
+    res = 64
+
+
+class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
+    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
+    Tend = 10
+    res = 64
+
+
+class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
+    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
+    Tend = 20
+    res = 64
