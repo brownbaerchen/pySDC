@@ -172,7 +172,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     # spectrum
     _s = xp.array(spectrum)
     avg_spectrum = xp.mean(_s[t >= config.converged], axis=0)
-    axs[3].loglog(k[avg_spectrum > 1e-15], avg_spectrum[avg_spectrum > 1e-15])
+    axs[3].loglog(k[avg_spectrum > 1e-16], avg_spectrum[avg_spectrum > 1e-16])
     axs[3].set_xlabel('$k$')
     axs[3].set_ylabel(r'$\|\hat{u}_x\|$')
 

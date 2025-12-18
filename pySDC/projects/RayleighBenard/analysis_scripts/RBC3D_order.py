@@ -9,13 +9,22 @@ import matplotlib.pyplot as plt
 from pySDC.helpers.plot_helper import figsize_by_journal
 from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import get_plotting_style, savefig
 
+stepsRa1e5 = [5e-3 * 2**i for i in range(8)]
+stepsRa1e6 = [5e-4 * 2**i for i in range(8)]
+
 step_sizes = {
-    'RBC3DG4R4SDC22Ra1e5': [5e-3 * 2**i for i in range(8)],
-    'RBC3DG4R4SDC23Ra1e5': [5e-3 * 2**i for i in range(8)],
-    'RBC3DG4R4SDC34Ra1e5': [5e-3 * 2**i for i in range(8)],
-    'RBC3DG4R4SDC44Ra1e5': [5e-3 * 2**i for i in range(8)],
-    'RBC3DG4R4RKRa1e5': [5e-3 * 2**i for i in range(8)],
-    'RBC3DG4R4EulerRa1e5': [5e-3 * 2**i for i in range(8)],
+    'RBC3DG4R4SDC22Ra1e5': stepsRa1e5,
+    'RBC3DG4R4SDC23Ra1e5': stepsRa1e5,
+    'RBC3DG4R4SDC34Ra1e5': stepsRa1e5,
+    'RBC3DG4R4SDC44Ra1e5': stepsRa1e5,
+    'RBC3DG4R4RKRa1e5': stepsRa1e5,
+    'RBC3DG4R4EulerRa1e5': stepsRa1e5,
+    'RBC3DG4R4SDC22Ra1e6': stepsRa1e6,
+    'RBC3DG4R4SDC23Ra1e6': stepsRa1e6,
+    'RBC3DG4R4SDC34Ra1e6': stepsRa1e6,
+    'RBC3DG4R4SDC44Ra1e6': stepsRa1e6,
+    'RBC3DG4R4RKRa1e6': stepsRa1e6,
+    'RBC3DG4R4EulerRa1e6': stepsRa1e6,
 }
 n_freefall_times = {}
 
@@ -77,6 +86,10 @@ def compare_order(Ra):  # pragma: no cover
         names = ['RK', 'Euler', 'SDC22', 'SDC23', 'SDC34', 'SDC44'][::-1]
         configs = [f'RBC3DG4R4{me}Ra1e5' for me in names]
         paths = [f'./data/RBC3DG4R4{me}Ra1e5-res-1-order.pickle' for me in names]
+    elif Ra == 1e6:
+        names = ['RK', 'SDC23', 'SDC34']
+        configs = [f'RBC3DG4R4{me}Ra1e6' for me in names]
+        paths = [f'./data/RBC3DG4R4{me}Ra1e6-res-1-order.pickle' for me in names]
 
     else:
         raise NotImplementedError
@@ -99,7 +112,7 @@ def compare_order(Ra):  # pragma: no cover
     ax.legend(frameon=False)
     ax.set_xlabel(r'$\Delta t$')
     ax.set_ylabel(r'$e$')
-    savefig(fig, 'RBC3D_order_Ra1e5')
+    savefig(fig, 'RBC3D_order_Ra1e6')
 
 
 def run(args, dt, Tend):
@@ -146,6 +159,6 @@ if __name__ == '__main__':
     if args['config'] is not None:
         plot_error_all_components(args)
 
-    compare_order(1e5)
+    compare_order(1e6)
     if MPI.COMM_WORLD.rank == 0:
         plt.show()

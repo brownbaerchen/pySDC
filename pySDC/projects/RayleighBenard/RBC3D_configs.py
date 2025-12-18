@@ -30,7 +30,7 @@ class RayleighBenard3DRegular(Config):
 
         LogToFile.filename = self.get_file_name()
         LogToFile.time_increment = 5e-1
-        LogToFile.allow_overwriting = True
+        # LogToFile.allow_overwriting = True
 
         return LogToFile
 
@@ -232,12 +232,37 @@ class RBC3DM3K4(RBC3Dverification):
         return desc
 
 
+class RBC3DM3K5(RBC3Dverification):
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 5
+        desc['sweeper_params']['num_nodes'] = 3
+        return desc
+
+
 class RBC3DM4K4(RBC3Dverification):
 
     def get_description(self, *args, **kwargs):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['nsweeps'] = 4
         desc['sweeper_params']['num_nodes'] = 4
+        return desc
+
+
+class RBC3DadaptiveM2K3(RBC3Dverification):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.convergence_controller_classes.adaptivity import AdaptivityPolynomialError
+
+        desc = super().get_description(*args, **kwargs)
+
+        # desc['convergence_controllers'][Adaptivity] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.3}
+        desc['convergence_controllers'][AdaptivityPolynomialError] = {'e_tol': 1e-4, 'dt_rel_min_slope': 0.3}
+        desc['level_params']['restol'] = 1e-7
+        desc['sweeper_params']['num_nodes'] = 2
+        desc['sweeper_params']['skip_residual_computation'] = ('IT_DOWN', 'IT_UP', 'IT_FINE', 'IT_COARSE')
+        desc['step_params']['maxiter'] = 20
+        desc['level_params']['nsweeps'] = 1
         return desc
 
 
@@ -288,6 +313,13 @@ class RBC3DG4R4SDC34Ra1e5(RBC3DM3K4):
     converged = 50
 
 
+class RBC3DG4R4SDC35Ra1e5(RBC3DM3K5):
+    Tend = 200
+    dt = 6e-2
+    res = 32
+    # converged = 50
+
+
 class RBC3DG4R4SDC44Ra1e5(RBC3DM4K4):
     Tend = 200
     dt = 6e-2
@@ -309,9 +341,17 @@ class RBC3DG4R4EulerRa1e5(RBC3DverificationEuler):
     converged = 50
 
 
-class RBC3DG4R4SDC34Ra1e6(RBC3DM3K4):
-    Tend = 100
-    dt = 6e-2
+class RBC3DG4R4SDC44Ra1e6(RBC3DM4K4):
+    Tend = 75
+    dt = 2e-2
+    res = 64
+    # converged = 22
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+
+
+class RBC3DG4R4AdaptiveSDC23Ra1e6(RBC3DadaptiveM2K3):
+    Tend = 75
+    dt = 1e-2
     res = 64
     ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
     # converged = 50
@@ -401,3 +441,44 @@ class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
     ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
     Tend = 20
     res = 64
+    # converged = 22
+
+
+class RBC3DG4R4SDC34Ra1e6(RBC3DM3K4):
+    Tend = 75
+    dt = 2e-2
+    res = 64
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+    converged = 22
+
+
+class RBC3DG4R4SDC35Ra1e6(RBC3DM3K5):
+    Tend = 75
+    dt = 2e-2
+    res = 64
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+    # converged = 22
+
+
+class RBC3DG4R4SDC23Ra1e6(RBC3DM2K3):
+    Tend = 75
+    dt = 6e-2
+    res = 64
+    converged = 22
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+
+
+class RBC3DG4R4RKRa1e6(RBC3DverificationRK):
+    Tend = 75
+    dt = 1e-2
+    res = 64
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+    # converged = 22
+
+
+class RBC3DG4R4EulerRa1e6(RBC3DverificationEuler):
+    Tend = 75
+    dt = 1e-2
+    res = 64
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+    # converged = 22
