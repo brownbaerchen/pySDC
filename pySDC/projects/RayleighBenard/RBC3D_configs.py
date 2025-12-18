@@ -433,12 +433,6 @@ class RBC2DG4R4SDC23Ra1e5(RBC2DM2K3):
 
 class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
     ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
-    Tend = 10
-    res = 64
-
-
-class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
-    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
     Tend = 20
     res = 64
     # converged = 22
