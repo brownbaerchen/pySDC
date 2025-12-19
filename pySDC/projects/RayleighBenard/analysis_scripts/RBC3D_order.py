@@ -82,6 +82,7 @@ def plot_error_all_components(args):  # pragma: no cover
 
 def compare_order(Ra):  # pragma: no cover
     fig, ax = plt.subplots(figsize=figsize_by_journal('Nature_CS', 1, 0.6))
+    # fig, ax = plt.subplots(figsize=figsize_by_journal('JSC_beamer', 0.5, 0.9))
     if Ra == 1e5:
         names = ['RK', 'Euler', 'SDC22', 'SDC23', 'SDC34', 'SDC44'][::-1]
         configs = [f'RBC3DG4R4{me}Ra1e5' for me in names]

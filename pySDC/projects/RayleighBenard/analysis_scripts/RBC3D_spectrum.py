@@ -7,12 +7,17 @@ from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import (
 import matplotlib.pyplot as plt
 
 
-def plot_spectrum(res, dt, config_name, ax):  # pragma: no cover
+def plot_spectrum(res, dt, config_name, ax, **plotting_params):  # pragma: no cover
     data = get_pySDC_data(res=res, dt=dt, config_name=config_name)
 
     spectrum = data['avg_spectrum']
     k = data['k']
-    ax.loglog(k[spectrum > 1e-16], spectrum[spectrum > 1e-16], **get_plotting_style(config_name), markevery=5)
+    ax.loglog(
+        k[spectrum > 1e-16],
+        spectrum[spectrum > 1e-16],
+        **{**get_plotting_style(config_name), **plotting_params},
+        markevery=5,
+    )
     ax.set_xlabel('$k$')
     ax.set_ylabel(r'$\|\hat{u}_x\|$')
 

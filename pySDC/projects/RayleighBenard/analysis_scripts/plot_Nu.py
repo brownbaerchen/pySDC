@@ -56,6 +56,7 @@ def plot_Nu_over_time_Ra1e5():  # pragma: no cover
 
     ref_data = get_pySDC_data(res=res, dt=0.01, config_name='RBC3DG4R4SDC44Ra1e5')
 
+    plot_Nu(res, [0.08], 'RBC3DG4R4SDC35Ra1e5', ref_data, Nu_axs[0], 'SDC35', converged_from)
     plot_Nu(res, [0.06, 0.04, 0.02], 'RBC3DG4R4SDC34Ra1e5', ref_data, Nu_axs[0], 'SDC34', converged_from)
     plot_Nu(res, [0.06, 0.05, 0.02, 0.01], 'RBC3DG4R4SDC23Ra1e5', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.05, 0.04, 0.02, 0.01, 0.005], 'RBC3DG4R4RKRa1e5', ref_data, Nu_axs[2], 'RK443', converged_from)
@@ -75,12 +76,13 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
     res = 64
     converged_from = 25
 
-    ref_data = get_pySDC_data(res=res, dt=0.005, config_name='RBC3DG4R4SDC34Ra1e6')
+    ref_data = get_pySDC_data(res=res, dt=0.002, config_name='RBC3DG4R4SDC34Ra1e6')
 
-    plot_Nu(res, [0.02, 0.01, 0.005], 'RBC3DG4R4SDC34Ra1e6', ref_data, Nu_axs[0], 'SDC34', converged_from)
-    plot_Nu(res, [0.01, 0.005], 'RBC3DG4R4SDC23Ra1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
+    plot_Nu(res, [0.02, 0.01, 0.005, 0.002], 'RBC3DG4R4SDC34Ra1e6', ref_data, Nu_axs[0], 'SDC34', converged_from)
+    plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4SDC23Ra1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4RKRa1e6', ref_data, Nu_axs[2], 'RK443', converged_from)
-    # plot_Nu(res, [0.02, 0.01, 0.005], 'RBC3DG4R4EulerRa1e6', ref_data, Nu_axs[3], 'RK111', converged_from)
+    plot_Nu(res, [0.01], 'RBC3DG4R4SDC44Ra1e6', ref_data, Nu_axs[3], 'SDC44', converged_from)
+    plot_Nu(res, [0.005, 0.002], 'RBC3DG4R4EulerRa1e6', ref_data, Nu_axs[3], 'RK111', converged_from)
     # plot_Nu(res, [0.04, 0.02], 'RBC3DG4R4SDC22Ra1e6', ref_data, Nu_axs[3], 'SDC22', converged_from)
 
     Nu_axs[-1].set_xlabel('$t$')
@@ -90,9 +92,28 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
     Nu_fig.savefig('./plots/Nu_over_time_Ra1e6.pdf', bbox_inches='tight')
 
 
+def plot_Nu_A2DRa1e5():
+    fig, axs = plt.subplots(2, 1)
+
+    res = 64
+    converged_from = 50
+    ref_data = get_pySDC_data(res=res, dt=0.06, config_name='RBC2DG4R4SDC23Ra1e5')
+    plot_Nu(res, [0.1], 'RBC2DG4R4SDC23A10Ra1e5', ref_data, axs[0], '', converged_from)
+    plot_Nu(res, [0.06], 'RBC2DG4R4SDC23Ra1e5', ref_data, axs[0], '', converged_from)
+
+    res = 128
+    converged_from = 10
+    ref_data = get_pySDC_data(res=res, dt=0.01, config_name='RBC2DG4R4SDC23Ra1e6')
+    plot_Nu(res, [0.01], 'RBC2DG4R4SDC23Ra1e6', ref_data, axs[1], '', converged_from)
+    plot_Nu(res, [0.02], 'RBC2DG4R4SDC23A10Ra1e6', ref_data, axs[1], '', converged_from)
+
+    fig.tight_layout()
+
+
 if __name__ == '__main__':
 
     # plot_Nu_over_time_Ra1e5()
-    plot_Nu_over_time_Ra1e6()
+    # plot_Nu_over_time_Ra1e6()
+    plot_Nu_A2DRa1e5()
 
     plt.show()

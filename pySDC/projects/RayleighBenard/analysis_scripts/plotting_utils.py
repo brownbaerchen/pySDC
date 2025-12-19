@@ -38,7 +38,7 @@ def get_plotting_style(config):  # pragma: no cover
         args['color'] = 'tab:red'
         args['ls'] = '--'
         args['marker'] = '>'
-        args['label'] = 'RK444'
+        args['label'] = 'RK443'
     else:
         warnings.warn(f'No plotting style for {config=!r}')
 

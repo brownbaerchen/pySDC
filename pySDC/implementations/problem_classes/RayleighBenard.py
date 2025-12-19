@@ -2,7 +2,7 @@ import numpy as np
 from mpi4py import MPI
 
 from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.datatype_classes.mesh import mesh, imex_artificial_mesh
 from pySDC.core.convergence_controller import ConvergenceController
 from pySDC.core.hooks import Hooks
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
@@ -47,7 +47,7 @@ class RayleighBenard(GenericSpectralLinear):
     """
 
     dtype_u = mesh
-    dtype_f = imex_mesh
+    dtype_f = imex_artificial_mesh
 
     def __init__(
         self,
@@ -61,6 +61,7 @@ class RayleighBenard(GenericSpectralLinear):
         Lx=4,
         Lz=1,
         z0=0,
+        artificial_diffusion=0,
         **kwargs,
     ):
         """
@@ -110,6 +111,11 @@ class RayleighBenard(GenericSpectralLinear):
             localVars=locals(),
             readOnly=True,
         )
+        self._makeAttributeAndRegister(
+            'artificial_diffusion',
+            localVars=locals(),
+            readOnly=False,
+        )
 
         bases = [
             {'base': 'fft', 'N': nx, 'x0': 0, 'x1': self.Lx},
@@ -144,13 +150,21 @@ class RayleighBenard(GenericSpectralLinear):
         Ra = Rayleigh / (max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * self.axes[1].L ** 3)
         self.kappa = (Ra * Prandtl) ** (-1 / 2.0)
         self.nu = (Ra / Prandtl) ** (-1 / 2.0)
+        self.artificial_diffusion *= self.nu
 
         # construct operators
+        L_artificial = {
+            'u': {'u': -self.artificial_diffusion * (U02 @ Dxx + Dzz)},
+            'v': {'v': -self.artificial_diffusion * (U02 @ Dxx + Dzz)},
+            'T': {'T': -self.artificial_diffusion * (U02 @ Dxx + Dzz)},
+        }
+        self.L_artificial = self._setup_operator(L_artificial)
+
         L_lhs = {
             'p': {'u': U01 @ Dx, 'v': Dz},  # divergence free constraint
-            'u': {'p': U02 @ Dx, 'u': -self.nu * (U02 @ Dxx + Dzz)},
-            'v': {'p': U12 @ Dz, 'v': -self.nu * (U02 @ Dxx + Dzz), 'T': -U02 @ Id},
-            'T': {'T': -self.kappa * (U02 @ Dxx + Dzz)},
+            'u': {'p': U02 @ Dx, 'u': -(self.nu + self.artificial_diffusion) * (U02 @ Dxx + Dzz)},
+            'v': {'p': U12 @ Dz, 'v': -(self.nu + self.artificial_diffusion) * (U02 @ Dxx + Dzz), 'T': -U02 @ Id},
+            'T': {'T': -(self.kappa + self.artificial_diffusion) * (U02 @ Dxx + Dzz)},
         }
         self.setup_L(L_lhs)
 
@@ -210,12 +224,18 @@ class RayleighBenard(GenericSpectralLinear):
         # evaluate implicit terms
         if not hasattr(self, '_L_T_base'):
             self._L_T_base = self.base_change @ self.L
-        f_impl_hat = -(self._L_T_base @ u_hat.flatten()).reshape(u_hat.shape)
+            self._L_T_base_artifical = self.base_change @ self.L_artificial
+
+        f_impl_hat = -((self._L_T_base - self._L_T_base_artifical) @ u_hat.flatten()).reshape(u_hat.shape)
+
+        f_artifical_hat = -(self._L_T_base_artifical @ u_hat.flatten()).reshape(u_hat.shape)
 
         if self.spectral_space:
             f.impl[:] = f_impl_hat
+            f.artificial[:] = f_artifical_hat
         else:
             f.impl[:] = self.itransform(f_impl_hat).real
+            f.artificial[:] = self.itransform(f_artifical_hat).real
 
         # -------------------------------------------
         # treat convection explicitly with dealiasing
@@ -244,6 +264,39 @@ class RayleighBenard(GenericSpectralLinear):
 
         self.work_counters['rhs']()
         return f
+
+    def eval_f_expl_real_input(self, u):
+        in_shape = u.shape
+        u = u.reshape(self.global_shape)
+
+        u_hat = self.transform(u)
+
+        Dz = self.Dz
+        Dx = self.Dx
+
+        iu, iv, iT, ip = self.index(['u', 'v', 'T', 'p'])
+
+        # -------------------------------------------
+        # treat convection explicitly with dealiasing
+
+        # start by computing derivatives
+        if not hasattr(self, '_Dx_expanded') or not hasattr(self, '_Dz_expanded'):
+            self._Dx_expanded = self._setup_operator({'u': {'u': Dx}, 'v': {'v': Dx}, 'T': {'T': Dx}, 'p': {}})
+            self._Dz_expanded = self._setup_operator({'u': {'u': Dz}, 'v': {'v': Dz}, 'T': {'T': Dz}, 'p': {}})
+        Dx_u_hat = (self._Dx_expanded @ u_hat.flatten()).reshape(u_hat.shape)
+        Dz_u_hat = (self._Dz_expanded @ u_hat.flatten()).reshape(u_hat.shape)
+
+        padding = (self.dealiasing, self.dealiasing)
+        Dx_u_pad = self.itransform(Dx_u_hat, padding=padding).real
+        Dz_u_pad = self.itransform(Dz_u_hat, padding=padding).real
+        u_pad = self.itransform(u_hat, padding=padding).real
+
+        fexpl_pad = self.xp.zeros_like(u_pad)
+        fexpl_pad[iu][:] = -(u_pad[iu] * Dx_u_pad[iu] + u_pad[iv] * Dz_u_pad[iu])
+        fexpl_pad[iv][:] = -(u_pad[iu] * Dx_u_pad[iv] + u_pad[iv] * Dz_u_pad[iv])
+        fexpl_pad[iT][:] = -(u_pad[iu] * Dx_u_pad[iT] + u_pad[iv] * Dz_u_pad[iT])
+
+        return self.itransform(self.transform(fexpl_pad, padding=padding)).real.reshape(in_shape)
 
     def u_exact(self, t=0, noise_level=1e-3, seed=99):
         assert t == 0
@@ -388,6 +441,66 @@ class RayleighBenard(GenericSpectralLinear):
         vorticity_hat[0] = (Dx * u_hat[iv].flatten() + Dz @ u_hat[iu].flatten()).reshape(u_hat[iu].shape)
         return self.itransform(vorticity_hat)[0].real
 
+    def get_frequency_spectrum(self, u):
+        """
+        Compute the frequency spectrum of the velocity in x direction in the horizontal plane for every point in
+        z. If the problem is well resolved, the coefficients will decay quickly with the wave number, and the reverse
+        indicates that the resolution is too low.
+
+        Args:
+            u: The solution you want to compute the spectrum of
+
+        Returns:
+            RayleighBenard.xp.ndarray: wave numbers
+            RayleighBenard.xp.ndarray: spectrum
+        """
+        xp = self.xp
+        indices = self.index('u')
+
+        # transform the solution to be in frequency space in x and y, but real space in z
+        if self.spectral_space:
+            u_hat = self.itransform(u, axes=(-1,))
+        else:
+            u_hat = self.transform(
+                u,
+                axes=(-2,),
+            )
+        u_hat = self.spectral.redistribute(u_hat, axis=1, forward_output=False)
+
+        # compute "energy density" as absolute square of the velocity modes
+        energy = (u_hat[indices] * xp.conjugate(u_hat[indices])).real / (self.axes[0].N ** 2)
+
+        # prepare wave numbers at which to compute the spectrum
+        abs_kx = xp.abs(self.Kx[:, 0])
+
+        unique_k = xp.unique(abs_kx)
+        n_k = len(unique_k)
+
+        # compute local spectrum
+        local_spectrum = self.xp.empty(shape=(energy.shape[1], n_k))
+        for i, k in zip(range(n_k), unique_k, strict=True):
+            mask = abs_kx == k
+            local_spectrum[..., i] = xp.sum(energy[mask, :], axis=0)
+
+        # assemble global spectrum from local spectra
+        k_all = self.comm.allgather(unique_k)
+        unique_k_all = []
+        for k in k_all:
+            unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
+        n_k_all = len(unique_k_all)
+
+        spectra = self.comm.allgather(local_spectrum)
+        spectrum = self.xp.zeros(shape=(self.axes[-1].N, n_k_all))
+        for ks, _spectrum in zip(k_all, spectra, strict=True):
+            ks = list(ks)
+            unique_k_all = list(unique_k_all)
+            for k in ks:
+                index_global = unique_k_all.index(k)
+                index_local = ks.index(k)
+                spectrum[:, index_global] += _spectrum[:, index_local]
+
+        return xp.array(unique_k_all), spectrum
+
     def getOutputFile(self, fileName):
         from pySDC.helpers.fieldsIO import Rectilinear
 
@@ -469,6 +582,23 @@ class RayleighBenard(GenericSpectralLinear):
             't': Nusselt_t,
             'b': Nusselt_b,
         }
+
+    def get_vertical_profiles(self, u, components):
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        _u_hat = self.axes[-1].itransform(u_hat, axes=(-1,))
+
+        avgs = {}
+        for c in components:
+            i = self.index(c)
+            avg = self.xp.ascontiguousarray(_u_hat[i, 0, :].real) / self.axes[0].N
+            self.comm.Bcast(avg, root=0)
+            avgs[c] = avg
+
+        return avgs
 
     def compute_viscous_dissipation(self, u):
         iu, iv = self.index(['u', 'v'])

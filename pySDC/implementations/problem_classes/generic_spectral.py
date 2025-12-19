@@ -442,6 +442,115 @@ class GenericSpectralLinear(Problem):
             return np.array(u.real)
 
 
+class GenericSpectralLinearArtificialViscosity(GenericSpectralLinear):
+
+    def setup_LA(self, LHS):
+        """
+        Setup the left hand side of the linear artificial bonus operator LA and store it in ``self.LA``.
+
+        The argument is meant to be a dictionary with the line you want to write the equation in as the key and the relationship between components as another dictionary. For instance, you can add an algebraic condition capturing a first derivative relationship between u and ux as follows:
+
+        ```
+        Dx = self.get_differentiation_matrix(axes=(0,))
+        I = self.get_Id()
+        LHS = {'ux': {'u': Dx, 'ux': -I}}
+        self.setup_LA(LHS)
+        ```
+
+        If you put zero as right hand side for the solver in the line for ux, ux will contain the x-derivative of u afterwards.
+
+        Args:
+            LHS (dict): Dictionary containing the equations.
+        """
+        self.LA = self._setup_operator(LHS)
+        self.logger.debug('Set up LA matrix')
+
+    def solve_system(self, rhs, dt, dtA, u0=None, *args, skip_itransform=False, **kwargs):
+        """
+        Do an implicit Euler step to solve M u_t + Lu = rhs, with M the mass matrix and L the linear operator as setup by
+        ``GenericSpectralLinear.setup_L`` and ``GenericSpectralLinear.setup_M``.
+
+        The implicit Euler step is (M - dt L) u = M rhs. Note that M need not be invertible as long as (M + dt*L) is.
+        This means solving with dt=0 to mimic explicit methods does not work for all problems, in particular simple DAEs.
+
+        Note that by putting M rhs on the right hand side, this function can only solve algebraic conditions equal to
+        zero. If you want something else, it should be easy to overload this function.
+        """
+
+        sp = self.spectral.sparse_lib
+
+        if self.spectral_space:
+            rhs_hat = rhs.copy()
+            if u0 is not None:
+                u0_hat = u0.copy().flatten()
+            else:
+                u0_hat = None
+        else:
+            rhs_hat = self.spectral.transform(rhs)
+            if u0 is not None:
+                u0_hat = self.spectral.transform(u0).flatten()
+            else:
+                u0_hat = None
+
+        rhs_hat = (self.M @ rhs_hat.flatten()).reshape(rhs_hat.shape)
+        rhs_hat = self.spectral.put_BCs_in_rhs_hat(rhs_hat)
+        rhs_hat = self.Pl @ rhs_hat.flatten()
+
+        if (dt, dtA) not in self.cached_factorizations.keys():
+            M = self.M
+            L = self.L
+            LA = self.LA
+            Pl = self.Pl
+            Pr = self.Pr
+
+            A = M + dt * L + dtA * LA
+            A = Pl @ self.spectral.put_BCs_in_matrix(A) @ Pr
+
+        if self.solver_type.lower() == 'cached_direct':
+            if (dt, dtA) not in self.cached_factorizations.keys():
+                if len(self.cached_factorizations) >= self.max_cached_factorizations:
+                    self.cached_factorizations.pop(list(self.cached_factorizations.keys())[0])
+                    self.logger.debug(f'Evicted matrix factorization for {dt=:.6f} from cache')
+
+                if self.heterogeneous:
+                    import scipy.sparse as sp
+
+                    cpu_decomp = sp.linalg.splu(A)
+
+                    if self.useGPU:
+                        from cupyx.scipy.sparse.linalg import SuperLU
+
+                        solver = SuperLU(cpu_decomp).solve
+                    else:
+                        solver = cpu_decomp.solve
+                else:
+                    solver = self.spectral.linalg.factorized(A)
+
+                self.cached_factorizations[(dt, dtA)] = solver
+                self.logger.debug(f'Cached matrix factorization for {dt=:.6f}')
+                self.work_counters['factorizations']()
+
+            _sol_hat = self.cached_factorizations[(dt, dtA)](rhs_hat)
+            self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
+
+        else:
+            raise NotImplementedError(f'Solver {self.solver_type=} not implemented in {type(self).__name__}!')
+
+        sol_hat = self.spectral.u_init_forward
+        sol_hat[...] = (self.Pr @ _sol_hat).reshape(sol_hat.shape)
+
+        if self.spectral_space:
+            return sol_hat
+        else:
+            sol = self.spectral.u_init
+            sol[:] = self.spectral.itransform(sol_hat).real
+
+            if self.spectral.debug:
+                self.spectral.check_BCs(sol)
+
+            return sol
+
+
 def compute_residual_DAE(self, stage=''):
     """
     Computation of the residual that does not add u_0 - u_m in algebraic equations.

@@ -186,5 +186,9 @@ class imex_mesh(MultiComponentMesh):
     components = ['impl', 'expl']
 
 
+class imex_artificial_mesh(MultiComponentMesh):
+    components = ['impl', 'expl', 'artificial']
+
+
 class comp2_mesh(MultiComponentMesh):
     components = ['comp1', 'comp2']

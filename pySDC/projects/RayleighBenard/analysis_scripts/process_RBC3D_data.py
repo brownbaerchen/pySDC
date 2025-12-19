@@ -32,7 +32,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     # prepare paths
     os.makedirs(base_path, exist_ok=True)
     fname = config.get_file_name()
-    fname_trim = fname[fname.index('RBC3D') : fname.index('.pySDC')]
+    fname_trim = fname[fname.index('RBC') : fname.index('.pySDC')]
     path = f'{base_path}/{fname_trim}.pickle'
 
     # open simulation data
@@ -43,11 +43,12 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         'V': [],
         'b': [],
         't': [],
-        'thermal': [],
-        'kinetic': [],
+        # 'thermal': [],
+        # 'kinetic': [],
     }
     t = []
-    profiles = {key: [] for key in ['T', 'u', 'v', 'w']}
+    # profiles = {key: [] for key in ['T', 'u', 'v', 'w']}
+    profiles = {key: [] for key in ['T', 'u', 'v']}
     rms_profiles = {key: [] for key in profiles.keys()}
     spectrum = []
     spectrum_all = []
@@ -73,6 +74,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     # loop through all data points and compute stuff
     for i in indeces:
         _t, u = data.readField(i)
+        u = u[0 : P.ncomponents]
 
         # Nusselt numbers
         _Nu = P.compute_Nusselt_numbers(u)
@@ -93,7 +95,10 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
 
         # spectrum
         k, s = P.get_frequency_spectrum(u)
-        s_mean = zInt @ P.axes[-1].transform(s[0], axes=(0,))
+        if len(P.axes) == 3:
+            s_mean = zInt @ P.axes[-1].transform(s[0], axes=(0,))
+        else:
+            s_mean = zInt @ P.axes[-1].transform(s, axes=(0,))
         spectrum.append(s_mean)
         spectrum_all.append(s)
 
@@ -126,13 +131,15 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         for key in [
             't',
             'b',
-            'thermal',
-            'kinetic',
+            # 'thermal',
+            # 'kinetic',
         ]
     }
     if comm.rank == 0:
+        # print(
+        #     f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with errors: Top {rel_error["t"]:.2e}, bottom: {rel_error["b"]:.2e}, thermal: {rel_error["thermal"]:.2e}, kinetic: {rel_error["kinetic"]:.2e}')
         print(
-            f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with errors: Top {rel_error["t"]:.2e}, bottom: {rel_error["b"]:.2e}, thermal: {rel_error["thermal"]:.2e}, kinetic: {rel_error["kinetic"]:.2e}'
+            f'With Ra={P.Rayleigh:.0e} got Nu={avg_Nu["V"]:.2f}+-{std_Nu["V"]:.2f} with errors: Top {rel_error["t"]:.2e}, bottom: {rel_error["b"]:.2e}'
         )
 
     # compute average profiles

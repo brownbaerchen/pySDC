@@ -91,8 +91,12 @@ class RayleighBenard3DRegular(Config):
 
         if restart_idx == 0:
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
-            u0_with_pressure = P.solve_system(u0, 1e-9, u0)
-            P.cached_factorizations.pop(1e-9)
+            if 'artificial' in type(P).__name__.lower():
+                u0_with_pressure = P.solve_system(u0, 1e-9, 0, u0)
+                P.cached_factorizations.pop((1e-9, 0))
+            else:
+                u0_with_pressure = P.solve_system(u0, 1e-9, u0)
+                P.cached_factorizations.pop(1e-9)
             return u0_with_pressure, 0
         else:
             from pySDC.helpers.fieldsIO import FieldsIO
@@ -214,6 +218,22 @@ class RBC3DM2K3(RBC3Dverification):
         return desc
 
 
+class RBC3DM2K3A(RBC3Dverification):
+    artificial_viscosity = 10
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order_artificial_viscosity
+        from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3DArtificialViscosity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 3
+        desc['sweeper_params']['num_nodes'] = 2
+        desc['sweeper_class'] = imex_1st_order_artificial_viscosity
+        desc['problem_params']['artificial_viscosity'] = self.artificial_viscosity
+        desc['problem_class'] = RayleighBenard3DArtificialViscosity
+        return desc
+
+
 class RBC3DM2K2(RBC3Dverification):
 
     def get_description(self, *args, **kwargs):
@@ -306,6 +326,13 @@ class RBC3DG4R4SDC23Ra1e5(RBC3DM2K3):
     converged = 50
 
 
+class RBC3DG4R4SDC23ARa1e5(RBC3DM2K3A):
+    Tend = 200
+    dt = 6e-2
+    res = 32
+    converged = 50
+
+
 class RBC3DG4R4SDC34Ra1e5(RBC3DM3K4):
     Tend = 200
     dt = 6e-2
@@ -358,6 +385,9 @@ class RBC3DG4R4AdaptiveSDC23Ra1e6(RBC3DadaptiveM2K3):
 
 
 class RBC2Dverification(RBC3Dverification):
+    res_ratio = 4
+    res = 64
+
     def get_description(self, *args, MPIsweeper=False, res=-1, **kwargs):
         from pySDC.implementations.problem_classes.RayleighBenard import (
             RayleighBenard,
@@ -373,7 +403,11 @@ class RBC2Dverification(RBC3Dverification):
         desc['problem_class'] = RayleighBenard
         for param in ['ny', 'Ly']:
             desc['problem_params'].pop(param)
-        desc['problem_params']['Rayleigh'] = 1e6
+        Ra = int(type(self).__name__[-3]) * 10 ** int(type(self).__name__[-1])
+        desc['problem_params']['Rayleigh'] = Ra
+        res = self.res if res == -1 else res
+        desc['problem_params']['nx'] = self.gamma * res
+        desc['problem_params']['nz'] = res
 
         return desc
 
@@ -423,12 +457,130 @@ class RBC2DM2K3(RBC2Dverification):
         desc = super().get_description(*args, **kwargs)
         desc['level_params']['nsweeps'] = 3
         desc['sweeper_params']['num_nodes'] = 2
+        desc['sweeper_params']['skip_residual_computation'] = (None,)
+        return desc
+
+
+class RBC2DRes(RBC2Dverification):
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 1
+        desc['step_params']['maxiter'] = 99
+        desc['level_params']['restol'] = 1e-5
+        desc['sweeper_params']['num_nodes'] = 3
+        desc['sweeper_params']['skip_residual_computation'] = (None,)
+        desc['problem_params']['spectral_space'] = False
+        return desc
+
+
+class RBC2DResA(RBC2DRes):
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order_artificial_viscosity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['artificial_diffusion'] = 10
+        desc['sweeper_class'] = imex_1st_order_artificial_viscosity
+        return desc
+
+
+class RBC2DM2K3A(RBC2DM2K3):
+    artifical_visc = 10
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order_artificial_viscosity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['artificial_diffusion'] = self.artifical_visc
+        desc['sweeper_class'] = imex_1st_order_artificial_viscosity
+        desc['sweeper_params']['skip_residual_computation'] = (None,)
+        return desc
+
+
+class RBC2DM3K5A(RBC2Dverification):
+    artifical_visc = 10
+
+    def get_description(self, *args, **kwargs):
+        from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order_artificial_viscosity
+
+        desc = super().get_description(*args, **kwargs)
+        desc['problem_params']['artificial_diffusion'] = self.artifical_visc
+        desc['level_params']['nsweeps'] = 5
+        desc['sweeper_class'] = imex_1st_order_artificial_viscosity
+        desc['sweeper_params']['skip_residual_computation'] = (None,)
         return desc
 
 
 class RBC2DG4R4SDC23Ra1e5(RBC2DM2K3):
-    Tend = 10
+    Tend = 100
     res = 64
+    dt = 0.06
+
+
+class RBC2DG4R4ResRa1e5(RBC2DRes):
+    Tend = 100
+    res = 64
+
+
+class RBC2DG4R4ResARa1e5(RBC2DResA):
+    Tend = 100
+    res = 64
+
+
+class RBC2DG4R4ResARa1e5(RBC2DResA):
+    Tend = 100
+    res = 64
+
+
+class RBC2DG4R4SDC23A10Ra1e5(RBC2DM2K3A):
+    Tend = 100
+    res = 64
+    artifical_visc = 10
+    dt = 0.1
+
+
+class RBC2DG4R4SDC23A100Ra1e5(RBC2DM2K3A):
+    Tend = 100
+    res = 64
+    artifical_visc = 100
+
+
+class RBC2DG4R4SDC23A50Ra1e5(RBC2DM2K3A):
+    Tend = 100
+    res = 64
+    artifical_visc = 50
+
+
+class RBC2DG4R4SDC23A30Ra1e5(RBC2DM2K3A):
+    Tend = 100
+    res = 64
+    artifical_visc = 30
+
+
+class RBC2DG4R4SDC35A25Ra1e5(RBC2DM3K5A):
+    Tend = 100
+    res = 64
+    artifical_visc = 25
+
+
+class RBC2DG4R4SDC23A10Ra1e6(RBC2DM2K3A):
+    Tend = 100
+    res = 64
+    artifical_visc = 10
+
+
+class RBC2DG4R4SDC23Ra1e6(RBC2DM2K3):
+    Tend = 50
+    res = 128
+    dt = 0.01
+    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 0.06}
+
+
+class RBC2DG4R4SDC23A10Ra1e6(RBC2DM2K3A):
+    Tend = 50
+    res = 128
+    dt = 0.02
+    artifical_visc = 10
+    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 0.06}
 
 
 class RBC2DG4R4SDC23SpreadRa1e5(RBC2DM2K3):
@@ -476,3 +628,15 @@ class RBC3DG4R4EulerRa1e6(RBC3DverificationEuler):
     res = 64
     ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
     # converged = 22
+
+
+class RBC2DG4R4SDC23EERa1e5(RBC2DM2K3):
+    ic_config = {'config': RBC2DG4R4SDC23Ra1e5, 'res': 64, 'dt': 1.0}
+    Tend = 20
+    res = 64
+
+    def get_description(self, *args, **kwargs):
+        desc = super().get_description(*args, **kwargs)
+        desc['level_params']['nsweeps'] = 3
+        desc['sweeper_params']['num_nodes'] = 2
+        return desc

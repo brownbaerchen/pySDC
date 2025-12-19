@@ -1,8 +1,11 @@
 import numpy as np
 from mpi4py import MPI
 
-from pySDC.implementations.problem_classes.generic_spectral import GenericSpectralLinear
-from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
+from pySDC.implementations.problem_classes.generic_spectral import (
+    GenericSpectralLinear,
+    GenericSpectralLinearArtificialViscosity,
+)
+from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh, imex_artificial_mesh
 from pySDC.core.convergence_controller import ConvergenceController
 from pySDC.core.hooks import Hooks
 from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
@@ -479,3 +482,114 @@ class RayleighBenard3D(GenericSpectralLinear):
             avgs[c] = avg
 
         return avgs
+
+
+class RayleighBenard3DArtificialViscosity(RayleighBenard3D, GenericSpectralLinearArtificialViscosity):
+    dtype_f = imex_artificial_mesh
+
+    def __init__(
+        self,
+        *args,
+        artificial_viscosity=10,
+        **kwargs,
+    ):
+        """
+        Constructor. `kwargs` are forwarded to parent class constructor.
+
+        Args:
+            Prandtl (float): Prandtl number
+            Rayleigh (float): Rayleigh number
+            nx (int): Resolution in x-direction
+            nz (int): Resolution in z direction
+            BCs (dict): Vertical boundary conditions
+            dealiasing (float): Dealiasing for evaluating the non-linear part in real space
+            comm (mpi4py.Intracomm): Space communicator
+            Lx (float): Horizontal length of the domain
+        """
+        self._makeAttributeAndRegister(
+            'artificial_viscosity',
+            localVars=locals(),
+            readOnly=True,
+        )
+
+        super().__init__(*args, **kwargs)
+
+        # construct 3D matrices
+        Dzz = self.get_differentiation_matrix(axes=(2,), p=2)
+        Dyy = self.get_differentiation_matrix(axes=(1,), p=2)
+        Dxx = self.get_differentiation_matrix(axes=(0,), p=2)
+        U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
+        self.eliminate_zeros(Dzz)
+
+        # construct operators
+        _D = U02 @ (Dxx + Dyy) + Dzz
+        LA_lhs = {}
+        LA_lhs['u'] = {'u': -self.artificial_viscosity * self.nu * _D}
+        LA_lhs['v'] = {'v': -self.artificial_viscosity * self.nu * _D}
+        LA_lhs['w'] = {'w': -self.artificial_viscosity * self.nu * _D}
+        LA_lhs['T'] = {'T': -self.artificial_viscosity * self.kappa * _D}
+        self.setup_LA(LA_lhs)
+
+    def eval_f(self, u, *args, **kwargs):
+        f = self.f_init
+
+        if self.spectral_space:
+            u_hat = u.copy()
+        else:
+            u_hat = self.transform(u)
+
+        f_impl_hat = self.u_init_forward
+
+        iu, iv, iw, iT, ip = self.index(['u', 'v', 'w', 'T', 'p'])
+        derivative_indices = [iu, iv, iw, iT]
+
+        # evaluate implicit terms
+        f_impl_hat = -(self.L @ u_hat.flatten()).reshape(u_hat.shape)
+        for i in derivative_indices:
+            f_impl_hat[i] = (self.S2 @ f_impl_hat[i].flatten()).reshape(f_impl_hat[i].shape)
+        f_impl_hat[ip] = (self.S1 @ f_impl_hat[ip].flatten()).reshape(f_impl_hat[ip].shape)
+
+        if self.spectral_space:
+            self.xp.copyto(f.impl, f_impl_hat)
+        else:
+            f.impl[:] = self.itransform(f_impl_hat).real
+
+        # evaluate artificial terms
+        f_art_hat = -(self.LA @ u_hat.flatten()).reshape(u_hat.shape)
+        for i in derivative_indices:
+            f_art_hat[i] = (self.S2 @ f_art_hat[i].flatten()).reshape(f_art_hat[i].shape)
+
+        if self.spectral_space:
+            self.xp.copyto(f.artificial, f_art_hat)
+        else:
+            f.artificial[:] = self.itransform(f_art_hat).real
+
+        # -------------------------------------------
+        # treat convection explicitly with dealiasing
+
+        # start by computing derivatives
+        padding = (self.dealiasing,) * self.ndim
+        derivatives = []
+        u_hat_flat = [u_hat[i].flatten() for i in derivative_indices]
+
+        _D_u_hat = self.u_init_forward
+        for D in [self.Dx, self.Dy, self.Dz]:
+            _D_u_hat *= 0
+            for i in derivative_indices:
+                self.xp.copyto(_D_u_hat[i], (D @ u_hat_flat[i]).reshape(_D_u_hat[i].shape))
+            derivatives.append(self.itransform(_D_u_hat, padding=padding).real)
+
+        u_pad = self.itransform(u_hat, padding=padding).real
+
+        fexpl_pad = self.xp.zeros_like(u_pad)
+        for i in derivative_indices:
+            for i_vel, iD in zip([iu, iv, iw], range(self.ndim), strict=True):
+                fexpl_pad[i] -= u_pad[i_vel] * derivatives[iD][i]
+
+        if self.spectral_space:
+            self.xp.copyto(f.expl, self.transform(fexpl_pad, padding=padding))
+        else:
+            f.expl[:] = self.itransform(self.transform(fexpl_pad, padding=padding)).real
+
+        self.work_counters['rhs']()
+        return f
