@@ -2,10 +2,8 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy import integrate
-from pySDC.helpers.plot_helper import figsize_by_journal, setup_mpl
 from pySDC.projects.RayleighBenard.analysis_scripts.process_RBC3D_data import get_pySDC_data
-
-setup_mpl()
+from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import figsize, savefig
 
 
 def interpolate_NuV_to_reference_times(data, reference_data, order=12):
@@ -18,7 +16,7 @@ def interpolate_NuV_to_reference_times(data, reference_data, order=12):
     return interpolation_matrix @ t_in, interpolation_matrix @ data['Nu']['V']
 
 
-def plot_Nu(res, dts, config_name, ref, ax, title, converged_from=0):  # pragma: no cover
+def plot_Nu(res, dts, config_name, ref, ax, title, converged_from=0, **plotting_args):  # pragma: no cover
     ax.plot(ref['t'], ref['Nu']['V'], color='black', ls='--')
     ax.set_title(title)
     Nu_ref = np.array(ref['Nu']['V'])
@@ -29,7 +27,7 @@ def plot_Nu(res, dts, config_name, ref, ax, title, converged_from=0):  # pragma:
         # t_conv = get_convergece_time(Nu_i, t_i)
 
         # ax.plot(t_i, Nu_i, label=rf'$\Delta t={{{dt}}}$')
-        ax.plot(data['t'], data['Nu']['V'], label=rf'$\Delta t={{{dt}}}$')
+        ax.plot(data['t'], data['Nu']['V'], **{'label': rf'$\Delta t={{{dt}}}$', **plotting_args})
 
         error = np.abs(Nu_ref[: Nu_i.shape[0]] - Nu_i) / np.abs(Nu_ref[: Nu_i.shape[0]])
 
@@ -49,7 +47,7 @@ def plot_Nu(res, dts, config_name, ref, ax, title, converged_from=0):  # pragma:
 
 
 def plot_Nu_over_time_Ra1e5():  # pragma: no cover
-    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize_by_journal('Nature_CS', 1, 1.4))
+    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize(scale=1, ratio=1.4))
 
     res = 32
     converged_from = 100
@@ -59,6 +57,7 @@ def plot_Nu_over_time_Ra1e5():  # pragma: no cover
     plot_Nu(res, [0.08], 'RBC3DG4R4SDC35Ra1e5', ref_data, Nu_axs[0], 'SDC35', converged_from)
     plot_Nu(res, [0.06, 0.04, 0.02], 'RBC3DG4R4SDC34Ra1e5', ref_data, Nu_axs[0], 'SDC34', converged_from)
     plot_Nu(res, [0.06, 0.05, 0.02, 0.01], 'RBC3DG4R4SDC23Ra1e5', ref_data, Nu_axs[1], 'SDC23', converged_from)
+    plot_Nu(res, [0.1], 'RBC3DG4R4SDC23ARa1e5', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.05, 0.04, 0.02, 0.01, 0.005], 'RBC3DG4R4RKRa1e5', ref_data, Nu_axs[2], 'RK443', converged_from)
     plot_Nu(res, [0.02, 0.01, 0.005], 'RBC3DG4R4EulerRa1e5', ref_data, Nu_axs[3], 'RK111', converged_from)
     plot_Nu(res, [0.04, 0.02], 'RBC3DG4R4SDC22Ra1e5', ref_data, Nu_axs[3], 'SDC22', converged_from)
@@ -71,7 +70,7 @@ def plot_Nu_over_time_Ra1e5():  # pragma: no cover
 
 
 def plot_Nu_over_time_Ra1e6():  # pragma: no cover
-    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize_by_journal('Nature_CS', 1, 1.4))
+    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize(scale=1, ratio=1.4))
 
     res = 64
     converged_from = 25
@@ -80,6 +79,7 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
 
     plot_Nu(res, [0.02, 0.01, 0.005, 0.002], 'RBC3DG4R4SDC34Ra1e6', ref_data, Nu_axs[0], 'SDC34', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4SDC23Ra1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4SDC23ARa1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4RKRa1e6', ref_data, Nu_axs[2], 'RK443', converged_from)
     plot_Nu(res, [0.01], 'RBC3DG4R4SDC44Ra1e6', ref_data, Nu_axs[3], 'SDC44', converged_from)
     plot_Nu(res, [0.005, 0.002], 'RBC3DG4R4EulerRa1e6', ref_data, Nu_axs[3], 'RK111', converged_from)
@@ -110,10 +110,39 @@ def plot_Nu_A2DRa1e5():
     fig.tight_layout()
 
 
+def plot_Nusselt_Ra1e5_same_dt():  # pragma: no cover
+    fig, ax = plt.subplots(figsize=figsize(scale=0.9, ratio=0.45))
+
+    res = 32
+    converged_from = 100
+
+    ref_data = get_pySDC_data(res=res, dt=0.01, config_name='RBC3DG4R4SDC44Ra1e5')
+
+    plot_Nu(res, [0.02], 'RBC3DG4R4SDC34Ra1e5', ref_data, ax, 'SDC34', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4SDC44Ra1e5', ref_data, ax, 'SDC44', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4SDC23Ra1e5', ref_data, ax, 'SDC23', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4RKRa1e5', ref_data, ax, 'RK443', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4EulerRa1e5', ref_data, ax, 'RK111', converged_from)
+    plot_Nu(res, [0.02], 'RBC3DG4R4SDC22Ra1e5', ref_data, ax, 'SDC22', converged_from)
+
+    ax.set_xlabel('$t$')
+    ax.set_ylabel('$Nu$')
+    ax.set_title(r'$Ra=10^5 \quad \Delta t=0.02$')
+
+    lines = ax.get_lines()
+    for line, label in zip(lines[1::3], ['SDC34', 'SDC44', 'SDC23', 'RK443', 'RK111', 'SDC22']):
+        line.set_label(label)
+    ax.legend(frameon=True, loc='right')
+
+    fig.tight_layout()
+    savefig(fig, 'NuRa1e5SameDt', pad_inches=0.1)
+
+
 if __name__ == '__main__':
 
     # plot_Nu_over_time_Ra1e5()
     # plot_Nu_over_time_Ra1e6()
-    plot_Nu_A2DRa1e5()
+    # plot_Nu_A2DRa1e5()
+    plot_Nusselt_Ra1e5_same_dt()
 
     plt.show()

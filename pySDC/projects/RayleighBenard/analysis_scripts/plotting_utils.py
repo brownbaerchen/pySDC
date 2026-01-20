@@ -1,8 +1,12 @@
-from pySDC.helpers.plot_helper import figsize_by_journal, setup_mpl
+from functools import partial
 import warnings
 import os
 
+from pySDC.helpers.plot_helper import figsize_by_journal, setup_mpl
+
 setup_mpl()
+
+figsize = partial(figsize_by_journal, journal='Nature_CS')
 
 
 def get_plotting_style(config):  # pragma: no cover
@@ -33,7 +37,7 @@ def get_plotting_style(config):  # pragma: no cover
         args['color'] = 'tab:purple'
         args['ls'] = '--'
         args['marker'] = '.'
-        args['label'] = 'Euler'
+        args['label'] = 'RK111'
     elif config == 'RBC3DG4R4RKRa1e5':
         args['color'] = 'tab:red'
         args['ls'] = '--'
