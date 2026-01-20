@@ -328,7 +328,7 @@ class RBC3DG4R4SDC23Ra1e5(RBC3DM2K3):
 
 class RBC3DG4R4SDC23ARa1e5(RBC3DM2K3A):
     Tend = 200
-    dt = 6e-2
+    dt = 1e-1
     res = 32
     converged = 50
 
@@ -608,9 +608,17 @@ class RBC3DG4R4SDC35Ra1e6(RBC3DM3K5):
 
 class RBC3DG4R4SDC23Ra1e6(RBC3DM2K3):
     Tend = 75
-    dt = 6e-2
+    dt = 1e-2
     res = 64
     converged = 22
+    ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
+
+
+class RBC3DG4R4SDC23ARa1e6(RBC3DM2K3A):
+    Tend = 75
+    dt = 2e-2
+    res = 64
+    # converged = 22
     ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
 
 
