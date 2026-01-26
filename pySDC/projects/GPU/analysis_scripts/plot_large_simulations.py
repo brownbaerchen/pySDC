@@ -210,6 +210,64 @@ class PlotRBC(PlotLargeRun):  # pragma: no cover
         ax.legend(frameon=False)
         self.save_fig(fig, 'residual')
 
+    def plot_thesis_cover(self):  # pragma: no cover
+        indices = [82]  # , 82, 100, 162, 186]
+        indices = [72]
+
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        mm_to_inch = 1 / 25.4
+        size = (153, 123)  # mm
+        plt.rcParams['figure.constrained_layout.use'] = True
+        fig, ax = plt.subplots(figsize=(size[0] * mm_to_inch, size[1] * mm_to_inch), sharex=True, sharey=True)
+
+        # get grid
+        X = {}
+        Z = {}
+
+        frame_range = range(self.procs[2])
+        if tqdm:
+            frame_range = tqdm(frame_range)
+            frame_range.set_description('Loading grid')
+
+        for r in frame_range:
+            path = self.get_path(idx=0, n_space=r)
+            with open(path, 'rb') as file:
+                data = pickle.load(file)
+            X[r] = data['X']
+            Z[r] = data['Z']
+
+        if tqdm:
+            frame_range.set_description('Plotting slice')
+
+        def plot_single(idx, ax):  # pragma: no cover
+            for r in frame_range:
+                path = self.get_path(idx=idx, n_space=r)
+                with open(path, 'rb') as file:
+                    data = pickle.load(file)
+                im = (
+                    ax.pcolormesh(X[r], Z[r], data['u'][2], vmin=-0.2, vmax=2.2, cmap='inferno', rasterized=True),
+                    data['t'],
+                )
+            return im
+
+        for i, ax in zip(indices, [ax], strict=True):
+            im, t = plot_single(i, ax)
+
+        dx = ax.get_xlim()[1] - ax.get_xlim()[0]
+        dy = ax.get_ylim()[1] - ax.get_ylim()[0]
+        aspect = dx / dy
+        aspect_want = size[0] / size[1]
+        print(aspect, aspect_want)
+        # ax.set_xlim(dx - 1.4* aspect_want * dy, dx)
+        # ax.set_xlim(0, 1.4* aspect_want * dy)
+        # ax.set_xlim(4.5, 7.4)
+        ax.set_xlim(0, 3.4)
+
+        ax.axis("off")
+        ax.margins(0)
+        self.save_fig(fig, 'thesis_cover')
+
     def plot_series(self):  # pragma: no cover
         indices = [0, 56, 82, 100, 162, 186]
 
@@ -352,11 +410,12 @@ if __name__ == '__main__':  # pragma: no cover
             plotter.compute_CFL_limit()
             exit()
 
-        plotter.plot_residual()
-        plotter.plot_step_size()
-        plotter.plot_work()
-        plotter.plot_verification()
-        plotter.plot_series()
+        # plotter.plot_residual()
+        # plotter.plot_step_size()
+        # plotter.plot_work()
+        # plotter.plot_verification()
+        # plotter.plot_series()
+        plotter.plot_thesis_cover()
     else:
         plotter.plot_series(args.config == 'test')
         plotter.plot_step_size()
