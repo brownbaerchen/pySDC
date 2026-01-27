@@ -21,7 +21,7 @@ patternset:
 
 #Operation
 step:
-  name: write_number
+  name: run_simulation
   use: param_set #use existing parameterset
   do:
   - 'mpirun -np ${ntasks} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark'
@@ -30,17 +30,17 @@ step:
 analyser:
 - name: analyse
   analyse:
-    step: write_number
+    step: run_simulation
     file:
     - use: pattern_time
       _: stdout
 
 #Create result table
 result:
-  use: analyse #use existing analyser
+  use: analyse
   table:
     name: result
-    style: pretty
+    style: csv
     sort: res
     column:
     - res
