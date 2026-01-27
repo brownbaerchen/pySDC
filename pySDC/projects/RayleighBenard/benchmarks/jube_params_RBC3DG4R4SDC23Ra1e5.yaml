@@ -1,0 +1,7 @@
+parameterset:
+  name: param_set
+  parameter:
+    - {name: ntasks_space, type: int, _: "1,2,4"} # comma separated integer must be quoted
+    - {name: ntasks_time, type: int, _: "1,2"} # comma separated integer must be quoted
+    - {name: res, type: int, _: "8"}
+    - {name: config, _: RBC3DG4R4SDC23Ra1e5}

@@ -1,0 +1,50 @@
+name: result_creation
+outpath: bench_run
+comment: A result creation example
+
+#Configuration
+parameterset:
+  name: param_set
+  init_with: jube_params_RBC3DG4R4SDC23Ra1e5.yaml
+  parameter: {name: ntasks, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
+#     # - {name: ntasks_space, type: int, _: "1,2,4"} # comma separated integer must be quoted
+#     # - {name: ntasks_time, type: int, _: "1,2"} # comma separated integer must be quoted
+#     # - {name: res, type: int, _: "8"}
+#     # - {name: config, _: RBC3DG4R4SDC23Ra1e5}
+#     # - {name: ntasks, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
+
+#Regex pattern
+patternset:
+- name: pattern_time
+  pattern:
+    - {name: pat_time, type: float, _: "CPU timing step: $jube_pat_fp"}
+
+#Operation
+step:
+  name: write_number
+  use: param_set #use existing parameterset
+  do:
+  - 'mpirun -np ${ntasks} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark'
+
+#Analyse
+analyser:
+- name: analyse
+  analyse:
+    step: write_number
+    file:
+    - use: pattern_time
+      _: stdout
+
+#Create result table
+result:
+  use: analyse #use existing analyser
+  table:
+    name: result
+    style: pretty
+    sort: res
+    column:
+    - res
+    - ntasks
+    - ntasks_time
+    - ntasks_space
+    - { title: "time", _: pat_time_avg}

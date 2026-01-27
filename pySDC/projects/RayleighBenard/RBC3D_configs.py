@@ -118,6 +118,32 @@ class RayleighBenard3DRegular(Config):
         """
         prob.eval_f(prob.u_init)
 
+    def prepare_for_benchmark(self):
+        def _pass(*args, **kwargs):
+            pass
+
+        self.get_LogToFile = _pass
+
+    def prepare_caches_for_benchmark(self, prob, controller):
+        _rhs = prob.u_init
+
+        sweeper = controller.MS[0].levels[0].sweep
+        _dt = sweeper.level.dt
+
+        for dt in [_dt * sweeper.QI[i + 1, i + 1] for i in range(sweeper.coll.num_nodes)]:
+            prob.solve_system(rhs=_rhs, dt=dt, u0=_rhs, t=0)
+
+        controller.logger.critical('Set up caches for benchmarking')
+
+    def prepare_description_for_benchmark(self, description, controller_params):
+        from pySDC.projects.RayleighBenard.benchmarks.print_timings_hook import PrintCPUTimings
+
+        self.Tend = 5 * description['level_params']['dt']
+
+        controller_params['logger_level'] = 40
+        controller_params['hook_class'] += [PrintCPUTimings]
+        description['problem_params']['max_cached_factorizations'] = 99
+
 
 class RBC3Dverification(RayleighBenard3DRegular):
     converged = 0
