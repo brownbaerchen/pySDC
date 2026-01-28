@@ -1,6 +1,0 @@
-parameterset:
-  name: executeset
-  parameter:
-    - {name: partition, "_": batch}
-    - {name: ppn, type: int, "_": 64}
-    - {name: venvname, "_": venv_jusuf}

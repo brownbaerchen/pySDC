@@ -1,24 +1,34 @@
 name: jobsystem
-outpath: bench_run
+outpath: "bench_run_${OUT}"
 comment: RBC benchmarks on Juelich machines
 
 parameterset:
   #benchmark configuration
   - name: param_set
-    init_with: param_files/jube_params_RBC3DG4R4SDC23Ra1e5.yaml
-    parameter: {name: procs, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
+    parameter:
+      - {name: procs, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
+      - {tag: 'RBC3DG4R4SDC23Ra1e5', name: config, '_': 'RBC3DG4R4SDC23Ra1e5'}
+      - {tag: 'RBC3DG4R4SDC23Ra1e5', name: res, type: int, '_': '32'}
+      - {tag: 'RBC3DG4R4SDC23Ra1e5', name: ntasks_time, type: int, '_': '1,2'}
+      - {tag: 'JUSUF+RBC3DG4R4SDC23Ra1e5', name: ntasks_space, type: int, '_': '64,128,256,512,1024,2048,4096'}
   #Job configuration
   - name: executeset
-    init_with: param_files/jube_params_JUSUF.yaml
     parameter:
       - {name: submit_cmd, "_": sbatch}
       - {name: job_file, "_": jobscript.sh}
       - {name: account, "_": cstma}
-      - {name: walltime, "_": "00:05:00"}
+      - {name: walltime, "_": "00:15:00"}
       - {name: ready_file, "_": ready}
       - {name: err_file, "_": stderr}
       - {name: out_file, "_": stdout}
-      - {name: exec, "_": 'srun -n ${procs} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark'}
+      - {name: cpu_bind, "_": socket}
+      - {name: distribution, "_": "block:cyclic:cyclic,cyclic:cyclic:cyclic"}
+      - {name: exec, "_": 'srun --cpu-bind=${cpu_bind} --distribution=${distribution} -n ${procs} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark'}
+      - {tag: JUSUF, name: ppn, type: int, "_": 64}
+      - {tag: JUSUF, name: partition, "_": batch}
+      - {tag: JUSUF, name: venvname, "_": venv_jusuf}
+
+
 
 #Regex pattern
 patternset:
@@ -73,6 +83,7 @@ result:
     sort: res
     column:
     - res
+    - distribution
     - procs
     - ntasks_time
     - ntasks_space
