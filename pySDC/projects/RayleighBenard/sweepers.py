@@ -47,7 +47,8 @@ class imex_1st_order_diagonal_serial(imex_1st_order):
             )
 
             # update function values
-            L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
+            if L.status.sweep < L.params.nsweeps:
+                L.f[m + 1] = P.eval_f(L.u[m + 1], L.time + L.dt * self.coll.nodes[m])
 
         # indicate presence of new values at this level
         L.status.updated = True
