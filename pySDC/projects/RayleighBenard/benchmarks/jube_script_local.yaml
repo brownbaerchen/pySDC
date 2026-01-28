@@ -1,6 +1,6 @@
 name: result_creation
 outpath: bench_run
-comment: A result creation example
+comment: run local RBC benchmarks
 
 #Configuration
 parameterset:

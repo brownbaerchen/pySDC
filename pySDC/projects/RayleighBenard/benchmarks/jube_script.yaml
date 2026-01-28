@@ -1,0 +1,79 @@
+name: jobsystem
+outpath: bench_run
+comment: RBC benchmarks on Juelich machines
+
+parameterset:
+  #benchmark configuration
+  - name: param_set
+    init_with: param_files/jube_params_RBC3DG4R4SDC23Ra1e5.yaml
+    parameter: {name: procs, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
+  #Job configuration
+  - name: executeset
+    init_with: param_files/jube_params_JUSUF.yaml
+    parameter:
+      - {name: submit_cmd, "_": sbatch}
+      - {name: job_file, "_": jobscript.sh}
+      - {name: account, "_": cstma}
+      - {name: walltime, "_": "00:05:00"}
+      - {name: ready_file, "_": ready}
+      - {name: err_file, "_": stderr}
+      - {name: out_file, "_": stdout}
+      - {name: exec, "_": 'srun -n ${procs} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark'}
+
+#Regex pattern
+patternset:
+- name: pattern_time
+  pattern:
+    - {name: pat_time, type: float, _: "CPU timing step: $jube_pat_fp"}
+
+#Load jobfile
+fileset:
+  name: files
+  copy: ${job_file}
+
+substituteset:
+  name: sub_job
+  iofile: {in: "${job_file}", out: $job_file} #attributes with {} must be quoted
+  sub:
+    - {source: "#PROCS#", dest: $procs} 
+    - {source: "#PROCS_PER_NODE#", dest: $ppn} 
+    - {source: "#PARTITION#", dest: $partition} 
+    - {source: "#ACCOUNT#", dest: $account} 
+    - {source: "#WALLTIME#", dest: $walltime}
+    - {source: "#ERROR_FILEPATH#", dest: $err_file}
+    - {source: "#OUT_FILEPATH#", dest: $out_file}
+    - {source: "#EXEC#", dest: $exec}
+    - {source: "#VENVNAME#", dest: $venvname}
+    - {source: "#READY#", _: $ready_file } # _ can be used here as well instead of dest (should be used for multiline output)
+
+#Operation
+step:
+  name: submit
+  work_dir: "${jube_benchmark_home}/jobsystem_bench_${jube_benchmark_id}_${jube_wp_id}"
+  use: [param_set,executeset,files,sub_job]
+  do:
+    done_file: $ready_file
+    _: $submit_cmd $job_file #shell command
+
+#Analyse
+analyser:
+- name: analyse
+  analyse:
+    step: submit
+    file:
+    - use: pattern_time
+      _: stdout
+
+#Create result table
+result:
+  use: analyse
+  table:
+    name: result
+    style: csv
+    sort: res
+    column:
+    - res
+    - procs
+    - ntasks_time
+    - ntasks_space
+    - { title: "time", _: pat_time_avg}
