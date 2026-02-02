@@ -104,7 +104,7 @@ def plot_CPU_timings():  # pragma: no cover
     axs[1].set_ylabel(r'parallel efficiency')
     axs[0].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, '../plots/CPU_timings.pdf')
+    savefig(fig, '../plots/pySDC_CPU_timings')
 
 
 def plot_GPU_timings():  # pragma: no cover
@@ -150,13 +150,13 @@ def plot_GPU_timings():  # pragma: no cover
     axs[1].set_ylabel(r'parallel efficiency')
     axs[0].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, '../plots/GPU_timings.pdf')
+    savefig(fig, '../plots/pySDC_GPU_timings')
 
 
 if __name__ == '__main__':
-    # plot_RBC3DG4R4SDC23Ra1e5()
-    # plot_RBC3DG4R4SDC44Ra1e5()
-    # plot_RBC3DG4R4SDC44Ra1e6()
-    plot_CPU_timings()
-    plot_GPU_timings()
+    plot_RBC3DG4R4SDC23Ra1e5()
+    plot_RBC3DG4R4SDC44Ra1e5()
+    plot_RBC3DG4R4SDC44Ra1e6()
+    # plot_CPU_timings()
+    # plot_GPU_timings()
     plt.show()
