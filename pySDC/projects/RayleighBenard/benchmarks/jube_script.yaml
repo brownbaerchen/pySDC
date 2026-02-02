@@ -19,8 +19,8 @@ parameterset:
       - {tag: 'JUSUF+RBC3DG4R4SDC23Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
       - {tag: 'JUSUF+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
       - {tag: 'JUSUF+RBC3DG4R4SDC44Ra1e6', name: ntasks_space, type: int, '_': '4,8,16,32,64,128,256,512,1024,2048,4096'}
-      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256'}
-      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e6', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256'}
+      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128'}
+      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e6', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128'}
   #Job configuration
   - name: executeset
     parameter:
