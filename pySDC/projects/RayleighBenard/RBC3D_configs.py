@@ -146,6 +146,8 @@ class RayleighBenard3DRegular(Config):
 
     def prepare_description_for_benchmark(self, description, controller_params):
         from pySDC.projects.RayleighBenard.benchmarks.print_timings_hook import PrintCPUTimings, PrintGPUTimings
+        from mpi4py import MPI
+        from logging import Logger
 
         self.Tend = 5 * description['level_params']['dt']
 
@@ -155,6 +157,13 @@ class RayleighBenard3DRegular(Config):
             controller_params['hook_class'] += [PrintGPUTimings]
 
         description['problem_params']['max_cached_factorizations'] = 99
+
+        time_rank = 1
+        if 'comm' in description['sweeper_params'].keys():
+            time_rank = description['sweeper_params']['comm'].rank
+        Logger('Benchmark').critical(
+            f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space'
+        )
 
 
 class RBC3Dverification(RayleighBenard3DRegular):

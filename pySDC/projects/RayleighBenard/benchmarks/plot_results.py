@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 
-def plot_config(fname, ax):  # pragma: no cover
+def plot_config(fname, ax, key='time'):  # pragma: no cover
     data = pd.read_csv(fname)
 
     for _res in np.unique(data.res):
@@ -18,7 +18,7 @@ def plot_config(fname, ax):  # pragma: no cover
 
                 mask = np.logical_and(np.logical_and(res_mask, task_mask), distribution_mask)
                 procs = np.array(data.procs[mask])
-                time = np.array(data.time[mask])
+                time = np.array(getattr(data, key)[mask])
                 ax.loglog(
                     procs[np.argsort(procs)],
                     time[np.argsort(procs)],
@@ -40,12 +40,16 @@ def plot_RBC3DG4R4SDC23Ra1e5():  # pragma: no cover
 
 
 def plot_RBC3DG4R4SDC44Ra1e5():  # pragma: no cover
-    fig, ax = plt.subplots()
-    fname = './results/JUSUF_RBC3DG4R4SDC44Ra1e5.txt'
-    plot_config(fname, ax)
+    fig, axs = plt.subplots(1, 2, figsize=(10, 4))
+    for cluster, key, ax in zip(['JUSUF', 'BOOSTER'], ['time', 'time_GPU'], axs, strict=True):
+        fname = f'./results/{cluster}_RBC3DG4R4SDC44Ra1e5.txt'
+        plot_config(fname, ax, key)
+        ax.set_title(cluster)
     ax.legend(frameon=False)
+    fig.tight_layout()
 
 
 if __name__ == '__main__':
+    plot_RBC3DG4R4SDC23Ra1e5()
     plot_RBC3DG4R4SDC44Ra1e5()
     plt.show()
