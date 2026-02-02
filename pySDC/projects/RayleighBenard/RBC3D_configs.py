@@ -161,9 +161,12 @@ class RayleighBenard3DRegular(Config):
         time_rank = 1
         if 'comm' in description['sweeper_params'].keys():
             time_rank = description['sweeper_params']['comm'].rank
-        Logger('Benchmark').critical(
-            f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space'
-        )
+        for i in range(MPI.COMM_WORLD.size):
+            if MPI.COMM_WORLD.rank == i:
+                Logger('Benchmark').critical(
+                    f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space'
+                )
+            MPI.COMM_WORLD.barrier()
 
 
 class RBC3Dverification(RayleighBenard3DRegular):
