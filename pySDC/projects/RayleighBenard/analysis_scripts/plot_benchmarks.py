@@ -34,38 +34,11 @@ def plot_config(fname, ax, key='time'):  # pragma: no cover
     ax.set_ylabel('time / s')
 
 
-def plot_RBC3DG4R4SDC23Ra1e5():  # pragma: no cover
-    fig, ax = plt.subplots()
-    fname = './results/JUSUF_RBC3DG4R4SDC23Ra1e5.txt'
-    plot_config(fname, ax)
-    ax.legend(frameon=False)
-
-
-def plot_RBC3DG4R4SDC44Ra1e5():  # pragma: no cover
-    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
-    for cluster, key, ax in zip(['JUSUF', 'BOOSTER'], ['time', 'time_GPU'], axs, strict=True):
-        fname = f'./results/{cluster}_RBC3DG4R4SDC44Ra1e5.txt'
-        plot_config(fname, ax, key)
-        ax.set_title(cluster)
-    ax.legend(frameon=False)
-    fig.tight_layout()
-
-
-def plot_RBC3DG4R4SDC44Ra1e6():  # pragma: no cover
-    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
-    for cluster, key, ax in zip(['JUSUF', 'BOOSTER'], ['time', 'time_GPU'], axs, strict=True):
-        fname = f'./results/{cluster}_RBC3DG4R4SDC44Ra1e6.txt'
-        plot_config(fname, ax, key)
-        ax.set_title(cluster)
-    ax.legend(frameon=False)
-    fig.tight_layout()
-
-
 def plot_CPU_timings():  # pragma: no cover
     fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4), sharex=True)
 
-    data_Ra1e5 = pd.read_csv('results/JUSUF_RBC3DG4R4SDC44Ra1e5.txt')
-    data_Ra1e6 = pd.read_csv('results/JUSUF_RBC3DG4R4SDC44Ra1e6.txt')
+    data_Ra1e5 = pd.read_csv('benchmarks/results/JUSUF_RBC3DG4R4SDC44Ra1e5.txt')
+    data_Ra1e6 = pd.read_csv('benchmarks/results/JUSUF_RBC3DG4R4SDC44Ra1e6.txt')
 
     ref = data_Ra1e5.time[0]
     mask_cyclic = data_Ra1e5.distribution == 'cyclic:cyclic:cyclic'
@@ -104,14 +77,14 @@ def plot_CPU_timings():  # pragma: no cover
     axs[1].set_ylabel(r'parallel efficiency')
     axs[0].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, '../plots/CPU_timings.pdf')
+    savefig(fig, 'CPU_timings.pdf')
 
 
 def plot_GPU_timings():  # pragma: no cover
     fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4), sharex=True)
 
-    data_Ra1e5 = pd.read_csv('results/BOOSTER_RBC3DG4R4SDC44Ra1e5.txt')
-    data_Ra1e6 = pd.read_csv('results/BOOSTER_RBC3DG4R4SDC44Ra1e6.txt')
+    data_Ra1e5 = pd.read_csv('benchmarks/results/BOOSTER_RBC3DG4R4SDC44Ra1e5.txt')
+    data_Ra1e6 = pd.read_csv('benchmarks/results/BOOSTER_RBC3DG4R4SDC44Ra1e6.txt')
 
     ref = data_Ra1e5.time[0]
     mask_cyclic = data_Ra1e5.distribution == 'cyclic:cyclic:cyclic'
@@ -150,13 +123,10 @@ def plot_GPU_timings():  # pragma: no cover
     axs[1].set_ylabel(r'parallel efficiency')
     axs[0].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, '../plots/GPU_timings.pdf')
+    savefig(fig, 'GPU_timings.pdf')
 
 
 if __name__ == '__main__':
-    # plot_RBC3DG4R4SDC23Ra1e5()
-    # plot_RBC3DG4R4SDC44Ra1e5()
-    # plot_RBC3DG4R4SDC44Ra1e6()
     plot_CPU_timings()
     plot_GPU_timings()
     plt.show()
