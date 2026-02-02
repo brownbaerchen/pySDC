@@ -9,14 +9,18 @@ parameterset:
       - {name: procs, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
       - {tag: 'JUSUF', name: useGPU, _: False}
       - {tag: 'BOOSTER', name: useGPU, _: True}
-      - {tag: 'RBC3DG4R4SDC23Ra1e5', name: config, '_': 'RBC3DG4R4SDC23Ra1e5'}
-      - {tag: 'RBC3DG4R4SDC44Ra1e5', name: config, '_': 'RBC3DG4R4SDC44Ra1e5'}
+      - {tag: 'RBC3DG4R4SDC23Ra1e5|RBC3DG4R4SDC23Ra1e6', name: config, '_': 'RBC3DG4R4SDC23Ra1e5'}
+      - {tag: 'RBC3DG4R4SDC44Ra1e5|RBC3DG4R4SDC44Ra1e6', name: config, '_': 'RBC3DG4R4SDC44Ra1e5'}
       - {tag: 'RBC3DG4R4SDC23Ra1e5|RBC3DG4R4SDC44Ra1e5', name: res, type: int, '_': '32'}
+      - {tag: 'RBC3DG4R4SDC23Ra1e6|RBC3DG4R4SDC44Ra1e6', name: res, type: int, '_': '64'}
       - {tag: 'RBC3DG4R4SDC23Ra1e5', name: ntasks_time, type: int, '_': '1,2'}
       - {tag: 'RBC3DG4R4SDC44Ra1e5', name: ntasks_time, type: int, '_': '1,4'}
+      - {tag: 'RBC3DG4R4SDC44Ra1e6', name: ntasks_time, type: int, '_': '1,4'}
       - {tag: 'JUSUF+RBC3DG4R4SDC23Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
       - {tag: 'JUSUF+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
+      - {tag: 'JUSUF+RBC3DG4R4SDC44Ra1e6', name: ntasks_space, type: int, '_': '4,8,16,32,64,128,256,512,1024,2048,4096'}
       - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256'}
+      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e6', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256'}
   #Job configuration
   - name: executeset
     parameter:
