@@ -8,6 +8,7 @@ parameterset:
     parameter:
       - {name: procs, mode: python, type: int, _: "${ntasks_space}*${ntasks_time}"}
       - {tag: 'JUSUF', name: useGPU, _: False}
+      - {tag: 'BOOSTER', name: useGPU, _: True}
       - {tag: 'RBC3DG4R4SDC23Ra1e5', name: config, '_': 'RBC3DG4R4SDC23Ra1e5'}
       - {tag: 'RBC3DG4R4SDC44Ra1e5', name: config, '_': 'RBC3DG4R4SDC44Ra1e5'}
       - {tag: 'RBC3DG4R4SDC23Ra1e5|RBC3DG4R4SDC44Ra1e5', name: res, type: int, '_': '32'}
@@ -15,6 +16,7 @@ parameterset:
       - {tag: 'RBC3DG4R4SDC44Ra1e5', name: ntasks_time, type: int, '_': '1,4'}
       - {tag: 'JUSUF+RBC3DG4R4SDC23Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
       - {tag: 'JUSUF+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256,512,1024,2048,4096'}
+      - {tag: 'BOOSTER+RBC3DG4R4SDC44Ra1e5', name: ntasks_space, type: int, '_': '1,2,4,8,16,32,64,128,256'}
   #Job configuration
   - name: executeset
     parameter:
@@ -29,8 +31,11 @@ parameterset:
       - {name: distribution, "_": "block:cyclic:cyclic,cyclic:cyclic:cyclic"}
       - {name: exec, "_": 'srun --cpu-bind=${cpu_bind} --distribution=${distribution} -n ${procs} python ${jube_benchmark_home}/../run_experiment.py --res=${res} --config=${config} --procs=1/${ntasks_time}/${ntasks_space} --mode=benchmark --useGPU=${useGPU}'}
       - {tag: JUSUF, name: ppn, type: int, "_": 64}
+      - {tag: BOOSTER, name: ppn, type: int, "_": 4}
       - {tag: JUSUF, name: partition, "_": batch}
+      - {tag: BOOSTER, name: partition, "_": booster}
       - {tag: JUSUF, name: venvname, "_": venv_jusuf}
+      - {tag: BOOSTER, name: venvname, "_": venv_booster}
 
 
 
@@ -39,6 +44,9 @@ patternset:
 - name: pattern_time
   pattern:
     - {name: pat_time, type: float, _: "CPU timing step: $jube_pat_fp"}
+- name: pattern_time_GPU
+  pattern:
+    - {name: pat_time_GPU, type: float, _: "GPU timing step: $jube_pat_fp"}
 
 #Load jobfile
 fileset:
@@ -77,6 +85,8 @@ analyser:
     file:
     - use: pattern_time
       _: stdout
+    - use: pattern_time_GPU
+      _: stdout
 
 #Create result table
 result:
@@ -92,3 +102,4 @@ result:
     - ntasks_time
     - ntasks_space
     - { title: "time", _: pat_time_avg}
+    - { title: "time_GPU", _: pat_time_GPU_avg}

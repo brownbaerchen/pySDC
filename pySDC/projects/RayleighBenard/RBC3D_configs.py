@@ -145,12 +145,15 @@ class RayleighBenard3DRegular(Config):
         controller.logger.critical('Set up caches for benchmarking')
 
     def prepare_description_for_benchmark(self, description, controller_params):
-        from pySDC.projects.RayleighBenard.benchmarks.print_timings_hook import PrintCPUTimings
+        from pySDC.projects.RayleighBenard.benchmarks.print_timings_hook import PrintCPUTimings, PrintGPUTimings
 
         self.Tend = 5 * description['level_params']['dt']
 
         controller_params['logger_level'] = 40
         controller_params['hook_class'] += [PrintCPUTimings]
+        if description['problem_params']['useGPU']:
+            controller_params['hook_class'] += [PrintGPUTimings]
+
         description['problem_params']['max_cached_factorizations'] = 99
 
 
