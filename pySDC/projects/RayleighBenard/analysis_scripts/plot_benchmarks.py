@@ -94,7 +94,7 @@ def plot_GPU_timings():  # pragma: no cover
     axs[1].set_ylabel(r'parallel efficiency')
     axs[0].legend(frameon=False)
     fig.tight_layout()
-    savefig(fig, '/pySDC_GPU_timings')
+    savefig(fig, 'pySDC_GPU_timings')
 
 
 def plot_distribution():  # pragma: no cover
@@ -153,8 +153,39 @@ def plot_distribution():  # pragma: no cover
     savefig(fig, 'pySDC_space_time_distribution')
 
 
+def plot_binding(machine='JUSUF'):
+    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
+    all_data = [pd.read_csv(f'benchmarks/results/{machine}_RBC3DG4R4SDC44Ra{Ra}.txt') for Ra in ['1e5', '1e6']]
+
+    for ax, data in zip(axs.flatten(), all_data):
+        binds = ['block:cyclic:cyclic', 'cyclic:cyclic:cyclic']
+        dists = ['space_first', 'time_first']
+        for dist in dists:
+            dist_label = 'space-major' if dist[0] == 's' else 'time-major'
+            ls = '-' if dist[0] == 's' else '--'
+            for bind in binds:
+                bind_label = 'block' if bind[0] == 'b' else 'cyclic'
+                ms = '.' if bind[0] == 'b' else 'x'
+                color = 'tab:blue' if bind[0] == 'b' else 'tab:orange'
+                mask = np.logical_and(data.distribution == bind, data.binding == dist)
+                mask = np.logical_and(mask, data.ntasks_time > 1)
+                ax.loglog(
+                    data.procs[mask],
+                    data.time[mask],
+                    label=f'{dist_label}, {bind_label}',
+                    ls=ls,
+                    marker=ms,
+                    color=color,
+                )
+        ax.legend(frameon=False)
+    fig.tight_layout()
+    savefig(fig, f'pySDC_binding_{machine}')
+
+
 if __name__ == '__main__':
     # plot_CPU_timings()
     # plot_GPU_timings()
-    plot_distribution()
+    # plot_distribution()
+    for machine in ['JUSUF', 'BOOSTER']:
+        plot_binding(machine)
     plt.show()
