@@ -135,13 +135,27 @@ class RayleighBenard3DRegular(Config):
 
     def prepare_caches_for_benchmark(self, prob, controller):
         _rhs = prob.u_init
-
         sweeper = controller.MS[0].levels[0].sweep
         _dt = sweeper.level.dt
 
-        for dt in [_dt * sweeper.QI[i + 1, i + 1] for i in range(sweeper.coll.num_nodes)]:
-            prob.solve_system(rhs=_rhs, dt=dt, u0=_rhs, t=0)
+        hooks = controller.hooks
 
+        # mute controller
+        type(controller).hooks = []
+        controller.run(_rhs, 0, _dt)
+
+        # unmute controller
+        controller.hooks = hooks
+
+        try:
+            import cuda as cp
+
+            cp.cuda.get_current_stream().synchronize()
+        except ModuleNotFoundError:
+            pass
+        from mpi4py import MPI
+
+        MPI.COMM_WORLD.Barrier()
         controller.logger.critical('Set up caches for benchmarking')
 
     def prepare_description_for_benchmark(self, description, controller_params):
@@ -391,3 +405,12 @@ class RBC3DG4R4EulerRa1e6(RBC3DverificationEuler):
     res = 64
     ic_config = {'config': RBC3DG4R4SDC34Ra1e5, 'res': 32, 'dt': 0.02}
     # converged = 22
+
+
+# --- Ra 1e7 ---
+class RBC3DG4R4SDC23Ra1e7(RBC3DM2K3):
+    Tend = 50
+    dt = 1e-2
+    res = 96
+    # converged = 22
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}

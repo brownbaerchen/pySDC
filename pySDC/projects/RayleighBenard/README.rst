@@ -1,6 +1,20 @@
 SDC for Rayleigh-Benard convection
 ==================================
 
+Run simulations
+---------------
+In order to run simulations, use commands like
+
+.. code-block:: bash
+   cd pySDC/projects/RayleighBenard
+   python run_experiment.py --res=32 --dt=0.06 --config=RBC3DG4R4SDC23Ra1e5 --procs=1/1/1 --mode=run --useGPU=False
+
+To analyse, stay in the directory you ran the simulation in and use commands like
+
+.. code-block:: bash
+   python analysis_scripts/process_RBC3D_data.py --config=RBC3DG4R4SDC23Ra1e5 --dt=0.06 --res=32
+
+
 Benchmarks
 ----------
 The benchmarks use JUBE.
