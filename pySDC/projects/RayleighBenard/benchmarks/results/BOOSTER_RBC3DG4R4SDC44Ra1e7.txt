@@ -1,0 +1,16 @@
+res,distribution,procs,ntasks_time,ntasks_space,binding,time,time_GPU
+128,block:cyclic:cyclic,4,1,4,time_first,,
+128,block:cyclic:cyclic,8,1,8,time_first,,
+128,block:cyclic:cyclic,16,1,16,time_first,,
+128,block:cyclic:cyclic,32,1,32,time_first,2.367889314375,2.3679151974999995
+128,block:cyclic:cyclic,64,1,64,time_first,1.8375610588749995,1.8376216906875
+128,block:cyclic:cyclic,128,1,128,time_first,1.541054146578126,1.5411174535625003
+128,block:cyclic:cyclic,256,1,256,time_first,1.396167796273438,1.3962372844375
+128,block:cyclic:cyclic,16,4,4,time_first,,
+128,block:cyclic:cyclic,32,4,8,time_first,,
+128,block:cyclic:cyclic,64,4,16,time_first,,
+128,block:cyclic:cyclic,128,4,32,time_first,0.9713795999843746,0.9728589279999988
+128,block:cyclic:cyclic,256,4,64,time_first,0.6183197717968755,0.6199831363671879
+128,block:cyclic:cyclic,512,4,128,time_first,0.5018680641523428,0.5038477209140615
+128,block:cyclic:cyclic,1024,4,256,time_first,0.41273145664453076,0.41574065039453184
+

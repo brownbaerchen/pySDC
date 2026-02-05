@@ -1,0 +1,14 @@
+res,distribution,procs,ntasks_time,ntasks_space,time
+64,block:cyclic:cyclic,64,1,64,5.742978452781249
+64,block:cyclic:cyclic,128,1,128,2.857688873749999
+64,block:cyclic:cyclic,256,1,256,1.2901998921406272
+64,block:cyclic:cyclic,128,2,64,4.358172208515622
+64,block:cyclic:cyclic,256,2,128,2.304838314078131
+64,block:cyclic:cyclic,512,2,256,1.1248410605468753
+64,cyclic:cyclic:cyclic,64,1,64,5.731830683218751
+64,cyclic:cyclic:cyclic,128,1,128,2.733296479968751
+64,cyclic:cyclic:cyclic,256,1,256,1.139101317359375
+64,cyclic:cyclic:cyclic,128,2,64,4.225258113218745
+64,cyclic:cyclic:cyclic,256,2,128,2.0727555867421876
+64,cyclic:cyclic:cyclic,512,2,256,0.8638103226328122
+
