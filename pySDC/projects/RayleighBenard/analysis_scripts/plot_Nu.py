@@ -71,9 +71,9 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
     res = 64
     converged_from = 25
 
-    ref_data = get_pySDC_data(res=res, dt=0.002, config_name='RBC3DG4R4SDC34Ra1e6')
+    ref_data = get_pySDC_data(res=res, dt=0.002, config_name='RBC3DG4R4SDC44Ra1e6')
 
-    plot_Nu(res, [0.02, 0.01], 'RBC3DG4R4SDC44Ra1e6', ref_data, Nu_axs[0], 'SDC44', converged_from)
+    plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4SDC44Ra1e6', ref_data, Nu_axs[0], 'SDC44', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4SDC23Ra1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4RKRa1e6', ref_data, Nu_axs[2], 'RK443', converged_from)
     plot_Nu(res, [0.005, 0.002], 'RBC3DG4R4EulerRa1e6', ref_data, Nu_axs[3], 'RK111', converged_from)
@@ -114,7 +114,7 @@ def plot_Nusselt_Ra1e5_same_dt():  # pragma: no cover
 if __name__ == '__main__':
 
     # plot_Nu_over_time_Ra1e5()
-    # plot_Nu_over_time_Ra1e6()
-    plot_Nusselt_Ra1e5_same_dt()
+    plot_Nu_over_time_Ra1e6()
+    # plot_Nusselt_Ra1e5_same_dt()
 
     plt.show()

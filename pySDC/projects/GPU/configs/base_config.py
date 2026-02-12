@@ -70,11 +70,12 @@ class Config(object):
         self.comm_world = MPI.COMM_WORLD if comm_world is None else comm_world
         self.n_procs_list = args["procs"]
         if args['mode'] in ['run', 'benchmark']:
-            if args['distribution'] == 'space_first':
+            distribution = args.get('distribution', 'time_first')
+            if distribution == 'space_first':
                 self.comms = get_comms(
                     n_procs_list=self.n_procs_list[::-1], useGPU=args['useGPU'], comm_world=self.comm_world
                 )[::-1]
-            elif args['distribution'] == 'time_first':
+            elif distribution == 'time_first':
                 self.comms = get_comms(
                     n_procs_list=self.n_procs_list, useGPU=args['useGPU'], comm_world=self.comm_world
                 )

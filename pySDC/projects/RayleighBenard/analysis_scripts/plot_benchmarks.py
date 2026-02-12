@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import figsize, savefig
+from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import figsize, savefig, get_plotting_style
 
 
 def plot_CPU_timings():  # pragma: no cover
@@ -178,14 +178,125 @@ def plot_binding(machine='JUSUF'):
                     color=color,
                 )
         ax.legend(frameon=False)
+        _res = data.res[0]
+        ax.set_title(fr'$N={{{_res*4}}}^2\times {{{_res}}}$')
     fig.tight_layout()
     savefig(fig, f'pySDC_binding_{machine}')
+
+
+def plot_scaling(Ra):
+    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4), sharex=True)
+
+    machines = ['JUSUF', 'BOOSTER']
+    colors = {'JUSUF': 'tab:blue', 'BOOSTER': 'tab:orange'}
+
+    for machine in machines:
+        data = pd.read_csv(f'benchmarks/results/{machine}_RBC3DG4R4SDC44Ra{Ra}.txt')
+        bind_mask = data.distribution == 'block:cyclic:cyclic'
+        dist_mask = data.binding == 'time_first'
+        base_mask = np.logical_and(bind_mask, dist_mask)
+
+        mask = base_mask
+
+        finite_mask = np.logical_and(base_mask, np.isfinite(data.time))
+        ref_idx = np.argmin(data.procs[finite_mask])
+        ref_time = np.array(data.time[finite_mask])[ref_idx]
+        ref_procs = np.array(data.procs[finite_mask])[ref_idx]
+        ref_procs_time = np.array(data.ntasks_time[finite_mask])[ref_idx]
+        print(
+            f'Reference time for {Ra=} on {machine} is {ref_time}s with {ref_procs} procs and {ref_procs_time} procs in time'
+        )
+        for _tasks_time in np.unique(data.ntasks_time):
+            ls = '-' if _tasks_time == 1 else '--'
+            PinT_label = '' if _tasks_time == 1 else ' PinT'
+
+            mask = np.logical_and(data.ntasks_time == _tasks_time, base_mask)
+            axs[0].loglog(
+                data.procs[mask], data.time[mask], color=colors[machine], ls=ls, label=f'{machine}{PinT_label}'
+            )
+
+            speedup = ref_time / data.time
+            efficiency = speedup / (data.procs / ref_procs)
+            axs[1].loglog(
+                data.procs[mask], efficiency[mask], color=colors[machine], ls=ls, label=f'{machine}{PinT_label}'
+            )
+
+    axs[1].set_yscale('linear')
+    axs[0].set_xlabel(r'$N_\mathrm{tasks}$')
+    axs[1].set_xlabel(r'$N_\mathrm{tasks}$')
+    axs[0].set_ylabel(r'time / s')
+    axs[1].set_ylabel(r'parallel efficiency')
+    axs[0].legend(frameon=False)
+    axs[1].legend(frameon=False)
+    fig.tight_layout()
+    savefig(fig, f'scaling_{Ra}')
+
+
+def compare_methods_single_config(ax, machine, Ra='1e5'):
+    colors = {'JUSUF': 'tab:blue', 'BOOSTER': 'tab:orange'}
+    methods = ['SDC44', 'SDC23', 'RK', 'Euler']
+    titles = {
+        '1e5': r'$N=128\times 128\times 32$',
+        '1e6': r'$N=256\times 256\times 64$',
+        '1e7': r'$N=512\times 512\times 128$',
+    }
+
+    for method in methods:
+        config = f"RBC3DG4R4{method}Ra{Ra}"
+        try:
+            data = pd.read_csv(f'benchmarks/results/{machine}_{config}.txt')
+        except FileNotFoundError:
+            continue
+        bind_mask = data.distribution == 'block:cyclic:cyclic'
+        dist_mask = data.binding == 'time_first'
+        base_mask = np.logical_and(bind_mask, dist_mask)
+
+        mask = base_mask
+
+        finite_mask = np.logical_and(base_mask, np.isfinite(data.time))
+        for _tasks_time in np.unique(data.ntasks_time):
+            mask = np.logical_and(data.ntasks_time == _tasks_time, base_mask)
+            plotting_style = get_plotting_style(config)
+            plotting_style['ls'] = '-' if _tasks_time == 1 else '--'
+            plotting_style['label'] += ' PinT' if _tasks_time > 1 else ''
+            ax.loglog(data.procs[mask], data.time[mask], **plotting_style)
+
+    ax.set_xlabel(r'$N_\mathrm{tasks}$')
+    ax.set_ylabel(r'time / s')
+    ax.set_title(titles[Ra])
+    # ax.legend(frameon=False)
+
+
+def compare_methods(machine):
+    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
+
+    Ras = {'JUSUF': ['1e5', '1e6'], 'BOOSTER': ['1e6', '1e7']}
+    for Ra, ax in zip(Ras[machine], axs.flatten(), strict=True):
+        compare_methods_single_config(ax, machine, Ra)
+
+    handles, labels = axs[0].get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))  # removes duplicates
+
+    fig.legend(
+        by_label.values(),
+        by_label.keys(),
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.18),  # centered below figure
+        ncol=4,
+        frameon=False,
+    )
+    fig.tight_layout()
+    fig.savefig(f"plots/compare_methods_{machine}.pdf", bbox_inches="tight")
 
 
 if __name__ == '__main__':
     # plot_CPU_timings()
     # plot_GPU_timings()
     # plot_distribution()
+
     for machine in ['JUSUF', 'BOOSTER']:
-        plot_binding(machine)
+        # plot_binding(machine)
+        compare_methods(machine)
+    # for Ra in ['1e5', '1e6', '1e7']:
+    #     plot_scaling(Ra)
     plt.show()

@@ -91,7 +91,7 @@ def get_pySDC_data(Ra):
     from pySDC.projects.RayleighBenard.analysis_scripts.process_RBC3D_data import get_pySDC_data as _get_data
 
     dts = {'1e5': 0.06, '1e6': 0.01, '1e7': 0.005}
-    res = {'1e5': 32, '1e6': 64, '1e7': 96}
+    res = {'1e5': 32, '1e6': 64, '1e7': 128}
     return _get_data(config_name=f'RBC3DG4R4SDC23Ra{Ra}', dt=dts[Ra], res=res[Ra])
 
 
@@ -118,6 +118,7 @@ def plot_Nu_scaling(ax):  # pragma: no cover
 
 def plot_T_profile(ax):  # pragma: no cover
     colors = {'1e5': 'tab:blue', '1e6': 'tab:orange', '1e7': 'tab:green'}
+    markevery = {'1e7': 3}
 
     # reference values
     for Ra in ['1e5', '1e6', '1e7']:
@@ -127,7 +128,8 @@ def plot_T_profile(ax):  # pragma: no cover
     # pySDC values
     for Ra in ['1e5', '1e6', '1e7']:
         dat = get_pySDC_data(Ra)
-        ax.scatter(dat['profile_T'], dat['z'], color=colors[Ra], label=f'pySDC Ra={Ra}')
+        s = slice(None, None, markevery.get(Ra, 1))
+        ax.scatter(dat['profile_T'][s], dat['z'][s], color=colors[Ra], label=f'pySDC Ra={Ra}')
 
     ax.set_ylabel('$z$')
     ax.set_xlabel('$T$')

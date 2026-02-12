@@ -305,10 +305,15 @@ def test_rhs_evals(sweeper_name, useGPU=False):
 
     rhs_evaluations = [me[1] for me in get_sorted(stats, type='work_rhs')]
 
+    sweeper = get_sweeper(sweeper_name)
+    expect_rhs_evals = num_stages
+    if sweeper.get_Butcher_tableau().globally_stiffly_accurate and not sweeper.is_embedded():
+        expect_rhs_evals -= 1
+
     assert len(rhs_evaluations) > 0, 'Did not register any right hand side evaluations!'
     assert all(
-        me == num_stages for me in rhs_evaluations
-    ), f'Did not perform one RHS evaluation per step and stage in {sweeper_name} method! Expected {num_stages}, but got {rhs_evaluations}.'
+        me == expect_rhs_evals for me in rhs_evaluations
+    ), f'Did not perform one RHS evaluation per step and stage in {sweeper_name} method! Expected {expect_rhs_evals}, but got {rhs_evaluations}.'
 
 
 @pytest.mark.base
@@ -387,7 +392,8 @@ def test_RK_sweepers_with_GPU(test_name, sweeper_name):
 
 if __name__ == '__main__':
     # test_rhs_evals('ARK54')
-    test_order('ARK2')
+    # test_order('ARK2')
+    test_rhs_evals('CrankNicolson')
     # test_order('ARK54')
     # test_sweeper_equivalence('Cash_Karp')
     # test_order('ARK54')

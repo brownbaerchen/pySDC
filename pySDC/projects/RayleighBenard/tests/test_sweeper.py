@@ -14,6 +14,7 @@ def run_simulation(sweeper_class, nsteps, nsweeps, nnodes):
     description = config.get_description(res=8)
     description['level_params']['nsweeps'] = nsweeps
     description['sweeper_params']['num_nodes'] = nnodes
+    description['sweeper_class'] = sweeper_class
 
     controller_params = config.get_controller_params()
     controller_params['hook_class'] = [LogWork]
@@ -53,5 +54,27 @@ def test_serial_optimized_sweeper(nsweeps, nnodes):
     assert np.allclose(expect_work, got_solves), f'Expected {expect_work} solves, but did {got_solves}'
 
 
+def test_RK_sweeper():
+    import numpy as np
+    from pySDC.helpers.stats_helper import get_sorted
+    from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+    from pySDC.implementations.sweeper_classes.Runge_Kutta import ARK3
+    from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_diagonal_serial
+
+    RK_sweeper_class = ARK3
+
+    u, stats = run_simulation(RK_sweeper_class, 4, 1, 1)
+
+    s = len(RK_sweeper_class.weights)
+
+    expect_work = s
+    got_rhs = [me[1] for me in get_sorted(stats, type='work_rhs')]
+    assert np.allclose(expect_work, got_rhs), f'Expected {expect_work} right hand side evaluations, but did {got_rhs}'
+
+    got_solves = [me[1] for me in get_sorted(stats, type='work_cached_direct')]
+    assert np.allclose(expect_work, got_solves), f'Expected {expect_work} solves, but did {got_solves}'
+
+
 if __name__ == '__main__':
-    test_serial_optimized_sweeper(2, 2)
+    # test_serial_optimized_sweeper(2, 2)
+    test_RK_sweeper()
