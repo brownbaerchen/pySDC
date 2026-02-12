@@ -12,3 +12,4 @@ module load mpi4py
 # module load FFmpeg/.6.0
 # module load SciPy-Stack
 module load texlive
+module load Nsight-Systems

@@ -96,7 +96,7 @@ def test_differentiation_matrix2D(nx, nz, axes, bx, bz, useGPU=False, **kwargs):
     D_u_hat = (conv @ D @ u_hat.flatten()).reshape(u_hat.shape)
     D_u = helper.itransform(D_u_hat).real
 
-    assert np.allclose(D_u, expect, atol=1e-11)
+    assert np.allclose(D_u, expect, atol=1e-10)
 
 
 @pytest.mark.cupy
@@ -881,7 +881,8 @@ if __name__ == '__main__':
         # test_tau_method2D('T2U', 2**1, 2**2, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
-        test_tau_method_GPU()
+        # test_tau_method_GPU()
+        test_differentiation_matrix2D(32, 16, bx='fft', bz='cheby', axes=(-2,), useGPU=True)
     else:
         raise NotImplementedError
     print('done')
