@@ -232,7 +232,7 @@ def plot_scaling(Ra):
     savefig(fig, f'scaling_{Ra}')
 
 
-def compare_methods_single_config(ax, machine, Ra='1e5'):
+def compare_methods_single_config(ax, machine, Ra='1e5', normalize=False):
     colors = {'JUSUF': 'tab:blue', 'BOOSTER': 'tab:orange'}
     methods = ['SDC44', 'SDC23', 'RK', 'Euler']
     titles = {
@@ -240,6 +240,15 @@ def compare_methods_single_config(ax, machine, Ra='1e5'):
         '1e6': r'$N=256\times 256\times 64$',
         '1e7': r'$N=512\times 512\times 128$',
     }
+
+    if normalize:
+        norm_data = pd.read_csv(f'benchmarks/results/{machine}_RBC3DG4R4EulerRa{Ra}.txt')
+        norm = norm_data.time[0]
+        for cost in [3, 4, 5, 13]:
+            ax.axhline(cost, ls=':', color='black')
+    else:
+        norm_data = None
+        norm = 1
 
     for method in methods:
         config = f"RBC3DG4R4{method}Ra{Ra}"
@@ -259,20 +268,33 @@ def compare_methods_single_config(ax, machine, Ra='1e5'):
             plotting_style = get_plotting_style(config)
             plotting_style['ls'] = '-' if _tasks_time == 1 else '--'
             plotting_style['label'] += ' PinT' if _tasks_time > 1 else ''
-            ax.loglog(data.procs[mask], data.time[mask], **plotting_style)
+
+            timings = np.array(data.time[mask])
+            procs = np.array(data.procs[mask])
+            space_procs = np.array(data.ntasks_space[mask])
+
+            if norm_data is not None:
+                for i in range(len(timings)):
+                    ref_time = np.array(norm_data.time[norm_data.ntasks_space == space_procs[i]])[0]
+                    timings[i] /= ref_time
+            ax.loglog(procs, timings, **plotting_style)
+
+    if normalize:
+        ax.set_ylabel(r'time / ($t_\mathrm{E}+t_\mathrm{S}$)')
+    else:
+        ax.set_ylabel(r'time / s')
 
     ax.set_xlabel(r'$N_\mathrm{tasks}$')
-    ax.set_ylabel(r'time / s')
     ax.set_title(titles[Ra])
     # ax.legend(frameon=False)
 
 
-def compare_methods(machine):
+def compare_methods(machine, normalize=False):
     fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
 
     Ras = {'JUSUF': ['1e5', '1e6'], 'BOOSTER': ['1e6', '1e7']}
     for Ra, ax in zip(Ras[machine], axs.flatten(), strict=True):
-        compare_methods_single_config(ax, machine, Ra)
+        compare_methods_single_config(ax, machine, Ra, normalize=normalize)
 
     handles, labels = axs[0].get_legend_handles_labels()
     by_label = dict(zip(labels, handles))  # removes duplicates
@@ -286,7 +308,10 @@ def compare_methods(machine):
         frameon=False,
     )
     fig.tight_layout()
-    fig.savefig(f"plots/compare_methods_{machine}.pdf", bbox_inches="tight")
+    if normalize:
+        fig.savefig(f"plots/compare_methods_{machine}_normalized.pdf", bbox_inches="tight")
+    else:
+        fig.savefig(f"plots/compare_methods_{machine}.pdf", bbox_inches="tight")
 
 
 if __name__ == '__main__':
@@ -296,7 +321,7 @@ if __name__ == '__main__':
 
     for machine in ['JUSUF', 'BOOSTER']:
         # plot_binding(machine)
-        compare_methods(machine)
+        compare_methods(machine, normalize=True)
     # for Ra in ['1e5', '1e6', '1e7']:
     #     plot_scaling(Ra)
     plt.show()

@@ -20,7 +20,7 @@ class RayleighBenard3DRegular(Config):
 
     def get_sweeper(self, useMPI):
         if useMPI:
-            from pySDC.implementations.sweeper_classes.imex_1st_order_MPI import imex_1st_order_MPI as sweeper
+            from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_MPI_fixed_k as sweeper
         elif not useMPI:
             from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_diagonal_serial as sweeper
         else:
