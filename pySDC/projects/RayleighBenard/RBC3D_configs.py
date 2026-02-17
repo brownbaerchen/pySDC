@@ -414,3 +414,26 @@ class RBC3DG4R4SDC23Ra1e7(RBC3DM2K3):
     res = 128
     converged = 25
     ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}
+
+class RBC3DG4R4SDC44Ra1e7(RBC3DM4K4):
+    Tend = 45
+    dt = 5e-3
+    res = 128
+    converged = 25
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}
+
+
+class RBC3DG4R4EulerRa1e7(RBC3DverificationEuler):
+    Tend = 45
+    dt = 5e-3
+    res = 128
+    converged = 25
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}
+
+
+class RBC3DG4R4RKRa1e7(RBC3DverificationRK):
+    Tend = 45
+    dt = 5e-3
+    res = 128
+    converged = 25
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}
