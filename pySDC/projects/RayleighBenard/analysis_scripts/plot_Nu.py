@@ -85,6 +85,26 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
     Nu_fig.savefig('./plots/Nu_over_time_Ra1e6.pdf', bbox_inches='tight')
 
 
+def plot_Nu_over_time_Ra1e6():  # pragma: no cover
+    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize(scale=1, ratio=1.4))
+
+    res = 128
+    converged_from = 25
+
+    ref_data = get_pySDC_data(res=res, dt=0.004, config_name='RBC3DG4R4SDC44Ra1e7')
+
+    plot_Nu(res, [0.004, 0.005], 'RBC3DG4R4SDC44Ra1e7', ref_data, Nu_axs[0], 'SDC44', converged_from)
+    plot_Nu(res, [0.005, 0.004], 'RBC3DG4R4SDC23Ra1e7', ref_data, Nu_axs[1], 'SDC23', converged_from)
+    plot_Nu(res, [0.004], 'RBC3DG4R4RKRa1e7', ref_data, Nu_axs[2], 'RK443', converged_from)
+    plot_Nu(res, [0.001], 'RBC3DG4R4EulerRa1e7', ref_data, Nu_axs[3], 'RK111', converged_from)
+
+    Nu_axs[-1].set_xlabel('$t$')
+    Nu_axs[-1].set_ylabel('$Nu$')
+
+    Nu_fig.tight_layout()
+    Nu_fig.savefig('./plots/Nu_over_time_Ra1e6.pdf', bbox_inches='tight')
+
+
 def plot_Nusselt_Ra1e5_same_dt():  # pragma: no cover
     fig, ax = plt.subplots(figsize=figsize(scale=0.9, ratio=0.45))
 

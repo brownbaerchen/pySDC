@@ -6,8 +6,7 @@ from pySDC.projects.RayleighBenard.RBC3D_configs import get_config
 from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 from mpi4py import MPI
 import matplotlib.pyplot as plt
-from pySDC.helpers.plot_helper import figsize_by_journal
-from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import get_plotting_style, savefig
+from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import get_plotting_style, savefig, figsize
 
 step_sizes = {
     'RBC3DG4R4SDC22Ra1e5': [5e-3 * 2**i for i in range(8)],
@@ -72,9 +71,9 @@ def plot_error_all_components(args):  # pragma: no cover
 
 
 def compare_order(Ra):  # pragma: no cover
-    fig, ax = plt.subplots(figsize=figsize_by_journal('Nature_CS', 1, 0.6))
+    fig, ax = plt.subplots(figsize=figsize(scale=1, ratio=0.4))
     if Ra == 1e5:
-        names = ['RK', 'Euler', 'SDC22', 'SDC23', 'SDC34', 'SDC44'][::-1]
+        names = ['RK', 'Euler', 'SDC23', 'SDC44'][::-1]
         configs = [f'RBC3DG4R4{me}Ra1e5' for me in names]
         paths = [f'./data/RBC3DG4R4{me}Ra1e5-res-1-order.pickle' for me in names]
 
@@ -92,13 +91,13 @@ def compare_order(Ra):  # pragma: no cover
         ax.loglog(dt, e, **get_plotting_style(config))
 
     for _dt in dt:
-        for i in [1, 2, 3, 4]:
+        for i in [1, 3, 4]:
             ax.text(_dt, _dt**i, i, fontweight='bold', fontsize=14, ha='center', va='center')
             ax.loglog(dt, dt**i, ls=':', color='black')
 
     ax.legend(frameon=False)
     ax.set_xlabel(r'$\Delta t$')
-    ax.set_ylabel(r'$e$')
+    ax.set_ylabel(r'$\|\frac{T - T_\mathrm{ref}\|}{\|T_\mathrm{ref}\|}$')
     savefig(fig, 'RBC3D_order_Ra1e5')
 
 
@@ -117,7 +116,7 @@ def run(args, dt, Tend):
 
     ic_config_name = type(config).__name__
     for name in ['RK', 'Euler', 'O3', 'O4', 'SDC23', 'SDC34', 'SDC44', 'SDC22']:
-        ic_config_name = ic_config_name.replace(name, 'SDC34')
+        ic_config_name = ic_config_name.replace(name, 'SDC23')
 
     ic_config = get_config({**args, 'config': ic_config_name})
     config.ic_config['config'] = type(ic_config)
