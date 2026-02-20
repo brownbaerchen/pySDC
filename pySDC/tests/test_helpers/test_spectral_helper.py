@@ -222,14 +222,10 @@ def _test_transform_dealias(
     X_pad, Z_pad = helper_pad.get_grid()
 
     if useGPU:
-        X_CPU = X.get()
         Z_CPU = Z.get()
-        X_pad_CPU = X_pad.get()
         Z_pad_CPU = Z_pad.get()
     else:
-        X_CPU = X
         Z_CPU = Z
-        X_pad_CPU = X_pad
         Z_pad_CPU = Z_pad
 
     if axis == -2:

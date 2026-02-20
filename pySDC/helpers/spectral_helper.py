@@ -54,6 +54,11 @@ def cache(func):
 
 
 class vkFFT(object):
+    """
+    pyVkFFT FFT backend.
+    The special feature of vkFFT is fast DCT on GPU with cached plans.
+    """
+
     cached_plans = {}
 
     @staticmethod
@@ -82,7 +87,9 @@ class vkFFT(object):
         return vkFFT.cached_plans[key]
 
     @staticmethod
-    def fftn(x, s=None, axes=None, norm=None, overwrite_x=False):
+    def fftn(x, s=None, axes=None, norm='backward', overwrite_x=False):
+        assert not overwrite_x  # for consistent interface with scipy
+        assert norm == 'backward'  # for consistent interface with scipy
         plan = vkFFT.get_plan(
             transform_type='fft',
             shape=x.shape,
@@ -90,17 +97,15 @@ class vkFFT(object):
             axes=axes,
             norm=norm,
         )
-        if overwrite_x and not vkFFT.is_complex(x):
-            plan.fft(x)
-            return x
-        else:
-            _x = x.copy() + 0j  # cast to complex
-            plan.fft(_x)
-            return _x
+        _x = x.copy() + 0j  # cast to complex
+        plan.fft(_x)
+        return _x
 
     @staticmethod
-    def ifftn(x, s=None, axes=None, norm=None, overwrite_x=False):
+    def ifftn(x, s=None, axes=None, norm='forward', overwrite_x=False):
         assert norm == 'forward'
+        assert not overwrite_x  # for consistent interface with scipy
+
         norm = 'backward'
         plan = vkFFT.get_plan(
             transform_type='fft',
@@ -109,18 +114,17 @@ class vkFFT(object):
             axes=axes,
             norm=norm,
         )
-        if overwrite_x and not vkFFT.is_complex(x):
-            plan.ifft(x)
-            return x * sum(x.shape[i] for i in axes)
-        else:
-            _x = x.copy() + 0j  # cast to complex
-            plan.ifft(_x)
-            return _x * sum(x.shape[i] for i in axes)
+        _x = x.copy() + 0j  # promote to complex
+        plan.ifft(_x)
+        return _x * sum(x.shape[i] for i in axes)
 
     @staticmethod
     def dctn(x, type=2, s=None, axes=None, norm=None, overwrite_x=False):
+        assert type == 2  # for consistent interface with scipy
+        assert not overwrite_x  # for consistent interface with scipy
+
         is_complex = vkFFT.is_complex(x)
-        assert type == 2
+
         dtype = x.dtype if not is_complex else x.real.dtype
 
         plan = vkFFT.get_plan(
@@ -146,7 +150,9 @@ class vkFFT(object):
 
     @staticmethod
     def idctn(x, type=2, s=None, axes=None, norm=None, overwrite_x=False):
-        assert type == 2
+        assert type == 2  # for consistent interface with scipy
+        assert not overwrite_x  # for consistent interface with scipy
+
         is_complex = vkFFT.is_complex(x)
         dtype = x.dtype if not is_complex else x.real.dtype
 
@@ -229,13 +235,12 @@ class SpectralHelper1D:
         import cupy as cp
         import cupyx.scipy.sparse as sparse_lib
         import cupyx.scipy.sparse.linalg as linalg
-        import cupyx.scipy.fft as fft_lib
         from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
 
         cls.xp = cp
         cls.sparse_lib = sparse_lib
         cls.linalg = linalg
-        cls.fft_lib = vkFFT  # fft_lib
+        cls.fft_lib = vkFFT
 
     @classmethod
     def setup_CPU(cls, useFFTW=False):
