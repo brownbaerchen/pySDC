@@ -4,3 +4,4 @@ matplotlib>=3.0
 dill>=0.2.6
 scipy>=1.14
 tqdm
+pyvkfft
