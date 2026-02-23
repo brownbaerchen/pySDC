@@ -60,3 +60,18 @@ for all the configurations to generate the data and then run
     python analysis_scripts/RBC3D_order.py
 
 to make the plot.
+
+
+3D Plotting
+-----------
+
+Step 1: Convert `.pySDC` data to `.vtr` data using commands like
+
+.. code-block:: bash
+   mkdir data/vtr_files/RBC3DG4R4SDC23Ra1e5
+   python analysis_scripts/convert_pySDC_to_vtr.py --path data/RBC3DG4R4SDC23Ra1e5-res32-dt6e-02.pySDC --outpath data/vtr_files/RBC3DG4R4SDC23Ra1e5/RBC3DG4R4SDC23Ra1e5
+
+Step 2: Plot the `.vtr` file with ParaView using commands like
+
+.. code-block:: bash
+   pvpython --force-offscreen-rendering analysis_scripts/pv_3DRBC.py --folder data/vtr_files/RBC3DG4R4SDC23Ra1e5/ --outputFile plots/RBC3DG4R4SDC23Ra1e5.avi
