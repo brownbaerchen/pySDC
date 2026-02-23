@@ -369,7 +369,7 @@ def plot_space_scaling(method='Euler'):
 
 
 def plot_space_time_scaling(method='SDC44'):
-    fig, axs = plt.subplots(1, 3, figsize=figsize(scale=1, ratio=0.4))  # , sharex=True, sharey=True)
+    fig, axs = plt.subplots(1, 3, figsize=figsize(scale=1, ratio=0.4), sharex=True, sharey=True)
     PinT_efficiency_fig, PinT_efficiency_ax = plt.subplots(figsize=figsize(scale=1, ratio=0.4))
 
     for machine in ['JUSUF', 'BOOSTER', 'JUPITER']:
@@ -389,7 +389,7 @@ def plot_space_time_scaling(method='SDC44'):
 
                 plotting_style = {}
                 plotting_style['ls'] = '-' if ntasks_time == 1 else '--'
-                plotting_style['label'] = machine + ' PinT' if ntasks_time > 1 else ''
+                plotting_style['label'] = machine + (' PinT' if ntasks_time > 1 else '')
                 plotting_style['color'] = COLORS[machine]
 
                 time_max = time[0]
@@ -424,7 +424,7 @@ def plot_space_time_scaling(method='SDC44'):
     for ax in axs.flatten():
         ax.set_xlabel(r'$N_\mathrm{tasks}$')
         ax.set_box_aspect(1)
-        ax.set_ylabel(r'time / s')
+    axs[0].set_ylabel(r'time / s')
 
     handles, labels = axs[1].get_legend_handles_labels()
     by_label = dict(zip(labels, handles))  # removes duplicates
@@ -433,7 +433,7 @@ def plot_space_time_scaling(method='SDC44'):
         by_label.values(),
         by_label.keys(),
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.1),  # centered below figure
+        bbox_to_anchor=(0.5, -0.2),  # centered below figure
         ncol=4,
         frameon=False,
     )
