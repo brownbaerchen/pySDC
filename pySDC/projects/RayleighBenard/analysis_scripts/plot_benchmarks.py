@@ -248,8 +248,15 @@ def plot_scaling(Ra):
     savefig(fig, f'scaling_{Ra}')
 
 
-def compare_methods_single_config(ax, machine, Ra='1e5', normalize=False):
+def compare_methods_single_config(ax, machine, Ra='1e5', normalize=False, scale_by_stability_limit=False):
     methods = ['SDC44', 'SDC23', 'RK', 'Euler']
+
+    assert not (normalize and scale_by_stability_limit)
+
+    stable_step_sizes = {}
+    stable_step_sizes['1e5'] = {'SDC44': 0.06, 'SDC23': 0.06, 'RK': 0.05, 'Euler': 0.02}
+    stable_step_sizes['1e6'] = {'SDC44': 0.01, 'SDC23': 0.01, 'RK': 0.01, 'Euler': 0.005}
+    stable_step_sizes['1e7'] = {'SDC44': 0.005, 'SDC23': 0.005, 'RK': 0.004, 'Euler': 0.001}
 
     if normalize:
         norm_data = pd.read_csv(f'benchmarks/results/{machine}_RBC3DG4R4EulerRa{Ra}.txt')
@@ -283,6 +290,9 @@ def compare_methods_single_config(ax, machine, Ra='1e5', normalize=False):
             procs = np.array(data.procs[mask])
             space_procs = np.array(data.ntasks_space[mask])
 
+            if scale_by_stability_limit:
+                timings *= 1 / stable_step_sizes[Ra][method]
+
             if norm_data is not None:
                 for i in range(len(timings)):
                     ref_time = np.array(norm_data.time[norm_data.ntasks_space == space_procs[i]])[0]
@@ -292,20 +302,24 @@ def compare_methods_single_config(ax, machine, Ra='1e5', normalize=False):
 
     if normalize:
         ax.set_ylabel(r'time / ($t_\mathrm{E}+t_\mathrm{S}$)')
+    elif scale_by_stability_limit:
+        ax.set_ylabel(r'free fall time / s')
     else:
-        ax.set_ylabel(r'time / s')
+        ax.set_ylabel(r'time per step / s')
 
     ax.set_xlabel(r'$N_\mathrm{tasks}$')
     ax.set_title(RA_TO_RES[Ra])
     # ax.legend(frameon=False)
 
 
-def compare_methods(machine, normalize=False):
+def compare_methods(machine, normalize=False, scale_by_stability_limit=False):
     fig, axs = plt.subplots(1, 2, figsize=figsize(scale=1, ratio=0.4))
 
     Ras = {'JUSUF': ['1e5', '1e6'], 'BOOSTER': ['1e6', '1e7'], 'JUPITER': ['1e6', '1e7']}
     for Ra, ax in zip(Ras[machine], axs.flatten(), strict=True):
-        compare_methods_single_config(ax, machine, Ra, normalize=normalize)
+        compare_methods_single_config(
+            ax, machine, Ra, normalize=normalize, scale_by_stability_limit=scale_by_stability_limit
+        )
 
     handles, labels = axs[0].get_legend_handles_labels()
     by_label = dict(zip(labels, handles))  # removes duplicates
@@ -321,6 +335,8 @@ def compare_methods(machine, normalize=False):
     fig.tight_layout()
     if normalize:
         fig.savefig(f"plots/compare_methods_{machine}_normalized.pdf", bbox_inches="tight")
+    elif scale_by_stability_limit:
+        fig.savefig(f"plots/compare_methods_{machine}_scaled_by_stability.pdf", bbox_inches="tight")
     else:
         fig.savefig(f"plots/compare_methods_{machine}.pdf", bbox_inches="tight")
 
@@ -457,12 +473,90 @@ def plot_space_time_scaling(method='SDC44'):
     savefig(PinT_efficiency_fig, f'PinT_efficiency_{method}')
 
 
-if __name__ == '__main__':
+def make_plots_for_SIAMPP26():  # pragma: no cover
+    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=0.9, ratio=0.4), sharex=True, sharey=True)
+
+    for machine in ['JUSUF', 'JUPITER']:
+        for Ra, ax in zip(['1e6', '1e7'], axs.flatten()):
+            try:
+                data = pd.read_csv(f'benchmarks/results/{machine}_RBC3DG4R4SDC44Ra{Ra}.txt')
+            except FileNotFoundError:
+                continue
+
+            base_mask = np.logical_and(data.distribution == 'block:cyclic:cyclic', data.binding == 'time_first')
+            base_mask = np.logical_and(base_mask, np.isfinite(data.time))
+
+            for ntasks_time in np.unique(data.ntasks_time):
+                mask = np.logical_and(base_mask, data.ntasks_time == ntasks_time)
+                time = np.array(data.time[mask])
+                procs = np.array(data.procs[mask])
+
+                plotting_style = {}
+                plotting_style['ls'] = '-' if ntasks_time == 1 else '--'
+                plotting_style['label'] = machine + (' PinT' if ntasks_time > 1 else '')
+                plotting_style['color'] = COLORS[machine]
+
+                time_max = time[0]
+                time_min = np.min(time)
+                procs_max = procs[0]
+                procs_min = procs_max * time_max / time_min
+                ax.loglog([procs_max, procs_min], [time_max, time_min], color='black', ls=':', label='ideal')
+
+                ax.loglog(procs, time, **plotting_style)
+                ax.set_title(f'Ra={Ra}\n{RA_TO_RES[Ra]}')
+
+    for ax in axs.flatten():
+        ax.set_xlabel(r'$N_\mathrm{tasks}$')
+    axs[0].set_ylabel(r'time / s')
+
+    handles, labels = axs[1].get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))  # removes duplicates
+
+    fig.legend(
+        by_label.values(),
+        by_label.keys(),
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.2),  # centered below figure
+        ncol=3,
+        frameon=False,
+    )
+    fig.tight_layout()
+    savefig(fig, f'space_time_scaling_SIAMPP')
+
+    # comparing methods
+    fig, axs = plt.subplots(1, 2, figsize=figsize(scale=0.9, ratio=0.4))
+
+    for scale_by_stability_limit, ax in zip([False, True], axs.flatten(), strict=True):
+        compare_methods_single_config(
+            ax, 'JUPITER', '1e7', normalize=False, scale_by_stability_limit=scale_by_stability_limit
+        )
+        ax.set_title(f'Ra={Ra}\n{RA_TO_RES[Ra]}')
+
+    handles, labels = axs[0].get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))  # removes duplicates
+
+    fig.legend(
+        by_label.values(),
+        by_label.keys(),
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.18),  # centered below figure
+        ncol=3,
+        frameon=False,
+    )
+    fig.tight_layout()
+    fig.savefig(f"plots/compare_methods_SIAMPP.pdf", bbox_inches="tight")
+
+
+def make_plots_for_paper():  # pragma: no cover
     # for machine in ['JUSUF', 'BOOSTER', 'JUPITER']:
     #    # plot_binding(machine)
     #    compare_methods(machine, normalize=False)
-    # compare_methods('JUPITER')
+    compare_methods('JUSUF', scale_by_stability_limit=False)
     # plot_binding()
     # plot_space_scaling()
-    plot_space_time_scaling('SDC44')
+    # plot_space_time_scaling('SDC44')
+
+
+if __name__ == '__main__':
+    make_plots_for_SIAMPP26()
     plt.show()
