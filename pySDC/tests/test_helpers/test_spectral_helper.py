@@ -877,8 +877,7 @@ if __name__ == '__main__':
         # test_tau_method2D('T2U', 2**1, 2**2, -2, plotting=False, useMPI=True)
         # test_filter(6, 6, (0,))
         # _test_transform_dealias('fft', 'cheby', -1, nx=2**2, nz=5, padding=1.5)
-        # test_tau_method_GPU()
-        test_differentiation_matrix2D(32, 16, bx='fft', bz='cheby', axes=(-2,), useGPU=True)
+        test_tau_method_GPU()
     else:
         raise NotImplementedError
     print('done')
