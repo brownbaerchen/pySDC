@@ -21,10 +21,8 @@ class RayleighBenard3DRegular(Config):
     def get_sweeper(self, useMPI):
         if useMPI:
             from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_MPI_fixed_k as sweeper
-        elif not useMPI:
-            from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_diagonal_serial as sweeper
         else:
-            raise NotImplementedError(f'Don\'t know the sweeper for {self.sweeper_type=}')
+            from pySDC.projects.RayleighBenard.sweepers import imex_1st_order_diagonal_serial as sweeper
         return sweeper
 
     def get_file_name(self):
@@ -414,6 +412,7 @@ class RBC3DG4R4SDC23Ra1e7(RBC3DM2K3):
     res = 128
     converged = 25
     ic_config = {'config': RBC3DG4R4SDC23Ra1e6, 'res': 64, 'dt': 0.01}
+
 
 class RBC3DG4R4SDC44Ra1e7(RBC3DM4K4):
     Tend = 45

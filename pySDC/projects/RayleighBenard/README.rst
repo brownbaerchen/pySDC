@@ -14,9 +14,9 @@ use
 .. code-block:: bash
    python run_experiment.py --help
 
-to get more information about the different parameters. The config names always start with `RBC3DG4R4`, which means Rayleigh-Benard convection in 3D with aspect ratio four and four times as many degrees of freedom in horizontal directions as in the vertical.
-Next comes the time-stepping scheme. Choices are `SDC44`, `SDC23`, `RK` for RK443 and `Euler` for RK111. Finally, the Rayleigh number is specified using `Ra1e5`, `Ra1e6`, or `Ra1e7`.
-Note that you need to run the simulations in order of ascending Rayleigh number since larger Rayleigh number simulations take solutions from lower Rayleigh number experiments as initial conditions. Only `Ra=1e5` is started from random perturbations.
+to get more information about the different parameters. The config names always start with ``RBC3DG4R4``, which means Rayleigh-Benard convection in 3D with aspect ratio four and four times as many degrees of freedom in horizontal directions as in the vertical.
+Next comes the time-stepping scheme. Choices are ``SDC44``, ``SDC23``, ``RK`` for RK443 and ``Euler`` for RK111. Finally, the Rayleigh number is specified using ``Ra1e5``, ``Ra1e6``, or ``Ra1e7``.
+Note that you need to run the simulations in order of ascending Rayleigh number since larger Rayleigh number simulations take solutions from lower Rayleigh number experiments as initial conditions. Only ``Ra=1e5`` is started from random perturbations.
 
 To analyse, stay in the directory you ran the simulation in and use commands like
 
@@ -35,7 +35,7 @@ Please run them using commands like
    OUT=JUSUF_RBC3DG4R4SDC44Ra1e5 jube run jube_script.yaml -t JUSUF SDC44 Ra1e5
    jube result bench_run_JUSUF_RBC3DG4R4SDC44Ra1e5 -a > results/JUSUF_RBC3DG4R4SDC44Ra1e5.txt
 
-Use tags `JUSUF` of `BOOSTER` for running on JUSUF or JUWELS booster respectively. The tags for configurations are `RBC3DG4R4SDC44Ra1e5` and `RBC3DG4R4SDC44Ra1e6`
+Use tags ``JUSUF`` of ``BOOSTER`` for running on JUSUF or JUWELS booster respectively. The tags for configurations are ``RBC3DG4R4SDC44Ra1e5`` and ``RBC3DG4R4SDC44Ra1e6``
 
 Once you have run all the benchmarks, plot them with
 
@@ -46,8 +46,8 @@ Once you have run all the benchmarks, plot them with
 
 Plotting the order of accuracy
 ------------------------------
-For this you first need to compute the error for all configurations (`RBC3DG4R4SDC44Ra1e5`, `RBC3DG4R4SDC23Ra1e5`, `RBC3DG4R4RKRa1e5`, and `RBC3DG4R4EulerRa1e5`) in the plot.
-However, before you can run these simulations, make sure, you have run the configuration `RBC3DG4R4SDC23Ra1e5` to get initial conditions.
+For this you first need to compute the error for all configurations (``RBC3DG4R4SDC44Ra1e5``, ``RBC3DG4R4SDC23Ra1e5``, ``RBC3DG4R4RKRa1e5``, and ``RBC3DG4R4EulerRa1e5``) in the plot.
+However, before you can run these simulations, make sure, you have run the configuration ``RBC3DG4R4SDC23Ra1e5`` to get initial conditions.
 Once you have those available, use
 
 .. code-block:: bash
@@ -65,13 +65,14 @@ to make the plot.
 3D Plotting
 -----------
 
-Step 1: Convert `.pySDC` data to `.vtr` data using commands like
+Step 1: Convert ``.pySDC`` data to ``.vtr`` data using commands like
 
 .. code-block:: bash
    mkdir data/vtr_files/RBC3DG4R4SDC23Ra1e5
    python analysis_scripts/convert_pySDC_to_vtr.py --path data/RBC3DG4R4SDC23Ra1e5-res32-dt6e-02.pySDC --outpath data/vtr_files/RBC3DG4R4SDC23Ra1e5/RBC3DG4R4SDC23Ra1e5
 
-Step 2: Plot the `.vtr` file with ParaView using commands like
+Step 2: Plot the ``.vtr`` file with ParaView using commands like
 
 .. code-block:: bash
    pvpython --force-offscreen-rendering analysis_scripts/pv_3DRBC.py --folder data/vtr_files/RBC3DG4R4SDC23Ra1e5/ --outputFile plots/RBC3DG4R4SDC23Ra1e5.avi
+=======
