@@ -71,11 +71,11 @@ class Config(object):
         self.n_procs_list = args["procs"]
         if args['mode'] in ['run', 'benchmark']:
             distribution = args.get('distribution', 'time_first')
-            if distribution == 'space_first':
+            if distribution in ['space_first', 'space_major']:
                 self.comms = get_comms(
                     n_procs_list=self.n_procs_list[::-1], useGPU=args['useGPU'], comm_world=self.comm_world
                 )[::-1]
-            elif distribution == 'time_first':
+            elif distribution in ['time_first', 'time_major']:
                 self.comms = get_comms(
                     n_procs_list=self.n_procs_list, useGPU=args['useGPU'], comm_world=self.comm_world
                 )

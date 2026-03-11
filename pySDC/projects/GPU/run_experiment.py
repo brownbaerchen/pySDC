@@ -32,7 +32,7 @@ def parse_args():
         type=str,
         help='distribute tasks',
         default='space_first',
-        choices=['space_first', 'time_first'],
+        choices=['space_first', 'space_major', 'time_first', 'time_major'],
     )
 
     return vars(parser.parse_args())
