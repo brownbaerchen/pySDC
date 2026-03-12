@@ -128,8 +128,11 @@ buoyancyLUTColorBar = GetScalarBar(buoyancyLUT, view)
 buoyancyLUTColorBar.Title = 'T'
 buoyancyLUTColorBar.ComponentTitle = ''
 buoyancyLUTColorBar.WindowLocation = 'Any Location'
-buoyancyLUTColorBar.Position = [0.8758553274682307, 0.028636884306987402]
+# buoyancyLUTColorBar.Position = [0.8758553274682307, 0.028636884306987402]
 buoyancyLUTColorBar.ScalarBarLength = 0.32999999999999996
+buoyancyLUTColorBar.TitleColor = [0.0, 0.0, 0.0]
+buoyancyLUTColorBar.LabelColor = [0.0, 0.0, 0.0]
+
 
 buoyancyPWF = GetOpacityTransferFunction('T')
 buoyancyPWF.Points = [0.00015009482740424573, 0.0, 0.5, 0.0, 0.9998499751091003, 1.0, 0.5, 0.0]
@@ -142,6 +145,7 @@ annotateTimeFilter1.Scale = 0.1
 annotateTimeFilter1Display = Show(annotateTimeFilter1, view, 'TextSourceRepresentation')
 annotateTimeFilter1Display.WindowLocation = 'Any Location'
 annotateTimeFilter1Display.Position = [0.46187683284457476, 0.85]
+annotateTimeFilter1Display.Color = [0.0, 0.0, 0.0]
 
 # Active sources
 SetActiveSource(data)
@@ -154,24 +158,28 @@ HideInteractiveWidgets(proxy=display)
 
 # Layout and view
 layout1 = GetLayout()
-layout1.SetSize(1023, 873)
+layout1.SetSize(1020, 600)
 view.CameraPosition = [2.4986495539150253, 3.0037498810813394, 1.292867266624508]
 view.CameraFocalPoint = [0.49218750000000006, 0.49218750000000006, 0.5000000146610546]
 view.CameraViewUp = [-0.14739149545982064, -0.1887511037859152, 0.9709010082833968]
 view.CameraParallelScale = 0.8569402061940335
 view.ResetCamera()
+view.CameraParallelScale *= 0.5
+view.UseColorPaletteForBackground = 0
 view.BackgroundColorMode = 'Single Color'
 view.Background = [1.0, 1.0, 1.0]
+view.OrientationAxesVisibility = 0
 view.Update()
+
 
 # Save Animation
 SaveAnimation(
     filename=args.outputFile,
     viewOrLayout=view,
     location=16,
-    ImageResolution=[1020, 672],
+    ImageResolution=[1020, 600],
     FrameRate=args.frameRate,
-    FrameWindow=[0, len(files)],
+    FrameWindow=[0, len(files)-1],
     # FFMPEG options
     # Quality=args.quality,
 )
