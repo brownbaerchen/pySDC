@@ -21,7 +21,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v1
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: ${{ env.YML }}
           create-args: >-
@@ -47,7 +47,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: "etc/environment-${{ matrix.env }}.yml"
           create-args: >-
@@ -106,7 +106,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: "pySDC/projects/${{ matrix.env }}/environment.yml"
       - name: Install additional packages as needed
@@ -239,7 +239,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: "pySDC/projects/Monodomain/etc/environment-monodomain.yml"
           create-args: >-
