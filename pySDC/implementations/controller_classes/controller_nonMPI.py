@@ -687,3 +687,54 @@ class controller_nonMPI(Controller):
             local_MS_running (list): list of currently running steps
         """
         raise ControllerError('Unknown stage, got %s' % local_MS_running[0].status.stage)  # TODO
+
+
+class NewtonSDC(controller_nonMPI):
+
+    def it_fine(self, local_MS_running: list[Step]):
+        """
+        Fine sweeps
+
+        Args:
+            local_MS_running (list): list of currently running steps
+        """
+
+        for S in local_MS_running:
+            S.levels[0].status.sweep = 0
+
+        for k in range(self.nsweeps[0]):
+            for S in local_MS_running:
+                S.levels[0].status.sweep += 1
+
+            for S in local_MS_running:
+                # send updated values forward
+                self.send_full(S, level=0)
+                # receive values
+                self.recv_full(S, level=0, add_to_stats=(k == self.nsweeps[0] - 1))
+
+            for S in local_MS_running:
+                # standard sweep workflow: update nodes, compute residual, log progress
+                for hook in self.hooks:
+                    hook.pre_sweep(step=S, level_number=0)
+
+                SDC_maxiter = 5
+                for j in SDC_maxiter:
+                    for level in S.levels:
+                        level.prob.update_jacobian(level.u[0])
+
+                    S.levels[0].sweep.updateVariableCoeffs(
+                        j + 1
+                    )  # update QDelta coefficients if variable preconditioner
+                    S.levels[0].sweep.update_nodes()
+
+                S.levels[0].prob.replace_jacobian_by_full_f()
+                for i in range(len(S.levels[0].u) - 1):
+                    S.levels[0].f[i + 1] = S.levels[0].prob.eval_f(S.levels[0].u[i + 1], S.levels.t[i + 1])
+                S.levels[0].sweep.compute_residual(stage='IT_FINE')
+
+                for hook in self.hooks:
+                    hook.post_sweep(step=S, level_number=0)
+
+        for S in local_MS_running:
+            # update stage
+            S.status.stage = 'IT_CHECK'
