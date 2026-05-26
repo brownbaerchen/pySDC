@@ -417,6 +417,67 @@ def test_vertical_profiles():
     assert xp.allclose(expect, profile['u'])
 
 
+def test_subproblems_solver():
+    from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D, WorkCounter
+
+    N = 8
+    prob = RayleighBenard3D(
+        nx=N,
+        ny=N,
+        nz=4,
+        dealiasing=1.0,
+        spectral_space=False,
+        Rayleigh=1.0,
+        solver_type='cached_direct',
+        left_preconditioner=True,
+        Dirichlet_recombination=True,
+    )
+    prob.work_counters['subproblems'] = WorkCounter()
+    xp = prob.xp
+
+    subproblem_masks = prob._get_subproblem_masks()
+    z_grid_1d = prob.spectral.axes[-1].get_1dgrid()
+    z_grid_full = prob.spectral.get_grid()[-1].flatten()
+    assert len(subproblem_masks) == prob.nx * prob.ny
+    for mask in subproblem_masks:
+        assert (
+            len(mask[mask]) == prob.ncomponents * prob.nz
+        ), f'Got {len(mask[mask])} elements in mask, but expected {prob.ncomponents * prob.nz}'
+        assert xp.allclose(
+            xp.repeat(z_grid_full, repeats=prob.ncomponents)[mask], xp.repeat(z_grid_1d, repeats=prob.ncomponents)
+        )
+
+    A = prob.Pl @ (prob.M + 1e2 * prob.L) @ prob.Pr
+    sub_matrices = prob._split_matrix_in_subproblems(A, subproblem_masks)
+    assert len(sub_matrices) == len(subproblem_masks)
+    singular = []
+    for i, matrix in enumerate(sub_matrices):
+        assert (
+            matrix.shape == (prob.ncomponents * prob.nz,) * 2
+        ), f'Got submatrix shape {matrix.shape} but expected {(prob.ncomponents * prob.nz,)*2}'
+        # try:
+        #     prob.spectral.linalg.factorized(matrix)
+        # except RuntimeError:
+        #     singular += [i]
+        #     import matplotlib.pyplot as plt
+        #     plt.spy(matrix)
+        #     # plt.spy(A)
+        #     plt.show()
+
+    # assert len(singular) == 0, f'Matrices {singular} are singular!'
+
+    u0 = prob.u_exact()
+    dt = 1.0e-1
+
+    u1_ref = prob.solve_system(u0, dt)
+
+    prob.solver_type = 'subproblems'
+    prob.cached_factorizations = {}
+    u1 = prob.solve_system(u0, dt)
+
+    assert xp.allclose(u1_ref, u1)
+
+
 if __name__ == '__main__':
     # test_eval_f(2**2, 2**1, 'x', False)
     # test_libraries()
@@ -426,5 +487,6 @@ if __name__ == '__main__':
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
     # test_Nusselt_number_computation(N=6, c=3)
-    test_vertical_profiles()
+    # test_vertical_profiles()
     # test_spectrum_computation(None)
+    test_subproblems_solver()

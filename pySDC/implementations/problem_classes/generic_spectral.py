@@ -373,6 +373,43 @@ class GenericSpectralLinear(Problem):
             self.work_counters[self.solver_type]()
             self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
 
+        elif self.solver_type.lower() == 'subproblems':
+
+            if dt not in self.cached_factorizations.keys():
+
+                if len(self.cached_factorizations) >= self.max_cached_factorizations:
+                    self.cached_factorizations.pop(list(self.cached_factorizations.keys())[0])
+                    self.logger.debug(f'Evicted matrix factorization for {dt=:.6f} from cache')
+
+                subproblem_masks = self._get_subproblem_masks()
+                sub_As = self._split_matrix_in_subproblems(A, subproblem_masks)
+
+                if self.heterogeneous:
+                    import scipy.sparse as sp
+
+                    cpu_decomps = [sp.linalg.splu(sub_A) for sub_A in sub_As]
+                    solvers = []
+
+                    for i in range(len(cpu_decomps)):
+                        if self.useGPU:
+                            from cupyx.scipy.sparse.linalg import SuperLU
+
+                            solvers.append(SuperLU(cpu_decomp[i]).solve)
+                        else:
+                            solvers = cpu_decomp[i].solve
+                else:
+                    solvers = [self.spectral.linalg.factorized(sub_A) for sub_A in sub_As]
+
+                solver = self._get_subproblem_solver_function(solvers, subproblem_masks)
+
+                self.cached_factorizations[dt] = solver
+                self.logger.debug(f'Cached matrix factorization for {dt=:.6f}')
+                self.work_counters['factorizations']()
+
+            _sol_hat = self.cached_factorizations[dt](rhs_hat)
+            self.work_counters[self.solver_type]()
+            self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
+
         elif self.solver_type.lower() == 'direct':
             _sol_hat = sp.linalg.spsolve(A, rhs_hat)
         elif 'gmres' in self.solver_type.lower():
@@ -441,6 +478,56 @@ class GenericSpectralLinear(Problem):
             return np.array(self.itransform(u).real)
         else:
             return np.array(u.real)
+
+    def _get_subproblem_masks(self):
+        from pySDC.helpers.spectral_helper import FFTHelper
+
+        # get masks for subproblems
+        ks = self.xp.vstack([me.flatten() for me in self.spectral.get_wavenumbers()])
+        masks = []
+        split_axes = []
+        for i in range(ks.shape[0]):
+            if type(self.spectral.axes[i]) == FFTHelper:
+                split_axes.append(i)
+                unique_k = self.xp.unique(ks[i])
+                new_masks = []
+
+                for k in unique_k:
+                    new_mask = ks[i] == k
+                    if len(masks) == 0:
+                        new_masks.append(new_mask)
+                    else:
+                        for mask in masks:
+                            new_masks.append(self.xp.logical_and(mask, new_mask))
+                masks = new_masks
+
+        # expand masks for components
+        expanded_masks = [self.xp.repeat(mask, repeats=self.ncomponents) for mask in masks]
+
+        self.logger.debug(f'Generated {len(expanded_masks)} masks to split along axes {split_axes}')
+
+        return expanded_masks
+
+    def _split_matrix_in_subproblems(self, A, subproblem_masks):
+        # assert not (self.left_preconditioner or self.Dirichlet_recombination)
+        A = A.tolil()
+        sub_As = [(A[mask][:, mask]).tocsc() for mask in subproblem_masks]
+        self.logger.debug(
+            f'Split the global matrix of shape {A.shape} into {len(sub_As)} many matrices of shape {sub_As[0].shape}'
+        )
+        return sub_As
+
+    def _get_subproblem_solver_function(self, sub_solvers, subproblem_masks):
+        from functools import partial
+
+        def solve(b, sub_solvers, subproblem_masks):
+            res = self.xp.empty_like(b)
+            for solver, mask in zip(sub_solvers, subproblem_masks, strict=True):
+                res[mask] = solver(b[mask])
+            return res
+
+        self.logger.debug(f'Setup solver for function for {len(sub_solvers)} many solvers')
+        return partial(solve, sub_solvers=sub_solvers, subproblem_masks=subproblem_masks)
 
 
 def compute_residual_DAE(self, stage=''):
