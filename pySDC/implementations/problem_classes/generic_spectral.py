@@ -394,7 +394,7 @@ class GenericSpectralLinear(Problem):
                         if self.useGPU:
                             from cupyx.scipy.sparse.linalg import SuperLU
 
-                            solvers.append(SuperLU(cpu_decomp[i]).solve)
+                            solvers.append(SuperLU(cpu_decomps[i]).solve)
                         else:
                             solvers = cpu_decomp[i].solve
                 else:
@@ -506,6 +506,10 @@ class GenericSpectralLinear(Problem):
 
         # expand masks for components
         expanded_masks = [self.xp.repeat(mask, repeats=self.ncomponents) for mask in masks]
+
+        if self.heterogeneous and self.useGPU:
+            for i, mask in enumerate(expanded_masks):
+                expanded_masks[i] = mask.get()
 
         self.logger.debug(f'Generated {len(expanded_masks)} masks to split along axes {split_axes}')
 
