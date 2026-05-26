@@ -57,7 +57,7 @@ class GenericSpectralLinear(Problem):
         comm=None,
         Dirichlet_recombination=True,
         left_preconditioner=True,
-        solver_type='cached_direct',
+        solver_type='subproblems',
         solver_args=None,
         preconditioner_args=None,
         useGPU=False,
@@ -500,6 +500,9 @@ class GenericSpectralLinear(Problem):
                         for mask in masks:
                             new_masks.append(self.xp.logical_and(mask, new_mask))
                 masks = new_masks
+
+        if len(masks) == 0:
+            masks.append(self.xp.ones(ks.shape[-1], dtype=bool))
 
         # expand masks for components
         expanded_masks = [self.xp.repeat(mask, repeats=self.ncomponents) for mask in masks]
