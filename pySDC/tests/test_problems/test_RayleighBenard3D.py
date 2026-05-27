@@ -417,7 +417,9 @@ def test_vertical_profiles():
     assert xp.allclose(expect, profile['u'])
 
 
-def test_subproblems_solver():
+@pytest.mark.parametrize('left_preconditioner', [True])
+@pytest.mark.parametrize('Dirichlet_recombination', [True, False])
+def test_subproblems_solver(left_preconditioner, Dirichlet_recombination):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D, WorkCounter
 
     N = 4
@@ -429,8 +431,8 @@ def test_subproblems_solver():
         spectral_space=False,
         Rayleigh=1.0,
         solver_type='cached_direct',
-        left_preconditioner=True,
-        Dirichlet_recombination=True,
+        left_preconditioner=left_preconditioner,
+        Dirichlet_recombination=Dirichlet_recombination,
     )
     prob.work_counters['subproblems'] = WorkCounter()
     xp = prob.xp

@@ -396,7 +396,7 @@ class GenericSpectralLinear(Problem):
 
                             solvers.append(SuperLU(cpu_decomps[i]).solve)
                         else:
-                            solvers = cpu_decomp[i].solve
+                            solvers.append(cpu_decomps[i].solve)
                 else:
                     solvers = [self.spectral.linalg.factorized(sub_A) for sub_A in sub_As]
 
@@ -521,7 +521,7 @@ class GenericSpectralLinear(Problem):
         return expanded_masks
 
     def _split_matrix_in_subproblems(self, A, subproblem_masks):
-        # assert not (self.left_preconditioner or self.Dirichlet_recombination)
+        assert self.left_preconditioner
         A = A.tolil()
         sub_As = [(A[mask][:, mask]).tocsc() for mask in subproblem_masks]
         self.logger.debug(
