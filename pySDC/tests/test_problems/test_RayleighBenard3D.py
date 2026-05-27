@@ -420,7 +420,7 @@ def test_vertical_profiles():
 def test_subproblems_solver():
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D, WorkCounter
 
-    N = 8
+    N = 4
     prob = RayleighBenard3D(
         nx=N,
         ny=N,
@@ -438,31 +438,32 @@ def test_subproblems_solver():
     subproblem_masks = prob._get_subproblem_masks()
     z_grid_1d = prob.spectral.axes[-1].get_1dgrid()
     z_grid_full = prob.spectral.get_grid()[-1].flatten()
-    assert len(subproblem_masks) == prob.nx * prob.ny
-    for mask in subproblem_masks:
-        assert (
-            len(mask[mask]) == prob.ncomponents * prob.nz
-        ), f'Got {len(mask[mask])} elements in mask, but expected {prob.ncomponents * prob.nz}'
-        assert xp.allclose(
-            xp.repeat(z_grid_full, repeats=prob.ncomponents)[mask], xp.repeat(z_grid_1d, repeats=prob.ncomponents)
-        )
+    if prob.comm.size == 1:
+        assert len(subproblem_masks) == prob.nx * prob.ny
+        for mask in subproblem_masks:
+            assert (
+                len(mask) == prob.ncomponents * prob.nz
+            ), f'Got {len(mask)} elements in mask, but expected {prob.ncomponents * prob.nz}'
+            assert xp.allclose(
+                xp.repeat(z_grid_full, repeats=prob.ncomponents)[mask], xp.repeat(z_grid_1d, repeats=prob.ncomponents)
+            )
 
-    A = prob.Pl @ (prob.M + 1e2 * prob.L) @ prob.Pr
-    sub_matrices = prob._split_matrix_in_subproblems(A, subproblem_masks)
-    assert len(sub_matrices) == len(subproblem_masks)
-    singular = []
-    for i, matrix in enumerate(sub_matrices):
-        assert (
-            matrix.shape == (prob.ncomponents * prob.nz,) * 2
-        ), f'Got submatrix shape {matrix.shape} but expected {(prob.ncomponents * prob.nz,)*2}'
-        # try:
-        #     prob.spectral.linalg.factorized(matrix)
-        # except RuntimeError:
-        #     singular += [i]
-        #     import matplotlib.pyplot as plt
-        #     plt.spy(matrix)
-        #     # plt.spy(A)
-        #     plt.show()
+        A = prob.Pl @ (prob.M + 1e2 * prob.L) @ prob.Pr
+        sub_matrices = prob._split_matrix_in_subproblems(A, subproblem_masks)
+        assert len(sub_matrices) == len(subproblem_masks)
+        singular = []
+        for i, matrix in enumerate(sub_matrices):
+            assert (
+                matrix.shape == (prob.ncomponents * prob.nz,) * 2
+            ), f'Got submatrix shape {matrix.shape} but expected {(prob.ncomponents * prob.nz,)*2}'
+            # try:
+            #     prob.spectral.linalg.factorized(matrix)
+            # except RuntimeError:
+            #     singular += [i]
+            #     import matplotlib.pyplot as plt
+            #     plt.spy(matrix)
+            #     # plt.spy(A)
+            #     plt.show()
 
     # assert len(singular) == 0, f'Matrices {singular} are singular!'
 

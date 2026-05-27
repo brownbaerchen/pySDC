@@ -504,8 +504,10 @@ class GenericSpectralLinear(Problem):
         if len(masks) == 0:
             masks.append(self.xp.ones(ks.shape[-1], dtype=bool))
 
-        # expand masks for components
-        expanded_masks = [self.xp.repeat(mask, repeats=self.ncomponents) for mask in masks]
+        expanded_masks = []
+        for mask in masks:
+            _mask = self.xp.where(self.xp.repeat(mask, repeats=self.ncomponents))[0]
+            expanded_masks.append(_mask)
 
         if self.heterogeneous and self.useGPU:
             for i, mask in enumerate(expanded_masks):
