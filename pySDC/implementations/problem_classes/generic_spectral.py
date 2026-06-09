@@ -497,6 +497,8 @@ class GenericSpectralLinear(Problem):
 
         split_axes = [i for i in range(ks.shape[0]) if isinstance(self.spectral.axes[i], FFTHelper)]
 
+        self.logger.debug(f'Starting generation of masks to split along axes {split_axes}')
+
         kvals = ks[split_axes]
         _, inverse = np.unique(kvals, axis=1, return_inverse=True)
         order = np.argsort(inverse)
@@ -506,6 +508,8 @@ class GenericSpectralLinear(Problem):
 
         if len(masks) == 0:
             masks.append(np.arange(ks.shape[-1]))
+
+        self.logger.debug(f'Generated {len(masks)} masks to split along axes {split_axes}')
 
         expanded_masks = []
         for mask in masks:
@@ -519,12 +523,13 @@ class GenericSpectralLinear(Problem):
             for i, mask in enumerate(expanded_masks):
                 expanded_masks[i] = self.xp.array(mask)
 
-        self.logger.debug(f'Generated {len(expanded_masks)} masks to split along axes {split_axes}')
+        self.logger.debug(f'Extended {len(expanded_masks)} masks along the {self.ncomponents} components')
 
         return expanded_masks
 
     def _split_matrix_in_subproblems(self, A, subproblem_masks):
         assert self.left_preconditioner
+        self.logger.debug(f'Starting splitting of global matrix into {len(subproblem_masks)} sub-matrices')
         A = A.tolil()
         sub_As = [(A[mask][:, mask]).tocsc() for mask in subproblem_masks]
         self.logger.debug(
