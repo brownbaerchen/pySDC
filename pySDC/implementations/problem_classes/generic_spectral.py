@@ -496,14 +496,12 @@ class GenericSpectralLinear(Problem):
 
         split_axes = [i for i in range(ks.shape[0]) if isinstance(self.spectral.axes[i], FFTHelper)]
 
-        # shape = (n_split_axes, n_points)
         kvals = ks[split_axes]
-
-        # Find unique columns and an inverse mapping
         _, inverse = np.unique(kvals, axis=1, return_inverse=True)
-
-        # masks is a list of index arrays, equivalent to your loop output
-        masks = [np.flatnonzero(inverse == g) for g in range(inverse.max() + 1)]
+        order = np.argsort(inverse)
+        counts = np.bincount(inverse)
+        splits = np.cumsum(counts[:-1])
+        masks = np.sort(np.split(order, splits), axis=1)
 
         if len(masks) == 0:
             masks.append(np.arange(ks.shape[-1]))
