@@ -57,7 +57,7 @@ class GenericSpectralLinear(Problem):
         comm=None,
         Dirichlet_recombination=True,
         left_preconditioner=True,
-        solver_type='subproblems',
+        solver_type='direct_subproblems',
         solver_args=None,
         preconditioner_args=None,
         useGPU=False,
@@ -373,7 +373,7 @@ class GenericSpectralLinear(Problem):
             self.work_counters[self.solver_type]()
             self.logger.debug(f'Used cached matrix factorization for {dt=:.6f}')
 
-        elif self.solver_type.lower() == 'subproblems':
+        elif self.solver_type.lower() == 'direct_subproblems':
 
             if dt not in self.cached_factorizations.keys():
 

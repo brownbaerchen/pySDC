@@ -434,7 +434,7 @@ def test_subproblems_solver(left_preconditioner, Dirichlet_recombination):
         left_preconditioner=left_preconditioner,
         Dirichlet_recombination=Dirichlet_recombination,
     )
-    prob.work_counters['subproblems'] = WorkCounter()
+    prob.work_counters['direct_subproblems'] = WorkCounter()
     xp = prob.xp
 
     subproblem_masks = prob._get_subproblem_masks()
@@ -474,7 +474,7 @@ def test_subproblems_solver(left_preconditioner, Dirichlet_recombination):
 
     u1_ref = prob.solve_system(u0, dt)
 
-    prob.solver_type = 'subproblems'
+    prob.solver_type = 'direct_subproblems'
     prob.cached_factorizations = {}
     u1 = prob.solve_system(u0, dt)
 
