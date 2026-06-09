@@ -494,23 +494,16 @@ class GenericSpectralLinear(Problem):
         if self.useGPU:
             ks = ks.get()
 
-        masks = []
-        split_axes = []
-        for i in range(ks.shape[0]):
-            if type(self.spectral.axes[i]) == FFTHelper:
-                split_axes.append(i)
-                unique_k = np.unique(ks[i])
-                new_masks = []
+        split_axes = [i for i in range(ks.shape[0]) if isinstance(self.spectral.axes[i], FFTHelper)]
 
-                for k in unique_k:
-                    new_mask = np.nonzero(ks[i] == k)[0]
-                    if len(masks) == 0:
-                        new_masks.append(new_mask)
-                    else:
-                        for mask in masks:
-                            new_masks.append(np.intersect1d(mask, new_mask))
-                            print(f'Generated {len(masks) + len(new_masks)} so far at axis {i}', flush=True)
-                masks = new_masks
+        # shape = (n_split_axes, n_points)
+        kvals = ks[split_axes]
+
+        # Find unique columns and an inverse mapping
+        _, inverse = np.unique(kvals, axis=1, return_inverse=True)
+
+        # masks is a list of index arrays, equivalent to your loop output
+        masks = [np.flatnonzero(inverse == g) for g in range(inverse.max() + 1)]
 
         if len(masks) == 0:
             masks.append(np.arange(ks.shape[-1]))
