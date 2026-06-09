@@ -481,40 +481,44 @@ class GenericSpectralLinear(Problem):
 
     def _get_subproblem_masks(self):
         from pySDC.helpers.spectral_helper import FFTHelper
+        import numpy as np
 
-        # get masks for subproblems
         ks = self.xp.vstack([me.flatten() for me in self.spectral.get_wavenumbers()])
+        if self.useGPU:
+            ks = ks.get()
+
         masks = []
         split_axes = []
         for i in range(ks.shape[0]):
             if type(self.spectral.axes[i]) == FFTHelper:
                 split_axes.append(i)
-                unique_k = self.xp.unique(ks[i])
+                unique_k = np.unique(ks[i])
                 new_masks = []
 
                 for k in unique_k:
-                    new_mask = self.xp.nonzero(ks[i] == k)[0]
+                    new_mask = np.nonzero(ks[i] == k)[0]
                     if len(masks) == 0:
                         new_masks.append(new_mask)
                     else:
                         for mask in masks:
-                            new_masks.append(self.xp.intersect1d(mask, new_mask))
+                            new_masks.append(np.intersect1d(mask, new_mask))
+                            print(f'Generated {len(masks) + len(new_masks)} so far at axis {i}', flush=True)
                 masks = new_masks
 
         if len(masks) == 0:
-            masks.append(self.xp.ones(ks.shape[-1], dtype=bool))
+            masks.append(np.arange(ks.shape[-1]))
 
         expanded_masks = []
         for mask in masks:
-            extended_mask = self.xp.array(
+            extended_mask = np.array(
                 [[me * self.ncomponents + i for i in range(self.ncomponents)] for me in mask]
             ).flatten()
 
             expanded_masks.append(extended_mask)
 
-        if self.heterogeneous and self.useGPU:
+        if not self.heterogeneous and self.useGPU:
             for i, mask in enumerate(expanded_masks):
-                expanded_masks[i] = mask.get()
+                expanded_masks[i] = self.xp.array(mask)
 
         self.logger.debug(f'Generated {len(expanded_masks)} masks to split along axes {split_axes}')
 
