@@ -237,11 +237,12 @@ class GenericSpectralLinear(Problem):
             else:
                 sp = self.spectral.sparse_lib
 
-            R = sp.lil_matrix((self.ncomponents * N,) * 2, dtype=int)
+            nc = self.ncomponents
 
-            for j in range(self.ncomponents):
-                for i in range(N):
-                    R[i * self.ncomponents + j, j * N + i] = 1
+            rows = self.xp.arange(N * nc)
+            cols = (rows % nc) * N + rows // nc
+
+            R = sp.csr_matrix((self.xp.ones(N * nc), (rows, cols)), shape=(N * nc, N * nc))
 
             self.Pl = self.spectral.sparse_lib.csc_matrix(R, dtype=complex)
 
