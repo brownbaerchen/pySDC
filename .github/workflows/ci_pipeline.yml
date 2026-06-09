@@ -99,6 +99,7 @@ jobs:
           - Second_orderSDC
           - soft_failure
           - TOMS
+          - StroemungsRaum
     defaults:
       run:
         shell: bash -l {0}
@@ -170,7 +171,7 @@ jobs:
   user_firedrake_tests:
     runs-on: ubuntu-latest
     container:
-      image: firedrakeproject/firedrake-vanilla-default:latest
+      image: firedrakeproject/firedrake-vanilla-default@sha256:455fabbe164276329a4cc91af54a05f56bf383dd3164195d0fa1182e981f6839
       options: --user root
       volumes:
         - ${{ github.workspace }}:/repositories
@@ -192,6 +193,8 @@ jobs:
         with:
           repository: firedrakeproject/gusto
           path: ./gusto_repo
+          # Last known passing Gusto commit in CI run 24328039993 / job 71027429748
+          ref: f11fba9ee858aa84281baf41baa09704431ac0ff
       - name: Create virtual environment
         # pass '--system-site-packages' so Firedrake can be found
         run: python3 -m venv --system-site-packages venv-pySDC
@@ -270,3 +273,39 @@ jobs:
           path: |
             data_monodomain
             coverage_monodomain.dat
+
+  coverage_comment_on_pr:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !cancelled()
+    needs: [user_cpu_tests_linux, project_cpu_tests_linux, user_libpressio_tests, user_firedrake_tests, user_monodomain_tests_linux]
+    permissions:
+      contents: read
+      pull-requests: write
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Conda environment with Micromamba
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: "etc/environment-postprocess.yml"
+      - name: Download all coverage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: .
+          pattern: test-artifacts-*
+          merge-multiple: true
+      - name: Combine coverage reports
+        continue-on-error: true
+        run: |
+          python -m coverage combine coverage_*.dat
+          python -m coverage xml
+          python -m coverage report
+      - name: Post coverage comment on PR
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MINIMUM_GREEN: 70
+          MINIMUM_ORANGE: 50
