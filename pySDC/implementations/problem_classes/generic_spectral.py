@@ -232,17 +232,12 @@ class GenericSpectralLinear(Problem):
             self.logger.debug(f'Setting up left preconditioner with {N} local degrees of freedom')
 
             # reverse Kronecker product
-            if self.spectral.useGPU:
-                import scipy.sparse as sp
-            else:
-                sp = self.spectral.sparse_lib
-
             nc = self.ncomponents
 
             rows = self.xp.arange(N * nc)
             cols = (rows % nc) * N + rows // nc
 
-            R = sp.csr_matrix((self.xp.ones(N * nc), (rows, cols)), shape=(N * nc, N * nc))
+            R = self.spectral.sparse_lib.csr_matrix((self.xp.ones(N * nc), (rows, cols)), shape=(N * nc, N * nc))
 
             self.Pl = self.spectral.sparse_lib.csc_matrix(R, dtype=complex)
 
