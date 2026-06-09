@@ -493,12 +493,12 @@ class GenericSpectralLinear(Problem):
                 new_masks = []
 
                 for k in unique_k:
-                    new_mask = ks[i] == k
+                    new_mask = self.xp.nonzero(ks[i] == k)[0]
                     if len(masks) == 0:
                         new_masks.append(new_mask)
                     else:
                         for mask in masks:
-                            new_masks.append(self.xp.logical_and(mask, new_mask))
+                            new_masks.append(self.xp.intersect1d(mask, new_mask))
                 masks = new_masks
 
         if len(masks) == 0:
@@ -507,7 +507,7 @@ class GenericSpectralLinear(Problem):
         expanded_masks = []
         for mask in masks:
             extended_mask = self.xp.array(
-                [[me * self.ncomponents + i for i in range(self.ncomponents)] for me in self.xp.where(mask)[0]]
+                [[me * self.ncomponents + i for i in range(self.ncomponents)] for me in mask]
             ).flatten()
 
             expanded_masks.append(extended_mask)
