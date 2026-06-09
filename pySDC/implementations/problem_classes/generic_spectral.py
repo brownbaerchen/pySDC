@@ -466,6 +466,8 @@ class GenericSpectralLinear(Problem):
         self.setUpFieldsIO()
 
         coords = [me.get_1dgrid() for me in self.spectral.axes]
+        if self.spectral.useGPU:
+            coords = [me.get() for me in coords]
         assert np.allclose([len(me) for me in coords], self.spectral.global_shape[1:])
 
         fOut = Rectilinear(np.float64, fileName=fileName)
@@ -475,9 +477,14 @@ class GenericSpectralLinear(Problem):
 
     def processSolutionForOutput(self, u):
         if self.spectral_space:
-            return np.array(self.itransform(u).real)
+            u = self.itransform(u).real
         else:
-            return np.array(u.real)
+            u = u.real
+
+        if self.spectral.useGPU:
+            u = u.get()
+
+        return np.array(u)
 
     def _get_subproblem_masks(self):
         from pySDC.helpers.spectral_helper import FFTHelper
