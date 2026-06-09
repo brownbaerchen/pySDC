@@ -525,7 +525,6 @@ class GenericSpectralLinear(Problem):
     def _split_matrix_in_subproblems(self, A, subproblem_masks):
         assert self.left_preconditioner
         self.logger.debug(f'Starting splitting of global matrix into {len(subproblem_masks)} sub-matrices')
-        A = A.tolil()
         sub_As = [(A[mask[:, None], mask]).tocsc() for mask in subproblem_masks]
         self.logger.debug(
             f'Split the global matrix of shape {A.shape} into {len(sub_As)} many matrices of shape {sub_As[0].shape}'
