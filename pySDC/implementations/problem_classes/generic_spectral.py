@@ -482,7 +482,8 @@ class GenericSpectralLinear(Problem):
 
         return np.array(u)
 
-    def _get_subproblem_masks(self):
+    def _get_subproblem_masks(self, max_masks=128):
+        # TODO: create a proper interface for the max_masks parameter
         from pySDC.helpers.spectral_helper import FFTHelper
         import numpy as np
 
@@ -502,9 +503,13 @@ class GenericSpectralLinear(Problem):
         masks = np.sort(np.split(order, splits), axis=1)
 
         if len(masks) == 0:
-            masks.append(np.arange(ks.shape[-1]))
+            masks = np.arange(ks.shape[-1])
 
         self.logger.debug(f'Generated {len(masks)} masks to split along axes {split_axes}')
+
+        if max_masks < len(masks):
+            masks = masks.reshape((max_masks, -1))
+            self.logger.debug(f'Reduced number of splitting masks to {len(masks)} due to limit of {max_masks}')
 
         nc = self.ncomponents
         expanded_masks = [(mask[:, None] * nc + np.arange(nc)).ravel() for mask in masks]
