@@ -476,13 +476,17 @@ class GenericSpectralLinear(Problem):
         return fOut
 
     def processSolutionForOutput(self, u):
+        self.logger.debug('Processing solution for output ...')
         if self.spectral_space:
             u = self.itransform(u).real
         else:
             u = u.real
 
+        self.logger.debug('Processed solution for output')
+
         if self.spectral.useGPU:
             u = u.get()
+            self.logger.debug('Transferred solution to CPU')
 
         return np.array(u)
 

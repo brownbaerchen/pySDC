@@ -46,7 +46,9 @@ def run_experiment(args, config, **kwargs):
     from pySDC.helpers.stats_helper import filter_stats
 
     type(config).base_path = args['o']
+    print(f'Setup directory {args["o"]}/data', flush=True)
     os.makedirs(f'{args["o"]}/data', exist_ok=True)
+    print(f'Finished setup directory {args["o"]}/data', flush=True)
 
     if args['mode'] == 'benchmark':
         config.prepare_for_benchmark()
@@ -91,11 +93,14 @@ def run_experiment(args, config, **kwargs):
 
 
 if __name__ == '__main__':
+    print('Hello', flush=True)
     from pySDC.projects.RayleighBenard.RBC3D_configs import get_config
 
     args = parse_args()
+    print('parsed args', flush=True)
 
     config = get_config(args)
+    print('got config', flush=True)
 
     if args['mode'] in ['run', 'benchmark']:
         run_experiment(args, config)
