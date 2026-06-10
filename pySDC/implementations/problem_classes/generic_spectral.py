@@ -399,7 +399,6 @@ class GenericSpectralLinear(Problem):
 
                 del A
                 del sub_As
-                import gc; gc.collect()
                 solver = self._get_subproblem_solver_function(solvers, subproblem_masks)
 
                 self.cached_factorizations[dt] = solver
@@ -516,8 +515,11 @@ class GenericSpectralLinear(Problem):
         self.logger.debug(f'Generated {len(masks)} masks to split along axes {split_axes}')
 
         if max_masks < len(masks):
-            masks = masks.reshape((max_masks, -1))
-            self.logger.debug(f'Reduced number of splitting masks to {len(masks)} due to limit of {max_masks}')
+            if masks.size % max_masks == 0:
+                masks = masks.reshape((max_masks, -1))
+                self.logger.debug(f'Reduced number of splitting masks to {len(masks)} due to limit of {max_masks}')
+            else:
+                self.logger.debug(f'Could not merge {len(masks)} masks to {max_masks} because it\'s not divisible')
 
         nc = self.ncomponents
         expanded_masks = [(mask[:, None] * nc + np.arange(nc, dtype=np.uint32)).ravel() for mask in masks]
@@ -536,10 +538,7 @@ class GenericSpectralLinear(Problem):
     def _split_matrix_in_subproblems(self, A, subproblem_masks):
         assert self.left_preconditioner
         self.logger.debug(f'Splitting global matrix into {len(subproblem_masks)} sub-matrices ...')
-        # sub_As = [(A[mask[:, None], mask]).tocsc() for mask in subproblem_masks]
-        sub_As = []
-        for i, mask in enumerate(subproblem_masks):
-            sub_As.append((A[mask[:, None], mask]))
+        sub_As = [(A[mask[:, None], mask]) for mask in subproblem_masks]
         self.logger.debug(
             f'Split the global matrix of shape {A.shape} into {len(sub_As)} matrices of shape {sub_As[0].shape}'
         )
