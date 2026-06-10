@@ -97,6 +97,7 @@ class RayleighBenard3DRegular(Config):
     def get_initial_condition(self, P, *args, restart_idx=0, **kwargs):
 
         if restart_idx == 0:
+            P.logger.debug('Setting up random initial conditions')
             u0 = P.u_exact(t=0, seed=P.comm.rank, noise_level=1e-3)
             u0_with_pressure = P.solve_system(u0, 1e-9, u0)
             P.cached_factorizations.pop(1e-9)
@@ -104,8 +105,11 @@ class RayleighBenard3DRegular(Config):
         else:
             from pySDC.helpers.fieldsIO import FieldsIO
 
+            filename = self.get_file_name()
+            P.logger.debug(f'Loading snapshot {restart_idx} from file {filename}')
+
             P.setUpFieldsIO()
-            outfile = FieldsIO.fromFile(self.get_file_name())
+            outfile = FieldsIO.fromFile(filename)
 
             t0, solution = outfile.readField(restart_idx)
             solution = solution[: P.spectral.ncomponents, ...]
@@ -120,13 +124,16 @@ class RayleighBenard3DRegular(Config):
             else:
                 u0[...] = solution
 
+            P.logger.info(f'Loaded snapshot {restart_idx} at t={t0} from file {filename}')
             return u0, t0
 
     def prepare_caches(self, prob):
         """
         Cache the fft objects, which are expensive to create on GPU because graphs have to be initialized.
         """
+        prob.logger.debug('Preparing caches ...')
         prob.eval_f(prob.u_init)
+        prob.logger.debug('Prepared caches')
 
     def prepare_for_benchmark(self):
         def _pass(*args, **kwargs):
@@ -238,12 +245,14 @@ class RBC3Dverification(RayleighBenard3DRegular):
         ic_config = self.ic_config['config'](
             args={**self.args, 'res': self.ic_config['res'], 'dt': self.ic_config['dt']}
         )
+        ic_config.base_path = self.base_path
         desc = ic_config.get_description(res=self.ic_config['res'], dt=self.ic_config['dt'])
         ic_nx = desc['problem_params']['nx']
         ic_ny = desc['problem_params']['ny']
         ic_nz = desc['problem_params']['nz']
 
-        _P = type(P)(nx=ic_nx, ny=ic_ny, nz=ic_nz, comm=P.comm, useGPU=P.useGPU)
+        P.logger.debug(f'Setting up auxiliary problem with resolution {ic_nx}x{ic_ny}x{ic_nz} for interpolating initial conditions')
+        _P = type(P)(nx=ic_nx, ny=ic_ny, nz=ic_nz, comm=P.comm, useGPU=P.useGPU, Dirichlet_recombination=False, left_preconditioner=False)
         _P.setUpFieldsIO()
         filename = ic_config.get_file_name()
         ic_file = FieldsIO.fromFile(filename)
