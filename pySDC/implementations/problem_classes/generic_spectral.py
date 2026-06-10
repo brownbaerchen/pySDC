@@ -171,7 +171,7 @@ class GenericSpectralLinear(Problem):
 
     def _setup_operator(self, LHS):
         """
-        Setup a sparse linear operator by adding relationships. See documentation for ``GenericSpectralLinear.setup_L`` to learn more.
+        Set up a sparse linear operator by adding relationships. See documentation for ``GenericSpectralLinear.setup_L`` to learn more.
 
         Args:
             LHS (dict): Equations to be added to the operator
@@ -186,7 +186,7 @@ class GenericSpectralLinear(Problem):
 
     def setup_L(self, LHS):
         """
-        Setup the left hand side of the linear operator L and store it in ``self.L``.
+        Set up the left hand side of the linear operator L and store it in ``self.L``.
 
         The argument is meant to be a dictionary with the line you want to write the equation in as the key and the relationship between components as another dictionary. For instance, you can add an algebraic condition capturing a first derivative relationship between u and ux as follows:
 
@@ -207,7 +207,7 @@ class GenericSpectralLinear(Problem):
 
     def setup_M(self, LHS):
         '''
-        Setup mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
+        Set up mass matrix, see documentation of ``GenericSpectralLinear.setup_L``.
         '''
         diff_index = list(LHS.keys())
         self.diff_mask = [me in diff_index for me in self.components]
@@ -380,6 +380,7 @@ class GenericSpectralLinear(Problem):
                 subproblem_masks = self._get_subproblem_masks()
                 sub_As = self._split_matrix_in_subproblems(A, subproblem_masks)
 
+                self.logger.debug(f'Setting up {len(sub_As)} direct solvers for subproblems ...')
                 if self.heterogeneous:
                     import scipy.sparse as sp
 
@@ -396,6 +397,9 @@ class GenericSpectralLinear(Problem):
                 else:
                     solvers = [self.spectral.linalg.factorized(sub_A) for sub_A in sub_As]
 
+                del A
+                del sub_As
+                import gc; gc.collect()
                 solver = self._get_subproblem_solver_function(solvers, subproblem_masks)
 
                 self.cached_factorizations[dt] = solver
@@ -513,27 +517,27 @@ class GenericSpectralLinear(Problem):
 
         nc = self.ncomponents
         expanded_masks = [(mask[:, None] * nc + np.arange(nc, dtype=np.uint32)).ravel() for mask in masks]
+        del masks
 
         if not self.heterogeneous and self.useGPU:
             for i, mask in enumerate(expanded_masks):
                 expanded_masks[i] = self.xp.array(mask)
 
         self.logger.debug(
-            f'Extended {len(expanded_masks)} masks along the {self.ncomponents} components, taking up {len(expanded_masks) * expanded_masks[0].nbytes} bytes with dtype {expanded_masks[0].dtype}'
+            f'Extended {len(expanded_masks)} masks along the {self.ncomponents} components, taking up {len(expanded_masks) * expanded_masks[0].nbytes / 1e9} GB with dtype {expanded_masks[0].dtype}'
         )
 
         return expanded_masks
 
     def _split_matrix_in_subproblems(self, A, subproblem_masks):
         assert self.left_preconditioner
-        self.logger.debug(f'Starting splitting of global matrix into {len(subproblem_masks)} sub-matrices')
+        self.logger.debug(f'Splitting global matrix into {len(subproblem_masks)} sub-matrices ...')
         # sub_As = [(A[mask[:, None], mask]).tocsc() for mask in subproblem_masks]
         sub_As = []
         for i, mask in enumerate(subproblem_masks):
             sub_As.append((A[mask[:, None], mask]))
-            print(f'split matrix {i}/{len(subproblem_masks)}', flush=True)
         self.logger.debug(
-            f'Split the global matrix of shape {A.shape} into {len(sub_As)} many matrices of shape {sub_As[0].shape}'
+            f'Split the global matrix of shape {A.shape} into {len(sub_As)} matrices of shape {sub_As[0].shape}'
         )
         return sub_As
 
@@ -546,7 +550,7 @@ class GenericSpectralLinear(Problem):
                 res[mask] = solver(b[mask])
             return res
 
-        self.logger.debug(f'Setup solver for function for {len(sub_solvers)} many solvers')
+        self.logger.debug(f'Set up solver for function for {len(sub_solvers)} many solvers')
         return partial(solve, sub_solvers=sub_solvers, subproblem_masks=subproblem_masks)
 
 

@@ -216,6 +216,7 @@ class RayleighBenard3D(GenericSpectralLinear):
         self.work_counters['rhs'] = WorkCounter()
 
     def eval_f(self, u, *args, **kwargs):
+        import gc; gc.collect()
         f = self.f_init
 
         if self.spectral_space:
