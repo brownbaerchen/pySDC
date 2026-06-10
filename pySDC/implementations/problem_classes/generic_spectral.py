@@ -497,13 +497,13 @@ class GenericSpectralLinear(Problem):
 
         kvals = ks[split_axes]
         _, inverse = np.unique(kvals, axis=1, return_inverse=True)
-        order = np.argsort(inverse)
+        order = np.argsort(inverse).astype(np.uint32)
         counts = np.bincount(inverse)
         splits = np.cumsum(counts[:-1])
         masks = np.sort(np.split(order, splits), axis=1)
 
         if len(masks) == 0:
-            masks = np.arange(ks.shape[-1])
+            masks = np.arange(ks.shape[-1], dtype=np.uint32)
 
         self.logger.debug(f'Generated {len(masks)} masks to split along axes {split_axes}')
 
@@ -512,13 +512,15 @@ class GenericSpectralLinear(Problem):
             self.logger.debug(f'Reduced number of splitting masks to {len(masks)} due to limit of {max_masks}')
 
         nc = self.ncomponents
-        expanded_masks = [(mask[:, None] * nc + np.arange(nc)).ravel() for mask in masks]
+        expanded_masks = [(mask[:, None] * nc + np.arange(nc, dtype=np.uint32)).ravel() for mask in masks]
 
         if not self.heterogeneous and self.useGPU:
             for i, mask in enumerate(expanded_masks):
                 expanded_masks[i] = self.xp.array(mask)
 
-        self.logger.debug(f'Extended {len(expanded_masks)} masks along the {self.ncomponents} components')
+        self.logger.debug(
+            f'Extended {len(expanded_masks)} masks along the {self.ncomponents} components, taking up {len(expanded_masks) * expanded_masks[0].nbytes} bytes with dtype {expanded_masks[0].dtype}'
+        )
 
         return expanded_masks
 
