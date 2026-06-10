@@ -506,13 +506,8 @@ class GenericSpectralLinear(Problem):
 
         self.logger.debug(f'Generated {len(masks)} masks to split along axes {split_axes}')
 
-        expanded_masks = []
-        for mask in masks:
-            extended_mask = np.array(
-                [[me * self.ncomponents + i for i in range(self.ncomponents)] for me in mask]
-            ).flatten()
-
-            expanded_masks.append(extended_mask)
+        nc = self.ncomponents
+        expanded_masks = [(mask[:, None] * nc + np.arange(nc)).ravel() for mask in masks]
 
         if not self.heterogeneous and self.useGPU:
             for i, mask in enumerate(expanded_masks):
