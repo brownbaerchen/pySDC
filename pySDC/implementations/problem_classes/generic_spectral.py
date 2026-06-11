@@ -237,9 +237,9 @@ class GenericSpectralLinear(Problem):
             rows = self.xp.arange(N * nc)
             cols = (rows % nc) * N + rows // nc
 
-            R = self.spectral.sparse_lib.csr_matrix((self.xp.ones(N * nc), (rows, cols)), shape=(N * nc, N * nc))
-
-            self.Pl = self.spectral.sparse_lib.csc_matrix(R, dtype=complex)
+            self.Pl = self.spectral.sparse_lib.csc_matrix(
+                (self.xp.ones(N * nc, dtype=complex), (rows, cols)), shape=(N * nc, N * nc)
+            )
 
             self.logger.debug('Finished setup of left preconditioner')
         else:
@@ -427,6 +427,7 @@ class GenericSpectralLinear(Problem):
         coords = [me.get_1dgrid() for me in self.spectral.axes]
         if self.spectral.useGPU:
             coords = [me.get() for me in coords]
+
         assert np.allclose([len(me) for me in coords], self.spectral.global_shape[1:])
 
         fOut = Rectilinear(np.float64, fileName=fileName)
@@ -447,7 +448,7 @@ class GenericSpectralLinear(Problem):
             u = u.get()
             self.logger.debug('Transferred solution to CPU')
 
-        return np.array(u)
+        return u.view(np.ndarray)
 
 
 def compute_residual_DAE(self, stage=''):

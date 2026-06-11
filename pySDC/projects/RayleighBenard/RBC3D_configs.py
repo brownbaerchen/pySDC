@@ -113,7 +113,10 @@ class RayleighBenard3DRegular(Config):
 
             t0, solution = outfile.readField(restart_idx)
             solution = solution[: P.spectral.ncomponents, ...]
-            
+
+            if P.useGPU:
+                solution = P.xp.array(solution)
+
             if P.useGPU:
                 solution = P.xp.array(solution)
 
@@ -251,8 +254,18 @@ class RBC3Dverification(RayleighBenard3DRegular):
         ic_ny = desc['problem_params']['ny']
         ic_nz = desc['problem_params']['nz']
 
-        P.logger.debug(f'Setting up auxiliary problem with resolution {ic_nx}x{ic_ny}x{ic_nz} for interpolating initial conditions')
-        _P = type(P)(nx=ic_nx, ny=ic_ny, nz=ic_nz, comm=P.comm, useGPU=P.useGPU, Dirichlet_recombination=False, left_preconditioner=False)
+        P.logger.debug(
+            f'Setting up auxiliary problem with resolution {ic_nx}x{ic_ny}x{ic_nz} for interpolating initial conditions'
+        )
+        _P = type(P)(
+            nx=ic_nx,
+            ny=ic_ny,
+            nz=ic_nz,
+            comm=P.comm,
+            useGPU=P.useGPU,
+            Dirichlet_recombination=False,
+            left_preconditioner=False,
+        )
         _P.setUpFieldsIO()
         filename = ic_config.get_file_name()
         ic_file = FieldsIO.fromFile(filename)
