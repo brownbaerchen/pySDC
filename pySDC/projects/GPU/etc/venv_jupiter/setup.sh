@@ -14,4 +14,4 @@ source "${ABSOLUTE_PATH}"/activate.sh
 
 FFTW_LIBRARY_DIR="/p/software/jupiter/stages/2025/software/FFTW/3.3.10-GCC-13.3.0/lib64/" python3 -m pip install git+https://github.com/brownbaerchen/mpi4py-fft.git@cupy_implementation
 python3 -m pip install -r "${ABSOLUTE_PATH}"/requirements.txt
-python3 -m pip install -e /e/project1/cjsc/baumann7/pySDC/
+python3 -m pip install -e /e/scratch/jureap1/baumann7/pySDC/
