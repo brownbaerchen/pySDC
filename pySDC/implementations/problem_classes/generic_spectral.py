@@ -448,7 +448,7 @@ class GenericSpectralLinear(Problem):
             u = u.get()
             self.logger.debug('Transferred solution to CPU')
 
-        return u.view(np.ndarray)
+        return np.ascontiguousarray(u.view(np.ndarray))
 
 
 def compute_residual_DAE(self, stage=''):
