@@ -7,7 +7,6 @@ from mpi4py import MPI
 import numpy as np
 import pickle
 import os
-import numpy as np
 
 
 def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, config=None):
