@@ -466,9 +466,9 @@ class RBC3DG4R4RKRa1e7(RBC3DverificationRK):
 # --- Ra 1e8 ---
 class RBC3DG4R4SDC23Ra1e8(RBC3DM2K3):
     Tend = 30
-    dt = 5e-3
+    dt = 7e-4
     res = 256
-    converged = 12
+    converged = 8
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
 
 
@@ -476,15 +476,15 @@ class RBC3DG4R4SDC44Ra1e8(RBC3DM4K4):
     Tend = 30
     dt = 5e-3
     res = 256
-    # converged = 25
+    converged = 8
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
 
 
 class RBC3DG4R4EulerRa1e8(RBC3DverificationEuler):
     Tend = 30
-    dt = 1e-3
+    dt = 1e-4
     res = 256
-    # converged = 25
+    converged = 8
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
 
 
@@ -492,5 +492,5 @@ class RBC3DG4R4RKRa1e8(RBC3DverificationRK):
     Tend = 30
     dt = 4e-3
     res = 256
-    # converged = 25
+    converged = 8
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
