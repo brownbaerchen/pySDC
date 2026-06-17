@@ -191,7 +191,7 @@ class RayleighBenard3DRegular(Config):
                     f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space',
                     flush=True,
                 )
-            MPI.COMM_WORLD.barrier()
+        MPI.COMM_WORLD.barrier()
 
 
 class RBC3Dverification(RayleighBenard3DRegular):

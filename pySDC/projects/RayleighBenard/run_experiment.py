@@ -1,3 +1,6 @@
+from datetime import datetime
+
+
 def parse_args():
     import argparse
 
@@ -39,6 +42,7 @@ def parse_args():
 
 
 def run_experiment(args, config, **kwargs):
+    print(f'{datetime.now()} Starting run_experiment', flush=True)
     import pickle
     import os
 
@@ -50,6 +54,7 @@ def run_experiment(args, config, **kwargs):
 
     if args['mode'] == 'benchmark':
         config.prepare_for_benchmark()
+    print(f'{datetime.now()} Prepared for benchmark', flush=True)
 
     description = config.get_description(
         useGPU=args['useGPU'], MPIsweeper=args['procs'][1] > 1, res=args['res'], dt=args['dt'], **kwargs
@@ -69,6 +74,7 @@ def run_experiment(args, config, **kwargs):
     ), 'Have not figured out how to do MPI controller with GPUs yet because I need NCCL for that!'
     controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
     prob = controller.MS[0].levels[0].prob
+    print(f'{datetime.now()} Setup prblem', flush=True)
 
     u0, t0 = config.get_initial_condition(prob, restart_idx=args['restart_idx'])
 
@@ -77,6 +83,7 @@ def run_experiment(args, config, **kwargs):
 
     config.prepare_caches(prob)
 
+    print(f'{datetime.now()} Start run', flush=True)
     uend, stats = controller.run(u0=u0, t0=t0, Tend=config.Tend)
 
     combined_stats = filter_stats(stats, comm=config.comm_world)
@@ -91,11 +98,14 @@ def run_experiment(args, config, **kwargs):
 
 
 if __name__ == '__main__':
+    print(f'{datetime.now()}, Entering script', flush=True)
     from pySDC.projects.RayleighBenard.RBC3D_configs import get_config
 
     args = parse_args()
+    print(f'{datetime.now()}, Parsed args', flush=True)
 
     config = get_config(args)
+    print(f'{datetime.now()} Got config', flush=True)
 
     if args['mode'] in ['run', 'benchmark']:
         run_experiment(args, config)
