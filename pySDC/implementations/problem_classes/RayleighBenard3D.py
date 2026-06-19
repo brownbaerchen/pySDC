@@ -450,13 +450,17 @@ class RayleighBenard3D(GenericSpectralLinear):
         unique_k_all = []
         for k in k_all:
             unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
+        unique_k_all = list(unique_k_all)
         n_k_all = len(unique_k_all)
 
         spectra = self.comm.allgather(local_spectrum)
         spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
         for ks, _spectrum in zip(k_all, spectra, strict=True):
-            idx = xp.nonzero(ks == unique_k_all)[0]
-            spectrum[..., idx] += _spectrum
+            ks = list(ks)
+            for k in ks:
+                index_global = unique_k_all.index(k)
+                index_local = ks.index(k)
+                spectrum[..., index_global] += _spectrum[..., index_local]
         # k_all = self.xp.array(self.comm.allgather(unique_k))
         # unique_k_all = xp.unique(k_all)
         # spectra = self.xp.array(self.comm.allgather(local_spectrum))
