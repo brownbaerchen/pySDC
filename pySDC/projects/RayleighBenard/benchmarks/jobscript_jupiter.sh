@@ -7,12 +7,12 @@
 #SBATCH -o #OUT_FILEPATH#
 #SBATCH --job-name=benchmark 
 #SBATCH -A jureap1
-#SBATCH --reservation=campaign
-#SBATCH --dependency=singleton
+#SBATCH --mail-user=t.baumann@fz-juelich.de
+#SBATCH --mail-type=BEGIN,END,FAIL
 
 ### start of jobscript
 
-source /e/project1/cjsc/baumann7/pySDC/pySDC/projects/GPU/etc/venv_jupiter/activate.sh
+source /e/scratch/jureap1/baumann7/pySDC/pySDC/projects/GPU/etc/venv_jupiter/activate.sh
 
 #EXEC#
 touch #READY#

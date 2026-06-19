@@ -16,6 +16,7 @@ parameterset:
       - {tag: 'Ra1e6', name: res, type: int, '_': '64'}
       - {tag: 'Ra1e7', name: res, type: int, '_': '128'}
       - {tag: 'Ra1e8', name: res, type: int, '_': '256'}
+      - {tag: 'Ra1e9', name: res, type: int, '_': '560'}
       - {tag: 'RK|Euler', name: ntasks_time, type: int, '_': '1'}
       - {tag: 'SDC23', name: ntasks_time, type: int, '_': '1,2'}
       - {tag: 'SDC44', name: ntasks_time, type: int, '_': '1,4'}
@@ -23,6 +24,7 @@ parameterset:
       - {tag: 'Ra1e6', name: ntasks_space, type: int, '_': '4,8,16,32,64'}
       - {tag: 'Ra1e7', name: ntasks_space, type: int, '_': '32,64,128,256,512'}
       - {tag: 'Ra1e8', name: ntasks_space, type: int, '_': '256,512,1024,2048'}
+      - {tag: 'Ra1e9', name: ntasks_space, type: int, '_': '2240'}
       - {name: binding, '_': 'time_first'}
       - {tag: 'SDC44+Ra1e7', name: binding, '_': 'time_first,space_first'}
   #Job configuration
@@ -30,7 +32,7 @@ parameterset:
     parameter:
       - {name: submit_cmd, "_": sbatch}
       - {name: job_file, "_": jobscript_jupiter.sh}
-      - {name: walltime, "_": "00:15:00"}
+      - {name: walltime, "_": "00:20:00"}
       - {name: ready_file, "_": ready}
       - {name: err_file, "_": stderr}
       - {name: out_file, "_": stdout}

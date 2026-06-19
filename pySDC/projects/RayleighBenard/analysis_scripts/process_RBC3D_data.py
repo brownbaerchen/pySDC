@@ -8,6 +8,14 @@ import numpy as np
 import pickle
 import os
 
+from datetime import datetime
+LOGGING = True
+comm_world = MPI.COMM_WORLD
+
+def _print(*args):
+    global LOGGING
+    if comm_world.rank == 0 and LOGGING:
+        print(f'{datetime.now().replace(microsecond=0)}:', *args, flush=True)
 
 def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, config=None):
     # prepare problem instance
@@ -16,6 +24,8 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     args['procs'] = [1, 1, comm.size]
     config = config if config else get_config(args)
     desc = config.get_description(**args)
+
+    _print('Starting problem setup')
     P = desc['problem_class'](
         **{
             **desc['problem_params'],
@@ -25,18 +35,22 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
             'left_preconditioner': False,
         }
     )
+    _print('Finished problem setup')
     P.setUpFieldsIO()
     zInt = P.axes[-1].get_integration_weights()
     xp = P.xp
 
+    _print('Preparing paths')
     # prepare paths
     os.makedirs(base_path, exist_ok=True)
     fname = config.get_file_name()
     fname_trim = fname[fname.index('RBC3D') : fname.index('.pySDC')]
     path = f'{base_path}/{fname_trim}.pickle'
 
+    _print('Opening simulation data')
     # open simulation data
     data = FieldsIO.fromFile(fname)
+    _print('Opened simulation data')
 
     # prepare arrays to store data in
     Nu = {
@@ -52,6 +66,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     spectrum = []
     spectrum_all = []
 
+    _print('Loading previous data')
     # try to load time averaged values
     u_mean_profile = P.u_exact()
     if os.path.isfile(path):
@@ -67,20 +82,25 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
                     u_mean_profile[P.index(key)] = avg_data[f'profile_{key}'][P.local_slice(False)[-1]]
     elif comm.rank == 0:
         print('No mean profiles available yet. Please rerun script after completion to get correct RMS profiles')
+    _print('Loaded previous data')
 
     # prepare progress bar
     indeces = range(args['restart_idx'], data.nFields)
-    if P.comm.rank == 0:
+    if P.comm.rank == 0 and not LOGGING:
         indeces = tqdm(indeces)
 
     # loop through all data points and compute stuff
+    _print('Starting main loop')
     for i in indeces:
         _t, u = data.readField(i)
+        _print(f'Read data {i} at {_t}')
 
         # Nusselt numbers
         if P.useGPU:
             u = P.xp.array(u)
+        _print('    Transferred data to GPU')
         _Nu = P.compute_Nusselt_numbers(u)
+        _print('    Computed Nusselt numbers')
         if any(me > 1e3 for me in _Nu.values()):
             continue
 
@@ -95,6 +115,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         # profiles
         _profiles = P.get_vertical_profiles(u, list(profiles.keys()))
         _rms_profiles = P.get_vertical_profiles((u - u_mean_profile) ** 2, list(profiles.keys()))
+        _print('    Computed vertical profiles')
         for key in profiles.keys():
             if P.useGPU:
                 profiles[key].append(_profiles[key].get())
@@ -106,6 +127,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         # spectrum
         k, s = P.get_frequency_spectrum(u)
         s_mean = zInt @ P.axes[-1].transform(s[0], axes=(0,))
+        _print('    Computed frequency spectrum')
         if P.useGPU:
             spectrum.append(s_mean.get())
             spectrum_all.append(s.get())
