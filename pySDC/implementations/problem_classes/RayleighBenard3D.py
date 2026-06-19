@@ -436,27 +436,40 @@ class RayleighBenard3D(GenericSpectralLinear):
         abs_ky = xp.abs(self.Ky[:, :, 0])
 
         unique_k = xp.unique(xp.append(xp.unique(abs_kx), xp.unique(abs_ky)))
+        n_k = len(unique_k)
 
         # compute local spectrum
+        local_spectrum = self.xp.empty(shape=(2, energy.shape[3], n_k))
         masks = (
             (abs_kx.flatten()[None, :] == unique_k[:, None]) | (abs_ky.flatten()[None, :] == unique_k[:, None])
-        ).reshape((-1, *abs_kx.shape))
+        ).reshape((n_k, *abs_kx.shape))
         local_spectrum = xp.einsum('kxy,ixyz->izk', masks, energy[indices])
 
         # assemble global spectrum from local spectra
-        k_all = self.xp.array(self.comm.allgather(unique_k))
-        unique_k_all = xp.unique(k_all)
-        spectra = self.xp.array(self.comm.allgather(local_spectrum))
+        k_all = self.comm.allgather(unique_k)
+        unique_k_all = []
+        for k in k_all:
+            unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
+        n_k_all = len(unique_k_all)
 
-        idx = xp.nonzero(k_all == unique_k_all)
-        task_idx = [idx[0][i * k_all.shape[1]] for i in range(k_all.shape[0])]
-        k_idx = [idx[1][i * k_all.shape[1] : (i + 1) * k_all.shape[1]] for i in range(k_all.shape[0])]
-        if xp.allclose(k_idx[0], k_idx):
-            spectrum = xp.sum(spectra[task_idx], axis=0)
-        else:
-            spectrum = self.xp.zeros(shape=(2, self.axes[2].N, len(unique_k_all)))
-            for i in range(k_all.shape[0]):
-                spectrum[..., k_idx[i]] += spectra[task_idx[i]]
+        spectra = self.comm.allgather(local_spectrum)
+        spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
+        for ks, _spectrum in zip(k_all, spectra, strict=True):
+            idx = xp.nonzero(ks == unique_k_all)[0]
+            spectrum[..., idx] += _spectrum
+        # k_all = self.xp.array(self.comm.allgather(unique_k))
+        # unique_k_all = xp.unique(k_all)
+        # spectra = self.xp.array(self.comm.allgather(local_spectrum))
+
+        # idx = xp.nonzero(k_all == unique_k_all)
+        # task_idx = [idx[0][i * k_all.shape[1]] for i in range(k_all.shape[0])]
+        # k_idx = [idx[1][i * k_all.shape[1] : (i + 1) * k_all.shape[1]] for i in range(k_all.shape[0])]
+        # if xp.allclose(k_idx[0], k_idx):
+        #     spectrum = xp.sum(spectra[task_idx], axis=0)
+        # else:
+        #     spectrum = self.xp.zeros(shape=(2, self.axes[2].N, len(unique_k_all)))
+        #     for i in range(k_all.shape[0]):
+        #         spectrum[..., k_idx[i]] += spectra[task_idx[i]]
 
         return xp.array(unique_k_all), spectrum
 
