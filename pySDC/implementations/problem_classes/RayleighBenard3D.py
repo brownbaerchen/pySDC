@@ -446,10 +446,8 @@ class RayleighBenard3D(GenericSpectralLinear):
         local_spectrum = xp.einsum('kxy,ixyz->izk', masks, energy[indices])
 
         # assemble global spectrum from local spectra
-        k_all = self.comm.allgather(unique_k)
-        unique_k_all = []
-        for k in k_all:
-            unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
+        k_all = self.xp.array(self.comm.allgather(unique_k))
+        unique_k_all = xp.unique(k_all)
         n_k_all = len(unique_k_all)
 
         spectra = self.comm.allgather(local_spectrum)
