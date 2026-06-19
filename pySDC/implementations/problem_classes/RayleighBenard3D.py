@@ -453,8 +453,6 @@ class RayleighBenard3D(GenericSpectralLinear):
         spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
         for ks, _spectrum in zip(k_all, spectra, strict=True):
             index_global = xp.nonzero(unique_k_all == ks)[0]
-            ks = list(ks)
-            unique_k_all = list(unique_k_all)
             spectrum[..., index_global] += _spectrum
 
         return xp.array(unique_k_all), spectrum
