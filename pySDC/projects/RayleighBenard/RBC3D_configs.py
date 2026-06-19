@@ -185,12 +185,12 @@ class RayleighBenard3DRegular(Config):
         time_rank = 0
         if 'comm' in description['sweeper_params'].keys():
             time_rank = description['sweeper_params']['comm'].rank
-        for i in range(MPI.COMM_WORLD.size):
-            if MPI.COMM_WORLD.rank == i:
-                print(
-                    f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space',
-                    flush=True,
-                )
+        # for i in range(MPI.COMM_WORLD.size):
+        #     if MPI.COMM_WORLD.rank == i:
+        #         print(
+        #             f'Global rank {MPI.COMM_WORLD.rank} is {time_rank} in time and {description["problem_params"]["comm"].rank} in space',
+        #             flush=True,
+        #         )
         MPI.COMM_WORLD.barrier()
 
 
@@ -465,7 +465,7 @@ class RBC3DG4R4RKRa1e7(RBC3DverificationRK):
 
 # --- Ra 1e8 ---
 class RBC3DG4R4SDC23Ra1e8(RBC3DM2K3):
-    Tend = 30
+    Tend = 60
     dt = 7e-4
     res = 256
     converged = 8
@@ -494,3 +494,36 @@ class RBC3DG4R4RKRa1e8(RBC3DverificationRK):
     res = 256
     converged = 8
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
+
+
+# --- Ra 1e9 ---
+class RBC3DG4R4SDC23Ra1e9(RBC3DM2K3):
+    Tend = 5
+    dt = 7e-4
+    res = 512
+    converged = 8
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e8, 'res': 256, 'dt': 0.0005}
+
+
+class RBC3DG4R4SDC44Ra1e9(RBC3DM4K4):
+    Tend = 5
+    dt = 5e-3
+    res = 512
+    converged = 8
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e8, 'res': 256, 'dt': 0.0005}
+
+
+class RBC3DG4R4EulerRa1e9(RBC3DverificationEuler):
+    Tend = 5
+    dt = 1e-4
+    res = 512
+    converged = 8
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e8, 'res': 256, 'dt': 0.0005}
+
+
+class RBC3DG4R4RKRa1e9(RBC3DverificationRK):
+    Tend = 5
+    dt = 4e-3
+    res = 512
+    converged = 8
+    ic_config = {'config': RBC3DG4R4SDC23Ra1e8, 'res': 256, 'dt': 0.0005}
