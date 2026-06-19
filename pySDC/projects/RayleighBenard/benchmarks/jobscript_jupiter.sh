@@ -6,7 +6,7 @@
 #SBATCH -e #ERROR_FILEPATH#
 #SBATCH -o #OUT_FILEPATH#
 #SBATCH --job-name=benchmark 
-#SBATCH -A jureap1
+#SBATCH -A jureap27
 #SBATCH --mail-user=t.baumann@fz-juelich.de
 #SBATCH --mail-type=BEGIN,END,FAIL
 
