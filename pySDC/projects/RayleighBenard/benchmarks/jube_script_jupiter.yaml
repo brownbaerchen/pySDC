@@ -32,7 +32,7 @@ parameterset:
     parameter:
       - {name: submit_cmd, "_": sbatch}
       - {name: job_file, "_": jobscript_jupiter.sh}
-      - {name: walltime, "_": "00:20:00"}
+      - {name: walltime, "_": "00:10:00"}
       - {name: ready_file, "_": ready}
       - {name: err_file, "_": stderr}
       - {name: out_file, "_": stdout}

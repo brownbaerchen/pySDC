@@ -1,4 +1,4 @@
-from pySDC.projects.GPU.configs.base_config import Config
+from pySDC.projects.GPU.configs.base_config import Config, LogStats
 
 
 def get_config(args):
@@ -71,6 +71,11 @@ class RayleighBenard3DRegular(Config):
 
         desc['convergence_controllers'][StepSizeSlopeLimiter] = {'dt_rel_min_slope': 0.1}
         desc['convergence_controllers'][StopAtNan] = {}
+        try:
+            desc['convergence_controllers'].pop(LogStats)
+        except KeyError:
+            pass
+        desc['convergence_controllers'][ClearStats] = {}
 
         desc['sweeper_params']['quad_type'] = 'RADAU-RIGHT'
         desc['sweeper_params']['num_nodes'] = 2
@@ -354,6 +359,19 @@ class RBC3DverificationEuler(RBC3DverificationRK):
         return desc
 
 
+class ClearStats(LogStats):
+
+    def post_step_processing(self, controller, S, **kwargs):
+        self.reset_stats(controller)
+
+    def post_run_processing(self, controller, S, **kwargs):
+
+        def return_stats():
+            return {}
+
+        controller.return_stats = return_stats
+
+
 # --- Ra 1e5 ---
 class RBC3DG4R4SDC22Ra1e5(RBC3DM2K2):
     Tend = 200
@@ -465,10 +483,10 @@ class RBC3DG4R4RKRa1e7(RBC3DverificationRK):
 
 # --- Ra 1e8 ---
 class RBC3DG4R4SDC23Ra1e8(RBC3DM2K3):
-    Tend = 60
+    Tend = 70
     dt = 7e-4
     res = 256
-    converged = 8
+    converged = 16
     ic_config = {'config': RBC3DG4R4SDC23Ra1e7, 'res': 128, 'dt': 0.005}
 
 
