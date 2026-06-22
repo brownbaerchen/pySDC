@@ -127,12 +127,11 @@ class RayleighBenard3D(GenericSpectralLinear):
         self.X, self.Y, self.Z = self.get_grid()
         self.Kx, self.Ky, self.Kz = self.get_wavenumbers()
 
-        if skip_setup:
-            return
-
         # construct 3D matrices
         Dzz = self.get_differentiation_matrix(axes=(2,), p=2)
+        self.eliminate_zeros(Dzz)
         Dz = self.get_differentiation_matrix(axes=(2,))
+        self.eliminate_zeros(Dz)
         Dy = self.get_differentiation_matrix(axes=(1,))
         Dyy = self.get_differentiation_matrix(axes=(1,), p=2)
         Dx = self.get_differentiation_matrix(axes=(0,))
@@ -140,15 +139,13 @@ class RayleighBenard3D(GenericSpectralLinear):
         Id = self.get_Id()
 
         S1 = self.get_basis_change_matrix(p_out=0, p_in=1)
+        self.eliminate_zeros(S1)
         S2 = self.get_basis_change_matrix(p_out=0, p_in=2)
+        self.eliminate_zeros(S2)
 
         U01 = self.get_basis_change_matrix(p_in=0, p_out=1)
         U12 = self.get_basis_change_matrix(p_in=1, p_out=2)
         U02 = self.get_basis_change_matrix(p_in=0, p_out=2)
-        self.eliminate_zeros(S1)
-        self.eliminate_zeros(S2)
-        self.eliminate_zeros(Dz)
-        self.eliminate_zeros(Dzz)
 
         self.Dx = Dx
         self.Dxx = Dxx
@@ -163,6 +160,9 @@ class RayleighBenard3D(GenericSpectralLinear):
         Ra = Rayleigh / (max([abs(BCs['T_top'] - BCs['T_bottom']), np.finfo(float).eps]) * self.axes[2].L ** 3)
         self.kappa = (Ra * Prandtl) ** (-1 / 2.0)
         self.nu = (Ra / Prandtl) ** (-1 / 2.0)
+
+        if skip_setup:
+            return
 
         # construct operators
         _D = U02 @ (Dxx + Dyy) + Dzz
