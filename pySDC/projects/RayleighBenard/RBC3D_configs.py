@@ -519,7 +519,7 @@ class RBC3DG4R4SDC23Ra1e9(RBC3DM2K3):
     Tend = 3
     dt = 7e-4
     res = 512
-    converged = 8
+    converged = 10
     ic_config = {'config': RBC3DG4R4SDC23Ra1e8, 'res': 256, 'dt': 0.0005}
 
 

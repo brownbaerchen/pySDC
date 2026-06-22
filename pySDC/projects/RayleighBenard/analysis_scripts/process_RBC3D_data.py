@@ -231,12 +231,12 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
             'Nu': Nu,
             'avg_Nu': avg_Nu,
             'std_Nu': std_Nu,
-            'z': P.axes[-1].get_1dgrid(),
+            'z': z,
             'k': k,
             'spectrum': spectrum_all,
             'avg_spectrum': avg_spectrum,
-            'boundary_layer_thickness': boundary_layer,
-            'res_in_boundary_layer': res_in_boundary_layer,
+            'boundary_layer_thickness': int(boundary_layer),
+            'res_in_boundary_layer': int(res_in_boundary_layer),
         }
         for key, values in avg_profiles.items():
             write_data[f'profile_{key}'] = values
