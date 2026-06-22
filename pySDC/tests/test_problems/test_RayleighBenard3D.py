@@ -358,7 +358,7 @@ def test_spectrum_computation(mpi_ranks):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
     N = 8
-    prob = RayleighBenard3D(nx=N, ny=N, nz=2, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
+    prob = RayleighBenard3D(nx=N, ny=N, nz=2, dealiasing=1.0, spectral_space=False, Rayleigh=1.0, skip_setup=True)
     xp = prob.xp
     iu, iv = prob.index(['u', 'v'])
 

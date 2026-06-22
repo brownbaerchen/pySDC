@@ -9,13 +9,16 @@ import pickle
 import os
 
 from datetime import datetime
+
 LOGGING = True
 comm_world = MPI.COMM_WORLD
+
 
 def _print(*args):
     global LOGGING
     if comm_world.rank == 0 and LOGGING:
         print(f'{datetime.now().replace(microsecond=0)}:', *args, flush=True)
+
 
 def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, config=None):
     # prepare problem instance
@@ -33,6 +36,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
             'comm': comm,
             'Dirichlet_recombination': False,
             'left_preconditioner': False,
+            'skip_setup': True,
         }
     )
     _print('Finished problem setup')
