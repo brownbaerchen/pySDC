@@ -430,51 +430,14 @@ class RayleighBenard3D(GenericSpectralLinear):
                     -2,
                 ),
             )
-        from mpi4py_fft.distarray import DistArray
-
-        N = (self.ncomponents,) + tuple(axis.N for axis in self.axes)
-        # me = DistArray(N).astype(u_hat.dtype) * 0
-        # me = me.redistribute(0)
-        # me = me.redistribute(1)
-        # me[...] = u_hat
-        # # u_hat.redistribute(out=me)
-        # me = me.redistribute(1)
-        # me = me.redistribute(2)
-        # u_hat = me
-        # print(me)
-        if self.comm.rank == 0:
-            N = (self.ncomponents,) + tuple(axis.N for axis in self.axes)
-            distributed = [0 if u_hat.shape[i] < N[i] else 1 for i in range(len(N))]
-            print('Starting, get', distributed, flush=True)
-            # breakpoint()
-        for i in range(2):
-            u_hat = u_hat.redistribute(3 - i - 1)
-            if self.comm.rank == 0:
-                N = (self.ncomponents,) + tuple(axis.N for axis in self.axes)
-                distributed = [0 if u_hat.shape[j] < N[j] else 1 for j in range(len(N))]
-                print(f'Aligning along {3-i-1}, get', distributed)
-        # exit()
-        # u_hat = u_hat.redistribute(2)
-        # # u_hat = self.spectral.redistribute(u_hat, axis=2, forward_output=True)
-        # print(self.comm.rank, 1, u_hat.shape)
-        # u_hat = u_hat.redistribute(1)
-        # print(self.comm.rank, 0, u_hat.shape)
-        assert np.allclose(
-            u_hat.shape[:3], (self.ncomponents, self.axes[0].N, self.axes[1].N)
-        ), f'Got unexpected shape {u_hat.shape[:3]} instead of {(self.ncomponents, self.axes[0].N, self.axes[1].N) }'
+        u_hat = self.spectral.redistribute(u_hat, axis=2, forward_output=False)
 
         # compute "energy density" as absolute square of the velocity modes
         energy = (u_hat[indices] * xp.conjugate(u_hat[indices])).real / (self.axes[0].N ** 2 * self.axes[1].N ** 2)
 
         # prepare wave numbers at which to compute the spectrum
-        Kx = self.Kx[:, :, 0]
-        Kx = self.xp.hstack(self.comm.allgather(Kx))
-        Ky = self.Ky[:, :, 0]
-        Ky = self.xp.hstack(self.comm.allgather(Ky))
-        # abs_kx = xp.abs(self.Kx[:, :, 0])
-        # abs_ky = xp.abs(self.Ky[:, :, 0])
-        abs_kx = xp.abs(Kx)
-        abs_ky = xp.abs(Ky)
+        abs_kx = xp.abs(self.Kx[:, :, 0])
+        abs_ky = xp.abs(self.Ky[:, :, 0])
 
         unique_k = xp.unique(xp.append(xp.unique(abs_kx), xp.unique(abs_ky)))
         n_k = len(unique_k)
@@ -483,44 +446,21 @@ class RayleighBenard3D(GenericSpectralLinear):
         masks = (
             (abs_kx.flatten()[None, :] == unique_k[:, None]) | (abs_ky.flatten()[None, :] == unique_k[:, None])
         ).reshape((n_k, *abs_kx.shape))
-        # print(self.comm.rank, masks.shape, energy.shape, abs_kx.shape, abs_ky.shape, Kx.shape,)
         local_spectrum = xp.einsum('kxy,ixyz->izk', masks, energy[indices])
 
         # assemble global spectrum from local spectra
-        # k_all = self.comm.allgather(unique_k)
-        # unique_k_all = []
-        # for k in k_all:
-        #     unique_k_all = xp.unique(xp.append(unique_k_all, xp.unique(k)))
-        # unique_k_all = list(unique_k_all)
-        # n_k_all = len(unique_k_all)
+        k_all = self.comm.allgather(unique_k)
+        unique_k_all = xp.unique(self.xp.concatenate(k_all))
+        n_k_all = len(unique_k_all)
 
-        # spectra = self.comm.allgather(local_spectrum)
-        # spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
-        # for ks, _spectrum in zip(k_all, spectra, strict=True):
-        #     ks = list(ks)
-        #     for k in ks:
-        #         index_global = unique_k_all.index(k)
-        #         index_local = ks.index(k)
-        #         spectrum[..., index_global] += _spectrum[..., index_local]
+        spectra = self.comm.allgather(local_spectrum)
+        spectrum = self.xp.zeros(shape=(2, self.axes[2].N, n_k_all))
+        for ks, _spectrum in zip(k_all, spectra, strict=True):
+            start_idx = np.nonzero(unique_k_all == ks.min())[0][0]
+            stop_idx = start_idx + len(ks)
+            spectrum[..., start_idx:stop_idx] += _spectrum
 
-        spectra = self.xp.concatenate(self.comm.allgather(local_spectrum), axis=1)
-
-        return unique_k, spectra
-        # k_all = self.xp.vstack(self.comm.allgather(unique_k))
-        # unique_k_all = xp.unique(k_all)
-        # # spectra = self.xp.array(self.comm.allgather(local_spectrum))
-
-        # idx = xp.nonzero(k_all == unique_k_all)
-        # task_idx = [idx[0][i * k_all.shape[1]] for i in range(k_all.shape[0])]
-        # k_idx = [idx[1][i * k_all.shape[1] : (i + 1) * k_all.shape[1]] for i in range(k_all.shape[0])]
-        # if xp.allclose(k_idx[0], k_idx):
-        #     spectrum = xp.sum(spectra[task_idx], axis=0)
-        # else:
-        #     spectrum = self.xp.zeros(shape=(2, self.axes[2].N, len(unique_k_all)))
-        #     for i in range(k_all.shape[0]):
-        #         spectrum[..., k_idx[i]] += spectra[task_idx[i]]
-
-        # return xp.array(unique_k_all), spectrum
+        return xp.array(unique_k_all), spectrum
 
     def get_vertical_profiles(self, u, components):
         if self.spectral_space:
