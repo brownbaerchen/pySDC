@@ -516,7 +516,7 @@ class RBC3DG4R4RKRa1e8(RBC3DverificationRK):
 
 # --- Ra 1e9 ---
 class RBC3DG4R4SDC23Ra1e9(RBC3DM2K3):
-    Tend = 5
+    Tend = 3
     dt = 7e-4
     res = 512
     converged = 8
@@ -524,7 +524,7 @@ class RBC3DG4R4SDC23Ra1e9(RBC3DM2K3):
 
 
 class RBC3DG4R4SDC44Ra1e9(RBC3DM4K4):
-    Tend = 5
+    Tend = 3
     dt = 5e-3
     res = 512
     converged = 8
@@ -532,7 +532,7 @@ class RBC3DG4R4SDC44Ra1e9(RBC3DM4K4):
 
 
 class RBC3DG4R4EulerRa1e9(RBC3DverificationEuler):
-    Tend = 5
+    Tend = 3
     dt = 1e-4
     res = 512
     converged = 8
@@ -540,7 +540,7 @@ class RBC3DG4R4EulerRa1e9(RBC3DverificationEuler):
 
 
 class RBC3DG4R4RKRa1e9(RBC3DverificationRK):
-    Tend = 5
+    Tend = 3
     dt = 4e-3
     res = 512
     converged = 8
