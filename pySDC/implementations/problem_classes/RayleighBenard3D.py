@@ -426,9 +426,64 @@ class RayleighBenard3D(GenericSpectralLinear):
                     -2,
                 ),
             )
-        u_hat = self.spectral.redistribute(u_hat, axis=2, forward_output=True)
-        u_hat = u_hat.redistribute(1)
-        assert np.allclose(u_hat.shape[:3], (self.ncomponents, self.axes[0].N, self.axes[1].N))
+        """
+                ... import numpy as np
+        ... from mpi4py import MPI
+        ... from mpi4py_fft.pencil import Subcomm, Pencil
+        ... comm = MPI.COMM_WORLD
+        ... N = (8, 8, 8, 8)
+        ... subcomms = Subcomm(comm, [0, 0, 1, 0])
+        ... axis = 2
+        ... p0 = Pencil(subcomms, N, axis)
+        ... p1 = p0.pencil(0)
+        ... transfer = p0.transfer(p1, float)
+        ... a0 = np.zeros(p0.subshape, dtype=float)
+        ... a1 = np.zeros(p1.subshape)
+        ... a0[:] = np.random.random(a0.shape)
+        ... transfer.forward(a0, a1)
+        ... s0 = comm.reduce(np.sum(a0**2))
+        ... s1 = comm.reduce(np.sum(a1**2))
+        ... if comm.Get_rank() == 0:
+        ...     assert np.allclose(s0, s1)''')
+        """
+        # from mpi4py_fft.pencil import Subcomm, Pencil, Transfer
+        # comm = self.comm
+        # N = (self.ncomponents,) + tuple(axis.N for axis in self.axes)
+        # distributed = [0 if u_hat.shape[i] < N[i] else 1 for i in range(len(N))]
+        # target_distribution = [1, 1, 1, 0]
+        # subcomms = Subcomm(comm, distributed)
+        # axis = distributed.index(1)
+        # p0 = Pencil(subcomms, N, axis)
+        # p1 = p0.pencil(distributed.index(0))
+
+        # # subcomms1 = Subcomm(comm, target_distribution)
+        # # p1 = Pencil(subcomms, N, 2)
+        # transfer = p0.transfer(p1, float)
+
+        # transfer = Transfer(comm = self.comm, shape=N, subshapeA=(5, 6, 3, 2), axisA=0, subshapeB=(5, 6, 6, 1), axisB=1, dtype=complex)
+        # me = self.xp.empty(transfer.subshapeB, dtype=transfer.dtype)
+        # transfer.forward(u_hat, me)
+
+        # print(N, subcomms, distributed)
+
+        # a = np.ones((2, 3))
+        # b = np.ones((3, 2))
+        # c = self.comm.alltoall(a)
+        # # me = self.comm.alltoall(u_hat)
+        # if self.comm.rank == 0:
+        #     breakpoint()
+        for i in range(3):
+            u_hat = u_hat.redistribute(3 - i - 1)
+            if self.comm.rank == 0:
+                N = (self.ncomponents,) + tuple(axis.N for axis in self.axes)
+                distributed = [0 if u_hat.shape[i] < N[i] else 1 for i in range(len(N))]
+                print(f'Aligning along {3-i-1}, get', distributed)
+        # u_hat = u_hat.redistribute(2)
+        # # u_hat = self.spectral.redistribute(u_hat, axis=2, forward_output=True)
+        # print(self.comm.rank, 1, u_hat.shape)
+        # u_hat = u_hat.redistribute(1)
+        # print(self.comm.rank, 0, u_hat.shape)
+        # assert np.allclose(u_hat.shape[:3], (self.ncomponents, self.axes[0].N, self.axes[1].N)), f'Got unexpected shape {u_hat.shape[:3]} instead of {(self.ncomponents, self.axes[0].N, self.axes[1].N) }'
 
         # compute "energy density" as absolute square of the velocity modes
         energy = (u_hat[indices] * xp.conjugate(u_hat[indices])).real / (self.axes[0].N ** 2 * self.axes[1].N ** 2)
