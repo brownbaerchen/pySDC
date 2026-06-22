@@ -353,11 +353,11 @@ def test_Nusselt_number_computation(c, N=6):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.mpi(ranks=[1, 2, 5])
+@pytest.mark.mpi(ranks=[1, 2, 4])
 def test_spectrum_computation(mpi_ranks):
     from pySDC.implementations.problem_classes.RayleighBenard3D import RayleighBenard3D
 
-    N = 5
+    N = 8
     prob = RayleighBenard3D(nx=N, ny=N, nz=2, dealiasing=1.0, spectral_space=False, Rayleigh=1.0)
     xp = prob.xp
     iu, iv = prob.index(['u', 'v'])
@@ -426,5 +426,5 @@ if __name__ == '__main__':
     # test_banded_matrix(False)
     # test_heterogeneous_implementation()
     # test_Nusselt_number_computation(N=6, c=3)
-    test_vertical_profiles()
-    # test_spectrum_computation(None)
+    # test_vertical_profiles()
+    test_spectrum_computation(None)
