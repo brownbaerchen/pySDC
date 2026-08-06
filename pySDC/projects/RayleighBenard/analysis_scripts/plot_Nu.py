@@ -1,9 +1,33 @@
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import json
 from scipy import integrate
 from pySDC.projects.RayleighBenard.analysis_scripts.process_RBC3D_data import get_pySDC_data
-from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import figsize, savefig
+from pySDC.projects.RayleighBenard.analysis_scripts.plotting_utils import figsize, savefig, get_plotting_style
+
+
+def get_path_to_Nu_deviation_times():
+    path = __file__
+    return f'{path[::-1][path[::-1].index('/'):][::-1]}../data/processed/Nu_deviation_times.json'
+
+
+def write_deviation_time(config_name, dt, time):
+    path = get_path_to_Nu_deviation_times()
+
+    try:
+        with open(path, 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        data = {}
+
+    if config_name not in data.keys():
+        data[config_name] = {}
+
+    data[config_name][dt] = time
+
+    with open(path, 'w') as file:
+        json.dump(data, file, indent=4)
 
 
 def interpolate_NuV_to_reference_times(data, reference_data, order=12):
@@ -38,6 +62,7 @@ def plot_Nu(res, dts, config_name, ref, ax, title, converged_from=0, **plotting_
         last_line = ax.get_lines()[-1]
         if any(error > 1e-2):
             deviates = min(t_i[error > 1e-2])
+            write_deviation_time(config_name, dt, deviates)
             ax.axvline(deviates, color=last_line.get_color(), ls=':')
             print(f'{title} dt={dt:.4f} Nu={Nu_mean:.3f}+={Nu_std:.3f}, deviates more than 1% from t={deviates:.2f}')
         else:
@@ -71,12 +96,32 @@ def plot_Nu_over_time_Ra1e6():  # pragma: no cover
     res = 64
     converged_from = 25
 
-    ref_data = get_pySDC_data(res=res, dt=0.002, config_name='RBC3DG4R4SDC34Ra1e6')
+    ref_data = get_pySDC_data(res=res, dt=0.002, config_name='RBC3DG4R4SDC44Ra1e6')
 
     plot_Nu(res, [0.02, 0.01], 'RBC3DG4R4SDC44Ra1e6', ref_data, Nu_axs[0], 'SDC44', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4SDC23Ra1e6', ref_data, Nu_axs[1], 'SDC23', converged_from)
     plot_Nu(res, [0.01, 0.005, 0.002], 'RBC3DG4R4RKRa1e6', ref_data, Nu_axs[2], 'RK443', converged_from)
     plot_Nu(res, [0.005, 0.002], 'RBC3DG4R4EulerRa1e6', ref_data, Nu_axs[3], 'RK111', converged_from)
+
+    Nu_axs[-1].set_xlabel('$t$')
+    Nu_axs[-1].set_ylabel('$Nu$')
+
+    Nu_fig.tight_layout()
+    Nu_fig.savefig('./plots/Nu_over_time_Ra1e6.pdf', bbox_inches='tight')
+
+
+def plot_Nu_over_time_Ra1e7():  # pragma: no cover
+    Nu_fig, Nu_axs = plt.subplots(4, 1, sharex=True, sharey=True, figsize=figsize(scale=1, ratio=1.4))
+
+    res = 128
+    converged_from = 25
+
+    ref_data = get_pySDC_data(res=res, dt=0.004, config_name='RBC3DG4R4SDC44Ra1e7')
+
+    plot_Nu(res, [0.005], 'RBC3DG4R4SDC44Ra1e7', ref_data, Nu_axs[0], 'SDC44', converged_from)
+    plot_Nu(res, [0.005, 0.004], 'RBC3DG4R4SDC23Ra1e7', ref_data, Nu_axs[1], 'SDC23', converged_from)
+    plot_Nu(res, [0.004], 'RBC3DG4R4RKRa1e7', ref_data, Nu_axs[2], 'RK443', converged_from)
+    plot_Nu(res, [0.001], 'RBC3DG4R4EulerRa1e7', ref_data, Nu_axs[3], 'RK111', converged_from)
 
     Nu_axs[-1].set_xlabel('$t$')
     Nu_axs[-1].set_ylabel('$Nu$')
@@ -155,11 +200,90 @@ def plot_Nusselt_Ra1e5_same_dt():  # pragma: no cover
     savefig(fig, 'NuRa1e5SameDt', pad_inches=0.1)
 
 
+def plot_deviation_times():  # pragma: no cover
+    fig, axs = plt.subplots(2, 2, figsize=figsize(scale=1.0, ratio=1.0))
+
+    Ras = ['1e5', '1e6', '1e7', '1e8']
+    configs = ['SDC44', 'SDC23', 'RK', 'Euler']
+
+    path = get_path_to_Nu_deviation_times()
+    try:
+        with open(path, 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        raise Exception('Please run the scripts for generating Nu deviation data first')
+
+    for Ra, ax in zip(Ras, axs.flatten(), strict=True):
+        for config in configs:
+            config_name = f'RBC3DG4R4{config}Ra{Ra}'
+
+            deviation_times = data[config_name]
+            plotting_args = get_plotting_style(config_name)
+            plotting_args.pop('markersize')
+            ax.scatter(
+                [float(me) for me in deviation_times.keys()],
+                [float(me) for me in deviation_times.values()],
+                **plotting_args,
+            )
+
+        ax.legend(frameon=True)
+        ax.set_title(fr'$Ra = 10^{{{Ra[2:]}}}$')
+        ax.set_xlabel(r'$\Delta t$')
+        ax.set_ylabel(r'$T_\mathrm{deviation}$')
+
+    fig.tight_layout()
+    savefig(fig, 'Nu_deviation_times')
+
+
+def plot_stability_limits():  # pragma: no cover
+    fig, axs = plt.subplots(1, 4, figsize=figsize(scale=1, ratio=0.47))
+
+    Ras = ['1e5', '1e6', '1e7', '1e8']
+    configs = ['SDC44', 'SDC23', 'RK', 'Euler'][::-1]
+
+    path = get_path_to_Nu_deviation_times()
+    try:
+        with open(path, 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        raise Exception('Please run the scripts for generating Nu deviation data first')
+
+    for Ra, ax in zip(Ras, axs.flatten(), strict=True):
+        stability_lims = {}
+        colors = {}
+        labels = {}
+        for config in configs:
+            config_name = f'RBC3DG4R4{config}Ra{Ra}'
+            deviation_times = data[config_name]
+            stability_lims[config] = max(float(me) for me in deviation_times.keys())
+            colors[config] = get_plotting_style(config_name)['color']
+            labels[config] = get_plotting_style(config_name)['label']
+            ax.ticklabel_format(axis="y", style="sci", scilimits=(0, 0), useMathText=True)
+
+        ax.bar(
+            [labels[key] for key in stability_lims.keys()],
+            [me for me in stability_lims.values()],
+            color=[colors[key] for key in stability_lims.keys()],
+        )
+        # ax.set_box_aspect(1)
+        ax.tick_params(axis='x', labelrotation=90)
+
+        ax.set_title(fr'$Ra = 10^{{{Ra[2:]}}}$')
+        ax.set_ylabel(r'$\Delta t_\mathrm{stable}$')
+
+    fig.tight_layout()
+    savefig(fig, 'stability_limits_bar_plot')
+
+
 if __name__ == '__main__':
 
     # plot_Nu_over_time_Ra1e5()
     # plot_Nu_over_time_Ra1e6()
+    # plot_Nu_over_time_Ra1e7()
+    # plot_Nu_over_time_Ra1e8()
     # plot_Nusselt_Ra1e5_same_dt()
-    plot_Nu_over_time_Ra1e9()
+    # plot_Nu_over_time_Ra1e9()
+    plot_deviation_times()
+    plot_stability_limits()
 
     plt.show()

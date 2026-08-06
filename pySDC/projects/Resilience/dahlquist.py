@@ -328,5 +328,5 @@ if __name__ == '__main__':
     custom_description = None
     stats, controller, Tend = run_dahlquist(custom_description=custom_description)
     plot_stability(stats, iter=[1, 2, 3])
-    plot_contraction(stats, iter=[0, 4])
+    # plot_contraction(stats, iter=[0, 4])
     plt.show()
