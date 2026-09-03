@@ -8,6 +8,17 @@ on:
   schedule:
     - cron: '1 5 * * 1'
 
+# Pushing to a branch with an open PR fires both `push` and `pull_request`
+# for the same commit, doubling the ~80-job matrix. Cancel the older,
+# now-stale run instead of letting both run to completion. `head_ref` is
+# only set on pull_request events (the PR's source branch); `ref_name` is
+# the plain branch name on push events (unlike `ref`, which carries a
+# `refs/heads/` prefix that would never match `head_ref`) - so both events
+# for the same branch land in the same group.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
 
   lint:
@@ -19,9 +30,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v1
+        uses: actions/checkout@v7
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: ${{ env.YML }}
           create-args: >-
@@ -37,6 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
         env: ['base', 'fenics', 'mpi4py', 'petsc', 'pytorch']
         python: ['3.10', '3.11', '3.12', '3.13']
@@ -45,9 +57,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: "etc/environment-${{ matrix.env }}.yml"
           create-args: >-
@@ -69,7 +81,7 @@ jobs:
           coverage combine
           mv .coverage coverage_${{ matrix.env }}.dat
       - name: Uploading artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.python == '3.13'
         with:
           name: test-artifacts-cpu-${{ matrix.env }}
@@ -81,8 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 8
       matrix:
-        env: 
+        env:
           - AllenCahn_Bayreuth
           - AsympConv
           - DAE
@@ -105,9 +118,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: "pySDC/projects/${{ matrix.env }}/environment.yml"
       - name: Install additional packages as needed
@@ -124,7 +137,7 @@ jobs:
           coverage combine
           mv .coverage coverage_${{ matrix.env }}.dat
       - name: Uploading artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifacts-project-${{ matrix.env }}
           path: |
@@ -142,7 +155,7 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install pySDC and pytest
         run: |
           source /pySDC/pySDC/projects/compression/Docker/install_pySDC.sh
@@ -161,7 +174,7 @@ jobs:
           coverage combine
           mv .coverage coverage_libpressio.dat
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifacts-libpressio
           path: |
@@ -185,11 +198,11 @@ jobs:
         # (https://github.com/actions/runner/issues/863)
         run: echo "HOME=/home/firedrake" >> "$GITHUB_ENV"
       - name: Checkout pySDC
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with: 
           path: ./pySDC
       - name: Checkout gusto
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: firedrakeproject/gusto
           path: ./gusto_repo
@@ -226,7 +239,7 @@ jobs:
           coverage combine
           mv .coverage ../coverage_firedrake.dat
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifacts-firedrake
           path: |
@@ -240,9 +253,9 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: "pySDC/projects/Monodomain/etc/environment-monodomain.yml"
           create-args: >-
@@ -267,7 +280,7 @@ jobs:
           coverage combine
           mv .coverage coverage_monodomain.dat
       - name: Uploading artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-artifacts-monodomain
           path: |
@@ -286,13 +299,13 @@ jobs:
         shell: bash -l {0}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Install Conda environment with Micromamba
-        uses: mamba-org/setup-micromamba@v1
+        uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: "etc/environment-postprocess.yml"
       - name: Download all coverage artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: .
           pattern: test-artifacts-*
@@ -305,6 +318,11 @@ jobs:
           python -m coverage report
       - name: Post coverage comment on PR
         uses: py-cov-action/python-coverage-comment-action@v3
+        # Non-blocking: this only posts an informational PR comment, not a
+        # correctness signal, and has been observed to fail on a transient
+        # GitHub API 504 unrelated to this workflow (see PR #659). Don't
+        # fail the whole PR's CI status over a comment.
+        continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ github.token }}
           MINIMUM_GREEN: 70
