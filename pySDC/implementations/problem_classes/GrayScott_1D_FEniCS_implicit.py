@@ -4,7 +4,6 @@ import random
 import dolfin as df
 import numpy as np
 
-from pySDC.core.errors import ParameterError
 from pySDC.core.problem import Problem
 from pySDC.implementations.datatype_classes.fenics_mesh import fenics_mesh
 
@@ -12,10 +11,12 @@ from pySDC.implementations.datatype_classes.fenics_mesh import fenics_mesh
 # noinspection PyUnusedLocal
 class fenics_grayscott(Problem):
     r"""
+    1D Gray-Scott reaction-diffusion system with FEniCS finite elements, fully implicit with FEniCS' Newton solver.
+
     The Gray-Scott system [1]_ describes a reaction-diffusion process of two substances :math:`u` and :math:`v`,
     where they diffuse over time. During the reaction :math:`u` is used up with overall decay rate :math:`B`,
     whereas :math:`v` is produced with feed rate :math:`A`. :math:`D_u,\, D_v` are the diffusion rates for
-    :math:`u,\, v`. This process is described by the one-dimensional model using Dirichlet boundary conditions
+    :math:`u,\, v`. This process is described by the one-dimensional model with homogeneous Neumann boundary conditions
 
     .. math::
         \frac{\partial u}{\partial t} = D_u \Delta u - u v^2 + A (1 - u),
@@ -32,7 +33,8 @@ class fenics_grayscott(Problem):
     .. math::
         \int_\Omega v_t q\,dx = \int_\Omega D_v \Delta v q + u v^2 q - B u q\,dx,
 
-    The spatial solve of the weak formulation is realized by ``FEniCS`` [2]_.
+    The Laplacians are integrated by parts, and no Dirichlet conditions are imposed, so the boundary terms drop out and
+    the boundaries are zero-flux. The spatial solve of the weak formulation is realized by ``FEniCS`` [2]_.
 
     Parameters
     ----------
@@ -46,9 +48,10 @@ class fenics_grayscott(Problem):
         of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [3]_.
     order : int, optional
         Defines the order of the elements in the function space.
-    refinements : list or tuple, optional
-        Defines the refinement for the spatial grid. Needs to be a list or tuple, e.g.
-        ``refinements=[2, 2]`` or ``refinements=(2, 2)``.
+    refinements : int, optional
+        How many times the mesh of ``c_nvars`` cells is refined uniformly, halving the cell size each time:
+        ``refinements=2`` gives ``4 * c_nvars`` cells. For a multilevel hierarchy, pass one value per level in the
+        description, e.g. ``[1, 0]``, which the controller splits across the levels. The default is ``0``.
     Du : float, optional
         Diffusion rate for :math:`u`.
     Dv: float, optional
@@ -57,6 +60,14 @@ class fenics_grayscott(Problem):
         Feed rate for :math:`v`.
     B : float, optional
         Overall decay rate for :math:`u`.
+    newton_tol : float, optional
+        Absolute tolerance of the node-local Newton solve. It has to be tighter than the SDC residual
+        tolerance, otherwise the node-local solve, not the SDC iteration, sets the accuracy floor.
+    newton_rtol : float, optional
+        Relative tolerance of the node-local Newton solve. Dolfin stops on whichever bar is met first,
+        so this one has to be lowered alongside ``newton_tol`` to actually tighten the solve.
+    newton_maxiter : int, optional
+        Maximum number of node-local Newton iterations.
 
     Attributes
     ----------
@@ -90,18 +101,29 @@ class fenics_grayscott(Problem):
     dtype_u = fenics_mesh
     dtype_f = fenics_mesh
 
-    def __init__(self, c_nvars=256, t0=0.0, family='CG', order=4, refinements=None, Du=1.0, Dv=0.01, A=0.09, B=0.086):
+    def __init__(
+        self,
+        c_nvars=256,
+        t0=0.0,
+        family='CG',
+        order=4,
+        refinements=0,
+        Du=1.0,
+        Dv=0.01,
+        A=0.09,
+        B=0.086,
+        newton_tol=1e-9,
+        newton_rtol=1e-8,
+        newton_maxiter=100,
+    ):
         """Initialization routine"""
 
-        if refinements is None:
-            refinements = [1, 0]
-
-        # define the Dirichlet boundary
-        def Boundary(x, on_boundary):
-            return on_boundary
-
         # set logger level for FFC and dolfin
-        df.set_log_level(df.WARNING)
+        warning_level = getattr(df, 'WARNING', None)
+        if warning_level is None and hasattr(df, 'LogLevel'):
+            warning_level = df.LogLevel.WARNING
+        if warning_level is not None:
+            df.set_log_level(warning_level)
         logging.getLogger('FFC').setLevel(logging.WARNING)
 
         # set solver and form parameters
@@ -113,14 +135,17 @@ class fenics_grayscott(Problem):
         for _ in range(refinements):
             mesh = df.refine(mesh)
 
-        # define function space for future reference
-        V = df.FunctionSpace(mesh, family, order)
-        self.V = V * V
+        # define mixed function space for future reference. `V * V` was removed in DOLFIN 2019.1,
+        # so the mixed space is built from a MixedElement instead.
+        element = df.FiniteElement(family, mesh.ufl_cell(), order)
+        self.V = df.FunctionSpace(mesh, df.MixedElement([element, element]))
 
-        # invoke super init, passing number of dofs
-        super(fenics_grayscott).__init__(V)
+        super().__init__(self.V)
         self._makeAttributeAndRegister(
             'c_nvars', 't0', 'family', 'order', 'refinements', 'Du', 'Dv', 'A', 'B', localVars=locals(), readOnly=True
+        )
+        self._makeAttributeAndRegister(
+            'newton_tol', 'newton_rtol', 'newton_maxiter', localVars=locals(), readOnly=False
         )
         # rhs in weak form
         self.w = df.Function(self.V)
@@ -147,6 +172,28 @@ class fenics_grayscott(Problem):
         a_M = u2 * q2 * df.dx
         M2 = df.assemble(a_M)
         self.M = M1 + M2
+
+    def apply_mass_matrix(self, u):
+        r"""
+        Apply the mass matrix, :math:`M \vec{u}`.
+
+        Required by the mass-matrix sweepers and transfers; ``Problem`` has no default.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+
+        Returns
+        -------
+        me : dtype_u
+            The product :math:`M \vec{u}`.
+        """
+
+        me = self.dtype_u(self.V)
+        self.M.mult(u.values.vector(), me.values.vector())
+
+        return me
 
     def __invert_mass_matrix(self, u):
         r"""
@@ -211,9 +258,9 @@ class fenics_grayscott(Problem):
         solver = df.NonlinearVariationalSolver(problem)
 
         prm = solver.parameters
-        prm['newton_solver']['absolute_tolerance'] = 1e-09
-        prm['newton_solver']['relative_tolerance'] = 1e-08
-        prm['newton_solver']['maximum_iterations'] = 100
+        prm['newton_solver']['absolute_tolerance'] = self.newton_tol
+        prm['newton_solver']['relative_tolerance'] = self.newton_rtol
+        prm['newton_solver']['maximum_iterations'] = self.newton_maxiter
         prm['newton_solver']['relaxation_parameter'] = 1.0
 
         solver.solve()
@@ -263,11 +310,12 @@ class fenics_grayscott(Problem):
             Exact solution (only at :math:`t_0 = 0.0`).
         """
 
-        class InitialConditions(df.Expression):
-            def __init__(self):
-                # fixme: why do we need this?
+        # subclassing df.Expression was removed in DOLFIN 2018.1; UserExpression is the
+        # replacement and requires the base initialiser to run.
+        class InitialConditions(df.UserExpression):
+            def __init__(self, **kwargs):
                 random.seed(2)
-                pass
+                super().__init__(**kwargs)
 
             def eval(self, values, x):
                 values[0] = 1 - 0.5 * np.power(np.sin(np.pi * x[0] / 100), 100)
@@ -278,9 +326,94 @@ class fenics_grayscott(Problem):
 
         assert t == 0, 'ERROR: u_exact only valid for t=0'
 
-        uinit = InitialConditions()
+        uinit = InitialConditions(degree=self.order)
 
         me = self.dtype_u(self.V)
         me.values = df.interpolate(uinit, self.V)
 
         return me
+
+
+class fenics_grayscott_mass(fenics_grayscott):
+    r"""
+    Gray-Scott in mass-matrix form, :math:`M \vec{u}' = F(\vec{u})`, with no mass inversion.
+
+    ``eval_f`` returns the assembled weak-form residual (a load vector) rather than
+    :math:`M^{-1} F`, and ``solve_system`` takes an rhs that is already in the dual space. Use
+    with :class:`generic_implicit_mass` and, for MLSDC, :class:`base_transfer_mass`.
+
+    The Newton loop is written out rather than handed to ``NonlinearVariationalSolver`` because
+    the rhs is a vector, not a form, so it cannot be folded into the variational problem.
+    """
+
+    def eval_f(self, u, t):
+        r"""
+        Evaluate the right-hand side in weak (dual) form, without inverting the mass matrix.
+
+        Parameters
+        ----------
+        u : dtype_u
+            Current values of the numerical solution.
+        t : float
+            Current time.
+
+        Returns
+        -------
+        f : dtype_f
+            The assembled load vector :math:`F(\vec{u})`.
+        """
+
+        f = self.dtype_f(self.V)
+        self.w.assign(u.values)
+        f.values = df.Function(self.V, df.assemble(self.F))
+
+        return f
+
+    def solve_system(self, rhs, factor, u0, t):
+        r"""
+        Solve :math:`M \vec{u} - factor \cdot F(\vec{u}) = \vec{rhs}` by Newton, rhs already dual.
+
+        Parameters
+        ----------
+        rhs : dtype_f
+            Right-hand side, in the dual space.
+        factor : float
+            Node-to-node stepsize.
+        u0 : dtype_u
+            Initial guess (unused; the loop starts from zero, matching the mass-inverse variant so
+            that the two are directly comparable).
+        t : float
+            Current time.
+
+        Returns
+        -------
+        sol : dtype_u
+            Solution.
+        """
+
+        sol = self.dtype_u(self.V)
+        self.w.assign(sol.values)
+
+        du = df.TrialFunction(self.V)
+        Jform = df.derivative(self.F, self.w, du)
+
+        res = df.Function(self.V)
+        delta = df.Function(self.V)
+        res0 = None
+
+        for _ in range(self.newton_maxiter):
+            self.M.mult(self.w.vector(), res.vector())
+            res.vector().axpy(-factor, df.assemble(self.F))
+            res.vector().axpy(-1.0, rhs.values.vector())
+
+            norm = res.vector().norm('l2')
+            res0 = norm if res0 is None else res0
+            if norm < self.newton_tol or norm < self.newton_rtol * res0:
+                break
+
+            df.solve(self.M - factor * df.assemble(Jform), delta.vector(), res.vector())
+            self.w.vector().axpy(-1.0, delta.vector())
+
+        sol.values.assign(self.w)
+
+        return sol

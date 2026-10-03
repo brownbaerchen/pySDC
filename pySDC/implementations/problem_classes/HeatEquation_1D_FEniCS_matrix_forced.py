@@ -10,6 +10,8 @@ from pySDC.implementations.datatype_classes.fenics_mesh import fenics_mesh, rhs_
 # noinspection PyUnusedLocal
 class fenics_heat(Problem):
     r"""
+    Forced 1D heat equation with FEniCS and Dirichlet BCs, IMEX, with the mass matrix inverted in the right-hand side.
+
     Example implementing the forced one-dimensional heat equation with Dirichlet boundary conditions
 
     .. math::
@@ -30,7 +32,7 @@ class fenics_heat(Problem):
     .. math::
         u(x, t) = \sin(\pi x)\cos(t) + c.
 
-    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [1]_. Hence, the problem
+    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [#]_. Hence, the problem
     is reformulated to the *weak formulation*
 
     .. math:
@@ -48,15 +50,15 @@ class fenics_heat(Problem):
     family : str, optional
         Indicates the family of elements used to create the function space
         for the trail and test functions. The default is ``'CG'``, which are the class
-        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [2]_.
+        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [#]_.
     order : int, optional
         Defines the order of the elements in the function space.
     refinements : int, optional
         Denotes the refinement of the mesh. ``refinements=2`` refines the mesh by factor :math:`2`.
     nu : float, optional
         Diffusion coefficient :math:`\nu`.
-    c: float, optional
-        Constant for the Dirichlet boundary condition :math: `c`
+    c : float, optional
+        Constant for the Dirichlet boundary condition :math:`c`.
 
     Attributes
     ----------
@@ -73,9 +75,9 @@ class fenics_heat(Problem):
 
     References
     ----------
-    .. [1] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
+    .. [#] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
         C. Richardson, J. Ring, M. E. Rognes, G. N. Wells. Archive of Numerical Software (2015).
-    .. [2] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
+    .. [#] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
         Wells and others. Springer (2012).
     """
 
@@ -167,6 +169,68 @@ class fenics_heat(Problem):
         df.solve(T, u.values.vector(), b.values.vector())
 
         return u
+
+    def eval_f_increment(self, base, delta, t):
+        """
+        Evaluate the right-hand side increment.
+
+        Parameters
+        ----------
+        base : dtype_u
+            The base state, unused: the implicit part is linear.
+        delta : dtype_u
+            The correction.
+        t : float
+            Physical time, accepted for interface compatibility.
+
+        Returns
+        -------
+        dtype_f
+            The increment, with a zero explicit part.
+        """
+        increment = self.eval_f(delta, t)
+        increment.expl = self.dtype_u(self.V, val=0.0)
+        return increment
+
+    def solve_system_delta(self, r, factor, base, f_base, t):
+        r"""
+        Solve :math:`\delta - factor\,[f(w+\delta) - f(w)] = r`, i.e.
+        :math:`(M - factor\,K)\,\delta = M r` with **zero** boundary data.
+
+        This is the piece ``linear_implicit=True`` cannot supply on this backend. That shortcut
+        reuses the stock ``solve_system``, which applies *inhomogeneous* Dirichlet data to whatever
+        right-hand side it is handed, and a correction must carry zero boundary data. Applying
+        ``bc_hom`` instead is the whole difference.
+
+        Without this the sweeper falls back to the substitution :math:`y = w + \delta`, which is
+        exact but reads the level's :math:`\mathcal{O}(1)` state. That is merely no benefit while
+        the level is at backend precision, and is a wrong answer once it is not -- measured here as
+        1.4e-05 with the coarse level at ``float32``.
+
+        Parameters
+        ----------
+        r : dtype_u
+            Right-hand side of the correction equation.
+        factor : float
+            Implicit prefactor assembled by the sweeper.
+        base : dtype_u
+            Base state, unused: the implicit operator is linear.
+        f_base : dtype_f
+            ``f`` evaluated at ``base``, unused for the same reason.
+        t : float
+            Physical time, accepted for interface compatibility.
+
+        Returns
+        -------
+        dtype_u
+            The correction.
+        """
+        b = self.apply_mass_matrix(r)
+        delta = self.dtype_u(self.V, val=0.0)
+        system = self.M - factor * self.K
+        self.bc_hom.apply(system, b.values.vector())
+        df.solve(system, delta.values.vector(), b.values.vector())
+        return delta
 
     def __eval_fexpl(self, u, t):
         """
@@ -303,6 +367,8 @@ class fenics_heat(Problem):
 # noinspection PyUnusedLocal
 class fenics_heat_mass(fenics_heat):
     r"""
+    Forced 1D heat equation with FEniCS and Dirichlet BCs, IMEX, with the mass matrix applied instead of inverted.
+
     Example implementing the forced one-dimensional heat equation with Dirichlet boundary conditions
 
     .. math::
@@ -323,7 +389,7 @@ class fenics_heat_mass(fenics_heat):
     .. math::
         u(x, t) = \sin(\pi x)\cos(t) + c.
 
-    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [1]_. Hence, the problem
+    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [#]_. Hence, the problem
     is reformulated to the *weak formulation*
 
     .. math:
@@ -341,13 +407,15 @@ class fenics_heat_mass(fenics_heat):
     family : str, optional
         Indicates the family of elements used to create the function space
         for the trail and test functions. The default is ``'CG'``, which are the class
-        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [2]_.
+        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [#]_.
     order : int, optional
         Defines the order of the elements in the function space.
     refinements : int, optional
         Denotes the refinement of the mesh. ``refinements=2`` refines the mesh by factor :math:`2`.
     nu : float, optional
         Diffusion coefficient :math:`\nu`.
+    c : float, optional
+        Constant for the Dirichlet boundary condition :math:`c`.
 
     Attributes
     ----------
@@ -368,9 +436,9 @@ class fenics_heat_mass(fenics_heat):
 
     References
     ----------
-    .. [1] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
+    .. [#] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
         C. Richardson, J. Ring, M. E. Rognes, G. N. Wells. Archive of Numerical Software (2015).
-    .. [2] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
+    .. [#] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
         Wells and others. Springer (2012).
     """
 
@@ -455,6 +523,8 @@ class fenics_heat_mass(fenics_heat):
 # noinspection PyUnusedLocal
 class fenics_heat_mass_timebc(fenics_heat_mass):
     r"""
+    Forced 1D heat equation with FEniCS, IMEX with the mass matrix applied, and time-dependent Dirichlet BCs.
+
     Example implementing the forced one-dimensional heat equation with time-dependent Dirichlet boundary conditions
 
     .. math::
@@ -475,7 +545,7 @@ class fenics_heat_mass_timebc(fenics_heat_mass):
     .. math::
         u(x, t) = \cos(\pi x)\cos(t) + c.
 
-    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [1]_. Hence, the problem
+    In this class the problem is implemented in the way that the spatial part is solved using ``FEniCS`` [#]_. Hence, the problem
     is reformulated to the *weak formulation*
 
     .. math:
@@ -493,13 +563,15 @@ class fenics_heat_mass_timebc(fenics_heat_mass):
     family : str, optional
         Indicates the family of elements used to create the function space
         for the trail and test functions. The default is ``'CG'``, which are the class
-        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [2]_.
+        of Continuous Galerkin, a *synonym* for the Lagrange family of elements, see [#]_.
     order : int, optional
         Defines the order of the elements in the function space.
     refinements : int, optional
         Denotes the refinement of the mesh. ``refinements=2`` refines the mesh by factor :math:`2`.
     nu : float, optional
         Diffusion coefficient :math:`\nu`.
+    c : float, optional
+        Constant :math:`c` added to the exact solution and hence to the time-dependent Dirichlet boundary condition.
 
     Attributes
     ----------
@@ -520,9 +592,9 @@ class fenics_heat_mass_timebc(fenics_heat_mass):
 
     References
     ----------
-    .. [1] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
+    .. [#] The FEniCS Project Version 1.5. M. S. Alnaes, J. Blechta, J. Hake, A. Johansson, B. Kehlet, A. Logg,
         C. Richardson, J. Ring, M. E. Rognes, G. N. Wells. Archive of Numerical Software (2015).
-    .. [2] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
+    .. [#] Automated Solution of Differential Equations by the Finite Element Method. A. Logg, K.-A. Mardal, G. N.
         Wells and others. Springer (2012).
     """
 

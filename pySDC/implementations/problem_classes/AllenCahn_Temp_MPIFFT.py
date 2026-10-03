@@ -1,53 +1,65 @@
 import numpy as np
-from mpi4py_fft import PFFT
+from pySDC.helpers.fft_helper import PFFT
 
 from pySDC.core.errors import ProblemError
-from pySDC.core.problem import Problem
+from pySDC.core.problem import Problem, WorkCounter
 from pySDC.implementations.datatype_classes.mesh import mesh, imex_mesh
 
+from mpi4py import MPI
 from mpi4py_fft import newDistArray
 
 
 class allencahn_temp_imex(Problem):
     r"""
-    This class implements the :math:`N`-dimensional Allen-Cahn equation with periodic boundary conditions :math:`u \in [0, 1]^2`
+    Periodic Allen-Cahn equation coupled to a temperature equation, mpi4py-fft FFTs, IMEX with both Laplacians implicit.
+
+    This class implements the :math:`N`-dimensional Allen-Cahn equation with periodic boundary conditions, with the two
+    phases at :math:`u = 0` and :math:`u = 1`
 
     .. math::
-        \frac{\partial u}{\partial t} = D \Delta u - \frac{2}{\varepsilon^2} u (1 - u) (1 - 2u)
-            - 6 d_w \frac{u - T_M}{T_M}u (1 - u)
+        \frac{\partial u}{\partial t} = \Delta u - \frac{2}{\varepsilon^2} u (1 - u) (1 - 2u)
+            - 6 d_w \frac{T - T_M}{T_M}u (1 - u),
 
-    on a spatial domain :math:`[-\frac{L}{2}, \frac{L}{2}]^2`, with driving force :math:`d_w`, and :math:`N=2,3`. :math:`D` and
+    .. math::
+        \frac{\partial T}{\partial t} = D \Delta T + \frac{\partial u}{\partial t}
+
+    for the phase field :math:`u` and the temperature :math:`T` on a spatial domain
+    :math:`[-\frac{L}{2}, \frac{L}{2}]^N`, with driving force :math:`d_w`, and :math:`N=2,3`. :math:`D` and
     :math:`T_M` are fixed parameters. Different initial conditions can be used, for example, circles of the form
 
     .. math::
-        u({\bf x}, 0) = \tanh\left(\frac{r - \sqrt{(x_i-0.5)^2 + (y_j-0.5)^2}}{\sqrt{2}\varepsilon}\right),
+        u({\bf x}, 0) = \frac{1}{2}\left(1 + \tanh\left(\frac{r - \sqrt{x_i^2 + y_j^2}}
+        {\sqrt{2}\varepsilon}\right)\right),
 
     for :math:`i, j=0,..,N-1`, where :math:`N` is the number of spatial grid points. For time-stepping, the problem is treated
-    *semi-implicitly*, i.e., the nonlinear system is solved by Fast-Fourier Tranform (FFT) and the linear parts in the right-hand
-    side will be treated explicitly using ``mpi4py-fft`` [1]_ to solve them.
+    *semi-implicitly*, i.e., the diffusion of both components is treated implicitly and solved by Fast Fourier Transform
+    (FFT) using ``mpi4py-fft`` [1]_, and the reaction terms are treated explicitly.
 
-    Attributes
+    Parameters
     ----------
-    nvars : List of int tuples, optional
-        Number of unknowns in the problem, e.g. ``nvars=[(128, 128), (64, 64)]``.
+    nvars : tuple of int, optional
+        Number of unknowns in each spatial direction, e.g. ``nvars=(128, 128)``. Has to be a tuple of at least two
+        entries.
     eps : float, optional
-        Scaling parameter :math:`\varepsilon`.
+        Scaling parameter :math:`\varepsilon`. For ``eps <= 0``, the reaction terms are dropped.
     radius : float, optional
-        Radius of the circles.
+        Radius of the circle for ``init_type='circle'``.
     spectral : bool, optional
-        Indicates if spectral initial condition is used.
+        If True, the solution is computed in spectral space.
     TM : float, optional
-        Problem parameter :math:`T_M`.
+        Reference temperature :math:`T_M` of the driving force, which vanishes where the temperature equals :math:`T_M`.
     D : float, optional
-        Problem parameter :math:`D`.
+        Diffusion coefficient :math:`D` of the temperature, the second component of the solution. The phase field
+        :math:`u` diffuses with coefficient one, and its right-hand side is the source of the temperature equation.
     dw : float, optional
-        Driving force.
+        Driving force :math:`d_w`.
     L : float, optional
-        Denotes the period of the function to be approximated for the Fourier transform.
+        Length of the periodic domain :math:`[-L/2, L/2]` in each direction.
     init_type : str, optional
-        Initialises type of initial state.
-    comm : bool, optional
-        Communicator.
+        Initial condition of the phase field, either ``'circle'`` or ``'circle_rand'`` (``int(L)**2`` circles with
+        random radii, 2D only). The temperature starts at one in both cases.
+    comm : MPI.Intracomm, optional
+        Communicator for ``mpi4py-fft``.
 
     Attributes
     ----------
@@ -75,18 +87,18 @@ class allencahn_temp_imex(Problem):
         nvars=None,
         eps=0.04,
         radius=0.25,
-        spectral=None,
+        spectral=False,
         TM=1.0,
         D=10.0,
         dw=0.0,
         L=1.0,
         init_type='circle',
-        comm=None,
+        comm=MPI.COMM_WORLD,
     ):
         """Initialization routine"""
 
         if nvars is None:
-            nvars = [(128, 128)]
+            nvars = (128, 128)
 
         if not (isinstance(nvars, tuple) and len(nvars) > 1):
             raise ProblemError('Need at least two dimensions')
@@ -126,7 +138,7 @@ class allencahn_temp_imex(Problem):
         X = list(np.ogrid[self.fft.local_slice(False)])
         N = self.fft.global_shape()
         for i in range(len(N)):
-            X[i] = X[i] * L[i] / N[i]
+            X[i] = X[i] * L[i] / N[i] - L[i] / 2.0
         self.X = [np.broadcast_to(x, self.fft.shape(False)) for x in X]
 
         # get local wavenumbers and Laplace operator
@@ -146,6 +158,8 @@ class allencahn_temp_imex(Problem):
         # Need this for diagnostics
         self.dx = self.L / nvars[0]
         self.dy = self.L / nvars[1]
+
+        self.work_counters['rhs'] = WorkCounter()
 
     def eval_f(self, u, t):
         """
@@ -196,6 +210,7 @@ class allencahn_temp_imex(Problem):
             f.impl[..., 1] = self.fft.backward(lap_u_hat, f.impl[..., 1])
             f.expl[..., 1] = f.impl[..., 0] + f.expl[..., 0]
 
+        self.work_counters['rhs']()
         return f
 
     def solve_system(self, rhs, factor, u0, t):
@@ -252,7 +267,7 @@ class allencahn_temp_imex(Problem):
 
         def circle():
             tmp_me = newDistArray(self.fft, self.spectral)
-            r2 = (self.X[0] - 0.5) ** 2 + (self.X[1] - 0.5) ** 2
+            r2 = self.X[0] ** 2 + self.X[1] ** 2
             if self.spectral:
                 tmp = 0.5 * (1.0 + np.tanh((self.radius - np.sqrt(r2)) / (np.sqrt(2) * self.eps)))
                 tmp_me[:] = self.fft.forward(tmp)
@@ -275,7 +290,7 @@ class allencahn_temp_imex(Problem):
                 for i in range(0, L):
                     for j in range(0, L):
                         # build radius
-                        r2 = (self.X[0] + i - L + 0.5) ** 2 + (self.X[1] + j - L + 0.5) ** 2
+                        r2 = (self.X[0] + i - L / 2 + 0.5) ** 2 + (self.X[1] + j - L / 2 + 0.5) ** 2
                         # add this blob, shifted by 1 to avoid issues with adding up negative contributions
                         tmp += np.tanh((rand_radii[i, j] - np.sqrt(r2)) / (np.sqrt(2) * self.eps)) + 1
             # normalize to [0,1]

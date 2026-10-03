@@ -171,33 +171,15 @@ def run_problem(
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('num_procs', [1, 4, 3])
+@pytest.mark.parallel([1, 3, 4])
 @pytest.mark.parametrize('spread_from_first_restarted', [0, 1])
-def test_SpreadStepSizesMPI(num_procs, spread_from_first_restarted):
-    import os
-    import subprocess
+def test_SpreadStepSizesMPI(spread_from_first_restarted):
+    from mpi4py import MPI
 
-    kwargs = {}
-    kwargs['useMPI'] = 1
-    kwargs['num_procs'] = num_procs
-    kwargs['spread_from_first_restarted'] = spread_from_first_restarted
-    kwargs['test'] = 1
-
-    # Set python path once
-    my_env = os.environ.copy()
-    my_env['PYTHONPATH'] = '../../..:.'
-    my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
-
-    # run code with different number of MPI processes
-    kwargs_str = "".join([f"{key}:{item} " for key, item in kwargs.items()])
-    cmd = f"mpirun -np {num_procs} python {__file__} {kwargs_str}".split()
-
-    p = subprocess.Popen(cmd, env=my_env, cwd=".")
-
-    p.wait()
-    assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
-        p.returncode,
-        num_procs,
+    spread_step_sizes_single_test(
+        useMPI=1,
+        num_procs=MPI.COMM_WORLD.size,
+        spread_from_first_restarted=spread_from_first_restarted,
     )
 
 
@@ -306,33 +288,15 @@ def spread_step_sizes_single_test(**kwargs):
 
 
 @pytest.mark.mpi4py
-@pytest.mark.parametrize('num_procs', [1, 4, 3])
+@pytest.mark.parallel([1, 3, 4])
 @pytest.mark.parametrize('restart_from_first_step', [0, 1])
-def test_basic_restarting_MPI(num_procs, restart_from_first_step):
-    import os
-    import subprocess
+def test_basic_restarting_MPI(restart_from_first_step):
+    from mpi4py import MPI
 
-    kwargs = {}
-    kwargs['useMPI'] = 1
-    kwargs['num_procs'] = num_procs
-    kwargs['restart_from_first_step'] = restart_from_first_step
-    kwargs['test'] = 0
-
-    # Set python path once
-    my_env = os.environ.copy()
-    my_env['PYTHONPATH'] = '../../..:.'
-    my_env['COVERAGE_PROCESS_START'] = 'pyproject.toml'
-
-    # run code with different number of MPI processes
-    kwargs_str = "".join([f"{key}:{item} " for key, item in kwargs.items()])
-    cmd = f"mpirun -np {num_procs} python {__file__} {kwargs_str}".split()
-
-    p = subprocess.Popen(cmd, env=my_env, cwd=".")
-
-    p.wait()
-    assert p.returncode == 0, 'ERROR: did not get return code 0, got %s with %2i processes' % (
-        p.returncode,
-        num_procs,
+    basic_restarting_single_test(
+        useMPI=1,
+        num_procs=MPI.COMM_WORLD.size,
+        restart_from_first_step=restart_from_first_step,
     )
 
 
@@ -417,17 +381,53 @@ def basic_restarting_single_test(**kwargs):
     ), f"Didn\'t get the restarts we expected! Got {times_restarted}, expected {expected_restarts}"
 
 
-def single_test(test, **kwargs):
-    if test == 0:
-        basic_restarting_single_test(**kwargs)
-    elif test == 1:
-        spread_step_sizes_single_test(**kwargs)
-    else:
-        raise NotImplementedError
+def max_restarts_single_test(crash_after_max_restarts, **kwargs):
+    """
+    With `restart_from_first_step`, a block may be restarted `max_restarts` times in a row, no matter which step asks.
+    Beyond that, we either move on or, if the first step asks for another restart, crash on all steps.
+    """
+    from pySDC.helpers.stats_helper import get_sorted
+    from pySDC.core.errors import ConvergenceError
+
+    # t=5 is the second or third step of its block, t=first the first one
+    first = 3.0 if kwargs['num_procs'] == 3 else 4.0
+    arguments = {
+        'restarts': [first if crash_after_max_restarts else 5.0] * 4,
+        'dt': 1.0,
+        'n_steps': 8,
+        'max_restarts': 2,
+        'restart_from_first_step': True,
+        'crash_after_max_restarts': crash_after_max_restarts,
+        **kwargs,
+    }
+
+    if crash_after_max_restarts:
+        with pytest.raises(ConvergenceError):
+            run_problem(**arguments)
+        return
+
+    stats = run_problem(**arguments)
+    comm = None
+    if arguments['useMPI']:
+        from mpi4py import MPI
+
+        comm = MPI.COMM_WORLD
+
+    restarts = [me for me in get_sorted(stats, type='restart', comm=comm) if me[1] and abs(me[0] - 5.0) < 1e-8]
+    assert len(restarts) == arguments['max_restarts'], f'Restarted t=5 {len(restarts)} times'
 
 
-if __name__ == "__main__":
-    import sys
+@pytest.mark.mpi4py
+@pytest.mark.parallel([3, 4])
+@pytest.mark.parametrize('crash_after_max_restarts', [0, 1])
+def test_max_restarts_MPI(crash_after_max_restarts):
+    from mpi4py import MPI
 
-    kwargs = {me.split(':')[0]: int(me.split(':')[1]) for me in sys.argv[1:]}
-    single_test(**kwargs)
+    max_restarts_single_test(crash_after_max_restarts, useMPI=True, num_procs=MPI.COMM_WORLD.size)
+
+
+@pytest.mark.base
+@pytest.mark.parametrize('num_procs', [3, 4])
+@pytest.mark.parametrize('crash_after_max_restarts', [False, True])
+def test_max_restarts_nonMPI(num_procs, crash_after_max_restarts):
+    max_restarts_single_test(crash_after_max_restarts, useMPI=False, num_procs=num_procs)

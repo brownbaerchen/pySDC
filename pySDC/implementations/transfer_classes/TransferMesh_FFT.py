@@ -1,4 +1,4 @@
-import numpy as np
+from scipy.signal import resample
 
 from pySDC.core.errors import TransferError
 from pySDC.core.space_transfer import SpaceTransfer
@@ -6,13 +6,12 @@ from pySDC.core.space_transfer import SpaceTransfer
 
 class mesh_to_mesh_fft(SpaceTransfer):
     """
-    Custom base_transfer class, implements Transfer.py
+    Space transfer between periodic 1d meshes: injection to restrict, Fourier interpolation to prolong.
 
     This implementation can restrict and prolong between 1d meshes with FFT for periodic boundaries
 
     Attributes:
-        irfft_object_fine: planned FFT for backward transformation, real-valued output
-        rfft_object_coarse: planned real-valued FFT for forward transformation
+        ratio (int): ratio of the fine to the coarse resolution
     """
 
     def __init__(self, fine_prob, coarse_prob, params):
@@ -57,12 +56,10 @@ class mesh_to_mesh_fft(SpaceTransfer):
         F = type(G)(self.fine_prob.init, val=0.0)
 
         def _prolong(coarse):
-            coarse_hat = np.fft.rfft(coarse)
-            fine_hat = np.zeros(self.fine_prob.init[0] // 2 + 1, dtype=np.complex128)
-            half_idx = self.coarse_prob.init[0] // 2
-            fine_hat[0:half_idx] = coarse_hat[0:half_idx]
-            fine_hat[-1] = coarse_hat[-1]
-            return np.fft.irfft(fine_hat) * self.ratio
+            # Fourier interpolation. `resample` also gets the normalisation and the splitting of the
+            # Nyquist mode right; zero-padding the spectrum by hand placed the coarse Nyquist mode at
+            # the *fine* Nyquist wavenumber, which is a different function entirely.
+            return resample(coarse, self.fine_prob.init[0])
 
         if type(G).__name__ == 'mesh':
             F[:] = _prolong(G)

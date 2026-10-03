@@ -5,6 +5,7 @@
 *sdc.txt
 *detail.txt
 data/*
+pySDC/projects/StroemungsRaum/data/
 step_*.png
 *.pkl
 *.swp
@@ -54,6 +55,9 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .coverage
+.coverage.*
+# what the CI legs hand to `coverage combine`; `modal run etc/modal_gpu_tests.py` writes one locally
+coverage_*.dat
 .cache
 nosetests.xml
 coverage.xml

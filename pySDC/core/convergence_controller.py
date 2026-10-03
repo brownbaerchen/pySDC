@@ -9,7 +9,15 @@ if TYPE_CHECKING:
 
 # short helper class to add params as attributes
 class Pars(FrozenClass):
+    """
+    Frozen parameters of a convergence controller as attributes, with defaults for `control_order` and `useMPI`.
+    """
+
     def __init__(self, params: Dict[str, Any]) -> None:
+        """
+        Args:
+            params (dict): Parameters to store as attributes, overriding the defaults
+        """
         self.control_order: int = 0  # integer that determines the order in which the convergence controllers are called
         self.useMPI: Optional[bool] = None  # depends on the controller
 
@@ -22,11 +30,16 @@ class Pars(FrozenClass):
 # short helper class to store status variables
 class Status(FrozenClass):
     """
+    Frozen container for named variables of a convergence controller.
     Initialize status variables with None, since at the time of instantiation of the convergence controllers, not all
     relevant information about the controller are known.
     """
 
     def __init__(self, status_variabes: List[str]) -> None:
+        """
+        Args:
+            status_variabes (list of str): Names of the status variables, all initialized to None
+        """
         [setattr(self, key, None) for key in status_variabes]
 
         self._freeze()
@@ -34,8 +47,7 @@ class Status(FrozenClass):
 
 class ConvergenceController(object):
     """
-    Base abstract class for convergence controller, which is plugged into the controller to determine the iteration
-    count and time step size.
+    Abstract base class for convergence controllers, which plug into the controller to steer iterations and step sizes.
     """
 
     def __init__(
@@ -125,9 +137,11 @@ class ConvergenceController(object):
         parameters by adding the convergence controller manually.
         This relies on children classes to return a composite dictionary from their defaults and from the result of this
         function, so you should write
-        ```
-        return {**defaults, **super().setup(controller, params, description, **kwargs)}
-        ```
+
+        .. code-block:: python
+
+            return {**defaults, **super().setup(controller, params, description, **kwargs)}
+
         when overloading this method in a child class, with `defaults` a dictionary containing default parameters.
 
         Args:
@@ -290,6 +304,35 @@ class ConvergenceController(object):
         """
         pass
 
+    def post_iteration_processing_block(self, controller: 'Controller', **kwargs: Any) -> None:
+        """
+        Do whatever you want to after each iteration, once for the whole block rather than once per step.
+
+        Use this instead of `post_iteration_processing` for state that belongs to the block rather than
+        to a step. A convergence controller is instantiated once per *controller*, so anything stored on
+        `self` spans a whole block in `controller_nonMPI` but a single rank under MPI, while the per-step
+        hooks fire once per step. A recursion driven from a per-step hook therefore advances a different
+        number of times depending only on how the run was decomposed. State that genuinely belongs to a
+        step should go on `S.status` via `add_status_variable_to_step` instead.
+
+        Note this fires once per iteration **per rank**, not once per block: under MPI every rank calls
+        it, so a quantity that has to agree across the block still needs a reduction in here. See
+        `AdaptiveAlpha` for how that looks.
+
+        Note also what that does *not* buy you. Under a pipelined method an early step converges and
+        drops out, so ranks take part in different numbers of iterations by design; a recursion driven
+        from here therefore still advances a different number of times on different ranks, and that is
+        the pipelining rather than a defect. Where every step iterates together -- ParaDiag, which
+        cannot converge one step at a time because the transform needs them all -- this is exact.
+
+        Args:
+            controller (pySDC.Controller): The controller
+
+        Returns:
+            None
+        """
+        pass
+
     def post_step_processing(self, controller: 'Controller', S: 'Step', **kwargs: Any) -> None:
         """
         Do whatever you want to after each step here.
@@ -351,6 +394,23 @@ class ConvergenceController(object):
         self.check_iteration_status(controller, S, **kwargs)
 
         return None
+
+    def communicate_convergence(self, controller: 'Controller', S: 'Step', **kwargs: Any) -> None:
+        """
+        Share convergence status across the block, however the block happens to be spread out.
+
+        Called once per step after every step has decided for itself, which is the only point at
+        which a reduction over the block is meaningful. `CheckConvergence` is the one that does
+        something here.
+
+        Args:
+            controller (pySDC.Controller): The controller
+            S (pySDC.Step): The current step
+
+        Returns:
+            None
+        """
+        pass
 
     def post_spread_processing(self, controller: 'Controller', S: 'Step', **kwargs: Any) -> None:
         """
@@ -439,9 +499,10 @@ class ConvergenceController(object):
         Args:
             comm (mpi4py.MPI.Intracomm): Communicator
             source (int): Where to look for receiving
+            buffer: Buffer to receive the data into
 
         Returns:
-            whatever has been received
+            None, the data is received into `buffer`
         """
         kwargs['tag'] = kwargs.get('tag', abs(self.params.control_order))
 
@@ -453,10 +514,20 @@ class ConvergenceController(object):
         return data
 
     def add_status_variable_to_step(self, key, value=None):
-        if type(self.controller).__name__ == 'controller_MPI':
-            steps = [self.controller.S]
-        else:
-            steps = self.controller.MS
+        """
+        Add a status variable to the steps of the controller and optionally set its value on all of them.
+
+        The variable is registered on the class of the step status, see `FrozenClass.add_attr`, so it exists on every
+        step.
+
+        Args:
+            key (str): Name of the status variable
+            value: Value to set on all steps, which is skipped if None
+
+        Returns:
+            None
+        """
+        steps = self.controller.steps
 
         steps[0].status.add_attr(key)
 
@@ -464,19 +535,36 @@ class ConvergenceController(object):
             self.set_step_status_variable(key, value)
 
     def set_step_status_variable(self, key, value):
-        if type(self.controller).__name__ == 'controller_MPI':
-            steps = [self.controller.S]
-        else:
-            steps = self.controller.MS
+        """
+        Set a status variable on all steps of the controller.
+
+        Args:
+            key (str): Name of the status variable, which must have been added already
+            value: Value to set
+
+        Returns:
+            None
+        """
+        steps = self.controller.steps
 
         for S in steps:
             S.status.__dict__[key] = value
 
     def add_status_variable_to_level(self, key, value=None):
-        if type(self.controller).__name__ == 'controller_MPI':
-            steps = [self.controller.S]
-        else:
-            steps = self.controller.MS
+        """
+        Add a status variable to the levels of the controller and optionally set its value on all of them.
+
+        The variable is registered on the class of the level status, see `FrozenClass.add_attr`, so it exists on every
+        level.
+
+        Args:
+            key (str): Name of the status variable
+            value: Value to set on all levels of all steps, which is skipped if None
+
+        Returns:
+            None
+        """
+        steps = self.controller.steps
 
         steps[0].levels[0].status.add_attr(key)
 
@@ -484,10 +572,17 @@ class ConvergenceController(object):
             self.set_level_status_variable(key, value)
 
     def set_level_status_variable(self, key, value):
-        if type(self.controller).__name__ == 'controller_MPI':
-            steps = [self.controller.S]
-        else:
-            steps = self.controller.MS
+        """
+        Set a status variable on all levels of all steps of the controller.
+
+        Args:
+            key (str): Name of the status variable, which must have been added already
+            value: Value to set
+
+        Returns:
+            None
+        """
+        steps = self.controller.steps
 
         for S in steps:
             for L in S.levels:

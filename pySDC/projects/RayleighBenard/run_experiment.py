@@ -40,12 +40,15 @@ def parse_args():
 
     return vars(parser.parse_args())
 
+
 from mpi4py import MPI
+
 comm_world = MPI.COMM_WORLD
+
+
 def _print(*args, **kwargs):
     if comm_world.rank == 0:
         print(*args, flush=True)
-
 
 
 def run_experiment(args, config, **kwargs):
@@ -53,6 +56,7 @@ def run_experiment(args, config, **kwargs):
     import pickle
     import os
 
+    from pySDC.implementations.controller_classes.controller_MPI import controller_MPI
     from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
     from pySDC.helpers.stats_helper import filter_stats
 
@@ -73,17 +77,19 @@ def run_experiment(args, config, **kwargs):
 
     _print(f'{datetime.now()} Setup parameters', flush=True)
     if args['useGPU']:
-        from pySDC.implementations.hooks.log_timings import GPUTimings
+        from pySDC.implementations.hooks.log_GPU_timings import GPUTimings
 
         controller_params['hook_class'].append(GPUTimings)
 
-    assert (
-        config.comms[0].size == 1
-    ), 'Have not figured out how to do MPI controller with GPUs yet because I need NCCL for that!'
-    controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
-    _print(f'{datetime.now()} Setup controller', flush=True)
-    prob = controller.MS[0].levels[0].prob
-    _print(f'{datetime.now()} Setup prblem', flush=True)
+    # Time-parallel runs need CUDA-aware MPI, which conda-forge's OpenMPI is built with and ships
+    # switched off: export `OMPI_MCA_opal_cuda_support=true` before launching. Without it the
+    # point-to-point calls in `controller_MPI` hand MPI a device pointer it will not read.
+    if config.comms[0].size > 1:
+        controller = controller_MPI(controller_params, description, config.comms[0])
+        prob = controller.S.levels[0].prob
+    else:
+        controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+        prob = controller.MS[0].levels[0].prob
 
     u0, t0 = config.get_initial_condition(prob, restart_idx=args['restart_idx'])
     _print(f'{datetime.now()} Got initial conditions', flush=True)

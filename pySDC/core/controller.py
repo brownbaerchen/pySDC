@@ -1,14 +1,15 @@
 import logging
 import os
 import sys
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type
 import numpy as np
 
 from pySDC.core.base_transfer import BaseTransfer
+from pySDC.core.errors import ControllerError
 from pySDC.helpers.pysdc_helper import FrozenClass
-from pySDC.implementations.convergence_controller_classes.check_convergence import CheckConvergence
-from pySDC.implementations.hooks.default_hook import DefaultHooks
-from pySDC.implementations.hooks.log_timings import CPUTimings
+from pySDC.core.check_convergence import CheckConvergence
+from pySDC.core.default_hook import DefaultHooks
+from pySDC.core.timings import CPUTimings
 
 
 # short helper class to add params as attributes
@@ -31,7 +32,7 @@ class _Pars(FrozenClass):
 
 class Controller(object):
     """
-    Base abstract controller class
+    Abstract base class of the controllers, which set up hooks and convergence controllers and run the steps in time.
     """
 
     def __init__(
@@ -42,6 +43,8 @@ class Controller(object):
 
         Args:
             controller_params (dict): parameter set for the controller and the steps
+            description (dict): description of the problem, sweeper, levels, ... passed to the steps
+            useMPI (bool): whether the controller communicates via MPI
         """
         self.useMPI: Optional[bool] = useMPI
         self.description: Dict[str, Any] = description
@@ -52,18 +55,27 @@ class Controller(object):
         user_hooks = controller_params.get('hook_class', [])
         hook_classes += user_hooks if type(user_hooks) == list else [user_hooks]
         [self.add_hook(hook) for hook in hook_classes]
-        controller_params['hook_class'] = hook_classes
 
         for hook in self.hooks:
             hook.pre_setup(step=None, level_number=None)
 
-        self.params: _Pars = _Pars(controller_params)
+        # the hooks go into the parameters, not into the caller's dictionary, where dump_setup would mark the
+        # defaults as user-defined and a controller reusing the dictionary would get them again
+        self.params: _Pars = _Pars({**controller_params, 'hook_class': hook_classes})
 
         self.__setup_custom_logger(self.params.logger_level, self.params.log_to_file, self.params.fname)
         self.logger: logging.Logger = logging.getLogger('controller')
 
-        if self.params.use_iteration_estimator and self.params.all_to_done:
-            self.logger.warning('all_to_done and use_iteration_estimator set, will ignore all_to_done')
+        if self.params.use_iteration_estimator:
+            raise ControllerError(
+                'The `use_iteration_estimator` controller parameter has been removed. Its only '
+                'implementation lived in `controller_MPI`, was never switched on anywhere, had no '
+                'tests, and deadlocked when used: every rank but the last posted a broadcast that '
+                'the last rank only matched if the estimate happened to fire. Use the '
+                '`CheckIterationEstimatorNonMPI` convergence controller instead, as '
+                '`pySDC/tutorial/step_8/C_iteration_estimator.py` does. Note it is, as its name '
+                'says, not yet available under MPI.'
+            )
 
         self.base_convergence_controllers: List[Type[Any]] = [CheckConvergence]
         self.setup_convergence_controllers(description)
@@ -147,6 +159,7 @@ class Controller(object):
             self.__hooks += [hook()]
 
     def welcome_message(self) -> None:
+        """Log the pySDC welcome banner at info level."""
         out = (
             "Welcome to the one and only, really very astonishing and 87.3% bug free"
             + "\n"
@@ -195,7 +208,7 @@ class Controller(object):
         out += '\nStep: %s\n' % step.__class__
         for k, v in sorted(vars(step.params).items()):
             if not k.startswith('_'):
-                if k in description['step_params']:
+                if k in description.get('step_params', {}):
                     out += '--> %s = %s\n' % (k, v)
                 else:
                     out += '    %s = %s\n' % (k, v)
@@ -216,8 +229,8 @@ class Controller(object):
                     out += '-->             %s = %s\n' % (k, v)
                 else:
                     out += '                %s = %s\n' % (k, v)
-            out += '-->             Data type u: %s\n' % L.prob.dtype_u
-            out += '-->             Data type f: %s\n' % L.prob.dtype_f
+            out += ' ->             Data type u: %s\n' % L.prob.dtype_u
+            out += ' ->             Data type f: %s\n' % L.prob.dtype_f
             out += '-->             Sweeper: %s\n' % L.sweep.__class__
             for k, v in sorted(vars(L.sweep.params).items()):
                 if not k.startswith('_'):
@@ -225,7 +238,7 @@ class Controller(object):
                         out += '-->                 %s = %s\n' % (k, v)
                     else:
                         out += '                    %s = %s\n' % (k, v)
-            out += '-->                 Collocation: %s\n' % L.sweep.coll.__class__
+            out += ' ->                 Collocation: %s\n' % L.sweep.coll.__class__
 
         if len(step.levels) > 1:
             if 'base_transfer_class' in description and description['base_transfer_class'] is not BaseTransfer:
@@ -276,6 +289,74 @@ class Controller(object):
             pySDC.Hooks.hooks: hooks
         """
         return self.__hooks
+
+    @property
+    def steps(self) -> List[Any]:
+        """
+        Getter for the steps this controller owns.
+
+        Controllers that hold the whole block expose them as `MS`; MPI controllers hold a single step
+        as `S`. Dispatch on which of those exists rather than on the class name, so that subclasses
+        keep working.
+
+        Returns:
+            list: the steps owned by this controller
+        """
+        return self.MS if hasattr(self, 'MS') else [self.S]
+
+    def check_variable_coefficients(self, num_procs: int) -> None:
+        """
+        Reject k-dependent QDelta coefficients outside plain SDC.
+
+        MIN-SR-FLEX and the Jumper variants vary QDelta with the sweep index, and the nilpotency
+        argument behind them is derived for SDC, where that index *is* the SDC iteration count.
+        Anything needing more iterations (PFASST) or fewer (MLSDC) breaks that identity and would
+        need its own analysis first.
+
+        They are also only refreshed by `Sweeper.updateVariableCoeffs`, which runs on the finest
+        level of the Jacobi sweep alone, so on a coarse level or on the Gauss-Seidel path they
+        silently degrade to a fixed preconditioner. Failing loudly beats either of those.
+
+        Note this gates parallelism across *steps* and the number of *levels*. Parallelism across
+        collocation nodes (`generic_implicit_MPI` and friends) is still SDC and stays allowed.
+
+        Args:
+            num_procs (int): number of parallel time steps
+
+        Raises:
+            ControllerError: if a k-dependent QDelta is combined with multiple levels or steps
+        """
+        S = self.steps[0]
+        if len(S.levels) == 1 and num_procs == 1:
+            return
+
+        for level in S.levels:
+            for name in ['genQI', 'genQE']:
+                generator = getattr(level.sweep, name, None)
+                if generator is not None and generator.isKDependent():
+                    raise ControllerError(
+                        f'{type(generator).__name__} varies QDelta with the sweep index and is only '
+                        f'verified for SDC, but you have {len(S.levels)} level(s) and {num_procs} '
+                        f'step(s). Use a preconditioner with fixed coefficients, e.g. MIN-SR-S or LU.'
+                    )
+
+    def step_is_active(self, time: float, block_start: float, Tend: float) -> bool:
+        """
+        Whether a step starting at `time`, in a block starting at `block_start`, still has work.
+
+        The default is that a step runs if it starts before the end of the interval, so a block
+        may be run partially. An algorithm that couples its steps too tightly to drop one of them
+        answers this from `block_start` instead and runs the block whole.
+
+        Args:
+            time (float): when this step starts
+            block_start (float): when the first step of this step's block starts
+            Tend (float): ending time
+
+        Returns:
+            bool: whether this step takes part
+        """
+        return time < Tend - 10 * np.finfo(float).eps
 
     def setup_convergence_controllers(self, description: Dict[str, Any]) -> None:
         '''
@@ -372,71 +453,3 @@ class Controller(object):
         for hook in self.hooks:
             stats = {**stats, **hook.return_stats()}
         return stats
-
-
-class ParaDiagController(Controller):
-
-    def __init__(
-        self,
-        controller_params: Dict[str, Any],
-        description: Dict[str, Any],
-        n_steps: int,
-        useMPI: Optional[bool] = None,
-    ) -> None:
-        """
-        Initialization routine for ParaDiag controllers
-
-        Args:
-           num_procs: number of parallel time steps (still serial, though), can be 1
-           controller_params: parameter set for the controller and the steps
-           description: all the parameters to set up the rest (levels, problems, transfer, ...)
-           n_steps (int): Number of parallel steps
-           alpha (float): alpha parameter for ParaDiag
-        """
-        from pySDC.implementations.sweeper_classes.ParaDiagSweepers import QDiagonalization
-
-        if QDiagonalization in description['sweeper_class'].__mro__:
-            description['sweeper_params']['ignore_ic'] = True
-            description['sweeper_params']['update_f_evals'] = False
-        else:
-            logging.getLogger('controller').warning(
-                f'Warning: Your sweeper class {description["sweeper_class"]} is not derived from {QDiagonalization}. You probably want to use another sweeper class.'
-            )
-
-        if controller_params.get('all_to_done', False):
-            raise NotImplementedError('ParaDiag only implemented with option `all_to_done=True`')
-        if 'alpha' not in controller_params.keys():
-            from pySDC.core.errors import ParameterError
-
-            raise ParameterError('Please supply alpha as a parameter to the ParaDiag controller!')
-        controller_params['average_jacobian'] = controller_params.get('average_jacobian', True)
-
-        controller_params['all_to_done'] = True
-        super().__init__(controller_params=controller_params, description=description, useMPI=useMPI)
-
-        self.n_steps: int = n_steps
-
-    def FFT_in_time(self, quantity: Any) -> None:
-        """
-        Compute weighted forward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
-
-        Note: The implementation via matrix-vector multiplication may be inefficient and less stable compared to an FFT
-              with transposes!
-        """
-        if not hasattr(self, '__FFT_matrix'):
-            from pySDC.helpers.ParaDiagHelper import get_weighted_FFT_matrix
-
-            self.__FFT_matrix = get_weighted_FFT_matrix(self.n_steps, self.params.alpha)
-
-        self.apply_matrix(self.__FFT_matrix, quantity)
-
-    def iFFT_in_time(self, quantity: Any) -> None:
-        """
-        Compute weighted backward FFT in time. The weighting is determined by the alpha parameter in ParaDiag
-        """
-        if not hasattr(self, '__iFFT_matrix'):
-            from pySDC.helpers.ParaDiagHelper import get_weighted_iFFT_matrix
-
-            self.__iFFT_matrix = get_weighted_iFFT_matrix(self.n_steps, self.params.alpha)
-
-        self.apply_matrix(self.__iFFT_matrix, quantity)

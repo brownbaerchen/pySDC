@@ -1,3 +1,31 @@
+# ---
+# jupyter:
+#   jupytext:
+#     formats: py:percent
+#   kernelspec:
+#     display_name: Python 3
+#     name: python3
+#   language_info:
+#     name: python
+# ---
+
+# %% [markdown]
+# # Part C: Time-parallel pySDC with space-parallel PETSc
+#
+# With rather unfavorable scaling properties, parallel-in-time methods are only really useful when spatial
+# parallelization is maxed out. To work with spatial parallelization, this part shows how to (1) include and work
+# with an external library and (2) set up space- and time-parallel runs. We use the forced heat equation again as our
+# testbed, and [PETSc](https://petsc.org/) for the space-parallel data structures and the linear solver. See
+# `implementations/datatype_classes/petsc_dmda_grid.py` and
+# `implementations/problem_classes/HeatEquation_2D_PETSc_forced.py` for the details of the PETSc bindings.
+#
+# ## Processes in space and in time
+#
+# The world communicator is split twice, by coloring: into space communicators of `num_procs_space` ranks each, which
+# go to the problem class, and across them into time communicators, which go to `controller_MPI`. With 4 ranks and
+# `num_procs_space = 2`, ranks 0 and 1 share space, as do ranks 2 and 3, and ranks 0 and 2 form one time communicator.
+
+# %%
 import sys
 from pathlib import Path
 
@@ -12,10 +40,15 @@ from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
 from pySDC.implementations.transfer_classes.TransferPETScDMDA import mesh_to_mesh_petsc_dmda
 
 
-def main():
+def main(num_procs_space=None, fname='step_7_C_out.txt'):
     """
     Program to demonstrate usage of PETSc data structures and spatial parallelization,
     combined with parallelization in time.
+
+    Args:
+        num_procs_space (int): number of ranks to give the space communicator. Defaults to the
+            first command line argument when run as a script, and to 1 otherwise.
+        fname (str): name of the output file written under ``data/``.
     """
     # set MPI communicator
     comm = MPI.COMM_WORLD
@@ -24,16 +57,16 @@ def main():
     world_size = comm.Get_size()
 
     # split world communicator to create space-communicators
-    if len(sys.argv) >= 2:
-        color = int(world_rank / int(sys.argv[1]))
+    if num_procs_space is not None:
+        color = int(world_rank / num_procs_space)
     else:
         color = int(world_rank / 1)
     space_comm = comm.Split(color=color)
     space_rank = space_comm.Get_rank()
 
     # split world communicator to create time-communicators
-    if len(sys.argv) >= 2:
-        color = int(world_rank % int(sys.argv[1]))
+    if num_procs_space is not None:
+        color = int(world_rank % num_procs_space)
     else:
         color = int(world_rank / world_size)
     time_comm = comm.Split(color=color)
@@ -112,10 +145,6 @@ def main():
 
     # limit output to space-rank 0 (as before when setting the logger level)
     if space_rank == 0:
-        if len(sys.argv) == 3:
-            fname = str(sys.argv[2])
-        else:
-            fname = 'step_7_C_out.txt'
         Path("data").mkdir(parents=True, exist_ok=True)
         f = open('data/' + fname, 'a+')
 
@@ -163,5 +192,53 @@ def main():
     time_comm.Free()
 
 
+# %% [markdown]
+# ## Running it
+#
+# With `mpirun`, giving the number of ranks in space and the output file, e.g. for 2 in time and 2 in space:
+#
+# ```bash
+# mpirun -np 4 python C_pySDC_with_PETSc.py 2 step_7_C_out_2x2.txt
+# ```
+
+# %%
 if __name__ == "__main__":
-    main()
+    # still runnable straight from the shell, as the tutorial text describes:
+    #   mpirun -np 4 python C_pySDC_with_PETSc.py 2 step_7_C_out_2x2.txt
+    main(
+        num_procs_space=int(sys.argv[1]) if len(sys.argv) >= 2 else None,
+        fname=sys.argv[2] if len(sys.argv) == 3 else 'step_7_C_out.txt',
+    )
+
+# %% [markdown]
+# ## Results
+#
+# PETSc does not run in the browser, nor in the environment this website is built in. Our CI runs this part three
+# times, in an environment with PETSc: with 1 and with 2 processes in space, and with 4 processes, 2 in time and 2 in
+# space. Do not expect scaling, due to the CI environment. These are the results of the run that built this page,
+# with 1 process:
+#
+# :::{literalinclude} /../../data/step_7_C_out_1x1.txt
+# :language: text
+# :::
+#
+# With 2 processes in space:
+#
+# :::{literalinclude} /../../data/step_7_C_out_1x2.txt
+# :language: text
+# :::
+#
+# And with 2 in time and 2 in space:
+#
+# :::{literalinclude} /../../data/step_7_C_out_2x2.txt
+# :language: text
+# :::
+#
+# The iterations and the error agree in all three: distributing the spatial problem over processes changes how it is
+# solved, not what, and running the steps in parallel does not change what PFASST computes. Only the time to solution
+# differs, and each time rank prints its own steps.
+#
+# :::{admonition} Important things to note
+# - We need processors in space and time, which can be achieved by `comm.Split` and coloring. The space communicator
+#   is then passed to the problem class.
+# :::

@@ -2,7 +2,7 @@ Allen-Cahn problems from Bayreuth
 =================================
 
 This project provides code for running, testing, benchmarking and playing with Allen-Cahn-type problems in material science.
-The setups come from `ParaPhase <http://paraphase.de>`_ partner `Bayreuth <https://www.metalle.uni-bayreuth.de>`_ and the codes should demonstrate correctness, parallelization and flexibility of the implementation with pySDC.
+The setups come from ParaPhase partner `Bayreuth <https://www.metalle.uni-bayreuth.de>`_ and the codes should demonstrate correctness, parallelization and flexibility of the implementation with pySDC.
 Many (possibly all) codes in this project need `mpi4py-fft <https://mpi4py-fft.readthedocs.io/en/latest/>`_ which can be installed via pip or conda.
 
 Verification
@@ -25,7 +25,7 @@ They run serial or parallel in space (although testing for the temperature setup
 Benchmark
 ---------
 
-The script ``run_simple_forcing_verification.py`` can be used to benchmark the code for simple driving forces on larger HPC machines.
+The script ``run_simple_forcing_benchmark.py`` can be used to benchmark the code for simple driving forces on larger HPC machines.
 It takes the number of processes in space as well as the setup type (as in the verification code) as input parameters.
 It can be run serial/parallel in space and/or time.
 
@@ -41,8 +41,6 @@ Further/related files
 
 The following files are also listed under this project:
 
-- ``AllenCahn_monitor_and_dump.py``: computes the radii for the verification problems and dumps the solution via MPI I/O
-- ``AllenCahn_monitor.py``: computes the radii for the verification problems
 - ``AllenCahn_dump.py``: dumps the solution via MPI I/O
 - ``visualize.py``: simple script to turn field data from the dump routines into pngs
 - ``visualize_temp.py``: simple script to turn field and temperature data from the dump routines into pngs and movies
@@ -50,6 +48,7 @@ The following files are also listed under this project:
 
 The project uses in particular these implementations from the ``implementations`` folder:
 
+- ``AllenCahn_monitor.py`` in the ``hooks``: computes the radii for the verification problems, shared with the other Allen-Cahn projects
 - ``mesh.py`` in the ``datatype_classes``: contains numpy-based data with a communicator
 - ``AllenCahn_MPIFFT.py`` in the ``problem_classes``: contains the implementation of the problem for simple forcing terms
 - ``AllenCahn_Temp_MPIFFT.py`` in the ``problem_classes``: contains the implementation of the problem for temperature-based forcing

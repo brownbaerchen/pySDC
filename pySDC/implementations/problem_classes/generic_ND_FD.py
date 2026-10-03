@@ -6,7 +6,7 @@ Created on Sat Feb 11 22:39:30 2023
 
 import numpy as np
 import scipy.sparse as sp
-from scipy.sparse.linalg import gmres, spsolve, cg
+import scipy.sparse.linalg as spla
 
 from pySDC.core.errors import ProblemError
 from pySDC.core.problem import Problem, WorkCounter
@@ -45,6 +45,12 @@ class GenericNDimFinDiff(Problem):
         Tolerance for spatial solver.
     liniter : int, optional
         Maximum number of iterations for linear solver.
+    dtype : dtype-like, optional
+        Precision the state is stored at. ``float64`` by default, which is what every caller got
+        before this existed. The operators follow at ``promote_types(dtype, float32)``, since SciPy
+        has no half-precision sparse matrix and hardware that stores half precision computes in
+        single anyway -- so ``float16`` here means genuinely half-precision *storage* with
+        single-precision arithmetic, which is the arrangement it has on real hardware too.
     solver_type : str, optional
         Type of solver. Can be ``'direct'``, ``'GMRES'`` or ``'CG'``.
     bc : str or tuple of 2 string, optional
@@ -67,6 +73,8 @@ class GenericNDimFinDiff(Problem):
         Default is None, which takes the default values for each parameters.
         You can also define a tuple to set different parameters for each
         side.
+    useGPU : bool, optional
+        Run on the GPU with CuPy instead of on the CPU with NumPy.
 
     Attributes
     ----------
@@ -80,6 +88,25 @@ class GenericNDimFinDiff(Problem):
 
     dtype_u = mesh
     dtype_f = mesh
+    xp = np
+    xsp = sp
+    linalg = spla
+
+    def setup_GPU(self):
+        """
+        Switch to GPU modules
+        """
+        import cupy as cp
+        import cupyx.scipy.sparse as csp
+        import cupyx.scipy.sparse.linalg as cspla
+
+        from pySDC.implementations.datatype_classes.cupy_mesh import cupy_mesh
+
+        self.xp = cp
+        self.xsp = csp
+        self.linalg = cspla
+        self.dtype_u = cupy_mesh
+        self.dtype_f = cupy_mesh
 
     def __init__(
         self,
@@ -94,7 +121,13 @@ class GenericNDimFinDiff(Problem):
         solver_type='direct',
         bc='periodic',
         bcParams=None,
+        dtype='float64',
+        useGPU=False,
     ):
+        """Initialization routine"""
+        if useGPU:
+            self.setup_GPU()
+
         # make sure parameters have the correct types
         if type(nvars) not in [int, tuple]:
             raise ProblemError('nvars should be either tuple or int')
@@ -132,8 +165,14 @@ class GenericNDimFinDiff(Problem):
         if ndim > 1 and nvars[1:] != nvars[:-1]:
             raise ProblemError('need a square domain, got %s' % nvars)
 
-        # invoke super init, passing number of dofs
-        super().__init__(init=(nvars[0] if ndim == 1 else nvars, None, np.dtype('float64')))
+        # invoke super init, passing number of dofs and the precision to store them at
+        dtype = np.dtype(dtype)
+
+        # SciPy holds no float16 sparse matrix, and hardware that stores half precision computes in
+        # single anyway, so the operators sit at the smallest single-or-wider type that holds `dtype`
+        operator_dtype = np.promote_types(dtype, np.float32)
+
+        super().__init__(init=(nvars[0] if ndim == 1 else nvars, None, dtype))
 
         dx, xvalues = problem_helper.get_1d_grid(size=nvars[0], bc=bc, left_boundary=0.0, right_boundary=1.0)
 
@@ -145,15 +184,27 @@ class GenericNDimFinDiff(Problem):
             size=nvars[0],
             dim=ndim,
             bc=bc,
+            cupy=useGPU,
         )
         self.A *= coeff
 
-        self.xvalues = xvalues
-        self.Id = sp.eye(np.prod(nvars), format='csc')
+        self.A = self.A.astype(operator_dtype)
+
+        # SciPy's sparse direct solver wants CSC and CuPy's wants CSR. Whichever one is handed the
+        # wrong layout converts the whole matrix on every call -- that is what cupyx's
+        # `SparseEfficiencyWarning: CSR format is required` is reporting, once per solve. CSR is
+        # also the better layout for the matrix-vector product in `eval_f`.
+        self.A = self.A.tocsr() if useGPU else self.A.tocsc()
+
+        # the grid feeds every `u_exact`, so it has to live where the solution does
+        self.xvalues = self.xp.asarray(xvalues)
+        self.Id = self.xsp.eye(np.prod(nvars), format='csr' if useGPU else 'csc', dtype=operator_dtype)
 
         # store attribute and register them as parameters
         self._makeAttributeAndRegister('nvars', 'stencil_type', 'order', 'bc', localVars=locals(), readOnly=True)
         self._makeAttributeAndRegister('freq', 'lintol', 'liniter', 'solver_type', localVars=locals())
+        self.dtype = dtype
+        self.operator_dtype = operator_dtype
 
         if self.solver_type != 'direct':
             self.work_counters[self.solver_type] = WorkCounter()
@@ -181,6 +232,14 @@ class GenericNDimFinDiff(Problem):
 
     @classmethod
     def get_default_sweeper_class(cls):
+        """
+        Default sweeper for these problems, which are treated fully implicitly.
+
+        Returns
+        -------
+        type
+            The sweeper class ``generic_implicit``.
+        """
         from pySDC.implementations.sweeper_classes.generic_implicit import generic_implicit
 
         return generic_implicit
@@ -203,6 +262,34 @@ class GenericNDimFinDiff(Problem):
         """
         f = self.f_init
         f[:] = self.A.dot(u.flatten()).reshape(self.nvars)
+        return f
+
+    def eval_f_increment(self, base, delta, t):
+        r"""
+        Evaluate :math:`f(w + \delta) - f(w) = A\delta`, which carries an explicit factor
+        :math:`\delta`.
+
+        The operator is linear, so the increment is the operator applied to the correction and the
+        base state does not enter. Supplying it means a sweeper never has to form the increment by
+        subtracting two stored right-hand sides, whose cancellation error carries
+        :math:`\varepsilon\|A\|` -- see :class:`pySDC.core.problem.Problem`.
+
+        Parameters
+        ----------
+        base : dtype_u
+            The base state, unused for a linear operator.
+        delta : dtype_u
+            The correction.
+        t : float
+            Current time, accepted for interface compatibility.
+
+        Returns
+        -------
+        f : dtype_f
+            The increment.
+        """
+        f = self.dtype_f(self.init)
+        f[:] = self.A.dot(delta.flatten()).reshape(self.nvars)
         return f
 
     def solve_system(self, rhs, factor, u0, t):
@@ -236,9 +323,9 @@ class GenericNDimFinDiff(Problem):
         )
 
         if solver_type == 'direct':
-            sol[:] = spsolve(Id - factor * A, rhs.flatten()).reshape(nvars)
+            sol[:] = self.linalg.spsolve(Id - factor * A, rhs.flatten()).reshape(nvars)
         elif solver_type == 'GMRES':
-            sol[:] = gmres(
+            sol[:] = self.linalg.gmres(
                 Id - factor * A,
                 rhs.flatten(),
                 x0=u0.flatten(),
@@ -249,7 +336,7 @@ class GenericNDimFinDiff(Problem):
                 callback_type='legacy',
             )[0].reshape(nvars)
         elif solver_type == 'CG':
-            sol[:] = cg(
+            sol[:] = self.linalg.cg(
                 Id - factor * A,
                 rhs.flatten(),
                 x0=u0.flatten(),
