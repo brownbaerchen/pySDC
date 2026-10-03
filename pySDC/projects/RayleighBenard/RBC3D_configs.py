@@ -120,9 +120,6 @@ class RayleighBenard3DRegular(Config):
             if P.useGPU:
                 solution = P.xp.array(solution)
 
-            if P.useGPU:
-                solution = P.xp.array(solution)
-
             u0 = P.u_init
 
             if P.spectral_space:
