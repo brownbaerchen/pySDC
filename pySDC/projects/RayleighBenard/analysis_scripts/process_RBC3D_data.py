@@ -42,7 +42,6 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
     _print('Finished problem setup')
     P.setUpFieldsIO()
     zInt = P.axes[-1].get_integration_weights()
-    xp = P.xp
 
     _print('Preparing paths')
     # prepare paths
@@ -99,6 +98,9 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         _t, u = data.readField(i)
         _print(f'Read data {i} at {_t}')
 
+        if P.useGPU:
+            u = P.xp.array(u)
+
         # Nusselt numbers
         if P.useGPU:
             u = P.xp.array(u)
@@ -131,7 +133,6 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         # spectrum
         k, s = P.get_frequency_spectrum(u)
         s_mean = zInt @ P.axes[-1].transform(s[0], axes=(0,))
-        _print('    Computed frequency spectrum')
         if P.useGPU:
             spectrum.append(s_mean.get())
             spectrum_all.append(s.get())
@@ -151,7 +152,7 @@ def process_RBC3D_data(base_path='./data/processed', plot=True, args=None, confi
         print('Warning: no convergence has been set for this configuration!')
     if np.max(t) < converged:
         converged = 0
-        print(f'Warning: Convergence time {config.converged} has not been reached! Simulation only goes to {xp.max(t)}')
+        print(f'Warning: Convergence time {config.converged} has not been reached! Simulation only goes to {np.max(t)}')
 
     fig, axs = plt.subplots(1, 4, figsize=(18, 4))
     for key in Nu.keys():
